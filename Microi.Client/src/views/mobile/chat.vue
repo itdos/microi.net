@@ -26,6 +26,8 @@
 
             <div class="messages-inner">
                 <div v-if="loading" class="loading-more" v-mci-loading:compact="true"></div>
+                <el-button v-else-if="historyState.error" link type="primary" @click="loadMoreMessages">历史消息加载失败，点击重试</el-button>
+                <el-button v-else-if="historyState.hasMore" link @click="loadMoreMessages">加载更早消息</el-button>
 
                 <div
                     v-for="(msg, index) in messages"
@@ -174,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useDiyStore } from '@/pinia';
@@ -184,11 +186,12 @@ import {
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
-    formatMessageContent, renderDataTable, getChatRecord, sendMessageToUser,
+    formatMessageContent, renderDataTable, sendMessageToUser,
     isDuplicateMessage, clearMessageDuplicateCache, loadAiModelList,
     buildAiOtherInfo
 } from '@/utils/chat.common';
 import { DiyCommon } from '@/utils/diy.common';
+import { createChatHistoryState, fetchChatHistoryPage, refreshChatHistoryTail, mergeChatHistory, chatMessageKey } from '@/utils/chat-history';
 
 defineOptions({ name: 'mobile_chat' });
 
@@ -208,7 +211,9 @@ const showEmoji = ref(false);
 const showChatMenu = ref(false);
 const chatMuted = ref(false);
 const chatPinned = ref(false);
-const loading = ref(false);
+const historyState = ref(createChatHistoryState(chatId.value));
+const loading = computed(() => historyState.value.loading);
+let disposed = false;
 const messagesContainer = ref(null);
 const isComposing = ref(false);
 const wsConnected = ref(false);
@@ -312,8 +317,9 @@ const sendMessage = async () => {
         return;
     }
     const content = inputMessage.value.trim();
+    const requestId = `mobile-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const newMsg = {
-        id: Date.now().toString(),
+        id: requestId, RequestId: requestId, tempId: requestId,
         Type: 'text', Content: content,
         SendTime: new Date().toISOString(),
         FromUserId: currentUser.value.Id, ToUserId: chatId.value,
@@ -328,6 +334,7 @@ const sendMessage = async () => {
 
     try {
         await sendMessageToUser(ws, {
+            RequestId: requestId,
             Content: content,
             OsClient: DiyCommon.GetOsClient(),
             ToUserId: chatId.value, ToUserName: chatName.value, ToUserAvatar: '',
@@ -349,18 +356,49 @@ const scrollToBottom = () => {
 };
 
 const handleScroll = () => {
-    if (messagesContainer.value && messagesContainer.value.scrollTop === 0) {
+    if (messagesContainer.value && messagesContainer.value.scrollTop < 80 && !historyState.value.error) {
         loadMoreMessages();
     }
+    refreshReadTail();
 };
 
-const loadMoreMessages = () => { /* reserved */ };
+const refreshReadTail = async () => {
+    const state = historyState.value, scroller = messagesContainer.value, ws = getWebSocket();
+    if (disposed || !state.tailPending || state.peerId === 'AI' || !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight >= 100 || ws?.state !== 'Connected') return;
+    const rows = await refreshChatHistoryTail(state, ws.invoke.bind(ws), currentUser.value.Id,
+        candidate => !disposed && candidate === historyState.value);
+    if (rows && !disposed && state === historyState.value)
+        messages.value = mergeChatHistory(messages.value, rows, currentUser.value.Id, state.peerId).map(toVisibleMessage);
+};
+
+const toVisibleMessage = r => ({
+    ...r, id: chatMessageKey(r) || r.id || crypto.randomUUID(),
+    Type: r.Type || 'text', SendTime: r.CreateTime || r.SendTime,
+    isSelf: r.FromUserId === currentUser.value.Id,
+    senderName: r.FromUserId === currentUser.value.Id ? t('Msg.Mobile.common.me') : (r.FromUserName || r.senderName || chatName.value),
+    avatar: r.FromUserAvatar || r.avatar || ''
+});
+const loadMoreMessages = async () => {
+    const ws = getWebSocket(), state = historyState.value;
+    if (disposed || !ws || ws.state !== 'Connected') return;
+    const scroller = messagesContainer.value;
+    const initial = !state.cursor, height = scroller?.scrollHeight || 0, top = scroller?.scrollTop || 0;
+    const rows = await fetchChatHistoryPage(state, ws.invoke.bind(ws), currentUser.value.Id,
+        candidate => !disposed && candidate === historyState.value);
+    if (!rows || state !== historyState.value || disposed) return;
+    messages.value = mergeChatHistory(messages.value, rows, currentUser.value.Id, state.peerId).map(toVisibleMessage);
+    await nextTick();
+    if (state !== historyState.value || !scroller || disposed) return;
+    if (initial) scrollToBottom();
+    else scroller.scrollTop = top + scroller.scrollHeight - height;
+};
 
 const loadChatRecord = async () => {
     const ws = getWebSocket();
     if (!ws || ws.state !== 'Connected') {
         let retryCount = 0;
         const waitForWs = () => {
+            if (disposed) return;
             retryCount++;
             const wsRetry = getWebSocket();
             if (wsRetry && wsRetry.state === 'Connected') {
@@ -379,24 +417,17 @@ const loadChatRecord = async () => {
     doLoadChatRecord();
 };
 
-const doLoadChatRecord = async () => {
-    try {
-        const ws = getWebSocket();
-        if (!ws || ws.state !== 'Connected') return;
-        await getChatRecord(ws, currentUser.value.Id, chatId.value, DiyCommon.GetOsClient());
-    } catch (error) {
-        console.error('[mobile-chat] history load failed:', error);
-    }
-};
+const doLoadChatRecord = () => loadMoreMessages();
 
 const handleReceiveSendToUser = (message) => {
     if (!message) return;
     if (message.FromUserId !== chatId.value && message.ToUserId !== chatId.value) return;
     if (message.FromUserId === currentUser.value.Id) return;
-    if (isDuplicateMessage(message)) return;
+    if (!chatMessageKey(message) && isDuplicateMessage(message)) return;
 
     const newMsg = {
-        id: message.Id || Date.now().toString(),
+        ...message,
+        id: chatMessageKey(message) || message.Id || Date.now().toString(),
         Type: message.Type || 'text',
         Content: message.Content,
         SendTime: message.CreateTime || message.SendTime || new Date().toISOString(),
@@ -406,8 +437,11 @@ const handleReceiveSendToUser = (message) => {
         avatar: message.FromUserAvatar || '',
         isStreaming: false
     };
-    messages.value.push(newMsg);
-    nextTick(() => scrollToBottom());
+    const scroller = messagesContainer.value;
+    const nearBottom = !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100;
+    messages.value = mergeChatHistory(messages.value, [newMsg], currentUser.value.Id, chatId.value).map(toVisibleMessage);
+    historyState.value.tailPending = true;
+    if (nearBottom) nextTick(() => { scrollToBottom(); refreshReadTail(); });
 };
 
 const handleReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
@@ -452,24 +486,8 @@ const handleReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
     nextTick(() => scrollToBottom());
 };
 
-const handleReceiveSendChatRecordToUser = (records) => {
-    if (records && Array.isArray(records) && records.length > 0) {
-        messages.value = records.map(r => ({
-            id: r.Id || (Date.now().toString() + Math.random()),
-            Type: r.Type || 'text',
-            Content: r.Content,
-            SendTime: r.CreateTime || r.SendTime,
-            FromUserId: r.FromUserId, ToUserId: r.ToUserId,
-            isSelf: r.FromUserId === currentUser.value.Id,
-            senderName: r.FromUserId === currentUser.value.Id ? t('Msg.Mobile.common.me') : (r.FromUserName || chatName.value),
-            avatar: r.FromUserAvatar || '',
-            isStreaming: false
-        }));
-        nextTick(() => scrollToBottom());
-    } else if (records && Array.isArray(records) && records.length === 0) {
-        messages.value = [];
-    }
-};
+// Old history broadcasts belong to another window; this page uses direct cursor responses.
+const handleReceiveSendChatRecordToUser = () => {};
 
 const handleReceiveSendLastContacts = (contactList) => { /* sync only */ };
 
@@ -551,7 +569,16 @@ onMounted(() => {
     }
 });
 
+watch(chatId, () => {
+    historyState.value = createChatHistoryState(chatId.value, historyState.value.generation + 1);
+    messages.value = [];
+    currentStreamMessage.value = null;
+    loadChatRecord();
+});
+
 onBeforeUnmount(() => {
+    disposed = true;
+    historyState.value = createChatHistoryState();
     unregisterWebSocketEvents();
     currentStreamMessage.value = null;
     clearMessageDuplicateCache();

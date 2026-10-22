@@ -19,11 +19,10 @@ export async function artifactFiles(directory,type){
  return files;
 }
 export function verifyArtifact(receipt,candidate,files,type='api',policy='Full'){
- if(!['Full','SmokeOnly'].includes(policy)||receipt.schema!==1||receipt.gate!==policy||!receipt.candidate?.files)throw Error('Release Full/SmokeOnly acceptance policy/provenance mismatch: rebuild with the release script');
+ if(policy!=='Full'||receipt.schema!==1||receipt.gate!=='Full'||!receipt.candidate?.files)throw Error('Release Full acceptance policy/provenance mismatch: rebuild with the release script');
  const changed=changedCandidate(receipt.candidate,candidate);
  if(changed.length)throw Error(`Prebuilt artifact is from different source: ${changed.slice(0,10).join(', ')}`);
  if(JSON.stringify(receipt.files)!==JSON.stringify(files))throw Error('Prebuilt artifact changed after acceptance: rebuild, do not re-sign stale files');
- if(type==='api'&&policy==='SmokeOnly')verifySmokeReceipt(receipt.smoke,files);
  if(type==='api')assertCompositionArtifacts(candidate,files);
 }
 export function verifySmokeReceipt(smoke, files){
@@ -36,7 +35,7 @@ export function verifySmokeReceipt(smoke, files){
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [mode,type,manifest,receiptFile]=process.argv.slice(2);
  const policy=process.env.MICROI_RELEASE_TEST_POLICY||'Full';
- if(!['Full','SmokeOnly'].includes(policy))throw Error('Unknown release test policy');
+ if(policy!=='Full')throw Error('Release artifacts require the Full test policy');
  if(!['capture','verify'].includes(mode)||!['api','client'].includes(type)||!manifest||!receiptFile)throw Error('Usage: release-artifact.mjs capture|verify api|client <tested-source-manifest> <receipt>');
  const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
  const candidate=JSON.parse(await fs.readFile(manifest,'utf8'));

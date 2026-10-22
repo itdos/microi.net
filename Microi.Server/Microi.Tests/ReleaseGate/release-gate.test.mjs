@@ -185,6 +185,17 @@ test('same-version Docker hotfix keeps full gates and excludes version and remot
  assert.ok(gate.includes('-SolutionPath "$SLN_FILE"'),'Full gate must use the detected solution in an isolated checkout');
 });
 
+test('direct release refuses the retired skip-tests flag before preparation or publication',()=>{
+ const policy=source.slice(source.indexOf('MICROI_FULL_ONLY=false'),source.indexOf('# Windows (Git Bash) 下'));
+ for(const args of ['--docker-only-hotfix --skip-tests','--full-only --skip-tests','--skip-tests']){
+  const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',input:`set -- ${args}\n${policy}\nprintf 'PREPARATION_REACHED\\n'\n`});
+  assert.ifError(result.error);assert.notEqual(result.status,0,args);
+  assert.equal(result.stdout.includes('PREPARATION_REACHED'),false,args);
+ }
+ const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',env:{...process.env,MICROI_RELEASE_TEST_POLICY:'SmokeOnly',MICROI_RELEASE_SKIP_TESTS:'true'},input:`set -- --docker-only-hotfix\n${policy}\nprintf '%s' "$MICROI_RELEASE_TEST_POLICY"\n`});
+ assert.equal(result.status,0,result.stderr);assert.equal(result.stdout,'Full');
+});
+
 test('isolated release targets its own service ports and retains shared defaults',()=>{
  const preparation=source.slice(source.indexOf('prepare_release_workspace() {'),source.indexOf('handle_session_interrupt() {'));
  for(const ports of [null,{backend:63681,frontend:63683}]){

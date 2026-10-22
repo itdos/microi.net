@@ -64,7 +64,7 @@ public sealed class DatabasePoolRecoveryIntegrationTests
         var raw = Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN");
         Assert.False(string.IsNullOrWhiteSpace(raw), "Full 连接池测试需要隔离本地 SQL Server。");
         var settings = new System.Data.SqlClient.SqlConnectionStringBuilder(raw);
-        Assert.Matches(@"^127\.0\.0\.1,\d{1,5}$", settings.DataSource);
+        SqlServerFixtureGuard.Verify(settings);
         settings.ApplicationName = "pool-recovery-" + Guid.NewGuid().ToString("N");
         settings.MaxPoolSize = 1; settings.MinPoolSize = 0; settings.ConnectTimeout = 1;
         var pool = new DbSession(DatabaseType.SqlServer, settings.ConnectionString).Db;

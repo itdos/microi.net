@@ -153,11 +153,14 @@ ORDER BY CreateTime ASC");
  ProgressSampleCurrent,ProgressSampleCount,BusinessTable,BusinessId,BusinessStatusField,BusinessTaskIdField,
  BusinessProgressField,BusinessEtaField,RuntimeOsClientType,RuntimeOsClientNetwork)
 VALUES
-(@id,@now,@now,@userId,@userName,0,@osClient,@userKey,@title,'ApiEngine',@apiEngineKey,'Pending','排队中',
+(@id,@now,@now,@userId,@userName,0,@osClient,@userKey,@title,'ApiEngine',@apiEngineKey,'Pending',@queuedText,
  0,'Indeterminate',0,0,'','',0,'',@paramJson,@trustedUserJson,@idempotencyKey,@concurrencyKey,0,0,@maxAttempts,0,
  @retryOnFailure,0,0,@businessTable,@businessId,@businessStatusField,@businessTaskIdField,
  @businessProgressField,@businessEtaField,@runtimeType,@runtimeNetwork)";
             var command = FromSql(client, sql)
+                // 状态文案必须参数化：SQL Server 的普通字符串字面量会先按库代码页
+                // 编码，即使目标列是 nvarchar，非中文排序规则下也会永久变成问号。
+                .AddInParameter("queuedText", "排队中")
                 .AddInParameter("id", item.Id)
                 .AddInParameter("now", DbTime(item.CreateTime))
                 .AddInParameter("userId", userId ?? "")
@@ -284,12 +287,14 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1 AND Id
             if (task == null || task.Status != "Failed" || !(AiImageBackgroundTaskService.IsImageWorker(task.ApiEngineKey) || AiMusicBackgroundTaskService.IsMusicWorker(task.ApiEngineKey))) return false;
             var client = GetRequiredClient(task.OsClient);
             // 仅当前所有者的失败任务可以恢复；CAS 与 Worker 的 fencing 共同阻止跨节点重复认领。
-            return FromSql(client, $@"UPDATE {TableName} SET Status='Pending',StatusText='恢复已有媒体',
-Msg='正在恢复供应商已有媒体，未重新生成',ParamJson=@param,AttemptCount=0,EndTime=NULL,
+            return FromSql(client, $@"UPDATE {TableName} SET Status='Pending',StatusText=@resumeText,
+Msg=@resumeMessage,ParamJson=@param,AttemptCount=0,EndTime=NULL,
 NextRunTime=@now,LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@now
 WHERE Id=@id AND OsClient=@tenant AND UserKey=@user AND Status='Failed' AND CancelRequested=0
 AND FencingToken=@fence AND ApiEngineKey=@worker AND (IsDeleted=0 OR IsDeleted IS NULL)
 AND {RuntimeScopePredicate}")
+                .AddInParameter("resumeText", "恢复已有媒体")
+                .AddInParameter("resumeMessage", "正在恢复供应商已有媒体，未重新生成")
                 .AddInParameter("param", frozenParam.ToString(Newtonsoft.Json.Formatting.None))
                 .AddInParameter("now", DbTime(DateTime.Now.AddSeconds(1)))
                 .AddInParameter("id", task.Id).AddInParameter("tenant", task.OsClient).AddInParameter("user", task.UserKey)
@@ -303,13 +308,15 @@ AND {RuntimeScopePredicate}")
             if (!SaasPromotionSecurity.CanResumePublicTrialTask(task)) return false;
             var client = GetRequiredClient(task.OsClient);
             // 保留原 GrantCipher、幂等键和加密数据库检查点。CAS 后仍由 Worker 领取新栅栏，禁止重建已有库。
-            return FromSql(client, $@"UPDATE {TableName} SET Status='Pending',StatusText='恢复开通',
-Msg='正在恢复原开通申请',EndTime=NULL,NextRunTime=@now,LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@now
+            return FromSql(client, $@"UPDATE {TableName} SET Status='Pending',StatusText=@resumeText,
+Msg=@resumeMessage,EndTime=NULL,NextRunTime=@now,LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@now
 WHERE Id=@id AND OsClient=@tenant AND UserKey=@user AND ApiEngineKey=@worker
 AND BusinessTable='mci_saas_referral_link' AND BusinessId=@link AND Status='Failed'
 AND CancelRequested=0 AND FencingToken=@fence AND AttemptCount=@attempt AND AttemptCount<MaxAttempts
 AND ExecutionCount=@executions AND ExecutionCount<MaxAttempts
 AND (IsDeleted=0 OR IsDeleted IS NULL) AND {RuntimeScopePredicate}")
+                .AddInParameter("resumeText", "恢复开通")
+                .AddInParameter("resumeMessage", "正在恢复原开通申请")
                 .AddInParameter("now", DbTime(DateTime.Now.AddSeconds(1)))
                 .AddInParameter("id", task.Id).AddInParameter("tenant", task.OsClient).AddInParameter("user", task.UserKey)
                 .AddInParameter("worker", SaasPromotionSecurity.WorkerEngine).AddInParameter("link", task.BusinessId)
@@ -357,13 +364,16 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
             var now = DateTime.Now;
             return FromSql(client, $@"UPDATE {TableName}
 SET CancelRequested=1,Status=CASE WHEN Status='Pending' THEN 'Canceled' ELSE Status END,
-    StatusText=CASE WHEN Status='Pending' THEN '已停止' ELSE '停止中' END,
-    Msg='已请求停止，正在等待当前执行点结束。',
+    StatusText=CASE WHEN Status='Pending' THEN @canceledText ELSE @cancelingText END,
+    Msg=@cancelMessage,
     EndTime=CASE WHEN Status='Pending' THEN @p0 ELSE EndTime END,
     EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id=@p3
   AND {RuntimeScopePredicate}
   AND Status NOT IN ('Succeeded','Failed','Canceled')")
+                .AddInParameter("canceledText", "已停止")
+                .AddInParameter("cancelingText", "停止中")
+                .AddInParameter("cancelMessage", "已请求停止，正在等待当前执行点结束。")
                 .AddInParameter("p0", DbTime(now))
                 .AddInParameter("p1", osClient)
                 .AddInParameter("p2", userKey)
@@ -550,7 +560,8 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1
   AND {RuntimeScopePredicate}
   AND Status='Pending' AND (LeaseOwner IS NULL OR LeaseOwner='')
   AND AttemptCount>=MaxAttempts
-  AND Msg='等待同一并发组的上一项任务完成'")
+  AND Msg=@waitingForGroup")
+                .AddInParameter("waitingForGroup", "等待同一并发组的上一项任务完成")
                 .AddInParameter("p0", DbTime(now))
                 .AddInParameter("p1", osClient)
                 .AddInParameter("runtimeType", runtimeType)
@@ -562,9 +573,9 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1
                 // active state forever. Finalize only ownerless work (or Running work
                 // whose lease has expired), preserving a live owner's execution.
                 FromSql(client, $@"UPDATE {TableName}
-SET Status='Failed',StatusText='执行失败',
-    Msg='任务已耗尽重试次数，系统已自动终结；请查看错误与日志，修复原因后重新提交。',
-    LastError=CASE WHEN LastError IS NULL OR LastError='' THEN '任务已耗尽重试次数。' ELSE LastError END,
+SET Status='Failed',StatusText=@failedText,
+    Msg=@exhaustedMessage,
+    LastError=CASE WHEN LastError IS NULL OR LastError='' THEN @exhaustedError ELSE LastError END,
     EndTime=@p0,EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
     LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=0
@@ -572,6 +583,9 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=0
   AND (MaxAttempts IS NULL OR MaxAttempts<=0 OR AttemptCount>=MaxAttempts)
   AND (Status IN ('Pending','Retrying')
        OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p0)))")
+                .AddInParameter("failedText", "执行失败")
+                .AddInParameter("exhaustedMessage", "任务已耗尽重试次数，系统已自动终结；请查看错误与日志，修复原因后重新提交。")
+                .AddInParameter("exhaustedError", "任务已耗尽重试次数。")
                 .AddInParameter("p0", DbTime(now))
                 .AddInParameter("p1", osClient)
                 .AddInParameter("runtimeType", runtimeType)
@@ -583,14 +597,16 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=0
                 // A running task is finalized only after its lease expires; pending or
                 // retrying work has no active owner and can be finalized immediately.
                 FromSql(client, $@"UPDATE {TableName}
-SET Status='Canceled',StatusText='已停止',
-    Msg='任务已停止；失败或取消不会伪装成 100%。',EndTime=@p0,
+SET Status='Canceled',StatusText=@canceledText,
+    Msg=@canceledMessage,EndTime=@p0,
     EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
     LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=1
   AND {RuntimeScopePredicate}
   AND (Status IN ('Pending','Retrying')
        OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p0)))")
+                .AddInParameter("canceledText", "已停止")
+                .AddInParameter("canceledMessage", "任务已停止；失败或取消不会伪装成 100%。")
                 .AddInParameter("p0", DbTime(now))
                 .AddInParameter("p1", osClient)
                 .AddInParameter("runtimeType", runtimeType)
@@ -688,7 +704,7 @@ ORDER BY COALESCE(NextRunTime, CreateTime) ASC, CreateTime ASC");
             var leaseSeconds = ResolveLeaseSeconds(candidate.ApiEngineKey);
             var leaseExpiresAt = now.AddSeconds(leaseSeconds);
             var affected = FromSql(client, $@"UPDATE {TableName}
-SET Status='Running',StatusText='执行中',LeaseOwner=@p0,LeaseExpiresAt=@p1,HeartbeatTime=@p2,
+SET Status='Running',StatusText=@runningText,LeaseOwner=@p0,LeaseExpiresAt=@p1,HeartbeatTime=@p2,
     StartTime=CASE WHEN StartTime IS NULL THEN @p2 ELSE StartTime END,
     RuntimeOsClientType=CASE WHEN RuntimeOsClientType IS NULL OR RuntimeOsClientType='' THEN @runtimeType ELSE RuntimeOsClientType END,
     RuntimeOsClientNetwork=CASE WHEN RuntimeOsClientNetwork IS NULL OR RuntimeOsClientNetwork='' THEN @runtimeNetwork ELSE RuntimeOsClientNetwork END,
@@ -697,6 +713,7 @@ SET Status='Running',StatusText='执行中',LeaseOwner=@p0,LeaseExpiresAt=@p1,He
 WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
   AND {RuntimeScopePredicate}
   AND (Status IN ('Pending','Retrying') OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p2)))")
+                .AddInParameter("runningText", "执行中")
                 .AddInParameter("p0", owner)
                 .AddInParameter("p1", DbTime(leaseExpiresAt))
                 .AddInParameter("p2", DbTime(now))
@@ -912,8 +929,8 @@ WHERE Id=@p14 AND OsClient=@p15 AND Status='Running' AND LeaseOwner=@p16 AND Fen
             item.AttemptCount = 0;
             item.LastError = "";
             return OwnedUpdate(item, @"Status=CASE WHEN CancelRequested=1 THEN 'Canceled' ELSE 'Pending' END,
-StatusText=CASE WHEN CancelRequested=1 THEN '已停止' ELSE '等待下一批' END,
-Msg=CASE WHEN CancelRequested=1 THEN '任务已停止；失败或取消不会伪装成 100%。' ELSE @p0 END,
+StatusText=CASE WHEN CancelRequested=1 THEN @canceledText ELSE @pendingText END,
+Msg=CASE WHEN CancelRequested=1 THEN @canceledMessage ELSE @p0 END,
 ParamJson=@p1,CheckpointJson=@p2,
 NextRunTime=CASE WHEN CancelRequested=1 THEN NULL ELSE @p3 END,
 EndTime=CASE WHEN CancelRequested=1 THEN @p4 ELSE EndTime END,
@@ -923,6 +940,9 @@ EndTime=CASE WHEN CancelRequested=1 THEN @p4 ELSE EndTime END,
  AttemptCount=0,LastError='',
  LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
                 command => command
+                    .AddInParameter("canceledText", "已停止")
+                    .AddInParameter("pendingText", "等待下一批")
+                    .AddInParameter("canceledMessage", "任务已停止；失败或取消不会伪装成 100%。")
                     .AddInParameter("p0", item.Msg)
                     .AddInParameter("p1", item.ParamJson)
                     .AddInParameter("p2", item.CheckpointJson)
@@ -953,8 +973,8 @@ EndTime=CASE WHEN CancelRequested=1 THEN @p4 ELSE EndTime END,
                 item.AttemptCount = Math.Max(0, item.MaxAttempts - 1);
             }
             return OwnedUpdate(item, @"Status=CASE WHEN CancelRequested=1 THEN 'Canceled' ELSE 'Pending' END,
-StatusText=CASE WHEN CancelRequested=1 THEN '已停止' ELSE '排队中' END,
-Msg=CASE WHEN CancelRequested=1 THEN '任务已停止；失败或取消不会伪装成 100%。' ELSE @p0 END,
+StatusText=CASE WHEN CancelRequested=1 THEN @canceledText ELSE @pendingText END,
+Msg=CASE WHEN CancelRequested=1 THEN @canceledMessage ELSE @p0 END,
 NextRunTime=CASE WHEN CancelRequested=1 THEN NULL ELSE @p1 END,
 EndTime=CASE WHEN CancelRequested=1 THEN @p2 ELSE EndTime END,
 EstimatedEndTime=CASE WHEN CancelRequested=1 THEN NULL ELSE EstimatedEndTime END,
@@ -967,6 +987,9 @@ AttemptCount=CASE
 END,
 LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p2",
                 command => command
+                    .AddInParameter("canceledText", "已停止")
+                    .AddInParameter("pendingText", "排队中")
+                    .AddInParameter("canceledMessage", "任务已停止；失败或取消不会伪装成 100%。")
                     .AddInParameter("p0", message ?? "等待执行")
                     .AddInParameter("p1", DbTime(nextRun))
                     .AddInParameter("p2", DbTime(DateTime.Now)));
@@ -996,10 +1019,11 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p2",
                 item.StatusText = "执行失败";
                 item.Msg = safeError;
                 item.EndTime = now;
-                return OwnedUpdate(item, @"Status='Failed',StatusText='执行失败',Msg=@p0,LastError=@p0,
+                return OwnedUpdate(item, @"Status='Failed',StatusText=@failedText,Msg=@p0,LastError=@p0,
 AttemptCount=@p1,EndTime=@p2,EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
 LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p2",
                     command => command
+                        .AddInParameter("failedText", "执行失败")
                         .AddInParameter("p0", safeError)
                         .AddInParameter("p1", nextAttempt)
                         .AddInParameter("p2", DbTime(now)));

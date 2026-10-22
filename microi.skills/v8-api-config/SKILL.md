@@ -45,6 +45,7 @@ ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
 - MCP 创建接口时传 `apiRoutes: ['/api/Old/A', '/api/Old/B']`；更新时省略表示保留，传空字符串/空数组表示清空。官方应用包必须同时携带 `ApiRoutes`、醒目 Managed 提示与 `ResourcePolicies.ApiEngines`。
 - 迁移旧 Controller 不能只迁方法名：同时核对历史 GET/POST、JSON/Form/Query、无需 `Action` 的调用和原始返回结构。按服务端 `_RequestPath` 精确识别兼容动作，历史只读地址不得被请求 `Action` 改为写操作；现代稳定 Key 的其它合法动作仍须可用。
 - 同地址采用“当前租户接口引擎优先 → 确认缺失才回退 Controller → 两者均不存在才 404”。不可按 Controller 前缀跳过接口引擎；停用、StopHttp、鉴权拒绝、执行异常及权威查询失败都不等于缺失，不得降级执行旧逻辑。单请求复用已确认的缺失结果，不能用长效负缓存延迟在线新增接口生效。
+- `/api/License/GetManagementState` 也遵循上述同址优先规则；现有 GET/POST Controller 读取授权管理页状态，要求平台管理员身份并按可信租户范围返回。若用接口引擎承接该地址，必须保留相同的身份与租户边界；路由存储故障返回 503，不能回退绕过。动态路由优先级由后端二进制交付，仅更新应用包不代表宿主已支持。
 - 公开设置等启动接口的参数、读取顺序、错误分类和响应组装应留在可编辑 V8；宿主只保留秘密投影、公钥、可信身份、验签及受限存储原子。禁止新增一个返回完整业务响应的 C# 门面再以单行 V8 包装冒充迁移。必要启动包从官方拥有者包显式投影，不能借核心接口升级默认安装可选平台应用。
 - 部门树旧地址 `/api/SysDept/GetSysDeptStep` 由 `platform-sys-dept` 的多路由交付，保留 DiyToken、组织范围及 `_Child`。缺引擎兜底仅登记该历史读地址，不能把整个现代引擎地址截获为只读分发器。验收需对比引擎存在、缺失再恢复的同一用户树结构，并验证匿名、伪造身份、停用/StopHttp 不绕过。
 

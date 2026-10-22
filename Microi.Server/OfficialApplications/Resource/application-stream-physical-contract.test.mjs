@@ -16,11 +16,12 @@ const importer = read('./import-package.js');
 const parser = importer.slice(importer.indexOf('function readDeclarativePackageDdl('), importer.indexOf('/* SPARSE_TABLE_IMPORT_PREFLIGHT_V2'));
 const indexHelpers = importer.slice(importer.indexOf('    // PACKAGE_DECLARED_INDEX_DEFINITION_V1'), importer.indexOf('    // MySQL 严格模式不允许'));
 const executeHelper = importer.slice(importer.indexOf('    var executePackageDdl ='), importer.indexOf('    // PACKAGE_DECLARED_IDENTIFIER_STORAGE_V1'));
-function context(statements, query, sqlServer = false) {
+function context(statements, query, sqlServer = false, physicalColumns = []) {
   const scope = { allDdlStatements: statements, runtimeIsSqlServer: sqlServer,
     isSafeIdentifier: name => /^[A-Za-z0-9_]+$/.test(String(name)),
     getScalarCount: (row, names) => Number(names.map(name => row[name]).find(value => value !== undefined)),
     quotePhysicalIdentifier: name => sqlServer ? '[' + name + ']' : '`' + name + '`',
+    readTargetPhysicalColumns: () => physicalColumns,
     V8: { Db: { FromSql(sql) { const args = {}; return {
       AddInParameter(key, value) { args[key] = value; return this; },
       ToArray() { return query(sql, args); }, ExecuteNonQuery() { return query(sql, args); },
@@ -103,7 +104,7 @@ test('legacy ALTER ADD UNIQUE INDEX and KEY retain uniqueness on first install a
       if (/COUNT/.test(sql)) return [{ ObjectCount: exists ? 1 : 0 }];
       if (/^(CREATE|ALTER)/.test(sql)) { writes.push(sql); exists = true; return []; }
       return rows;
-    }, sqlServer);
+    }, sqlServer, [{ COLUMN_NAME: 'AppId', IS_NULLABLE: 'NO' }, { COLUMN_NAME: 'RequestId', IS_NULLABLE: 'NO' }]);
     const install = () => {
       if (!scope.ddlIndexExists('history', 'ux_history')) scope.executePackageDdl(definition, scope.readDeclarativePackageDdl(definition.DDL, 'history'));
       assert.equal(scope.ddlIndexExists('history', 'ux_history'), true);

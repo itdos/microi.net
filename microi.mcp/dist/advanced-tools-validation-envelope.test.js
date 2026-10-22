@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildDefaultFormBanner, buildGenerateSystemValidationPayload, registerAdvancedTools } from './advanced-tools.js';
+test('field config only enables selected-value lookup through an explicit boolean contract', async () => {
+    const handlers = new Map();
+    registerAdvancedTools({ tool(name, ...args) { handlers.set(name, args.at(-1)); } }, {}, { osClient: 'test' });
+    const build = handlers.get('microi_build_field_config');
+    for (const sourceType of ['ApiEngine', 'DataSource']) {
+        const options = { apiEngineKey: 'test-options', dataSourceId: 'test-options', selectedValueLookup: true };
+        const result = JSON.parse((await build({ sourceType, options })).content[0].text);
+        assert.equal(result.ok, true);
+        assert.equal(result.config.SelectedValueLookup, true);
+        await assert.rejects(() => build({ sourceType, options: { ...options, selectedValueLookup: 'false' } }), /boolean/);
+        assert.equal(JSON.parse((await build({ sourceType, options: { ...options, selectedValueLookup: false } })).content[0].text).config.SelectedValueLookup, false);
+    }
+});
 test('generate_system preserves validator Code, Msg and Data for deterministic recovery', () => {
     const payload = buildGenerateSystemValidationPayload([{ step: 'upsertEngine', response: { Code: 1 } }], {
         Code: 0,

@@ -24,11 +24,11 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
   "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.store.json": Object.freeze({
-  "version": "v8.5.14",
-  "title": "共享模块标题物理快照",
+  "version": "v8.6.4",
+  "title": "SQL Server 可空唯一索引安装修复",
   "changeType": "Fix",
-  "content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
-  "releaseTime": "2026-10-17 20:17:35"
+  "content": "安装器升级至 v3.0.14：先同步声明列，再按 SQL Server 实际可空键生成过滤唯一索引，修复 SaaS 等应用多条 NULL 被误判重复的问题。复合键保留非空唯一约束，历史同名同列索引缺失过滤时原子修复并回读；同版本重装复用正确索引，真实重复键和未知定义继续报错，保留业务数据与租户配置。",
+  "releaseTime": "2026-10-22 17:58:37"
 }),
   "app.microi.saas-engine.json": Object.freeze({
   "version": "v8.4.25",
@@ -59,18 +59,18 @@ export const officialPackageChangeLogDefinitions = Object.freeze({
   "releaseTime": "2026-10-17 20:17:35"
 }),
   "app.microi.message-notification.json": Object.freeze({
-  "version": "v8.3.18",
-  "title": "共享模块标题物理快照",
+  "version": "v8.3.24",
+  "title": "聊天跨月跨年游标分页",
   "changeType": "Fix",
-  "content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
-  "releaseTime": "2026-10-17 20:17:35"
+  "content": "聊天消息按租户、年份数据库和月份集合保存；历史查询兼容旧年度集合，采用有界游标异步分页，跨月和跨年不中断。PC 与移动端滚动保留阅读位置，SignalR 仅向请求者回传历史。需配套 Core、MongoDB、API 与前端新版，应用包本身不替换二进制或清空历史数据。",
+  "releaseTime": "2026-10-22 18:30:00"
 }),
   "app.microi.ai-engine.json": Object.freeze({
-  "version": "v7.7.4",
-  "title": "共享模块标题物理快照",
-  "changeType": "Fix",
-  "content": "同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。",
-  "releaseTime": "2026-10-17 20:17:35"
+  "version": "v7.7.7",
+  "title": "Agent 官方媒体接口引擎统一接入",
+  "changeType": "Optimize",
+  "content": "Microi Agent 官方模型目录、媒体生成和原任务查询统一经受限 Managed 接口引擎调用，复用后端可信租户身份与持久任务。新增图片任务原子和媒体模型目录能力，保留音乐、视频、账户与租户扩展。需同步部署 Core、AI、API 与 Agent，应用包不修改用户模型密钥或历史。",
+  "releaseTime": "2026-10-22 18:30:00"
 }),
   "app.microi.sys-log.json": Object.freeze({
   "version": "v8.4.13",

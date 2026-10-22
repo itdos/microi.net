@@ -76,7 +76,7 @@ namespace Microi.net
                     }
                 }
                 
-                model["CreateTime"] = DateTime.Now;
+                model["CreateTime"] = param.OccurredAt ?? DateTime.Now;
                 if (!param.Id.DosIsNullOrWhiteSpace())
                 {
                     model["_id"] = new ObjectId(param.Id);

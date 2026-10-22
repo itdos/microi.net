@@ -224,12 +224,12 @@ test('official Managed cores and CreateIfMissing hooks carry immutable package c
     Ownership: 'Platform',
     UpgradePolicy: 'Managed',
   });
-  assert.equal(chatRuntime.Version, 'v1.0.2');
+  assert.equal(chatRuntime.Version, 'v1.1.0');
   assert.equal(chatRuntime.StopHttp, 1);
   assert.equal(chatRuntime.AllowAnonymous, 0);
   assert.equal(chatRuntime.ApiV8Code, normalizeSource(readResource('platform-chat-runtime.js')));
   assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
-    'ApiEngine:platform-chat-runtime@v1.0.2',
+    'ApiEngine:platform-chat-runtime@v1.1.0',
   ));
   assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
     'V8.Method.RequireManagedProtocolContext',

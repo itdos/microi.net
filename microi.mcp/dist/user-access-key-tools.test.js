@@ -41,7 +41,7 @@ test('current-user access-key tools require confirmation and expose plaintext on
     };
     const server = createMcpServer(fakeClient, {
         osClient: 'iTdos',
-        apiBaseUrl: 'https://api.itdos.com',
+        apiBaseUrl: 'https://api.microi.net',
         label: 'Microi official',
         codexMode: true,
     });

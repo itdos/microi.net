@@ -6,7 +6,7 @@ import { createMcpServer } from './server.js';
 test('standard engine MCP keeps bounded sparse selectors and both CAS proofs without weakening confirmation', async () => {
     const calls = [];
     const fake = { executeEngine: async (key, params) => { calls.push({ key, params }); return { Code: 1 }; }, writeAuditLog: async () => ({ Code: 1 }) };
-    const server = createMcpServer(fake, { osClient: 'iTdos', apiBaseUrl: 'https://api.itdos.com', label: 'fixture', codexMode: true });
+    const server = createMcpServer(fake, { osClient: 'iTdos', apiBaseUrl: 'https://api.microi.net', label: 'fixture', codexMode: true });
     const client = new Client({ name: 'sparse-selection-test', version: '1.0.0' });
     const [ct, st] = InMemoryTransport.createLinkedPair();
     await Promise.all([server.connect(st), client.connect(ct)]);

@@ -49,17 +49,16 @@ public sealed class SqlServerMenuCapacityTests
     public static bool HasSqlServerFixture => !string.IsNullOrWhiteSpace(
         Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
 
-    // 数据行保留独立用例身份，让显式例外回执可以精确核验两个 SQL Server provider。
-    [Theory]
-    [InlineData(DatabaseType.SqlServer, Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
-    [InlineData(DatabaseType.SqlServer9, Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    // 方法级环境条件不改变两个 provider 数据行及其独立执行身份。
+    [Theory(Skip = "Requires an isolated local SQL Server fixture", SkipUnless = nameof(HasSqlServerFixture))]
+    [InlineData(DatabaseType.SqlServer)]
+    [InlineData(DatabaseType.SqlServer9)]
     [Trait("Category", "FullStack")]
     [Trait("DatabaseProvider", "SqlServer")]
     public async Task LegacyMenuMigrationWidensBeforeBackfillAndKeepsConstraintsAcrossRestart(DatabaseType provider)
     {
         var connection = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN")!);
-        Assert.Matches(@"^127\.0\.0\.1,\d{1,5}$", connection.DataSource);
-        Assert.Equal("upgrade_fixture", connection.InitialCatalog);
+        SqlServerFixtureGuard.Verify(connection);
         var databaseName = "microi_menu_capacity_" + Guid.NewGuid().ToString("N");
         connection.InitialCatalog = "master";
         var master = MicroiORMExtensions.CreateDbSession(connection.ConnectionString, provider);

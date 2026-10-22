@@ -110,6 +110,7 @@ test('source stream stages raw local paths under one batch and finalizes with al
             },
         };
         const result = await runMicroServiceSourceSync(client, {
+            expectedSourceManifestHash: OLD_SOURCE_HASH,
             microService: { MsKey: 'demo-source', MsName: 'Demo' },
             directory,
             confirmExecution: 'SYNC',
@@ -165,6 +166,7 @@ test('dropped stage response performs context readback then exactly replays the 
             async syncMicroServiceSource() { throw new Error('legacy path must not run'); },
         };
         const result = await runMicroServiceSourceSync(client, {
+            expectedSourceManifestHash: OLD_SOURCE_HASH,
             microService: { MsKey: 'demo-source' },
             directory,
             confirmExecution: 'SYNC',
@@ -194,6 +196,7 @@ test('dropped finalize response is recovered only from an exact active source re
             async syncMicroServiceSource() { throw new Error('legacy path must not run'); },
         };
         const result = await runMicroServiceSourceSync(client, {
+            expectedSourceManifestHash: OLD_SOURCE_HASH,
             microService: { MsKey: 'demo-source' },
             directory,
             confirmExecution: 'SYNC',
@@ -222,6 +225,7 @@ test('CAS baseline drift before finalize fails closed without calling finalize',
             async syncMicroServiceSource() { throw new Error('legacy path must not run'); },
         };
         const result = await runMicroServiceSourceSync(client, {
+            expectedSourceManifestHash: OLD_SOURCE_HASH,
             microService: { MsKey: 'demo-source' },
             directory,
             confirmExecution: 'SYNC',
@@ -235,7 +239,7 @@ test('old server falls back only for a bounded source directory', async () => {
     await withProject(async (directory, manifest) => {
         let legacyPayload;
         const client = {
-            async getApplicationContext() { return contextResponse({ stream: false }); },
+            async getApplicationContext() { return contextResponse({ stream: false, sourceManifestHash: null }); },
             async stageMicroServiceSourceFile() { throw new Error('stream path must not run'); },
             async finalizeMicroServiceSourceManifest() { throw new Error('stream path must not run'); },
             async syncMicroServiceSource(data) {
@@ -252,6 +256,7 @@ test('old server falls back only for a bounded source directory', async () => {
             },
         };
         const result = await runMicroServiceSourceSync(client, {
+            expectedSourceManifestHash: null,
             microService: { MsKey: 'demo-source' },
             directory,
             confirmExecution: 'SYNC',
@@ -276,7 +281,7 @@ test('old Code=1 context without CurrentVersion remains eligible for bounded leg
                     Data: {
                         Application: { Id: 'old-app', AppKey: 'demo-source', AppVersion: 'v0.9.0' },
                         Files: [],
-                        SourceManifestHash: OLD_SOURCE_HASH,
+                        SourceManifestHash: null,
                     },
                 };
             },
@@ -296,6 +301,7 @@ test('old Code=1 context without CurrentVersion remains eligible for bounded leg
             },
         };
         const result = await runMicroServiceSourceSync(client, {
+            expectedSourceManifestHash: null,
             microService: { MsKey: 'demo-source' },
             directory,
             confirmExecution: 'SYNC',
@@ -322,6 +328,7 @@ test('context failure and missing application fail closed before any legacy writ
                 },
             };
             const result = await runMicroServiceSourceSync(client, {
+                expectedSourceManifestHash: null,
                 microService: { MsKey: 'demo-source' },
                 directory,
                 confirmExecution: 'SYNC',
@@ -342,7 +349,7 @@ test('legacy inline Base64 rejects invalid, non-canonical and oversized encoding
     for (const value of invalidValues) {
         let legacyCalls = 0;
         const client = {
-            async getApplicationContext() { return contextResponse({ stream: false }); },
+            async getApplicationContext() { return contextResponse({ stream: false, sourceManifestHash: null }); },
             async stageMicroServiceSourceFile() { throw new Error('stream path must not run'); },
             async finalizeMicroServiceSourceManifest() { throw new Error('stream path must not run'); },
             async syncMicroServiceSource() {
@@ -351,6 +358,7 @@ test('legacy inline Base64 rejects invalid, non-canonical and oversized encoding
             },
         };
         const result = await runMicroServiceSourceSync(client, {
+            expectedSourceManifestHash: null,
             microService: { MsKey: 'demo-source' },
             sourceFiles: [{ Path: 'src/App.vue', FileByteBase64: value }],
             confirmExecution: 'SYNC',
@@ -366,7 +374,7 @@ test('dropped legacy response is recovered from an exact active source readback 
         let committed = false;
         const client = {
             async getApplicationContext() {
-                return committed ? activeContext(manifest) : contextResponse({ stream: false });
+                return committed ? activeContext(manifest) : contextResponse({ stream: false, sourceManifestHash: null });
             },
             async stageMicroServiceSourceFile() { throw new Error('stream path must not run'); },
             async finalizeMicroServiceSourceManifest() { throw new Error('stream path must not run'); },
@@ -377,6 +385,7 @@ test('dropped legacy response is recovered from an exact active source readback 
             },
         };
         const result = await runMicroServiceSourceSync(client, {
+            expectedSourceManifestHash: null,
             microService: { MsKey: 'demo-source' },
             directory,
             confirmExecution: 'SYNC',
@@ -390,7 +399,7 @@ test('dropped legacy response fails closed when active source readback is not ex
     await withProject(async (directory) => {
         let legacyCalls = 0;
         const client = {
-            async getApplicationContext() { return contextResponse({ stream: false }); },
+            async getApplicationContext() { return contextResponse({ stream: false, sourceManifestHash: null }); },
             async stageMicroServiceSourceFile() { throw new Error('stream path must not run'); },
             async finalizeMicroServiceSourceManifest() { throw new Error('stream path must not run'); },
             async syncMicroServiceSource() {
@@ -399,6 +408,7 @@ test('dropped legacy response fails closed when active source readback is not ex
             },
         };
         const result = await runMicroServiceSourceSync(client, {
+            expectedSourceManifestHash: null,
             microService: { MsKey: 'demo-source' },
             directory,
             confirmExecution: 'SYNC',
@@ -417,5 +427,43 @@ test('delivery batch id is deterministic, fixed length and source-manifest speci
     assert.equal(first.length, 50);
     assert.match(first, /^[A-Za-z0-9][A-Za-z0-9._-]{0,49}$/u);
     assert.match(crypto.createHash('sha256').update(first).digest('hex'), /^[a-f0-9]{64}$/u);
+});
+test('missing or stale pre-edit baseline never uploads or replaces existing remote source', async () => {
+    await withProject(async (directory) => {
+        for (const expectedSourceManifestHash of [undefined, null, 'b'.repeat(64)]) {
+            let writes = 0;
+            const client = {
+                async getApplicationContext() { return contextResponse(); },
+                async stageMicroServiceSourceFile() { writes++; throw new Error('unexpected upload'); },
+                async finalizeMicroServiceSourceManifest() { writes++; throw new Error('unexpected finalize'); },
+                async syncMicroServiceSource() { writes++; throw new Error('unexpected legacy replacement'); },
+            };
+            const result = await runMicroServiceSourceSync(client, {
+                microService: { MsKey: 'demo-source' }, directory,
+                expectedSourceManifestHash, confirmExecution: 'SYNC',
+            });
+            assert.equal(result.isError, true);
+            assert.match(resultText(result), /SOURCE_EDIT_BASELINE_(REQUIRED|CHANGED)/);
+            assert.equal(writes, 0);
+        }
+    });
+});
+test('old server cannot overwrite existing source without atomic CAS support', async () => {
+    await withProject(async (directory) => {
+        let writes = 0;
+        const client = {
+            async getApplicationContext() { return contextResponse({ stream: false }); },
+            async stageMicroServiceSourceFile() { writes++; throw new Error('unexpected upload'); },
+            async finalizeMicroServiceSourceManifest() { writes++; throw new Error('unexpected finalize'); },
+            async syncMicroServiceSource() { writes++; throw new Error('unexpected legacy replacement'); },
+        };
+        const result = await runMicroServiceSourceSync(client, {
+            microService: { MsKey: 'demo-source' }, directory,
+            expectedSourceManifestHash: OLD_SOURCE_HASH, confirmExecution: 'SYNC',
+        });
+        assert.equal(result.isError, true);
+        assert.match(resultText(result), /原子 CAS/);
+        assert.equal(writes, 0);
+    });
 });
 //# sourceMappingURL=microservice-source-stream.test.js.map

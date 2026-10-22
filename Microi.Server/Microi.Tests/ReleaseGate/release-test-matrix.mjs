@@ -4,6 +4,8 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {verifyHdfsEvidence} from './staged-full-runtime.mjs';
+import {releaseBrowserWidths} from './release-browser-viewports.mjs';
+import {snapshotDesktopInputs} from '../../tools/release-desktop-inputs.mjs';
 
 const check=(condition,message)=>{if(!condition)throw Error(message);};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -15,8 +17,14 @@ const requiredCommon=['MICROI_TEST_API_BASE','MICROI_TEST_PEER_API_BASE','MICROI
 
 // 提供商选择是发行输入，不能从恰好存在的连接或历史 Full 环境推断；所选依赖仍全部必测。
 export function createMatrixPlan(matrix,environment){
- keys(matrix,['schemaVersion','observedAt','target','dependencies','fixture'],'矩阵');
+ keys(matrix,['schemaVersion','observedAt','target','dependencies','fixture','candidateInputs'],'矩阵');
  check(matrix.schemaVersion===1&&Number.isFinite(Date.parse(matrix.observedAt)),'缺少已观测矩阵版本/时间');
+ if(matrix.candidateInputs!==undefined){
+  keys(matrix.candidateInputs,['desktop'],'候选输入');
+  const desktop=matrix.candidateInputs.desktop;
+  keys(desktop,['fileCount','filesSha256','formalCandidateModule'],'Desktop Full 输入');
+  check(Number.isSafeInteger(desktop.fileCount)&&desktop.fileCount>0&&/^[a-f0-9]{64}$/.test(desktop.filesSha256||'')&&desktop.formalCandidateModule==='Microi.Server/tools/release-desktop-inputs.mjs','Desktop Full 输入指纹无效');
+ }
  keys(matrix.target,['profile','apiBase','osClient'],'目标');keys(matrix.fixture,['apiBase','peerApiBase','osClient','childOsClient'],'夹具');
  check(typeof matrix.target.profile==='string'&&matrix.target.profile.length>0,'缺少 MCP Profile');
  normalizedUrl(matrix.target.apiBase);
@@ -31,13 +39,21 @@ export function createMatrixPlan(matrix,environment){
  for(const provider of ['mysql','redis','mongo']){keys(matrix.dependencies[provider],['version'],provider);check(version(matrix.dependencies[provider].version),'缺少 '+provider+' 实际精确版本');}
  keys(matrix.dependencies.storage,['provider'],'存储');check(/^[A-Za-z][A-Za-z0-9_-]{1,40}$/.test(matrix.dependencies.storage.provider||''),'缺少当前生效 HDFS 提供商');
  check(environment.MICROI_TEST_MONGO_CURRENT_VERSION===matrix.dependencies.mongo.version,'Mongo 实际版本变量与冻结矩阵不一致');
+ const browserGeometryWidths=releaseBrowserWidths(environment);
  const requiredEnvironment=[...requiredCommon],sql=matrix.dependencies.sqlServer;
  if(sql){keys(sql,['version','explicitlyRequested'],'SQL Server');check(version(sql.version)&&sql.explicitlyRequested===true,'SQL Server 仅在明确专项选择时加入');requiredEnvironment.push('MICROI_UPGRADE_SQLSERVER_TEST_CONN');}
  else check(!environment.MICROI_UPGRADE_SQLSERVER_TEST_CONN,'未选择 SQL Server，拒绝残留连接扩大矩阵');
  const legacy=matrix.dependencies.mongoLegacy;
  if(legacy){keys(legacy,['version','explicitlyRequested'],'额外 Mongo');check(version(legacy.version)&&legacy.explicitlyRequested===true,'额外 Mongo 版本需要明确专项选择');check(environment.MICROI_TEST_MONGO_LEGACY_VERSION===legacy.version,'额外 Mongo 精确版本不一致');requiredEnvironment.push('MICROI_TEST_MONGO_LEGACY','MICROI_TEST_MONGO_LEGACY_VERSION');}
  else check(!environment.MICROI_TEST_MONGO_LEGACY&&!environment.MICROI_TEST_MONGO_LEGACY_VERSION,'未选择额外 Mongo 版本，拒绝残留连接');
- return {schemaVersion:1,matrix,requiredEnvironment,fullFilter:'Category=FullStack'+(sql?'':'&DatabaseProvider!=SqlServer'),dependencies:{...matrix.dependencies,sqlServer:sql?{...sql,status:'Selected'}:{status:'NotApplicable',reason:'目标未要求 SQL Server 专项；未执行'},mongoLegacy:legacy?{...legacy,status:'Selected'}:{status:'NotApplicable',reason:'常规仅验证当前 MCP 实际 MongoDB 版本'}}};
+ return {schemaVersion:1,matrix,requiredEnvironment,browserGeometryWidths,fullFilter:'Category=FullStack'+(sql?'':'&DatabaseProvider!=SqlServer'),dependencies:{...matrix.dependencies,sqlServer:sql?{...sql,status:'Selected'}:{status:'NotApplicable',reason:'目标未要求 SQL Server 专项；未执行'},mongoLegacy:legacy?{...legacy,status:'Selected'}:{status:'NotApplicable',reason:'常规仅验证当前 MCP 实际 MongoDB 版本'}}};
+}
+
+// 可选桌面矩阵记录必须回读正式候选同一快照，不能把孤立 SHA 附件当成测试绑定。
+export async function verifyMatrixDesktopInputs(matrix,workspace){
+ if(matrix.candidateInputs===undefined)return;
+ const files=await snapshotDesktopInputs(workspace),desktop=matrix.candidateInputs.desktop;
+ check(Object.keys(files).length===desktop.fileCount&&hash(JSON.stringify(files))===desktop.filesSha256,'Desktop Full 源码与冻结矩阵不一致');
 }
 
 function verifySuite(suite,label){
@@ -53,7 +69,10 @@ function verifySuite(suite,label){
 // 存储回执只接受本候选主/子租户的真实字节、匿名权限和权威删除回读；路由 mock 不算存储验收。
 export function validateMatrixResults(plan,outcomes,storage){
  const quick=verifySuite(outcomes.quick,'Quick'),full=verifySuite(outcomes.full,'Full');
- const geometry=outcomes.geometry;check(geometry?.stats?.expected>=2&&['unexpected','skipped','flaky'].every(key=>geometry.stats[key]===0)&&['1366','3840'].every(width=>geometry.caseTitles.some(title=>title.includes(width))),'搜索标签真实浏览器门禁缺少普通桌面/4K用例或存在失败/跳过');
+ // 按冻结时选择的视口核验，不能在回读时降低要求，也不能用相似数字冒充宽度。
+ const geometry=outcomes.geometry,widths=plan.browserGeometryWidths;
+ check(Array.isArray(widths)&&[2,3].includes(widths.length)&&widths[0]===1366&&widths[1]===1920&&(widths.length===2||widths[2]===3840),'搜索标签真实浏览器视口矩阵缺失或无效');
+ check(geometry?.stats?.expected>=widths.length&&['unexpected','skipped','flaky'].every(key=>geometry.stats[key]===0)&&Array.isArray(geometry.caseTitles)&&widths.every(width=>geometry.caseTitles.some(title=>new RegExp('(?:^|[^0-9])'+width+'px(?:$|[^0-9])').test(title))),'搜索标签真实浏览器门禁缺少所选桌面用例或存在失败/跳过');
  const sqlCases=full.filter(name=>/SqlServer/.test(name));
  check(plan.matrix.dependencies.sqlServer?sqlCases.length>0:sqlCases.length===0,plan.matrix.dependencies.sqlServer?'所选 SQL Server 零用例':'未选择 SQL Server 却执行了其用例');
  for(const [name,count] of [['FieldOptionTreePageIntegrationTests.LargeSourcePagesInDatabaseAndKeepsLookupInsideSourceFilter',1],['RoleLimitActiveSnapshotTests.RealRoleLoader_ExcludesDeletedGrantsAndRetainsLegacyNulls',1],['TenantJwtPersistenceIntegrationTests.NewlyAddedTenant_PersistsWeakKeyAndConvergesCompetingRefreshes',4]])check(full.filter(value=>value.includes(name)&&value.includes('"MySql"')).length===count,'MySQL 混合提供商用例缺失或被连带排除：'+name);
@@ -74,7 +93,7 @@ export function validateMatrixResults(plan,outcomes,storage){
   check(/^[a-f0-9]{64}$/.test(row.sha256)&&Number.isSafeInteger(row.bytes)&&row.bytes>0&&row.apiUpload===200&&row.apiReadGet===200&&row.authenticatedGet===200&&row.currentDomainGet===200&&row.anonymousGet===(scope==='Public'?200:403),'当前API实际存储字节或公开/私有权限验收失败');
   const removed=cleanup.filter(value=>value.scope===scope&&value.key===row.key);check(removed.length===1&&removed[0].signedHeadAfterCleanup===404,'存储对象未完成权威清理回读');
  }
- return {schemaVersion:1,accepted:true,sourceHead:plan.sourceHead,runtimeBuildId:storage.apiProbe.buildId,matrixSha256:plan.matrixSha256,quickPassed:quick.length,fullPassed:full.length,geometry:{status:'Passed',cases:geometry.stats.expected,reportSha256:geometry.reportSha256},dependencies:{...plan.dependencies,mysql:{...plan.dependencies.mysql,status:'Passed'},redis:{...plan.dependencies.redis,status:'Passed'},mongo:{...plan.dependencies.mongo,status:'Passed'},storage:{...plan.dependencies.storage,status:'Passed',objectsVerified:4,currentApiAndHdfsPlugin:true},...(plan.matrix.dependencies.sqlServer?{sqlServer:{...plan.dependencies.sqlServer,status:'Passed',cases:sqlCases.length}}:{})}};
+ return {schemaVersion:1,accepted:true,sourceHead:plan.sourceHead,runtimeBuildId:storage.apiProbe.buildId,matrixSha256:plan.matrixSha256,...(plan.matrix.candidateInputs?{candidateInputs:plan.matrix.candidateInputs}:{}),quickPassed:quick.length,fullPassed:full.length,geometry:{status:'Passed',cases:geometry.stats.expected,reportSha256:geometry.reportSha256},dependencies:{...plan.dependencies,mysql:{...plan.dependencies.mysql,status:'Passed'},redis:{...plan.dependencies.redis,status:'Passed'},mongo:{...plan.dependencies.mongo,status:'Passed'},storage:{...plan.dependencies.storage,status:'Passed',objectsVerified:4,currentApiAndHdfsPlugin:true},...(plan.matrix.dependencies.sqlServer?{sqlServer:{...plan.dependencies.sqlServer,status:'Passed',cases:sqlCases.length}}:{})}};
 }
 
 function readFile(file){check(path.isAbsolute(file),'矩阵/回执路径必须是绝对路径');const stat=fs.lstatSync(file);check(stat.isFile()&&!stat.isSymbolicLink(),'矩阵/回执必须是普通文件');return fs.readFileSync(file);}
@@ -97,9 +116,11 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  const [mode,file,receipt,...extra]=process.argv.slice(2);
  if(mode==='freeze'){
   const bytes=readFile(file),plan={...createMatrixPlan(JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/,'')),process.env),matrixFile:file,matrixSha256:hash(bytes),sourceHead:head()};
+  await verifyMatrixDesktopInputs(plan.matrix,root);
   write(receipt,plan);console.log(JSON.stringify({fullFilter:plan.fullFilter,requiredEnvironment:plan.requiredEnvironment}));
  }else if(mode==='verify'){
   const plan=JSON.parse(readFile(file));check(plan.sourceHead===head()&&hash(readFile(plan.matrixFile))===plan.matrixSha256,'Full 矩阵或候选 HEAD 在验收中漂移');
+  await verifyMatrixDesktopInputs(plan.matrix,root);
   const storageFile=process.env.MICROI_TEST_STORAGE_RECEIPT;check(storageFile,'缺少实际 HDFS 存储闭环回执 MICROI_TEST_STORAGE_RECEIPT');
   const outcomes=JSON.parse(readFile(receipt));
   for(const [suite,name]of [['quick','microi-quick.trx'],['full','microi-full-stack.trx']])authoritativeTrx(outcomes[suite],path.join(path.dirname(receipt),name));

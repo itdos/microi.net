@@ -1064,10 +1064,10 @@ namespace Microi.net
                     ?? new JArray();
                 return systemCode.Contains("platform-chat-runtime")
                     && System.Version.TryParse(runtimeVersionText, out var runtimeVersion)
-                    && runtimeVersion >= new System.Version(1, 0, 2)
+                    && runtimeVersion >= new System.Version(1, 1, 0)
                     && capabilities.Any(item => string.Equals(
                         item?.ToString(),
-                        "ApiEngine:platform-chat-runtime@v1.0.2",
+                        "ApiEngine:platform-chat-runtime@v1.1.0",
                         StringComparison.Ordinal))
                     && capabilities.Any(item => string.Equals(
                         item?.ToString(),

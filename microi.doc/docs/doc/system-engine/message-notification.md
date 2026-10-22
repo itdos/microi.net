@@ -362,6 +362,18 @@ SignalR Hub 调用聊天运行时仍保留 `Client` 权限语义，但不能因�
 
 Hook 只接收 `Stage`、`SourceApiEngineKey`、`Action`、`ActorUserId`、`PeerUserId`、`MessageId` 和 `MessageType`，不接收消息正文、头像、OpenId、Token 或其它秘密。C# `DiyWebSocket` 只保留 DiyToken 连接认证、在线连接缓存、SignalR 尽力投递和 AI 流式协议；消息先持久、再投递，投递丢失不会丢历史，重连后从 Managed 运行时回读。旧 Hub 方法与 `/api/DiyChat/SendSystemMessage` 仍保留，但都转发同一份 Managed 逻辑，不再直连 MongoDB/FormEngine 重复业务。
 
+### 跨月跨年的聊天历史
+
+聊天消息新写入 `diy_chat_{租户小写}_{yyyy}` 年度库的 `chat_{yyyyMM}` 月度集合，时间取原始持久事实。旧 `diy_chat_{租户小写}` 库中的 `chat_{yyyy}` 年集合及月集合继续兼容读取，升级无需先把所有历史迁入新库。联系人和稳定消息分区定位保留在旧基础库；同一 `RequestId` 跨月、跨年重试仍复用原始分区，不会再生成一条消息。
+
+`platform-chat-runtime` 的 `GetHistoryAndMarkRead` 使用 [V8.MongoDb.GetPartitionedTableData](../v8-engine/v8-server#跨年跨月分页-getpartitionedtabledata) 做时间、原生 Id 双字段游标分页；业务鉴权和双向消息条件由 Managed 接口引擎负责，C# 只提供租户边界、固定命名、索引和有界读取能力。不能只读当前月份，也不能用“本月已读到第一天”代表全部历史结束。
+
+PC 和移动端通过 SignalR `GetChatHistoryPage` 直接获取本次调用的结果：`{ PeerUserId, Messages, HasMore, NextCursor }`。首请求 `HistoryCursor=''`，后续原样带回游标，每页默认 30 条；滚到顶部再异步加载，并补偿前插消息的滚动高度。`Messages=[]` 且 `HasMore=true` 时继续翻页；查询失败保留游标供重试。相同时间消息按稳定 Id 排序，重复消息按 `MessageId/RequestId/_id` 合并，不按正文去重。联系人切换、旧请求迟到和另一窗口的历史广播都不得覆盖当前会话。
+
+实时消息增量合并到列表，不全量重载历史；查看最新消息时，以独立的有界最新页更新已读回执，不重置向前翻页的游标。只标记实际返回页内、来自当前对话人的来信；未加载的旧消息保持未读。SignalR 负责即时投递，MongoDB 是消息持久事实，断线后应回读而不是把一次投递成功作为历史保存证明。
+
+部署时需要同时具备新的 MongoDB/Core/API 原子与对应“消息通知” Managed 运行时，然后更新 PC/移动前端。源码回归、真实 MongoDB 分区测试、在线资源回读、SignalR 与浏览器滚动验收分别记录，不能只更新前端就宣称跨年历史修复已在线生效。
+
 ## 验收清单
 
 - 两个租户的三张表字段、通知方式数据源、Mongo 聊天读写和物理索引已回读一致。
@@ -370,6 +382,8 @@ Hook 只接收 `Stage`、`SourceApiEngineKey`、`Action`、`ActorUserId`、`Peer
 - 事务回滚不推送；提交后节点退出，持久日志仍可审计。
 - 用户不能读取或标记他人的通知；危险链接和超限参数被拒绝。
 - 无 Token、访问密钥、伪造租户/发送人被拒绝；相同 `RequestId` 并发只生成一条消息，不同载荷不得复用。
+- 跨月、跨年、空月与旧年度集合连续翻页，无重复或缺页；同时间多消息、失败重试、切换联系人迟到请求和实时消息并发加载均保留正确顺序与滚动位置。
+- 实时已读回执不重置历史游标，不把未展示的旧消息批量标记已读；跨月重试仍只产生一条持久消息。
 - 公众号/服务号发送主体与小程序跳转分别验证。
 - 源码测试、后端编译、远端回读、真实浏览器和商城安装/校验分别记录，不用本地成功冒充生产部署。
 

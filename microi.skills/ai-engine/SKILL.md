@@ -91,12 +91,19 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 - AI 的 Qdrant/Ollama/Embedding 配置、Schema 初始化和其它生命周期任务由 `AddMicroiAI()` 在模块内自注册；API 的 `Program.cs` 只负责调用模块注册。
 - `Microi.Core` 只承载跨模块契约和模型。新增入口时先扩展 AI 领域服务，再添加薄 Controller/Hub 适配，禁止复制业务流程。
 - AI 账户统一入口是 Managed 接口引擎 `/apiengine/platform-ai-account`；套餐、订阅和订单由 V8 编排。支付宝回调 C# 只做可信租户选择/归一化、该租户配置验签和一次性 Managed 调用；`CompletePayment` 在同一接口引擎事务内完成订单条件认领、金额校验、订阅续期/新建与平台/供应商 API Key 分配。供应商协议、密钥隔离、分布式额度原子、任务句柄和受控媒体落盘仍由绑定原子完成。
-- 非流式 `UpdateConversationTitle / RecognizeIntent / Chat / NL2SQL / NL2V8EngineSync` 与精确图片 `ProcessImage` 统一进入 Managed `/apiengine/platform-ai-runtime`，旧 Controller 同名路由只做兼容转发；SSE/流式、Provider Proxy、生成式媒体、文件和策略元数据保持原生。`platform-ai-runtime` 只调用绑定当前租户和当前用户的 `V8.AI` / `V8.Image` 原子，不接收客户端伪造的租户、用户、Endpoint、ApiKey、表白名单或管理员标记。
+- 非流式 `UpdateConversationTitle / RecognizeIntent / Chat / NL2SQL / NL2V8EngineSync` 与精确图片 `ProcessImage` 统一进入 Managed `/apiengine/platform-ai-runtime`，旧 Controller 同名路由只做兼容转发。媒体目录与图片/音乐任务的提交、查询、恢复也使用该 Managed 引擎的同名 `Action`；SSE/流式、Provider Proxy、文件传输和其余未迁移协议继续使用原生入口。`platform-ai-runtime` 只调用绑定当前租户和当前用户的 `V8.AI` / `V8.Image` 原子，不接收客户端伪造的租户、用户、Endpoint、ApiKey、表白名单或管理员标记。
 - AI 官方应用只有一个应用级租户扩展点 `platform-ai-custom-hook`，策略为 `CreateIfMissing`。`mci_ai_data_assistant` 与 `platform-ai-runtime` 只传 `Stage`、`SourceApiEngineKey`、`Action`；支付动作最多增加 `EventId`、`Provider`，账户其它动作只增加白名单资源元数据。Hook 禁止接收订单号、交易号、金额、标题、SQL、模型、附件、提示词或问题原文及其摘要、回答、供应商/平台密钥、供应商任务号、文件句柄或媒体内容。匿名发现接口不调用 Hook，`/v1/usage` 继续由 C# 凭据网关直接校验，使 `Authorization` 永不进入 V8。
 - 9 张 `mic_sub_*` 订阅表与 `mci_ai_token_account`、`mci_ai_token_log` 由官方 `app.microi.ai-engine` 应用升级提供，必须同时声明 DDL、PhysicalColumns、DiyTables、DiyFields；`PromptPreview` 属于日志表正式字段。`mci_ai_token_recharge` 当前不在该运行时实体闭包内，禁止根据线上残留自行扩包。运行时发现缺失时失败关闭，禁止在请求路径自动建表、加列或修改业务 Schema。
 - `Sys_User.AiApiKey` 归官方 `app.microi.sys_user`，由系统账号包同时维护建表 DDL、PhysicalColumns 和隐藏只读 DiyField；AI助手包不得重复声明 `Sys_User`。缺列错误必须提示升级系统账号应用，不能误导用户升级 AI助手。
 
 ## 模型与密钥
+
+### 媒体目录与图片任务的 Managed 调用
+
+- 后端新增 `V8.AI.GetMediaModels()`、`GenerateMiniMaxImage(param)`、`GetMiniMaxImageTask(taskId)`、`RecoverMiniMaxImageTask(taskId)` 四个原子。前端及 Microi Agent 调用 `/apiengine/platform-ai-runtime` 的同名 `Action`，后端 V8 可直接调用原子，不自请求本机 HTTP，不新增第二套媒体编排入口。
+- 当前租户和用户绑定于可信 V8 上下文，匿名拒绝；图片任务提交沿用既有运行时的模型、许可、权限、配额与幂等校验。查询和恢复只访问该租户、该用户拥有的任务。目录仅安全投影，Hook 仍只接收来源、阶段和动作，不接收媒体、提示词、任务号或密钥。
+- 提交持久任务后保存原 `RequestId`、`TaskId` 及服务器/租户/账号归属；`Code=2` 仅表示受理。超时、断连、空响应先复查原任务，不能换 Id 重发。恢复仅复用已经保存的供应商回执与结果，不重新生成；没有回执的未知结果明确失败或保持未知，不能伪造成功。
+- 四个原子、Managed 引擎和消费者需一起验收；应用包或版本号不代表服务器能力已部署。至少验证匿名拒绝、跨租户/跨用户隔离、请求参数白名单、幂等回放、未知结果复查，以及图片持久地址回读。没有线上回执时只报告源码与测试已完成，不声称某一版本已经上线。
 
 存量模型配置的兼容验收组合包括 `GenerateMiniMaxImage + image-01`、`GenerateMiniMaxMusic + music-2.6`。这些组合只适用于服务端已配置且供应商账号仍有权限的旧路由；新路由仍遵循下列实时能力选择规则。验收必须同时检查实际返回的模型标识、媒体类型与 HDFS 读取，不能仅凭兼容接口名称判断底层模型。
 

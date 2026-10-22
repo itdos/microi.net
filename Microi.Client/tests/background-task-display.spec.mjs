@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import * as taskDisplay from "../src/utils/background-task-display.js";
 import {
     getBackgroundTaskEta,
     getBackgroundTaskProgress,
@@ -8,6 +9,16 @@ import {
     mergeBackgroundTaskSummaries,
     shouldPollBackgroundTasks
 } from "../src/utils/background-task-display.js";
+
+test("legacy SQL Server question-mark labels recover only recognized task states", () => {
+    assert.equal(taskDisplay.getBackgroundTaskStatusText({ Status: "Failed", StatusText: "????" }), "执行失败");
+    assert.equal(taskDisplay.getBackgroundTaskStatusText({ Status: "Canceled", StatusText: "???" }), "已停止");
+    assert.equal(taskDisplay.getBackgroundTaskStatusText({ Status: "Running", StatusText: "正在上传" }), "正在上传");
+    assert.equal(taskDisplay.getBackgroundTaskStatusText({ Status: "FutureState", StatusText: "????" }), "????");
+    assert.equal(taskDisplay.getBackgroundTaskStatusText({ Status: "FutureState" }), "FutureState");
+    assert.equal(taskDisplay.getBackgroundTaskStatusText({ Status: "Failed", StatusText: "失败原因?" }), "失败原因?");
+    assert.equal(taskDisplay.getBackgroundTaskStatusText({ Status: "Failed", StatusText: "����" }, { Failed: "Failed" }), "Failed");
+});
 
 test("a detail response remains visible when a task summary arrives during loading", () => {
     const loadingRow = { Id: "storage-task", Status: "Running", DetailLoading: true };

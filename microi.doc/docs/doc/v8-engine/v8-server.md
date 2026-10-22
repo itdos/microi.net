@@ -1572,6 +1572,40 @@ V8.MongoDb.GetTableData({
 });
 ```
 
+### 跨年跨月分页 GetPartitionedTableData
+
+适用于按年分库、按月分集合的海量聊天和日志。接口引擎先校验当前用户与资源权限，再调用有界存储原子；不会把服务器的任意数据库列表开放给客户端。
+
+```javascript
+var result = V8.MongoDb.GetPartitionedTableData({
+  DatabasePrefix: 'audit_log', TablePrefix: 'event',
+  _Where: [['UserId', '=', V8.CurrentUser.Id]],
+  IndexFields: ['UserId'],
+  PageSize: 30, MaxPartitions: 64,
+  Cursor: V8.Param.Cursor || ''
+});
+// 成功：{ Code:1, Data:{ Rows, HasMore, NextCursor, ScannedPartitions } }
+```
+
+存储命名是 `{DatabasePrefix}_{当前租户小写}_{yyyy}` 库与 `{TablePrefix}_{yyyyMM}` 集合，同时兼容无年份旧库、`{TablePrefix}_{yyyy_MM}` 月集合和 `{TablePrefix}_{yyyy}` 年集合。年度库中的集合年份必须一致；业务代码固定前缀，不能直接透传用户输入。前缀仅允许小写字母开头的字母、数字、下划线，最多 48 字符。
+
+| 参数 | 契约 |
+| --- | --- |
+| `PageSize` | 默认 30，范围 1–100；与普通 `GetTableData` 的 `_PageSize` 不同 |
+| `MaxPartitions` | 单次最多扫描 64 个分区，可设 1–128；全目录最多 200 个租户库、2400 个有效集合 |
+| `_Where` / `_WhereAny` | 非空有效条件；`_WhereAny` 支持 1–4 组条件的 OR，替代 `_Where`，每一组都要包含权威业务边界 |
+| `IndexFields` | 可选，最多 3 个互异安全字段；组合这些字段升序与 `CreateTime DESC, _id DESC` 建索引 |
+| `Cursor` | 原样回传上次 `NextCursor`；首次传空，查询条件改变后重置，最大 2048 字符 |
+| `CountOnly` | 可选，`true` 返回 `{ Count }`；超出分区扫描上限失败，不返回部分总数 |
+
+文档应使用 BSON 日期 `CreateTime` 和原生 ObjectId `_id`。普通页按时间、Id 倒序合并，不执行 Count；旧/新分区重复 `_id` 在页内去重。同一时间多条消息通过 Id 继续，不因跨月、跨年或空月丢失。若 `Rows` 为空但 `HasMore=true`，仍要继续使用新游标；目录/扫描超限及存储故障不能作为“没有更早消息”。调用总时限为 20 秒，单集合查询为 10 秒。
+
+游标绑定租户、前缀和查询条件，只代表翻页位置，不能替代权限验证。行内的 `_PartitionDb`、`_PartitionTable` 仅用于受信任接口引擎更新实际分区；对外必须显式选择业务字段，不能直接返回内部行对象。`CountOnly` 计数物理行，迁移时同时保留多个分区中的未读副本可能重复计数，应避免双写或通过权威业务索引计数。
+
+普通 `_Where` 对原生 `_id` 的 `In` / `NotIn` 支持 1–1000 个合法 ObjectId（数组或逗号分隔字符串）；`=`、`!=` 和范围比较也转换为原生 ObjectId。非法值会失败，不能忽略过滤条件。可信重放可在 `AddFormData` 顶层传 `OccurredAt` 保持原始 `CreateTime`；未传则使用服务端当前时间，不应信任客户端自报时间。跨月重试仍需稳定业务 Id 与持久分区定位，防止重复落入新集合。
+
+平台聊天的接入及滚动历史规则见[消息通知](../system-engine/message-notification#跨月跨年的聊天历史)。该接口依赖对应 Core/MongoDB/API 组件与 Managed 运行时版本；未部署时不能用本地测试结论替代线上可用性。
+
 ### 查询单条数据 GetFormData
 ```javascript
 V8.MongoDb.GetFormData({
@@ -1679,6 +1713,31 @@ return result;
 可用方法包括 `GetLicenseState`、`UpdateConversationTitle`、`Chat`、`ChatStream`、`RecognizeIntent`、`NL2SQL`、`NL2SQLStream`、`NL2V8` 和 `NL2V8Stream`。`UpdateConversationTitle(conversationId, title, source)` 只修改当前 V8 租户、当前登录用户自己的对话。匿名接口没有可信用户上下文时返回 `Code=1001`；`NL2SQL` 始终重新按当前用户授权，`NL2V8/NL2V8Stream` 仅平台管理员可调用。
 
 官方 `app.microi.ai-engine` v6.3.6 使用 Managed `platform-ai-runtime` 编排标题修改、意图识别、非流式对话、NL2SQL 与非流式 NL2V8。租户个性化逻辑写在 CreateIfMissing `platform-ai-custom-hook`，该 Hook 只接收来源、阶段和动作，不接收问题、回答、标题、SQL、模型、附件或凭据。浏览器流式请求继续走原生 SSE 路由。
+
+媒体目录和图片持久任务增加以下四个后端原子，由 Managed `platform-ai-runtime` 按同名 `Action` 编排。使用前需同时部署包含这些方法的服务端和对应 AI助手应用包；版本号或应用安装成功不能代替实际能力检查。
+
+| 后端方法 | 用途与返回边界 |
+| --- | --- |
+| `await V8.AI.GetMediaModels()` | 返回当前登录租户可用的脱敏媒体目录，不接受客户端指定租户或用户，不返回供应商密钥。 |
+| `await V8.AI.GenerateMiniMaxImage(param)` | 以稳定 `RequestId` 入队图片任务；`Code=2 + Data.TaskId` 表示已受理，尚未生成成功。 |
+| `await V8.AI.GetMiniMaxImageTask(taskId)` | 查询当前租户、当前用户拥有的原任务；不能通过传入别人的 `TaskId` 越权读取。 |
+| `await V8.AI.RecoverMiniMaxImageTask(taskId)` | 对已有可恢复结果继续转存；复用原任务与供应商回执，不再次生成图片。 |
+
+外部客户端通过 `POST /apiengine/platform-ai-runtime` 提交 `Action` 和白名单业务参数；后端 V8 可直接调用上述方法。租户与用户取自可信 V8 上下文，匿名身份拒绝，伪造的 `OsClient`、`CurrentUser`、`ApiKey`、`Endpoint` 不会改变实际身份或供应商凭据。模型启用、用户权限、额度和许可仍由既有图片任务运行时检查。
+
+```javascript
+// RequestId 应由调用方保存并复用，不能在每次重试时重新生成。
+var result = await V8.ApiEngine.Run('platform-ai-runtime', {
+  Action: 'GenerateMiniMaxImage',
+  RequestId: String(V8.Param.RequestId || ''),
+  Prompt: String(V8.Param.Prompt || ''),
+  Model: String(V8.Param.Model || ''),
+  Count: 1
+});
+return result;
+```
+
+客户端保存原 `RequestId`、`TaskId` 以及所属服务器、租户和账号，异步查询原任务直到明确终态。只有实际图片结果及持久地址回读通过才算交付。超时、断连或空响应属于结果未知，应先复查原任务，不能换 `RequestId` 盲目重发；缺少可恢复回执时，`RecoverMiniMaxImageTask` 也不能把未知结果伪装成成功。旧原生 HTTP 路由保留兼容，应用包更新不会替代服务端二进制更新。
 
 后端流式回调会占用本次 Jint 请求，只适合确实需要由同一脚本消费增量的场景；面向页面的打字机效果仍优先让浏览器使用前端 `V8.AI.ChatStream`。MCP 直接使用专用 `microi_chat` 获取最终结果，不再绕到 `microi_run_engine` 包装接口。不要把 Token、完整问题或回答写入日志。完整代码与授权矩阵见 [AI 引擎与 Microi.AI 中转站](../system-engine/ai-engine.md)。
 

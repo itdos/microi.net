@@ -199,7 +199,7 @@ test('the exact internal maintenance log can change while runtime skills, source
  }finally{await rm(root,{recursive:true,force:true});}
 });
 
-test('independent desktop installer work does not invalidate PC API images while shared plugin inputs remain guarded',async()=>{
+test('desktop source exercised by Full stays frozen while the unused upstream checkout remains independent',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'microi-release-candidate-'));
  try{
   execFileSync('git',['init','--quiet'],{cwd:root});
@@ -214,9 +214,11 @@ test('independent desktop installer work does not invalidate PC API images while
    await mkdir(path.dirname(path.join(root,name)),{recursive:true});
    await writeFile(path.join(root,name),'before');
   }
+  await writeFile(path.join(root,'Microi.Agent/apps/microi-code/package.json'),'{"name":"microi-code","scripts":{"test":"vitest run"}}');
   const before=await snapshotCandidate(root,['.']);
   for(const name of names)await writeFile(path.join(root,name),'after');
   assert.deepEqual(changedCandidate(before,await snapshotCandidate(root,['.'])),[
+   'Microi.Agent/apps/microi-code/src/main/runtime/harness-runtime.ts',
    'Microi.Agent/plugins/microi/package.json',
    'Microi.Agent/server-engines/microi_code_update_latest.js',
    'Microi.Server/Microi.MCP/Microi.MCP.csproj'

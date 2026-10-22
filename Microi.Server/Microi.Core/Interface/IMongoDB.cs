@@ -59,6 +59,8 @@ namespace Microi.net
         /// <param name="dynamicParam">动态参数</param>
         /// <returns>表数据列表结果</returns>
         DosResultList<dynamic> GetTableData(dynamic dynamicParam);
+        /// <summary>按当前租户的年度库/月度集合读取有界游标页，兼容旧年度集合；不执行全量 Count。</summary>
+        DosResult GetPartitionedTableData(dynamic dynamicParam);
         Task<DosResult> AddSysLog(SysLogParam param);
         /// <summary>批量、幂等写入系统日志；仅供后台审计队列消费。</summary>
         Task<DosResult> AddSysLogs(IReadOnlyCollection<SysLogParam> parameters);

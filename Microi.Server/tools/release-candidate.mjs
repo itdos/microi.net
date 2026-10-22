@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {snapshotReleaseComposition} from './release-composition.mjs';
 import {snapshotStandardInputs} from './release-standard-inputs.mjs';
+import {snapshotDesktopInputs} from './release-desktop-inputs.mjs';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const repositories=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Agent','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
@@ -16,10 +17,9 @@ const generated=/(^|\/)(?:dist|bin|obj|node_modules|TestResults|\.resource-sync-
 const independentMobileSource=name=>/^microi\.uniapp\//i.test(name)
  &&!/^microi\.uniapp\/src\/utils\//i.test(name)
  &&name!=='microi.uniapp/scripts/test-request-queue.mjs';
-// Microi Code desktop installer is released and verified on its own channel.
-// Its app/upstream checkout does not enter the PC/API images or the VSIX/CLI;
-// the shared plugin, MCP, Skills and server-engine sources remain guarded.
-const independentDesktopSource=name=>/^Microi\.Agent\/(?:apps\/microi-code|upstream\/dsh-desktop)\//i.test(name);
+// 桌面安装包走独立渠道，但 Full 执行的桌面源码由专属快照纳入本候选；
+// 未执行的 upstream 检出仍独立，pretest 产物由精确规则排除以免误判漂移。
+const independentDesktopSource=name=>/^(?:Microi\.Agent\/(?:apps\/microi-code|upstream\/dsh-desktop)|Microi\.Code\/apps\/microi-code)\//i.test(name);
 // 官网源码、测试、依赖和正文均由独立官网发布验收，不进入 PC/API 镜像。
 // 共享 SDK、Skills、MCP 与平台发布工具继续进入 PC/API Full 候选。
 const documentationOnly=name=>/^microi\.doc\//i.test(name)
@@ -95,9 +95,9 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
    catch(error){if(error.code==='ENOENT')files[key]=null;else throw error;}
   }
  }
- Object.assign(files,await snapshotStandardInputs(root,{
-  includeTestInputs:!['UserRequestedSkip','SmokeOnly'].includes(process.env.MICROI_RELEASE_TEST_POLICY)
- }));
+ // 所有发布候选都绑定完整测试输入，历史 SmokeOnly 环境不能缩小源码指纹。
+ Object.assign(files,await snapshotStandardInputs(root));
+ Object.assign(files,await snapshotDesktopInputs(root));
  Object.assign(files,await snapshotLocalSmokeInputs(root));
  // Implicit composition belongs only to this actual workspace; explicit foreign contracts still fail.
  const compositionOptions={...options,environment:options.environment??(path.resolve(root)===workspace?process.env:{})};

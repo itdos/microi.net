@@ -234,6 +234,7 @@ export interface MicroServiceSourceSyncInput {
     microService: Record<string, unknown>;
     directory?: string;
     sourceFiles?: Array<Record<string, unknown>>;
+    expectedSourceManifestHash?: string | null;
     replace?: boolean;
     confirmExecution?: string;
 }

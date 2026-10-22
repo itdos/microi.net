@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dos.Common;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Newtonsoft.Json.Linq;
 
@@ -365,6 +366,8 @@ namespace Microi.net
         /// </summary>
         private FilterDefinition<dynamic> CreateFieldFilter(string field, string operatorStr, object value)
         {
+            // 原生 _id 是 ObjectId。转换失败必须拒绝整个查询，不能吞掉条件退化为全表读取。
+            if (field == "_id") return CreateObjectIdFilter(operatorStr, value);
             if (string.IsNullOrEmpty(field) || value == null)
             {
                 return Builders<dynamic>.Filter.Empty;
@@ -466,6 +469,32 @@ namespace Microi.net
             }
 
             return Builders<dynamic>.Filter.Empty;
+        }
+
+        private static FilterDefinition<dynamic> CreateObjectIdFilter(string operation, object value)
+        {
+            var op = (operation ?? "=").ToUpperInvariant();
+            var many = op == "IN" || op == "NOT IN" || op == "NOTIN";
+            var raw = many
+                ? value is string text ? text.Split(',').Select(item => (object)item.Trim()).ToArray()
+                    : value is System.Collections.IEnumerable items ? items.Cast<object>().ToArray() : Array.Empty<object>()
+                : new[] { value };
+            if (raw.Length < 1 || raw.Length > 1000) throw new ArgumentException("_id 查询需要 1 至 1000 个有效 ObjectId。");
+            var ids = raw.Select(item => ObjectId.TryParse(item?.ToString(), out var id)
+                ? id : throw new ArgumentException("_id 查询包含无效 ObjectId。")).Distinct().ToArray();
+            var filter = Builders<dynamic>.Filter;
+            switch (op)
+            {
+                case "=": case "==": case "EQ": case "EQUAL": return filter.Eq("_id", ids[0]);
+                case "<>": case "!=": case "NE": case "NOTEQUAL": return filter.Ne("_id", ids[0]);
+                case "IN": return filter.In("_id", ids);
+                case "NOT IN": case "NOTIN": return filter.Nin("_id", ids);
+                case ">": return filter.Gt("_id", ids[0]);
+                case ">=": return filter.Gte("_id", ids[0]);
+                case "<": return filter.Lt("_id", ids[0]);
+                case "<=": return filter.Lte("_id", ids[0]);
+                default: throw new ArgumentException("_id 查询运算符无效。");
+            }
         }
 
         /// <summary>
