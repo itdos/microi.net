@@ -151,6 +151,24 @@ if ($env:MICROI_DESKTOP_NODE_HOME) {
 $env:PYTHONUTF8 = '1'
 $env:PYTHONIOENCODING = 'utf-8'
 
+function Get-MicroiDesktopTestPath {
+    param([string]$OriginalPath, [string]$NodeHome, [bool]$WindowsHost)
+    $prefixes = @()
+    if (-not [string]::IsNullOrWhiteSpace($NodeHome)) { $prefixes += $NodeHome }
+    if ($WindowsHost) {
+        # Git Bash 的 GNU tar 把 D: 等盘符当作远端主机；原生 Windows 测试使用
+        # 系统 API 返回的 bsdtar 目录，同时保留已核验的 Node 运行时最高优先级。
+        $systemDirectory = [Environment]::GetFolderPath([Environment+SpecialFolder]::System)
+        if ([string]::IsNullOrWhiteSpace($systemDirectory) -or
+            -not [IO.File]::Exists((Join-Path $systemDirectory 'tar.exe'))) {
+            throw 'Windows desktop regression requires the native system tar.exe.'
+        }
+        $prefixes += $systemDirectory
+    }
+    $prefixes += $OriginalPath
+    return $prefixes -join [IO.Path]::PathSeparator
+}
+
 # 创始人工作区中的 Microi Code 桌面应用以自身 package.json 的 Vitest 入口为
 # 单一事实源。公开仓不带该闭源目录，因此只在应用存在时纳入统一门禁；Vitest
 # 默认对零用例和失败用例返回非零，禁止把空的历史 tests/ 目录视作通过。
@@ -183,8 +201,8 @@ if (Test-Path -LiteralPath $desktopPackage) {
             if (-not (Test-Path -LiteralPath $desktopNode)) {
                 throw "MICROI_DESKTOP_NODE_HOME does not contain ${desktopNodeName}: $env:MICROI_DESKTOP_NODE_HOME"
             }
-            $env:Path = $env:MICROI_DESKTOP_NODE_HOME + [IO.Path]::PathSeparator + $originalDesktopTestPath
         }
+        $env:Path = Get-MicroiDesktopTestPath -OriginalPath $originalDesktopTestPath -NodeHome $env:MICROI_DESKTOP_NODE_HOME -WindowsHost ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop')
         # 正式门禁与数据库、浏览器和双 API 同机运行；串行 Vitest worker 保留全部
         # 用例，同时避免 Windows 提交额度紧张时并发 worker 产生伪失败或争用插件目录。
         npm test -- --maxWorkers=1 --no-file-parallelism
