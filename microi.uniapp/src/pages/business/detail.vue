@@ -2831,6 +2831,7 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				}
 			},
 			async submitOrderApproval() {
+				if (!this.canApproveOrder) return
 				const opinion = this.approvalOpinion.trim()
 				if (this.approvalMode === 'reject' && !opinion) {
 					uni.showToast({
@@ -2847,35 +2848,13 @@ import { buildFriendShare, buildTimelineShare } from '@/utils/share.js'
 				})
 				try {
 					const isApprove = this.approvalMode === 'approve'
-					const result = isApprove ?
-						await callApiEngine('dingdan_shenpi', {
-							Id: this.detail.Id || this.id,
-							formData: {
-								ShenpiYJ: opinion
-							}
-						}) :
-						await callApiEngine('DingdanApproveReject', {
-							rejectData: {
-								Id: this.detail.Id || this.id
-							},
-							formData: {
-								ShenpiYJ: opinion
-							}
-						})
-					if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '审批未成功')
-					if (!isApprove) {
-						const updateResult = await V8.FormEngine.UptFormData('Diy_Dingdan', {
-							Id: this.detail.Id || this.id,
-							DingdanZT: '已驳回',
-							DingdanZTZ: 6
-						})
-						if (!updateResult || Number(updateResult.Code) !== 1) throw new Error((updateResult &&
-							updateResult.Msg) || '订单状态更新失败')
-					}
+					await executeBusinessRowAction(isApprove ? 'order-approve' : 'order-reject',
+						{ ...this.detail, Id: this.detail.Id || this.id }, opinion, this.currentUser, { menuId: this.menuId })
+					uni.$emit('microi:data-changed', { table: this.moduleConfig.table, id: this.detail.Id || this.id })
 					this.showOrderApprovalDialog = false
 					this.approvalOpinion = ''
 					uni.showToast({
-						title: isApprove ? '审批通过' : '订单已驳回',
+						title: isApprove ? '审批通过' : '已驳回，订单待审批',
 						icon: 'success'
 					})
 					await this.loadDetail(false)

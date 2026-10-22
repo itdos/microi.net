@@ -5,6 +5,7 @@ import vm from 'node:vm'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { resolveStatusOptions, reconcileStatusSelection } from '../src/platform/status-filter-options.mjs'
 
 // 用真实页面方法配合可控慢请求复现空态闪烁；不依赖网络速度或线上数据。
 function page(file, overrides = {}) {
@@ -16,6 +17,7 @@ function page(file, overrides = {}) {
     uni: { showToast() {}, $on() {}, $off() {} },
     themeMixin: {}, listReturnMixin: {}, getUser: () => ({}), getToken: () => 'token',
     PERIOD_OPTIONS: [], TASK_PERIODS: [], TASK_TYPES: [], TASK_STATES: [],
+    resolveStatusOptions, reconcileStatusSelection,
     loadModulePeriodCounts: () => Promise.resolve({}),
     hydrateCustomerContractTotals: async (rows) => rows,
     appConfig: { features: {}, osClient: 'test' },
@@ -61,6 +63,7 @@ test('业务列表恢复有效缓存不被骨架覆盖，初始化仍正确结�
   const { context } = page('pages/business/list.vue', { requiresAuthorizedMenuContext: () => false })
   context.baseConfig = { skipModuleMetadata: true }
   context.rows = [{ Id: 'cached' }]
+  context.statusOptionsFingerprint = '[]'
   context.rowsContainConfiguredCardFields = () => true
   context.loadViewConfig = async () => {}
   context.loadPlatformStatistics = async () => {}

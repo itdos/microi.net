@@ -52,9 +52,8 @@ test('我的订单不排除终态，并提供五种订单状态筛选', () => {
   )
   assert.match(ordersSource, /summaryFixedWhere:\s*\[\{ Name: 'DingdanZT', Type: '!=', Value: '已终止' \}\]/)
   assert.match(businessListSource, /const localStatusOptions = Array\.isArray\(merged\.statusOptions\) \? merged\.statusOptions : \[\]/)
-  assert.match(businessListSource, /merged\.statusOptions = \[\.\.\.new Set\(\[/)
-  assert.match(businessListSource, /\.\.\.\(Array\.isArray\(dynamic\.statusOptions\) \? dynamic\.statusOptions : \[\]\)/)
-  assert.match(businessListSource, /\.\.\.localStatusOptions\r?\n\s*\]\)\]/)
+  assert.match(businessListSource, /resolveStatusOptions\(menuConfig.statusOptions, localStatusOptions\)/)
+  assert.match(businessListSource, /resolveStatusOptions\(dynamic.statusOptions, merged.statusOptions\)/)
 })
 
 test('后台 SearchFieldIds 编译为移动端高级筛选，Out 保留查询配置，Line 留在行内', () => {

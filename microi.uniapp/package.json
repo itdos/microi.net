@@ -74,7 +74,7 @@
     "check:related-tab-full-list": "node scripts/check-related-tab-full-list.mjs && node --test scripts/test-related-tab-layout.mjs scripts/test-related-list-lifecycle.mjs",
     "check:customer-order-amount-metric": "node scripts/check-customer-order-amount-metric.mjs",
     "check:customer-list-summary": "node --test tests/customer-list-summary.test.mjs",
-    "check:order-list-summary": "node --test tests/order-list-summary.test.mjs tests/related-order-summary.test.mjs",
+    "check:order-list-summary": "node --test tests/order-list-summary.test.mjs tests/related-order-summary.test.mjs tests/order-status-pages.test.mjs",
     "check:customer-related-metrics": "node scripts/check-customer-related-metrics.mjs && node --test scripts/test-customer-latest-proposal.mjs",
     "check:customer-duplicate-search": "node scripts/check-customer-duplicate-search.mjs",
     "check:table-child-defaults": "node scripts/check-table-child-defaults.mjs",

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import { resolveListReadApi, queryMonthValue } from '../src/platform/configured-read-api.mjs'
+import { resolveStatusOptions, reconcileStatusSelection } from '../src/platform/status-filter-options.mjs'
 
 const source = fs.readFileSync(new URL('../src/components/mci-business-related-list/mci-business-related-list.vue', import.meta.url), 'utf8')
 const script = source.match(/<script>([\s\S]*?)<\/script>/)[1]
@@ -20,6 +21,7 @@ function setup(overrides = {}) {
   const sandbox = {
     loadTenantRelatedRows: async () => null, resolveRelatedFormNavigation: async () => null,
     resolveListReadApi, queryMonthValue,
+    resolveStatusOptions, reconcileStatusSelection,
     getUser: () => ({}), MciBusinessCard: {}, MciTaskCard: {}, MciNativeField: {}, MciListFilterField: {},
     uni: { $off() {} }, clearTimeout,
     loadNativeTableModel: async () => ({ Id: 'table-1', Name: 'Related' }),
@@ -48,7 +50,7 @@ function setup(overrides = {}) {
 }
 
 for (const withSummary of [true, false]) {
-  test(`initial card metadata preserves complete summary statuses only when configured: ${withSummary}`, async () => {
+  test(`fresh metadata replaces fallback status options, including summary lists: ${withSummary}`, async () => {
     const allStatuses = ['待审批', '进行中', '已到期', '终止待审批', '已终止']
     const cardStatuses = allStatuses.slice(0, 4)
     const { context } = setup({
@@ -65,7 +67,7 @@ for (const withSummary of [true, false]) {
     context.loadRelatedMetrics = async () => {}
     await context.initialize()
     assert.equal(context.error, '')
-    assert.deepEqual(Array.from(context.config.statusOptions), withSummary ? allStatuses : cardStatuses)
+    assert.deepEqual(Array.from(context.config.statusOptions), cardStatuses)
   })
 }
 

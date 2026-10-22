@@ -291,6 +291,7 @@ import { loadApiModuleDefinition, loadModuleDefinition } from '@/platform/module
 import { cardFieldKey, filterVisibleCardLines } from '@/platform/card-field-policy.mjs'
 import { requiresAuthorizedMenuContext } from '@/platform/menu-resolution.mjs'
 import { readListEntryPeriod } from '@/platform/list-entry-period.mjs'
+import { resolveStatusOptions, reconcileStatusSelection } from '@/platform/status-filter-options.mjs'
 import {
   buildListFilterWhere,
   hasListFilterValue,
@@ -366,6 +367,7 @@ export default {
       period: 'all',
       mineOnly: true,
       status: '',
+      statusOptionsFingerprint: '',
       periods: PERIOD_OPTIONS,
       periodCounts: {},
       customStart: '',
@@ -659,7 +661,12 @@ export default {
       }
       this.baseConfig = { ...this.baseConfig, menuId: this.menuId }
       this.config = { ...this.config, menuId: this.menuId }
+      const previousStatusOptions = this.statusOptionsFingerprint
       if (await this.loadViewConfig(refresh) === false) return
+      const previousStatus = this.status
+      this.status = reconcileStatusSelection(this.status, this.config.statusOptions)
+      this.statusOptionsFingerprint = JSON.stringify(this.config.statusOptions || [])
+      if (previousStatus !== this.status || previousStatusOptions !== this.statusOptionsFingerprint) restored = false
       if (!restored || !this.rowsContainConfiguredCardFields() || this.baseConfig.metadataApiEngineKey) {
         await this.loadData(true, refresh)
       } else {
@@ -682,6 +689,7 @@ export default {
         mineOnly: this.mineOnly,
         status: this.status,
         periodCounts: { ...this.periodCounts },
+        statusOptionsFingerprint: JSON.stringify(this.config.statusOptions || []),
         customStart: this.customStart,
         customEnd: this.customEnd,
         rows: [...this.rows],
@@ -708,7 +716,7 @@ export default {
       try {
         this.metadataError = ''
         let merged = { ...this.baseConfig, menuId: this.menuId }
-        // ViewSchema/菜单元数据可能只返回部分状态；保留租户声明，避免业务终态被运行时覆盖。
+        // 本地状态仅在元数据缺失时兜底，不能把已删除的旧状态重新并入最新配置。
         const localStatusOptions = Array.isArray(merged.statusOptions) ? merged.statusOptions : []
         if (this.baseConfig.skipModuleMetadata) {
           this.config = merged
@@ -724,10 +732,7 @@ export default {
             // 旧版菜单“卡片数据”没有摘要字段；移动显示列应完整进入内容行，
             // 不应继续被租户本地的 summaryField 改造成无标签摘要。
             merged = { ...merged, ...menuConfig, summaryField: '' }
-            merged.statusOptions = [...new Set([
-              ...localStatusOptions,
-              ...(Array.isArray(merged.statusOptions) ? merged.statusOptions : [])
-            ])]
+            merged.statusOptions = resolveStatusOptions(menuConfig.statusOptions, localStatusOptions)
             merged.filterFields = mergeModuleFilterFields(menuConfig.filterFields, localFilterFields, menuConfig.definition?.fields || [])
           } catch (error) {
             if (this.baseConfig.metadataApiEngineKey) throw error
@@ -812,10 +817,9 @@ export default {
         })
         if (dynamic.statusFromViewSchema) {
           merged.statusField = dynamic.statusField || ''
-          merged.statusOptions = [...new Set([
-            ...(Array.isArray(dynamic.statusOptions) ? dynamic.statusOptions : []),
-            ...localStatusOptions
-          ])]
+          merged.statusOptions = dynamic.statusField || merged.relatedSummary
+            ? resolveStatusOptions(dynamic.statusOptions, merged.statusOptions)
+            : []
         }
         merged.selectFields = [...new Set([
           ...(merged.selectFields || []),
@@ -919,6 +923,7 @@ export default {
       }
     },
     async loadData(reset = false, refresh = false) {
+      this.status = reconcileStatusSelection(this.status, this.config.statusOptions)
       if (this.metadataError) return
       if (this.loading && !reset) return
       if (!reset && this.finished) return
