@@ -53,21 +53,21 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 模块引擎或 `sys_menu`。逐步建模在字段完成后调用 `microi_configure_form_banner` 回读验收。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=720e0f2db0997318d879af67cd708b7d25a33c321e47100c4800ee39a25b4c9e -->
+<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=83a624f454346eac4a63fe64e0e6902b5fd1d0d74c8de578208e06ea11e180cf -->
 ## 交付总原则
 
 1. **先事实源，后建模**：先读需求文档、截图、现有蓝图、数据库结构和菜单结构，形成业务蓝图；不要边猜边建表、边猜边写接口。
 2. **先平台能力，后临时绕路**：能用 MCP/平台 API 修改元数据、字段、菜单、事件、接口引擎、数据源、任务调度，就不要新建临时 `_fix_*`、`_mcp_*` 接口引擎绕过平台能力。MCP 缺能力时优先补 MCP/后端，再补 Skill。
 3. **平台通用层禁止项目定制**：Microi.Server、Microi.Client、MCP、VS Code 插件、microi.skills 中不得写某个项目专属文案、专属上传限制、专属业务规则。项目规则应在租户表、接口引擎、业务配置、前端项目或业务蓝图中。
 4. **本地改完必须远端验收**：V8 文件、表单事件、菜单按钮、数据源、工作流、页面配置等不能只改本地文件。必须写入远端数据库，并通过 HTTP 或平台工具回读确认。
-5. **测试不等于接口能通**：交付前必须跑构建、接口契约、真实登录、核心写流程、截图、人眼复核、网络 404/5xx 守卫、远端同步状态。依赖默认按 `workspace-conventions` 的“平台回归与独立应用测试归属”使用当前 MCP 实际 MongoDB 版本与 HDFS 提供商；明确的兼容任务才扩展矩阵，未执行项如实记录。
+5. **测试不等于接口能通**：交付前必须跑构建、接口契约、真实登录、核心写流程、截图、人眼复核、网络 404/5xx 守卫、远端同步状态。测试依赖采用 `workspace-conventions/SKILL.md` 中“平台回归与独立应用测试归属”的当前MCP默认规则。
 6. **生产数据谨慎优先**：涉及真实会员、余额、积分、订单、库存、卡券、收益、佣金、分润等资金/资产数据时，先确认服务器、租户、目标表、筛选条件和影响范围，再执行 MCP、接口引擎或 SQL 写操作。除用户明确要求清理/重置或必须修复错误数据外，不得擅自批量改真实数据。
 7. **默认按分布式交付**：任何后端能力都假设会有至少两个节点连接同一数据库和 Redis，并经历滚动升级、重复投递与节点硬重启。定时任务/消费者使用分布式租约且业务本身幂等；会话、票据和任务状态使用共享存储；新旧版本并存时采用“先扩展、后迁移、再收缩”。只在单节点验证通过不能视为完整交付。
 8. **业务逻辑默认接口引擎、元数据升级默认应用商城**：先用低代码 CRUD/事件，再用接口引擎；只缺底层原子能力时先扩展 V8，只有协议/鉴权/密钥隔离/运行时内核才进入 C#。表、字段、Tab、菜单、权限、引擎、页面和任务等可打包资源不得新增 `Microi.Upgrade` 定制类；官方开发者通过 `microi_itdos` 发布官方应用后再由目标租户 MCP 更新，无官方权限时只升级自己的租户。
 9. **平台能力四项同步**：按 `workspace-conventions/SKILL.md` 首部识别创始人源码工作区；每项平台新增、增强或修复都逐项判断应用商城、官方中文文档、Skills、MCP 是否需要完善，交付时列出证据或无需修改的依据。复用已有 MCP 能力，不机械新增工具；镜像发布不等于客户部署，客户手动更新边界必须保留。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=e01ae6b21425b1410100e33ece7875b6313d9456144ad3131ad0fab7fb31d33a -->
+<!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=167c117fc2a52cea49cd1bf2128b450fb3c8af07e8af1e955d1482a454d472ef -->
 ## 用户问题编号跟踪（强制）
 
 用户一次提出多个问题时，必须先拆成 `1、2、3、4...` 的问题清单，并在交付过程中保持同一编号，不得合并吞掉或用笼统“已优化”代替。
@@ -87,7 +87,7 @@ Manifest 使用 `tables[].formBanner`；未显式配置时仍按字段类型选�
 - 每条结论明确区分源码已改、运行验收通过、渠道已发布；发现回归或用户再次指出问题时，将对应旧项重新标为待修复/部分完成，修复后再更新结论。最后逐项核对编号总数，禁止漏项、跳号或把未取得回执的发布写成完成。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=9a259382b07851aaa60a795da3ffa4773e9cf3b9f9d791a52f95e34e1944cc69 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=cc8ef54619f2f7a1dc3ba4268d02cbe678c855ba17e2d9e9ed3251ac0dc35e18 -->
 ## 交付完成定义
 
 一次 Microi 全系统交付只有同时满足以下条件才算完成：

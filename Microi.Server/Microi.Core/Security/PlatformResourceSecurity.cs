@@ -8,12 +8,12 @@ namespace Microi.net
     /// Server-owned policy for generic client FormEngine access to platform tables.
     ///
     /// Platform tables are deliberately split into three groups:
-    /// 1. AdministratorOnly: credentials, executable code, authorization policy and
+    /// 1. AdministratorOnly: credentials, global executable code, authorization policy and
     ///    infrastructure state. Ordinary roles can never receive generic access.
     /// 2. ReadOnly: runtime/catalog metadata that may be read only after an explicit
     ///    menu or direct-table grant. Writes still require Level >= 9999.
-    /// 3. RoleManaged: runtime business resources whose CRUD operations follow the
-    ///    same explicit role permissions as ordinary business tables.
+    /// 3. RoleManaged: business resources and explicitly delegated API engines whose
+    ///    CRUD operations follow the same action grants as ordinary business tables.
     ///
     /// Every platform table remains unavailable to anonymous FormEngine calls. Do not
     /// protect tables by a broad prefix such as mci_: some mci_ tables contain ordinary
@@ -36,6 +36,10 @@ namespace Microi.net
             // and renderers already use explicit menu/direct-table authorization.
             "mic_page",
             "mic_print",
+
+            // 接口引擎由管理员明确委托菜单/表权限，读、写、导入导出仍逐动作鉴权。
+            // 这不是普通登录即授权，也不改变执行接口本身的调用权限或 MCP 开发授权。
+            "sys_apiengine",
 
             // Account CRUD is a tenant business-administration capability. A real
             // sys_user menu/table grant controls Read/Add/Edit/Del, while the
@@ -75,7 +79,6 @@ namespace Microi.net
             "sys_config",
             // 全局可执行代码只能由管理员维护，普通角色误授表权限也不能修改。
             "mci_global_function",
-            "sys_apiengine",
             "sys_menu",
             "sys_role",
             "sys_rolelimit",

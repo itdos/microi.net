@@ -1,10 +1,15 @@
-import test from 'node:test';
+import test, {beforeEach, afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,mkdir,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {snapshotCandidate,changedCandidate} from '../../tools/release-candidate.mjs';
+
+// Fixture roots must not consume the parent release process's private smoke configuration.
+let inheritedSmokeConfig;
+beforeEach(()=>{ inheritedSmokeConfig=process.env.MICROI_RELEASE_SMOKE_CONFIG;delete process.env.MICROI_RELEASE_SMOKE_CONFIG; });
+afterEach(()=>{ if(inheritedSmokeConfig===undefined)delete process.env.MICROI_RELEASE_SMOKE_CONFIG;else process.env.MICROI_RELEASE_SMOKE_CONFIG=inheritedSmokeConfig; });
 
 async function smokeFixture(t){
  const root=await mkdtemp(path.join(tmpdir(),'microi-release-smoke-'));
@@ -35,6 +40,19 @@ test('local smoke marker appearance and removal cannot evade an earlier Full can
  const present=await snapshotCandidate(f.root,['.']);
  assert.deepEqual(changedCandidate(absent,present),[`${f.api}/.microi-local`,`${f.api}/appsettings.IsolatedSmoke.json`]);
  await rm(f.marker);assert.deepEqual(changedCandidate(present,await snapshotCandidate(f.root,['.'])),[`${f.api}/.microi-local`,`${f.api}/appsettings.IsolatedSmoke.json`]);
+});
+
+test('explicit isolated smoke configuration is frozen and changes invalidate the candidate',async t=>{
+ const f=await smokeFixture(t);
+ process.env.MICROI_RELEASE_SMOKE_CONFIG=f.config;
+ const before=await snapshotCandidate(f.root,['.']);
+ assert.match(before.files['@smoke-config'],/^[a-f0-9]{64}$/);
+ assert.equal(before.files[`${f.api}/.microi-local`],undefined);
+ assert.doesNotMatch(JSON.stringify(before),/private-fixture-secret/);
+ await writeFile(f.config,JSON.stringify({AppSettings:{OsClient:'IsolatedSmoke',OsClientDbConn:'changed-fixture-secret'}}));
+ assert.deepEqual(changedCandidate(before,await snapshotCandidate(f.root,['.'])),['@smoke-config']);
+ await writeFile(f.config,JSON.stringify({AppSettings:{OsClient:'IsolatedSmoke',ExtraBusinessSwitch:1}}));
+ await assert.rejects(snapshotCandidate(f.root,['.']),/AppSettings/);
 });
 
 test('missing, malformed or non-whitelisted smoke configuration and unsafe environment names fail closed',async t=>{

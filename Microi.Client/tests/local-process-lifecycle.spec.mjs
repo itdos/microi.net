@@ -74,8 +74,18 @@ function removeFixture(root) {
     assert.equal(fs.lstatSync(marker).isSymbolicLink(), false, '所有权标记必须是普通文件');
     assert.equal(fs.lstatSync(marker).isFile(), true);
     assert.deepEqual(JSON.parse(fs.readFileSync(marker, 'utf8')), ownedFixtures.get(root), '夹具所有权标记必须仍属于本用例');
-    // 已退出的 Windows 可执行文件句柄可能稍后才释放；只重试回收经过所有权校验的本用例根。
-    fs.rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    // Windows 先检查完整目录树及文件占用，再普通删除；避免部分删除后丢失归属标记。
+    if (process.platform === 'win32') {
+        const cleanup = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File',
+            path.join(repoRoot, 'Microi.Server/tools/Remove-MicroiReleaseScratch.ps1'),
+            '-LiteralPath', root, '-ExpectedParent', fixtureParent], {
+            encoding: 'utf8', windowsHide: true, timeout: 30000
+        });
+        assert.ifError(cleanup.error);
+        assert.equal(cleanup.status, 0, cleanup.stdout + '\n' + cleanup.stderr);
+    } else {
+        fs.rmSync(root, { recursive: true, force: false, maxRetries: 20, retryDelay: 250 });
+    }
     ownedFixtures.delete(root);
 }
 

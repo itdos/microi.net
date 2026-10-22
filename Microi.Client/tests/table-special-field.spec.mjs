@@ -19,7 +19,7 @@ test("normalizes legacy single and multiple upload values", () => {
         ])).map(item => [item.Path, item.Name]),
         [["/files/a.png", "封面.png"], ["/files/b.png", "详情.png"]]
     );
-    assert.equal(normalizeUploadItems({ Url: "https://api.itdos.com/api/HDFS/OpenPrivateFile?o=iTdos&t=abc" })[0].Path.includes("OpenPrivateFile"), true);
+    assert.equal(normalizeUploadItems({ Url: "https://api.microi.net/api/HDFS/OpenPrivateFile?o=iTdos&t=abc" })[0].Path.includes("OpenPrivateFile"), true);
 });
 
 test("detects private upload fields without treating ordinary uploads as private", () => {

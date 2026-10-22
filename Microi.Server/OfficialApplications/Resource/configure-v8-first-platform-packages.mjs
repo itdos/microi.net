@@ -709,7 +709,7 @@ function configureAiDataAssistant(packageModel) {
   const engine = (packageModel.SysApiEngines || []).find(item => item.ApiEngineKey === 'mci_ai_data_assistant');
   if (!engine) throw new Error('app.microi.ai-engine.json 缺少 mci_ai_data_assistant。');
   engine.ApiV8Code = normalizeSource(fs.readFileSync(path.join(root, 'mci-ai-data-assistant.js'), 'utf8'));
-  engine.Version = 'v1.1.8';
+  engine.Version = 'v1.1.9';
   // OnlyGet 角色也可调用此受管接口；业务读权限仍由引擎按域与模型校验。
   engine.ApiRole = JSON.stringify(['$authenticated']);
   engine.AllowAnonymous = 0;

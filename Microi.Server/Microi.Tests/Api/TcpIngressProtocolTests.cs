@@ -444,7 +444,7 @@ public class TcpIngressProtocolTests
     }
 
     [Fact]
-    public void Enabled_rule_rejects_broad_or_missing_source_network_and_bad_routing()
+    public void Enabled_rule_rejects_implicit_public_source_missing_source_and_bad_routing()
     {
         Assert.Throws<InvalidOperationException>(() => TcpIngressRules.Parse(
             RuleJson.Replace("127.0.0.1/32", "0.0.0.0/0", StringComparison.Ordinal)));
@@ -454,6 +454,59 @@ public class TcpIngressProtocolTests
             RuleJson.Replace("xinjiyuan-device-uplink", "../other-engine", StringComparison.Ordinal)));
         Assert.Throws<InvalidOperationException>(() => TcpIngressRules.Parse(
             RuleJson.Replace("\"xjy\"", "\"\"", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Explicit_public_source_accepts_all_ipv4_but_never_ipv6()
+    {
+        var rule = TcpIngressRules.Parse(RuleJson
+            .Replace("\"allowedCidrs\":", "\"allowAnySource\": true, \"allowedCidrs\":", StringComparison.Ordinal)
+            .Replace("127.0.0.1/32", "0.0.0.0/0", StringComparison.Ordinal))!;
+
+        Assert.True(rule.AllowAnySource);
+        Assert.True(rule.IsAllowed(IPAddress.Parse("1.2.3.4")));
+        Assert.True(rule.IsAllowed(IPAddress.Parse("203.0.113.8")));
+        Assert.True(rule.IsAllowed(IPAddress.Parse("::ffff:203.0.113.8")));
+        Assert.False(rule.IsAllowed(IPAddress.IPv6Loopback));
+    }
+
+    [Fact]
+    public void Explicit_false_does_not_authorize_public_source()
+    {
+        Assert.Throws<InvalidOperationException>(() => TcpIngressRules.Parse(RuleJson
+            .Replace("\"allowedCidrs\":", "\"allowAnySource\": false, \"allowedCidrs\":", StringComparison.Ordinal)
+            .Replace("127.0.0.1/32", "0.0.0.0/0", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Existing_multiple_narrow_sources_remain_supported()
+    {
+        var rule = TcpIngressRules.Parse(RuleJson.Replace(
+            "[\"127.0.0.1/32\"]", "[\"127.0.0.1/32\",\"192.0.2.0/24\"]", StringComparison.Ordinal))!;
+
+        Assert.False(rule.AllowAnySource);
+        Assert.True(rule.IsAllowed(IPAddress.Parse("127.0.0.1")));
+        Assert.True(rule.IsAllowed(IPAddress.Parse("192.0.2.27")));
+        Assert.False(rule.IsAllowed(IPAddress.Parse("192.0.3.27")));
+    }
+
+    [Theory]
+    [InlineData("[\"127.0.0.1/32\"]")]
+    [InlineData("[\"1.2.3.4/0\"]")]
+    [InlineData("[\"0.0.0.0/0\",\"127.0.0.1/32\"]")]
+    public void Explicit_public_source_rejects_ambiguous_networks(string networks)
+    {
+        Assert.Throws<InvalidOperationException>(() => TcpIngressRules.Parse(RuleJson
+            .Replace("\"allowedCidrs\":", "\"allowAnySource\": true, \"allowedCidrs\":", StringComparison.Ordinal)
+            .Replace("[\"127.0.0.1/32\"]", networks, StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Public_source_opt_in_requires_a_boolean()
+    {
+        Assert.Throws<InvalidOperationException>(() => TcpIngressRules.Parse(RuleJson
+            .Replace("\"allowedCidrs\":", "\"allowAnySource\": \"true\", \"allowedCidrs\":", StringComparison.Ordinal)
+            .Replace("127.0.0.1/32", "0.0.0.0/0", StringComparison.Ordinal)));
     }
 
     [Fact]

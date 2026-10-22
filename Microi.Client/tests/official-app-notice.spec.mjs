@@ -106,7 +106,7 @@ test("浏览器传输失败时使用当前租户同源代理", async () => {
     assert.equal(proxyParam.Action, "Query");
     assert.equal(proxyParam.Operation, "List");
     assert.equal(proxyParam.SourceId, "official");
-    assert.equal(proxyParam.ApiBase, "https://api.itdos.com");
+    assert.equal(proxyParam.ApiBase, "https://api.microi.net");
     assert.equal(proxyParam.OsClient, "iTdos");
     assert.equal(proxyParam.Param.Action, "CheckPlatformApps");
     assert.equal(proxyParam.Param.ApplicationType, "Platform");

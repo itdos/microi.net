@@ -2,7 +2,7 @@
 
 > 原规则按适用范围无损迁移；触发对应工作时必须完整读取相关章节。
 
-<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=adeb9e4ec4beadf3b7ba33325e860b378b81f6d7e95b25879b64ca4ee1c91987 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=b4cd10b169b54235314d170c8e74f17bf6bcb5f658d0d4d2e10c73dc8aa37ef7 -->
 ## 平台安全与存量兼容验收（强制）
 
 AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉及 FormEngine、菜单、角色、子表、文件、SaaS 或登录协议的交付，都必须按以下服务端边界设计和验收：
@@ -19,8 +19,8 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 
 ### 保护表、控制面与缓存
 
-- SaaS、接口引擎、表/字段、菜单角色、用户、任务、数据源、MQ/MQTT、页面、打印、工作流、数据库、应用商城、AI 与安全审计等保护表，普通客户端 `Level < 9999` 硬拒绝；菜单或表权限不能覆盖。
-- 创建 V8、接口引擎、任务、数据源和 Redis 管理等控制面 API 继续要求 `Level >= 9999`。不能只靠前端隐藏菜单。
+- 平台表按 `PlatformResourceSecurity` 的管理员专用、只读委托、按角色管理三类校验，不使用过时的统一硬拒绝清单。`sys_apiengine` 的标准 FormEngine 管理按真实菜单/表操作授权，不能因 `Level < 9999` 拒绝已获授权的开发角色；无授权、伪造菜单、匿名和撤权必须拒绝。
+- 接口代码写权限只授予可信开发角色；任务、Redis 等其它控制面门禁、接口运行权限和 MCP 专用开发权限仍独立执行，不能只靠前端隐藏菜单，也不能从接口管理菜单权限推导其它控制面权限。
 - 权限缓存使用按 `OsClient` 隔离的共享 Redis `epoch`、用户快照、短 TTL L1/L2。用户/角色/菜单/权限变化后提升 `epoch`；验收至少使用两个节点确认无需清 Redis或重启即可生效。
 - Upgrade15 只清理普通角色的保护表直接授权，不能删除正常业务菜单权限。
 
@@ -55,7 +55,7 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 9. SaaS 脱敏投影不包含基础设施密钥，Redis anonymous/temporary/非管理员管理失败。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-system-delivery-003 sha256=8e2891f2a149d6828b653b9f0735ea39a4df5ba60178c79f0e5b0065ce72ee84 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-003 sha256=479ccdb65450c7741b052a30d8e4a11917bc19d80bf9b4ac89ea00092b4aaa73 -->
 ## 前端交付检查清单
 
 - 底部 tabBar 图标不 404。

@@ -33,6 +33,94 @@ public class FormEngineRelatedDataTests
     }
 
     [Theory]
+    [InlineData("Counts", false)]
+    [InlineData("DataLog", false)]
+    [InlineData("DataComment", false)]
+    [InlineData("DataVersion", false)]
+    [InlineData("Counts", true)]
+    [InlineData("DataComment", true)]
+    public async Task TableChildDelegationReachesBothAuthorizationAndParentRead(string type, bool nested)
+    {
+        var fixture = new RelatedDataFixture();
+        var request = Request(type);
+        var context = TableChildContext(nested);
+        request["_TableChildAuth"] = context;
+
+        var result = await Run(fixture, request);
+
+        Assert.Equal(1, result["Code"]!.Value<int>());
+        var authorization = Assert.Single(fixture.ParentAuthorizationArguments);
+        var read = Assert.Single(fixture.ParentReadArguments);
+        // 执行真实 HTTP 身份归一化和完整服务；只在真实权限/存储边界观察参数，
+        // 不能靠 trusted 调用绕过父模块 Read、父记录范围或嵌套链复核。
+        Assert.Equal(context.ToString(), JObject.FromObject(authorization._TableChildAuth!).ToString());
+        Assert.Same(authorization._TableChildAuth, read._TableChildAuth);
+        Assert.Equal("actor", authorization._CurrentUser["Id"]!.Value<string>());
+        Assert.Equal("tenant-a", authorization.OsClient);
+        Assert.False(authorization._TrustedServerInvocation);
+        Assert.All(fixture.AuxiliaryArguments, argument => Assert.Null(argument._TableChildAuth));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeniedTableChildContextCannotReachParentOrAuxiliaryReads(bool nested)
+    {
+        var fixture = new RelatedDataFixture { MenuAllowed = false };
+        var request = Request("Counts");
+        request["_TableChildAuth"] = TableChildContext(nested);
+        request["_TrustedServerInvocation"] = true;
+        request["_InvokeType"] = "Server";
+
+        var result = await Run(fixture, request);
+
+        Assert.Equal(0, result["Code"]!.Value<int>());
+        Assert.NotNull(Assert.Single(fixture.ParentAuthorizationArguments)._TableChildAuth);
+        Assert.Empty(fixture.ParentReadArguments);
+        Assert.Empty(fixture.AuxiliaryArguments);
+    }
+
+    [Fact]
+    public async Task TableChildDelegationStillRequiresCurrentParentRecordVisibility()
+    {
+        var fixture = new RelatedDataFixture { ParentOwner = "another-user" };
+        var request = Request("Counts");
+        request["_TableChildAuth"] = TableChildContext(true);
+
+        var result = await Run(fixture, request);
+
+        Assert.Equal(0, result["Code"]!.Value<int>());
+        Assert.NotNull(Assert.Single(fixture.ParentReadArguments)._TableChildAuth);
+        Assert.Empty(fixture.AuxiliaryArguments);
+    }
+
+    [Fact]
+    public async Task DirectUnauthorizedChildRequestDoesNotAcquireDelegation()
+    {
+        var fixture = new RelatedDataFixture { MenuAllowed = false };
+
+        var result = await Run(fixture, Request("Counts"));
+
+        Assert.Equal(0, result["Code"]!.Value<int>());
+        Assert.Null(Assert.Single(fixture.ParentAuthorizationArguments)._TableChildAuth);
+        Assert.Empty(fixture.ParentReadArguments);
+        Assert.Empty(fixture.AuxiliaryArguments);
+    }
+
+    private static JObject TableChildContext(bool nested) => new()
+    {
+        ["ParentSysMenuId"] = "aggregate-menu", ["ParentTableId"] = "aggregate-table",
+        ["ParentFieldId"] = "child-field", ["ParentRowId"] = "aggregate-row",
+        ["ParentValue"] = "aggregate-row", ["ParentFormMode"] = "View",
+        ["Parent"] = nested ? new JObject
+        {
+            ["ParentSysMenuId"] = "root-menu", ["ParentTableId"] = "root-table",
+            ["ParentFieldId"] = "aggregate-field", ["ParentRowId"] = "root-row",
+            ["ParentValue"] = "root-row", ["ParentFormMode"] = "View", ["Parent"] = null
+        } : null
+    };
+
+    [Theory]
     [InlineData("DataLog", "microi_datalog")]
     [InlineData("DataComment", "diy_comment")]
     [InlineData("DataVersion", "mic_data_version")]
@@ -361,7 +449,9 @@ public class FormEngineRelatedDataTests
         var identityHelper = File.ReadAllText(Path.Combine(root,
             "Microi.Server/Microi.Core/Runtime/HttpOwnedIdentityTransfer.cs"));
         // 执行完整生产服务，仅替换数据库与主库身份复核边界；不在测试里重写业务逻辑。
-        var service = File.ReadAllText(Path.Combine(root,"Microi.Server/Microi.Core/FormEngine/FormRelatedDataService.cs"))
+        var servicePath = Environment.GetEnvironmentVariable("TEST_RELATED_SERVICE_SOURCE")
+            ?? Path.Combine(root,"Microi.Server/Microi.Core/FormEngine/FormRelatedDataService.cs");
+        var service = File.ReadAllText(servicePath)
             .Replace("namespace Microi.net", "namespace Microi.Tests.Generated")
             .Replace("public static class FormRelatedDataService", "public class FormRelatedDataRuntime")
             .Replace("public static Task<object>", "public Task<object>")
@@ -392,6 +482,8 @@ public class RelatedDataFixture
     public TokenSource Token { get; } = new();
     public List<string> Calls { get; } = new();
     public List<DiyTableRowParam> AuxiliaryArguments { get; } = new();
+    public List<DiyTableRowParam> ParentAuthorizationArguments { get; } = new();
+    public List<DiyTableRowParam> ParentReadArguments { get; } = new();
     public Func<object, bool> IsTrusted { get; set; } = _ => false;
     public bool MenuAllowed { get; set; } = true;
     public bool ParentExists { get; set; } = true;
@@ -431,6 +523,7 @@ public class RelatedDataFixture
 
     public Task<DosResult> AuthorizeClientTableOperationAsync(DiyTableRowParam param, string operation)
     {
+        ParentAuthorizationArguments.Add(param);
         Calls.Add("authorize"); Assert.Equal("Client", param._InvokeType); Assert.False(param._TrustedServerInvocation);
         Assert.Equal("Read", operation); Assert.Equal("tenant-a", param.OsClient);
         param.TableId = "canonical-table-a";
@@ -440,6 +533,7 @@ public class RelatedDataFixture
     public Task<DosResult<dynamic>> GetFormDataAsync(object argument)
     {
         var param=Assert.IsType<DiyTableRowParam>(argument); Calls.Add("parent"); ParentReads++;
+        ParentReadArguments.Add(param);
         Assert.Equal("Client", param._InvokeType); Assert.False(IsTrusted(param));
         Assert.Equal("actor", param._CurrentUser["Id"]!.Value<string>());
         if (!ParentExists) return Task.FromResult(new DosResult<dynamic>(2, null));

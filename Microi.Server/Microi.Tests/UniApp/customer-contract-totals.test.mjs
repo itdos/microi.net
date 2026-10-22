@@ -110,7 +110,8 @@ test('列表和详情必须接入同一金额模块，列表提交迟到响应�
   const detail = fs.readFileSync(new URL('../../../microi.uniapp/src/pages/business/detail.vue', import.meta.url), 'utf8')
   assert.match(list, /hydrateCustomerContractTotals\(incomingRows,[\s\S]*?customerMenuId: this\.menuId[\s\S]*?if \(requestId !== this\.loadRequestId\) return[\s\S]*?this\.rows =/)
   assert.match(detail, /loadCustomerContractTotals\([\s\S]*?customerMenuId: this\.menuId/)
-  assert.match(list, /<xjy-customer-contract-totals[\s\S]*?:state="row\.__xjyContractTotals"/)
+  assert.match(list, /<mci-business-card[\s\S]*?:lines="cardLines\(row\)"/)
+  assert.match(list, /cardLines\(row\)[\s\S]*?\.concat\(buildCustomerContractCardLines\(this\.config\.table \|\| this\.baseConfig\.table, row\)\)/)
   assert.match(detail, /<xjy-customer-contract-totals[\s\S]*?:state="customerContractTotals"/)
 })
 

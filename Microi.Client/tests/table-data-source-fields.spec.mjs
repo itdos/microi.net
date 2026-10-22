@@ -6,6 +6,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import { parse } from "@babel/parser";
 import { isReactive, nextTick, reactive, toRaw, watchEffect } from "vue";
+import { createSelectedOptionHydrator } from "../src/utils/selected-option-hydration.js";
 
 import {
     collectMenuFieldReferenceIds,
@@ -15,6 +16,34 @@ import {
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const clientRoot = path.resolve(testDir, "..");
+
+test("visible column copies and JOIN aliases share one lookup; hidden fields do not query", async () => {
+    const source = fs.readFileSync(path.join(clientRoot, 'src/views/form-engine/mixins/diy-table-schema.mixin.js'), 'utf8');
+    const ast = parse(source, { sourceType: 'module' });
+    const methods = ast.program.body.find(n => n.type === 'ExportDefaultDeclaration').declaration.properties.find(n => n.key.name === 'methods').value.properties;
+    const node = methods.find(n => n.key.name === 'ResolveTableSelectedOptions');
+    const resolve = vm.runInNewContext(`({${source.slice(node.start, node.end)}})`).ResolveTableSelectedOptions;
+    const original = { Id: 'owner', Name: 'Owner', Component: 'Select', Data: [], Config: { DataSource: 'Sql', Sql: 'select Id,Name from users limit 20', SelectSaveField: 'Id', SelectLabel: 'Name' } };
+    let calls = 0;
+    const hydrate = createSelectedOptionHydrator({ identity: () => 'test', sqlUrl: '/sql', request: async (_, body) => {
+        calls++;
+        assert.deepEqual(Array.from(body.FieldIds), ['owner']);
+        assert.deepEqual(body._SelectedValues.owner, ['a', 'b']);
+        return { Code: 1, Data: [{ FieldId: 'owner', Result: { Code: 1, Data: [{ Id: 'a', Name: '姓名甲' }, { Id: 'b', Name: '姓名乙' }], DataAppend: { SelectedValuesResolved: true } } }] };
+    } });
+    const state = reactive({
+        DiyFieldList: [original, { ...original, Id: 'hidden', Name: 'Hidden' }],
+        ShowDiyFieldList: [{ ...original, AsName: 'Buyer' }, { ...original, AsName: 'Seller' }],
+        DiyTableRowList: [{ Buyer: 'a', Seller: 'b', Hidden: 'not-requested' }],
+        DiyCommon: { ResolveFieldsSelectedData: hydrate }
+    });
+    const before = JSON.stringify(state.DiyTableRowList);
+    await resolve.call(state);
+    for (const column of state.ShowDiyFieldList) assert.deepEqual(column.Data.map(o => o.Name), ['姓名甲', '姓名乙']);
+    await resolve.call(state);
+    assert.equal(calls, 1);
+    assert.equal(JSON.stringify(state.DiyTableRowList), before);
+});
 
 test("keeps every primary-table field but filters unrelated joined-table data sources", () => {
     const fields = [
@@ -80,23 +109,37 @@ test("loads asynchronous field data only after the table field list is reactive"
         `({${source.slice(method.start, method.end)}})`,
         { selectTableDataSourceFields }
     ).GetDiyFieldAfter;
+    const lookupMethod = methods.find((node) => node.key.name === "ResolveTableSelectedOptions");
+    const lookup = vm.runInNewContext(`({${source.slice(lookupMethod.start, lookupMethod.end)}})`, { selectTableDataSourceFields }).ResolveTableSelectedOptions;
     const rawFields = [
         { Id: "main-select", TableId: "main", Config: {}, Data: [] },
         { Id: "department", TableId: "sys-user", Config: {}, Data: [] },
         { Id: "unrelated", TableId: "sys-user", Config: {}, Data: [] }
     ];
     let completeLoad;
+    let lookupCalls = 0;
     const state = reactive({
         DiyFieldList: [],
+        ShowDiyFieldList: [rawFields[0], rawFields[1]],
         TableId: "main",
         SysMenuModel: { SearchFieldIds: [{ Id: "department" }] },
         PropsVirtualFields: [],
         TableChildAuth: { ChildTableId: "child-table" },
+        SysMenuId: "real-menu",
+        DiyTableRowList: [{ Department: "department-id" }],
+        ResolveTableSelectedOptions: lookup,
         DiyCommon: {
             IsNull: (value) => value === undefined || value === null || value === "",
             DiyFieldConfigStrToJson() {},
             Base64DecodeDiyField() {},
             EnsureFieldProperties() {},
+            ResolveFieldsSelectedData(fields, rows, context) {
+                lookupCalls++;
+                assert.deepEqual(Array.from(fields, field => field.Id), ["main-select", "department"]);
+                assert.equal(rows, state.DiyTableRowList);
+                assert.equal(context.menuId, state.SysMenuId);
+                assert.equal(context.tableChildAuth, state.TableChildAuth);
+            },
             SetFieldsData(fields, formData, tableChildAuth) {
                 assert.equal(isReactive(state.DiyFieldList), true, "the list must already be reactive when loading starts");
                 assert.deepEqual(fields.map((field) => field.Id), ["main-select", "department"]);
@@ -120,6 +163,7 @@ test("loads asynchronous field data only after the table field list is reactive"
     });
     try {
         getDiyFieldAfter.call(state, { Code: 1, Data: rawFields });
+        assert.equal(lookupCalls, 1, "同页选中值通过同一批次加载，保留真实授权上下文");
         await nextTick();
         assert.equal(renderedLabel, "department-id", "the saved value is visible before the option response");
         await Promise.resolve().then(completeLoad);

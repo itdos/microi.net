@@ -14,7 +14,10 @@ test('MCP Banner persisted configuration validation regression suite', () => {
   });
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stdout, /# tests 20\b/);
+  const total = Number(result.stdout.match(/^# tests (\d+)$/m)?.[1]);
+  const passed = Number(result.stdout.match(/^# pass (\d+)$/m)?.[1]);
+  assert.ok(total >= 20, 'All existing Banner cases and any new cases must run');
+  assert.equal(passed, total);
   assert.match(result.stdout, /# fail 0\b/);
   assert.match(result.stdout, /# skipped 0\b/);
 });

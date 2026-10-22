@@ -143,7 +143,7 @@ test('release JSON reader handles numeric ports, escaped strings, BOM and nested
 });
 
 test('release-only gate directory override is absolute, keeps defaults and relocates every receipt',()=>{
- const setup=source.slice(source.indexOf('# 发布进程专用输出目录'),source.indexOf('# 直接启动前端构建守护器'));
+ const setup=source.slice(source.indexOf('# 发布进程专用输出目录'),source.indexOf('MICROI_RELEASE_SCRATCH=$(node'));
  assert.match(setup,/MICROI_RELEASE_GATE_DIR="\$\{MICROI_RELEASE_GATE_DIR:-\$PWD\/\.tmp\/microi-release-gate\}"/);
  const directory=fs.mkdtempSync(path.join(root,'.tmp','release gate path '));
  const custom=path.join(directory,'external gate with spaces');

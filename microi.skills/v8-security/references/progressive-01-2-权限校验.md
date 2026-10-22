@@ -2,8 +2,14 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=v8-security-005 sha256=657db8189d96c594073735e9182af9d3e9a91f4f7dd111ecf2c7fe1eec6d7ede -->
+<!-- microi-progressive:chunk id=v8-security-005 sha256=e0f600f6c4d6b654e358f6da229ad60d6814f198f1566c8009948072b1e6e9c2 -->
 ## 2. 权限校验
+
+### 历史管理员等级兼容
+
+`admin` 内置账号和名称精确为“超级管理员”的有效角色必须分别为 `9999`；还要核对账号 `RoleIds` 的权威绑定与等级快照。普通角色名称包含“管理员”不构成升级依据。数据库兼容步骤 `7.6.17.0` 独立于商城恢复门槛，按共享租约、事务、回读、授权 epoch 失效和登录投影刷新执行，失败不推进该步骤版本。
+
+只有旧版本（早于 `7.6.15.0` 或无版本）且用户、角色均未出现 `Level>=9999` 时，才转换其它旧 `999/998` 为 `9999/9998`。新版可能把 `999/998` 用于普通业务权限，禁止无条件提升。生产专项修复先读取账号、角色、绑定用户和版本，再按明确授权精确处理；主租户可通过受控接口引擎的 `FormEngine` 显式指定子租户，必须固定目标、复核管理员身份、记录审计并回读，不能把主租户能力开放为任意跨租户参数。
 
 ### DiyToken 是平台会话与权限入口，不替换为 ASP.NET Identity
 
@@ -37,7 +43,7 @@ DiyToken 与 `sys_user`、`OsClient`、终端 `did`、共享 Redis 登录态、�
 - 菜单 `SqlWhere`、`SqlJoin` / `JoinTables` 数据范围必须在服务端形成的**真实列表、计数和导出查询**中执行，不能只用于界面展示或查询后过滤。单行详情只校验同表菜单访问权，不应用这些模块列表过滤；它们也不是行级写权限。
 - 主表新增、修改、删除分别由当前角色的 `Add`、`Edit`、`Del` 权限控制；不得把查询 SqlWhere 追加到写入 SQL，也不得因为查询包含跨表 Join 拒绝已获授权的写入。需要“仅可修改本人数据”等业务限制时，在 `SubmitBeforeServerV8` 或专用接口引擎中以可信服务器代码校验，并统一写入 `TenantId`、负责人、创建人等归属字段。
 - 导入、导出必须携带真实菜单上下文，并分别拥有 `Import`、`Export`；不能用 Table 级直接授权绕过。
-- 平台表必须按后端 `PlatformResourceSecurity` 分级：角色/权限、SaaS 配置、接口引擎、任务、数据源、密钥和基础设施等管理员专用表，对 `Level < 9999` 的通用客户端 FormEngine 全操作硬拒绝；`diy_table/diy_field`、工作流、微服务/商店、蓝图和微应用运行元数据只允许显式授权后的 `Read/List`，增删改及导入导出仍硬拒绝；`mic_page/mic_print/sys_user` 按真实菜单或 Table 的 `Read/Add/Edit/Del` 权限管理，账号管理另外执行层级校验和密码脱敏。
+- 平台表必须按后端 `PlatformResourceSecurity` 分级：角色/权限、SaaS 配置、任务、数据源、密钥和基础设施等管理员专用表，对 `Level < 9999` 的通用客户端 FormEngine 全操作硬拒绝；`diy_table/diy_field`、工作流、微服务/商店、蓝图和微应用运行元数据只允许显式授权后的 `Read/List`，增删改及导入导出仍硬拒绝；`sys_apiengine/mic_page/mic_print/sys_user` 按真实菜单或 Table 的各项操作权限管理，账号管理另外执行层级校验和密码脱敏。接口引擎菜单授权必须在服务端生效，不能要求给已授权开发角色提级到 9999；只读不等于代码写权限。
 - 需要角色查询表/字段目录时，在 `/#/system/role` 的【表直连权限】选择 `diy_table/diy_field` 并仅授予【查】，不必强制改用接口引擎。授权包含配置与事件源码，仅授予可信角色；选列参数不构成字段权限，需限制返回字段时仍用固定投影的接口引擎。此策略由后端发布，前端读取 `GetDirectTableGrantPolicies`，不维护第二份表名白名单；不得自动给存量角色补授权。
 - 匿名读取/新增仅适用于 `diy_table` 明确开启匿名能力的普通业务表；上述三类平台表必须先于匿名开关拒绝。
 - 角色增删改接口不能只相信 Token 缓存或前端禁用状态，必须覆盖请求中的 `_CurrentUser/OsClient`，并从租户主库复核活动用户、数据库 Level 与有效角色 Level。角色降级要先同步受影响用户 Level，再提升共享授权 `epoch`，避免旧令牌窗口；Postman 伪造 `_IsAdmin/Level/RoleIds` 必须失败。
@@ -47,7 +53,7 @@ DiyToken 与 `sys_user`、`OsClient`、终端 `did`、共享 Redis 登录态、�
 
 跨租户公共发现接口可以匿名，但返回值必须采用严格字段白名单，只返回公开标识和展示信息，禁止返回 `ApiKey`、上游 Endpoint、连接串或内部配置。例如官方 AI 中转模型清单应保持 `IsEnable=1`、`StopHttp=0`、`AllowAnonymous=1`，且只返回模型 Id、展示名等公开字段；将这类被其它租户服务器调用的发现接口误改为非匿名，会让所有消费者得到空模型列表或 `NoAuth`，属于破坏性配置变更。发布和升级后必须用无 Token 的真实 HTTP 请求验证返回字段与匿名状态。
 
-> 后端接口引擎、后端表单 V8 和平台内部调用由服务端在构造参数时设置不可由 HTTP JSON 注入的 `_TrustedServerInvocation`，因此调用 `V8.FormEngine` 不要求 `_SysMenuId`。`_InvokeType:'Server'` 只是事件调用语义，不是外部客户端可用的授权开关；普通用户即使在请求中伪造这两个字段也不能成为可信调用。能写 V8、接口引擎、任务或数据源的普通管理入口仍限制为 `Level >= 9999`。MCP 唯一例外是上节明确授权的 Full 范围且同时具有创建/修改、删除权限的可信开发角色，并须通过 MCP 专用逐请求鉴权；不能由菜单授权或请求参数推导此例外。
+> 后端接口引擎、后端表单 V8 和平台内部调用由服务端在构造参数时设置不可由 HTTP JSON 注入的 `_TrustedServerInvocation`，因此调用 `V8.FormEngine` 不要求 `_SysMenuId`。`_InvokeType:'Server'` 只是事件语义，伪造它不能获得信任。接口引擎标准 FormEngine 管理允许精确菜单/表操作权限委托；代码写权限意味着可信服务端执行能力，仅授予可信开发角色。其它控制面管理员门禁、接口运行权限不因此放宽。MCP 仍须独立验证 Full 范围及创建/修改、删除等专用开发授权，不能从菜单权限推导 MCP 授权。
 
 > 外层 `AddFormData` 的客户端菜单/`Add` 权限校验与事件内部执行权是两件事：前者防止无新增权限的用户进入事件，后者允许已经进入的 `SubmitBeforeServerV8` / `SubmitAfterServerV8` 像接口引擎一样在当前租户内执行复杂 SQL、跨表事务和其它表 CRUD。不要把客户端菜单范围再次套到服务器 V8 的嵌套调用。
 

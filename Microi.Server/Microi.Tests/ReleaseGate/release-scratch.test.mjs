@@ -10,8 +10,9 @@ const workspace=fileURLToPath(new URL('../../../',import.meta.url));
 const tools=path.join(workspace,'Microi.Server/tools');
 const source=fs.readFileSync(path.join(workspace,'Microi一键编译发布.sh'),'utf8');
 const bash=process.env.MICROI_TEST_BASH || (process.platform==='win32' ? (()=>{
- const git=spawnSync('where.exe',['git.exe'],{encoding:'utf8'}).stdout.trim().split(/\r?\n/)[0];
- return path.resolve(path.dirname(git),'../bin/bash.exe');
+ const git=spawnSync('git',['--exec-path'],{encoding:'utf8',windowsHide:true});
+ assert.ifError(git.error);assert.equal(git.status,0,git.stderr);
+ return path.resolve(git.stdout.trim(),'../../..','bin/bash.exe');
 })() : 'bash');
 const quote=value=>`'${value.replaceAll("'", "'\\''")}'`;
 function fixture(t){
@@ -39,6 +40,7 @@ for(const exit of [0,7,'INT','TERM','HUP','cleanup-failed','both-failed'])test(`
  const script=path.join(root,'exit.sh');
  fs.writeFileSync(script,`set -e\nMICROI_RELEASE_SCRATCH=${quote(scratch)}\nMICROI_RELEASE_SCRATCH_TOOL=${quote(path.join(tools,'release-scratch.mjs'))}\nMICROI_SKIP_EXIT_PAUSE=true\nstop_active_client_build() { printf stopped > ${quote(path.join(root,'stopped'))}; }\nrelease_workspace_lock() { printf released > ${quote(path.join(root,'released'))}; }\nis_windows_shell() { return 1; }\n${['cleanup_release_scratch','finish_windows_session','handle_session_interrupt'].map(shellFunction).join('\n')}\ntrap finish_windows_session EXIT\ntrap 'handle_session_interrupt INT' INT\ntrap 'handle_session_interrupt TERM' TERM\ntrap 'handle_session_interrupt HUP' HUP\n${['INT','TERM','HUP'].includes(exit)?`kill -s ${exit} $$`:`exit ${exit==='cleanup-failed'?0:exit==='both-failed'?7:exit}`}\n`);
  const result=spawnSync(bash,[script],{encoding:'utf8',windowsHide:true,timeout:30000});
+ assert.ifError(result.error);
  const expected=exit==='INT'?130:['TERM','HUP'].includes(exit)?143:exit==='cleanup-failed'?1:exit==='both-failed'?7:exit;
  assert.equal(result.status,expected,result.stdout+'\n'+result.stderr);
  assert.equal(fs.readFileSync(path.join(root,'stopped'),'utf8'),'stopped');
@@ -76,5 +78,6 @@ test('一键入口的四类临时文件全部归属 scratch，删除失败没有
  assert.match(source,/_tmp_dir=\$\(mktemp -d "\$MICROI_RELEASE_SCRATCH\//);
  assert.doesNotMatch(source,/rm -[a-z]*f[^\n]*(?:_BUILD_LOG|_PACK_LOG|SMOKE_LOG|_tmp_dir)/);
  const run=spawnSync(bash,['-n',path.join(workspace,'Microi一键编译发布.sh')],{encoding:'utf8',windowsHide:true});
+ assert.ifError(run.error);
  assert.equal(run.status,0,run.stderr);
 });

@@ -1240,6 +1240,7 @@ export default {
                                     self.ResetLazyRender();
                                 }
                             }
+                            self.ResolveTableSelectedOptions();
                             if (typeof self.RefreshModulePresentation === 'function') {
                                 self.RefreshModulePresentation(param, result.Data);
                             }

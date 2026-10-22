@@ -103,7 +103,7 @@ AI 为 Microi 平台新增或修改任何业务逻辑、后台工具、数据维
 - 平台级强制安全校验不能为了“全部低代码化”放进租户可编辑脚本而被绕过；可以留在 C#，但必须是通用、失败关闭的安全边界，不得夹带某个项目的业务文案、字段组合或状态机。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=e33b8387bbe8dbc400249ca9d16f91656149492f5f7ce253cbfa67b80f4ca8ef -->
+<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=9748eb80b50ef72828a14c237d42a1a1cee4815767b47900703902cfcc3a4e9b -->
 ## 应用商城优先于 Microi.Upgrade（强制）
 
 能由应用包声明、差异安装和回读验收完成的升级，不得在 `Microi.Server/Microi.Upgrade/` 新增定制 .NET 升级类。表、字段、Tab、菜单、角色权限、接口引擎、表单事件、数据源、页面、打印、工作流、任务及可幂等安装的种子数据，默认都属于应用商城资源。

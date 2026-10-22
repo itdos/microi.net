@@ -226,7 +226,7 @@ public class ChildTenantPlatformAppControlServiceTests
             "Resource",
             "bulk-import-packages.js"));
 
-        Assert.Contains("Version: v1.4.1", worker, StringComparison.Ordinal);
+        Assert.Contains("Version: v1.4.2", worker, StringComparison.Ordinal);
         Assert.Contains("MARKETPLACE_LIST_CUSTOM_ADDRESS_V1", worker, StringComparison.Ordinal);
         Assert.Contains("MARKETPLACE_LIST_ROUTE_FAILOVER_V1", worker, StringComparison.Ordinal);
         Assert.Contains("formalListPath = '/apiengine/get-microi-store-list'", worker, StringComparison.Ordinal);

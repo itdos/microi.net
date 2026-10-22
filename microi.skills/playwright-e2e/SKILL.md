@@ -21,6 +21,8 @@ description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化�
 
 真实依赖与发布范围沿用 `../workspace-conventions/SKILL.md` 的“平台回归与独立应用测试归属”：常规验证指定 MCP 实际使用的 MySQL、MongoDB、Redis 和 MinIO 或 OSS/HDFS，不要求额外 SQL Server 环境；仅用户明确指定 SQL Server 问题时才做其专项。按 [发布测试矩阵](../microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md#按指定-mcp-选择发布测试矩阵) 记录实际覆盖，保留正常登录、业务闭环与资源收尾，不以连接成功代替真实读写验收。
 
+桌面人工补充或新建浏览器验收默认只选一个常规 CSS 视口：优先复现用户实际浏览器尺寸，未知时用 1920×1080。截图文件像素还受设备缩放影响，不能据此强制 4K；仅用户明确要求或问题涉及超宽屏时追加 4K，移动端或响应式改动按需补充相关窄屏。沿用已有有效验收，不为截图分辨率重复整套用例；正式脚本既有 Full 不在运行中删减。核心发布已冻结后，新增规范文案独立交付，不因此重启合格候选的构建、测试或上传。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=playwright-e2e-000 sha256=a6ef528a2a940fd0f58efaee6b73eb5dbc159db93d95afedf41c7b8642536d18 -->
 ## 是否需要 `-e2e` 后缀

@@ -1588,6 +1588,9 @@ export default {
                         // SetFieldsData 本身是异步的，组件随后挂载时会直接读取 field.Data，
                         // 已挂载组件则由 field.Data watcher 接收回填。
                         self.DiyCommon.SetFieldsData(self.DiyFieldList, formData, self.TableChildAuth);
+                        self.DiyCommon.ResolveFieldsSelectedData(self.DiyFieldList, self.FormDiyTableModel, {
+                            formData: self.FormDiyTableModel, tableChildAuth: self.TableChildAuth, menuId: self.SysMenuId
+                        });
 
                         self.RefreshDiyFieldRuntimeState();
                         formTrace("diy-form:runtime-refresh-after-fields", {

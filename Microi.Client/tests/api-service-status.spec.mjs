@@ -250,7 +250,7 @@ test("an official external API block never covers the customer tenant system", f
     const officialContext = {
         apiBase: "https://api.customer.example.com",
         osClient: "customer",
-        url: "https://api.itdos.com/apiengine/get-microi-store-list?OsClient=iTdos",
+        url: "https://api.microi.net/apiengine/get-microi-store-list?OsClient=iTdos",
         method: "post"
     };
 
@@ -296,7 +296,7 @@ test("the security page renders complete diagnostics and current tenant branding
     await requestOfficialStoreList({ Action: "CheckPlatformApps" }, {
         fetchImpl: async (url, options) => {
             officialRequests++;
-            assert.equal(new URL(url).origin, "https://api.itdos.com");
+            assert.equal(new URL(url).origin, "https://api.microi.net");
             assert.equal(options.credentials, "omit");
             assert.deepEqual(options.headers, { "Content-Type": "application/json", apiengine: "1" });
             return { ok: true, status: 200, text: async () => JSON.stringify({ Code: 1, Data: { Notices: [] } }) };

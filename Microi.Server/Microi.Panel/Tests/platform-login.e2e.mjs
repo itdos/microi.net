@@ -15,7 +15,7 @@ const old = JSON.parse(docker(['inspect', name]))[0]; assert.equal(old.Config.La
 const configuredApi = process.env.PANEL_PLATFORM_API_BASE;
 const testedApi = new URL(configuredApi || 'https://localhost:61501');
 assert.equal(testedApi.protocol, 'https:'); assert(!testedApi.username && !testedApi.password && !testedApi.search && !testedApi.hash);
-assert(!configuredApi || testedApi.href === 'https://api.itdos.com/', 'Remote legacy acceptance must match the approved official credential target');
+assert(!configuredApi || testedApi.href === 'https://api.microi.net/', 'Remote legacy acceptance must match the approved official credential target');
 // 远端使用系统信任链验证后再固定证书；只有既有本机开发模式允许读取自签名开发证书。
 const certificate = await new Promise((resolveCert, reject) => {
   const socket = tls.connect({ host: testedApi.hostname, port: Number(testedApi.port || 443), servername: testedApi.hostname, rejectUnauthorized: Boolean(configuredApi) }, () => { const raw = socket.getPeerCertificate().raw; socket.end(); resolveCert(raw); }); socket.setTimeout(15000, () => socket.destroy(Error('Platform certificate timeout'))); socket.on('error', reject);

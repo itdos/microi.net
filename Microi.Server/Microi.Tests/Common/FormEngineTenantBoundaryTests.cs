@@ -103,7 +103,6 @@ public class FormEngineTenantBoundaryTests
     [InlineData("sys_osclients")]
     [InlineData("sys_config")]
     [InlineData("mci_global_function")]
-    [InlineData("sys_apiengine")]
     [InlineData("sys_menu")]
     [InlineData("sys_role")]
     [InlineData("sys_rolelimit")]
@@ -153,6 +152,7 @@ public class FormEngineTenantBoundaryTests
     [Theory]
     [InlineData("mic_page")]
     [InlineData("mic_print")]
+    [InlineData("sys_apiengine")]
     [InlineData("sys_user")]
     public void ClientFormEngine_RoleManagedRuntimeTablesUseExplicitRolePermissions(string tableName)
     {
@@ -183,6 +183,45 @@ public class FormEngineTenantBoundaryTests
         Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "Export"));
         Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "EditByWhere"));
         Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator("sys_user", "DeleteByWhere"));
+    }
+
+    [Theory]
+    [InlineData("Read", "Read", true)]
+    [InlineData("List", "Read", true)]
+    [InlineData("Add", "Add", true)]
+    [InlineData("Edit", "Edit", true)]
+    [InlineData("Delete", "Del", true)]
+    [InlineData("Export", "Export", true)]
+    [InlineData("Import", "Import", true)]
+    [InlineData("Edit", "Read", false)]
+    [InlineData("Delete", "Read", false)]
+    public async Task ApiEngine_UsesActualMenuActionWithoutPromotingUser(string operation, string permission, bool expected)
+    {
+        var menu = new FormEngineAuthorizationMenuSnapshot { Id = "engine-menu", DiyTableId = "engine-table" };
+        var snapshot = NewActiveAuthorizationSnapshot(menu, "[\"" + permission + "\"]");
+        snapshot.UserLevel = 9998;
+        var param = new DiyTableRowParam
+        {
+            _InvokeType = "Client", _SysMenuId = menu.Id,
+            _CurrentUser = new JObject { ["Id"] = "user-a", ["Level"] = 9998 },
+            _AuthorizationSnapshot = snapshot
+        };
+        var table = new JObject { ["Id"] = "engine-table", ["Name"] = "sys_apiengine" };
+        var engine = new FormEngine();
+        Assert.Equal(expected, await InvokeClientAuthorization(engine, param, table, operation));
+        Assert.True(await InvokeClientMetadataAuthorization(engine, param, table));
+        Assert.Equal(9998, snapshot.UserLevel);
+        param._SysMenuId = "ungranted-menu";
+        Assert.False(await InvokeClientAuthorization(engine, param, table, "List"));
+        param._SysMenuId = menu.Id;
+        table["Id"] = "other-table";
+        Assert.False(await InvokeClientAuthorization(engine, param, table, "List"));
+        table["Id"] = "engine-table";
+        snapshot.RoleLimits.Clear();
+        Assert.False(await InvokeClientAuthorization(engine, param, table, "List"));
+        Assert.False(await InvokeClientMetadataAuthorization(engine, param, table));
+        param._IsAnonymous = true;
+        Assert.False(await InvokeClientAuthorization(engine, param, table, "Read"));
     }
 
     [Fact]

@@ -85,7 +85,7 @@ public static class TcpIngressRules
             .ToArray();
 
         return new TcpIngressRule(
-            osClient, apiEngineKey, listenPort, cidrs, requestHeader, responseHeader, tail,
+            osClient, apiEngineKey, listenPort, cidrs, allowAnySource, requestHeader, responseHeader, tail,
             lengthOffset, lengthAdjustment, correlationOffset, correlationLength,
             maxFrameBytes, maxConnections, idleTimeoutSeconds, executionTimeoutSeconds,
             maxQueuedFrames, downlink, requestPolicy, responsePolicy, allowNoResponse);
@@ -159,7 +159,8 @@ public static class TcpIngressRules
 public sealed class TcpIngressRule
 {
     internal TcpIngressRule(string osClient, string apiEngineKey, int listenPort,
-        IReadOnlyList<TcpIngressCidr> allowedCidrs, byte[] requestHeader, byte[] responseHeader,
+        IReadOnlyList<TcpIngressCidr> allowedCidrs, bool allowAnySource,
+        byte[] requestHeader, byte[] responseHeader,
         byte[] tail, int lengthOffset, int lengthAdjustment, int correlationOffset,
         int correlationLength, int maxFrameBytes, int maxConnections, int idleTimeoutSeconds,
         int executionTimeoutSeconds, int maxQueuedFramesPerConnection, IoTDownlinkPolicy? downlink = null,
@@ -169,6 +170,7 @@ public sealed class TcpIngressRule
         ApiEngineKey = apiEngineKey;
         ListenPort = listenPort;
         AllowedCidrs = allowedCidrs;
+        AllowAnySource = allowAnySource;
         RequestHeader = requestHeader;
         ResponseHeader = responseHeader;
         Tail = tail;
@@ -207,6 +209,7 @@ public sealed class TcpIngressRule
     public TcpFramePolicy ResponsePolicy { get; }
     public bool AllowNoResponse { get; }
     internal IReadOnlyList<TcpIngressCidr> AllowedCidrs { get; }
+    public bool AllowAnySource { get; }
 
     public bool IsAllowed(IPAddress address) => AllowedCidrs.Any(cidr => cidr.Contains(address));
 }

@@ -18,6 +18,7 @@
     因为field.Name是固定不变的，
     已解决-->
     <el-select
+        ref="selectControl"
         v-model="ModelValue"
         :disabled="GetFieldReadOnly(field)"
         :multiple="field.Component == 'MultipleSelect'"
@@ -243,6 +244,11 @@ export default {
         },
         "field.Data": function (newVal, oldVal) {
             var self = this;
+            // Element Plus 的 remote 模式不会在选项 label 更新时重算已选标签。
+            // 等 el-option 更新后只刷新显示缓存，不清空 ModelValue、不触发 change/V8。
+            self.$nextTick(() => {
+                if (!self._selectDestroyed) self.$refs.selectControl?.setSelected?.();
+            });
             // if (newVal.length > 0 && self.FieldAllData.length == 0) {//2023-10-27注释
             //2023-10-27新增：有可能下拉框组件的数据源是动态赋值的，FieldAllData也要跟着变
             // 首次数据加载时（FieldAllData为空），即使NeedResetDataSourse=false也要匹配
@@ -285,8 +291,9 @@ export default {
                     // 其他数据源（Sql/DataSource/ApiEngine），item是对象
                     var saveField = self.field.Config.SelectSaveField || self.field.Config.SelectLabel;
                     if (saveField) {
-                        if (self._isMultipleSelectSaveFieldObjectDataSource()) {
-                            self.ModelValue = self._normalizeMultipleSaveFieldValue(self.ModelValue);
+                        if (self._isMultipleSelect()) {
+                            self.ModelValue = self._isMultipleSelectSaveFieldObjectDataSource()
+                                ? self._normalizeMultipleSaveFieldValue(self.ModelValue) : self._normalizeMultipleObjectValue(self.ModelValue);
                             self._ensureSelectOption(self.ModelValue);
                             self.FieldAllData = [...self.field.Data];
                             self.NeedResetDataSourse = true;
@@ -344,8 +351,8 @@ export default {
             self.field.Data = self.field.Data.map(item => {
                 if (typeof item === 'object' && item !== null) {
                     return {
-                        Key: item.Key || item.key || '',
-                        Value: item.Value || item.value || ''
+                        Key: item.Key ?? item.key ?? '',
+                        Value: item.Value ?? item.value ?? ''
                     };
                 }
                 return item;
@@ -393,6 +400,9 @@ export default {
         }
 
         self.ModelValue = self.normalizeSelectValue(self.ModelValue);
+        if (self._isMultipleSelect() && self._isObjectDataSource() && !self._isMultipleSelectSaveFieldObjectDataSource()) {
+            self.ModelValue = self._normalizeMultipleObjectValue(self.ModelValue);
+        }
 
         // 对于 SQL/DataSource/ApiEngine 数据源，如果 field.Data 已经加载，
         // 需要从 field.Data 中查找匹配的完整选项对象，否则 el-select 的 value-key 无法匹配
@@ -549,7 +559,7 @@ export default {
         _isObjectDataSource() {
             var self = this;
             var ds = self.field && self.field.Config ? self.field.Config.DataSource : "";
-            return ds === "Sql" || ds === "DataSource" || ds === "ApiEngine" || (ds === "Data" && self._hasObjectOptionData());
+            return ds === "Sql" || ds === "DataSource" || ds === "ApiEngine" || ds === "Api" || (ds === "Data" && self._hasObjectOptionData());
         },
         _isMultipleSelect() {
             return this.field && this.field.Component === "MultipleSelect";
@@ -558,6 +568,7 @@ export default {
             var cfg = (this.field && this.field.Config) || {};
             return this._isMultipleSelect()
                 && this._isObjectDataSource()
+                && cfg.SelectSaveFormat !== "Json"
                 && !this.DiyCommon.IsNull(cfg.SelectSaveField);
         },
         _getOptionFieldValue(item, fieldName) {
@@ -634,6 +645,17 @@ export default {
                 return self._getOptionFieldValue(item, cfg.SelectSaveField);
             }).filter(function (item) {
                 return !self._isEmptySelectValue(item);
+            });
+        },
+        _normalizeMultipleObjectValue(value) {
+            const cfg = this.field.Config || {};
+            const key = cfg.SelectSaveField || cfg.SelectLabel || 'Id';
+            const label = cfg.SelectLabel || key;
+            const values = Array.isArray(value) ? value : this._isEmptySelectValue(value) ? [] : [value];
+            return values.filter(item => !this._isEmptySelectValue(item)).map(item => {
+                if (item && typeof item === 'object') return item;
+                return (this.field.Data || []).find(option => option && typeof option === 'object' && option[key] == item)
+                    || { [key]: item, [label]: item };
             });
         },
         _normalizePlainDataSourceValue(value) {
@@ -802,6 +824,9 @@ export default {
         _resolveTextFormatValue(val) {
             var self = this;
             if (self._isEmptySelectValue(val)) return "";
+            if (self._isMultipleSelect() && self._isObjectDataSource() && !self._isMultipleSelectSaveFieldObjectDataSource()) {
+                return self._normalizeMultipleObjectValue(val);
+            }
             // 如果已经是对象，确保它存在于field.Data中
             if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
                 self._ensureSelectOption(val);
@@ -997,7 +1022,8 @@ export default {
         async SelectChange(item, field) {
             var self = this;
             // KeyValue 数据源特殊处理：ModelValue 和 FormDiyTableModel 都保持完整对象
-            var saveItem = item;
+            // Element Plus 清空单选时可能返回 undefined，必须提交明确空值而非漏掉字段。
+            var saveItem = self._isEmptySelectValue(item) ? self._getEmptyModelValue() : item;
             if (field.Config.DataSource === "KeyValue") {
                 saveItem = self._normalizeKeyValueValue(item);
                 // ModelValue 和 FormDiyTableModel 都保存标准化后的对象/对象数组
@@ -1079,7 +1105,7 @@ export default {
             if (field.Config.DataSource === "KeyValue") {
                 return "Key";
             }
-            if (field.Component === "MultipleSelect" && !self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
+            if (self._isMultipleSelectSaveFieldObjectDataSource()) {
                 return undefined;
             }
             // zhy：对象选项优先使用稳定 Id 比较，联系人改名后仍能匹配同一条记录，不再把可变姓名当唯一键。
@@ -1154,6 +1180,8 @@ export default {
                 };
                 if (field.Config.DataSource == "Sql") {
                     apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
+                } else if (field.Config.DataSource == "Api") {
+                    apiGetDiyFieldSqlData = self.DiyCommon.RepalceUrlKey(field.Config.Api);
                 } else if (field.Config.DataSource == "DataSource") {
                     apiGetDiyFieldSqlData = self.DiyApi.GetDataSourceEngine;
                     postData = {
@@ -1185,10 +1213,11 @@ export default {
                             currentValue = self.FormDiyTableModel[field.Name];
                         }
                         var nextData = mergeCurrentSelectOptions(
-                            data,
+                            self.DiyCommon.MergeResolvedFieldOptions(field, data),
                             currentValue,
                             field.Config,
-                            self._isMultipleSelect()
+                            self._isMultipleSelect(),
+                            field.Data
                         );
                         if (!self._isSameOptionList(field.Data, nextData)) {
                             field.Data = nextData;
@@ -1236,6 +1265,7 @@ export default {
                 DataSource: self.field.Config.DataSource || 'Data',
                 Sql: self.field.Config.Sql || '',
                 DataSourceId: self.field.Config.DataSourceId || '',
+                SelectedValueLookup: self.field.Config.SelectedValueLookup === true,
                 DataSourceApiEngineKey: self.field.Config.DataSourceApiEngineKey || '',
                 DataSourceSqlRemote: self.field.Config.DataSourceSqlRemote || false
             };
@@ -1245,7 +1275,7 @@ export default {
                     self.configKeyValueList = self.field.Data.map(item => {
                         if (typeof item === 'object' && item !== null) {
                             // 兼容旧数据的小写key/value，但优先使用大驼峰Key/Value
-                            return { Key: item.Key || item.key || '', Value: item.Value || item.value || '' };
+                            return { Key: item.Key ?? item.key ?? '', Value: item.Value ?? item.value ?? '' };
                         }
                         return { Key: String(item), Value: String(item) };
                     });
@@ -1271,6 +1301,7 @@ export default {
             self.field.Config.DataSource = self.configForm.DataSource;
             self.field.Config.Sql = self.configForm.Sql;
             self.field.Config.DataSourceId = self.configForm.DataSourceId;
+            self.field.Config.SelectedValueLookup = self.configForm.SelectedValueLookup === true;
             self.field.Config.DataSourceApiEngineKey = self.configForm.DataSourceApiEngineKey;
             self.field.Config.DataSourceSqlRemote = self.configForm.DataSourceSqlRemote;
 

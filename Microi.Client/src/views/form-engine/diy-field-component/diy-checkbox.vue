@@ -412,7 +412,7 @@ export default {
                         //这里要把设置的默认值加进入，不然开启了limit远程搜索后，不显示值或者错误
                         //注意这里的逻辑和DiyCommon的SetFieldData逻辑类似 ，如果这里修改，那边需要同步
                         if (self.DiyCommon.Result(result)) {
-                            field.Data = result.Data;
+                            field.Data = self.DiyCommon.MergeResolvedFieldOptions(field, result.Data);
                         }
                         field.Config.DataSourceSqlRemoteLoading = false;
                     },
@@ -468,7 +468,7 @@ export default {
                     if (self.DiyCommon.IsNull(result.Data)) {
                         result.Data = [];
                     }
-                    field.Data = result.Data;
+                            field.Data = self.DiyCommon.MergeResolvedFieldOptions(field, result.Data);
                 }
             });
         },
@@ -485,6 +485,7 @@ export default {
                 DataSource: self.field.Config.DataSource || 'Data',
                 Sql: self.field.Config.Sql || '',
                 DataSourceId: self.field.Config.DataSourceId || '',
+                SelectedValueLookup: self.field.Config.SelectedValueLookup === true,
                 DataSourceApiEngineKey: self.field.Config.DataSourceApiEngineKey || '',
                 DataSourceSqlRemote: self.field.Config.DataSourceSqlRemote || false
             };
@@ -541,6 +542,7 @@ export default {
             self.field.Config.DataSource = self.configForm.DataSource;
             self.field.Config.Sql = self.configForm.Sql;
             self.field.Config.DataSourceId = self.configForm.DataSourceId;
+            self.field.Config.SelectedValueLookup = self.configForm.SelectedValueLookup === true;
             self.field.Config.DataSourceApiEngineKey = self.configForm.DataSourceApiEngineKey;
             self.field.Config.DataSourceSqlRemote = self.configForm.DataSourceSqlRemote;
             
