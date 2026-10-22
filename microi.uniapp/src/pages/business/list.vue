@@ -1440,8 +1440,10 @@ export default {
         this.mciNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(row.Id)}`)
         return
       }
-      if (['customers', 'orders', 'devices', 'leads', 'recruitment', 'demands', 'stores', 'providers'].includes(this.key)) {
-        this.mciNavigateToDetail(`/pages/business/detail?key=${encodeURIComponent(this.key)}&id=${encodeURIComponent(row.Id)}&menuId=${encodeURIComponent(this.menuId || '')}`)
+      // 同类业务入口可复用详情，但授权菜单与返回列表仍属于当前入口。
+      const detailKey = this.config.detailKey || this.key
+      if (['customers', 'orders', 'devices', 'leads', 'recruitment', 'demands', 'stores', 'providers'].includes(detailKey)) {
+        this.mciNavigateToDetail(`/pages/business/detail?key=${encodeURIComponent(detailKey)}&id=${encodeURIComponent(row.Id)}&menuId=${encodeURIComponent(this.menuId || '')}`)
         return
       }
       this.mciMarkDetailReturn()

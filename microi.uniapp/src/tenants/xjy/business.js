@@ -168,8 +168,10 @@ export const businessModules = {
   }),
   cooperativeCustomers: native({
     title: '合作客户', table: 'Diy_Kehu', menuAliases: ['合作客户', '客户管理', '客户'],
+    // 仅列表限定合作状态；详情复用客户业务页，保持统计、关联页与操作一致。
+    detailKey: 'customers',
     titleField: 'KehuMC', statusField: 'Zhuangtai', tagFields: ['KehuLX'],
-    fixedWhere: [{ Name: 'Zhuangtai', Type: 'Like', Value: '合作' }],
+    fixedWhere: [{ Name: 'Zhuangtai', Type: '=', Value: '合作客户' }],
     lines: [
       { label: '负责人', field: 'FuzeR' },
       { label: '所在城市', field: 'Chengshi', format: 'region' },
