@@ -10,11 +10,12 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.14
+ * Version: v3.0.15
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
  * - SQL Server 唯一索引先同步声明列，再按真实可空键生成过滤条件；原子修复历史缺失过滤并严格回读，保留非空唯一约束和业务数据。
+ * - 随包数据的查重、父记录与元数据读写共享安装事务；保留已有租户配置值，任何真实查询或写入失败均回滚本片。
  */
 
 /* EMPTY_SHARED_TABLE_PREREQUISITE_V1
@@ -4390,7 +4391,7 @@ try {
         var menuResult = V8.FormEngine.GetFormData('sys_menu', {
             Id: targetMenuId,
             _SelectFields: ['Id', 'Name', 'DiyTableId', 'DiyTableName']
-        });
+        }, V8.DbTrans);
         if (menuResult && menuResult.Code == 2) {
             throw pageEngineMissingReferenceError(
                 '界面引擎 diytable 引用修复失败：目标菜单不存在，MenuId=' + targetMenuId
@@ -4409,7 +4410,7 @@ try {
         var tableResult = V8.FormEngine.GetFormData('diy_table', {
             Id: targetTableId,
             _SelectFields: ['Id', 'Name']
-        });
+        }, V8.DbTrans);
         if (tableResult && tableResult.Code == 2) {
             throw pageEngineMissingReferenceError(
                 '界面引擎 diytable 引用修复失败：目标菜单绑定的DIY表不存在，MenuId='
@@ -10603,8 +10604,10 @@ try {
         }
         return fields;
     };
+    // 随包数据的查重与写入必须共享安装事务：后续种子要看见本片尚未提交的行，
+    // 避免 SQL Server 独立读连接等待本片写锁，也不能把真实查询失败当成不存在。
     var findExistingPackageData = function (dataTableName, sourceRow, conflictPolicy, conflictFields) {
-        var existingById = V8.FormEngine.GetFormData(dataTableName, { Id: String(sourceRow.Id) });
+        var existingById = V8.FormEngine.GetFormData(dataTableName, { Id: String(sourceRow.Id) }, V8.DbTrans);
         if (existingById && existingById.Code == 1 && existingById.Data) {
             return { Exists: true, Match: 'Id', Result: existingById };
         }
@@ -10625,7 +10628,7 @@ try {
             _Where: conflictWhere,
             _SelectFields: ['Id'],
             _PageSize: 1
-        });
+        }, V8.DbTrans);
         if (existingByConflict && existingByConflict.Code == 1 && existingByConflict.Data) {
             return { Exists: true, Match: conflictFields.join(','), Result: existingByConflict };
         }
@@ -10708,7 +10711,7 @@ try {
         var parentResult = V8.FormEngine.GetTableData(binding.TableName, {
             _Where: [[binding.MatchField, '=', binding.MatchValue]],
             _SelectFields: ['Id'], _PageSize: 2, _PageIndex: 1
-        });
+        }, V8.DbTrans);
         if (!parentResult || parentResult.Code != 1 || !parentResult.Data
             || parentResult.Data.length != 1 || !parentResult.Data[0].Id) {
             throw new Error('应用数据 ParentBinding 必须匹配唯一父记录：' + binding.TableName);
@@ -10728,7 +10731,7 @@ try {
         if(isEmptySharedTablePrerequisite(dataSet)) {
             var dependencyTable=V8.FormEngine.GetFormData('diy_table',{
                 _Where:[['Name','=',dataTableName]],_SelectFields:['Id','Name']
-            });
+            }, V8.DbTrans);
             if(!dependencyTable || dependencyTable.Code!==1 || !dependencyTable.Data || !dependencyTable.Data.Id)
                 throw new Error('共享表依赖元数据不存在：'+dataTableName);
             stats.DataSetCount++;continue;
@@ -10745,7 +10748,7 @@ try {
         var tableDefinitionResult = V8.FormEngine.GetFormData('diy_table', {
             _Where: [['Name', '=', dataTableName]],
             _SelectFields: ['Id', 'Name']
-        });
+        }, V8.DbTrans);
         if (!tableDefinitionResult || tableDefinitionResult.Code != 1 || !tableDefinitionResult.Data) {
             throw new Error('应用数据导入失败：目标表 ' + dataTableName + ' 尚未创建');
         }
@@ -10788,7 +10791,8 @@ try {
                         var metadataFieldName = metadataFields[metadataCopyIndex];
                         metadataTargetRow[metadataFieldName] = sourceRow[metadataFieldName];
                     }
-                    var metadataUpdateResult = V8.FormEngine.UptFormData(dataTableName, metadataTargetRow);
+                    // 展示元数据也随整片提交或回滚；失败时不能遗留已独立提交的半次更新。
+                    var metadataUpdateResult = V8.FormEngine.UptFormData(dataTableName, metadataTargetRow, V8.DbTrans);
                     if (!metadataUpdateResult || metadataUpdateResult.Code != 1) {
                         throw new Error('应用数据元数据更新失败：表 ' + dataTableName + '，Id=' + metadataTargetRow.Id
                             + '，' + ((metadataUpdateResult && metadataUpdateResult.Msg) || '未知错误'));

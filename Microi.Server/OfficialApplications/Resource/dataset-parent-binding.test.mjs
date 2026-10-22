@@ -8,15 +8,16 @@ const end=source.indexOf('\n    if (dataSets.length > 0)',start);
 const helper=source.slice(start,end);
 const binding={Field:'SysConfigId',TableName:'sys_config',MatchField:'IsEnable',MatchValue:1};
 function run(data,result){
- const calls=[];
- const ctx={isSafeDataTableName:n=>/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(n||'')),V8:{FormEngine:{GetTableData:(...args)=>{calls.push(args);return result;}}}};
+ const calls=[],transaction={};
+ const ctx={isSafeDataTableName:n=>/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(n||'')),V8:{DbTrans:transaction,FormEngine:{GetTableData:(...args)=>{calls.push(args);return result;}}}};
  vm.createContext(ctx);vm.runInContext(helper,ctx);
- return {value:ctx.resolveDataSetParentBinding(data),calls};
+ return {value:ctx.resolveDataSetParentBinding(data),calls,transaction};
 }
 test('种子按目标当前唯一配置绑定，仅查询 Id，不读写系统设置值',()=>{
- const {value,calls}=run({ConflictPolicy:'InsertIfMissing',ParentBinding:binding},{Code:1,Data:[{Id:'target-config'}]});
+ const {value,calls,transaction}=run({ConflictPolicy:'InsertIfMissing',ParentBinding:binding},{Code:1,Data:[{Id:'target-config'}]});
  assert.equal(value.Id,'target-config');assert.equal(value.Field,'SysConfigId');
- assert.equal(JSON.stringify(calls[0]),JSON.stringify(['sys_config',{_Where:[['IsEnable','=',1]],_SelectFields:['Id'],_PageSize:2,_PageIndex:1}]));
+ assert.equal(JSON.stringify(calls[0].slice(0,2)),JSON.stringify(['sys_config',{_Where:[['IsEnable','=',1]],_SelectFields:['Id'],_PageSize:2,_PageIndex:1}]));
+ assert.equal(calls[0][2],transaction);
 });
 test('歧义、查表失败和不安全绑定不得继续安装',()=>{
  for(const result of [{Code:1,Data:[]},{Code:1,Data:[{Id:'a'},{Id:'b'}]},{Code:0,Msg:'denied'}])
