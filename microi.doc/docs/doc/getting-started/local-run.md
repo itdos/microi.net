@@ -48,8 +48,8 @@
 本地与存量部署的 CORS 在未配置来源时默认允许任意来源；只有在 SaaS 引擎主租户的 `CorsAllowOrigins` 中填写来源后才收紧。严格 SSRF 模式同样默认关闭，并由主租户 `SsrfProtectionEnabled` 控制。不要为了本地调试删除登录 RSA 历史兼容密钥或私有授权密钥；完整规则见 [平台安全与兼容基线](../more/security)。
 
 ::: warning 注意事项
-- 拉取源码后，请**优先将 `Microi.net.dll` 更新至最新版本**
-- 若 NuGet 自动还原失败 / 加载项目失败导致编译失败，可尝试重启 VS Code 重新加载项目等待 NuGet 还原
+- 公开源码使用 `Microi.Server/Microi.net.sln`；五个闭源库由 `Directory.Build.props` 指定的同平台版本 NuGet 提供，不要单独替换其中一个 DLL。
+- 还原失败时先查看第一条错误；项目未加载、方案缺项和 SDK/IDE 不兼容与网络故障应分别排查，步骤见下方。
 :::
 
 5. 右键 `Microi.net.Api` 项目 → 调试 → 启动新实例
@@ -57,12 +57,30 @@
 
 ---
 
-### 🖥️ 使用 Visual Studio 2022 打开解决方案（Windows 推荐）
+### 🖥️ 使用 Visual Studio 2026 打开解决方案（Windows 推荐）
 
-1. 下载并安装 [Visual Studio 2022](https://visualstudio.microsoft.com/zh-hans/)
-2. 双击打开 `/Microi.net.sln`，稍等片刻右键 `Microi.net.Api` 项目 → 重新生成
-3. 若还原 NuGet 包失败，关闭 VS2022 并重新打开 `Microi.net.sln`（一般是网络问题，可尝试手机热点）
-4. **必须**配置 `/Microi.net.Api/appsettings.json`，说明同上
+1. 安装 [Visual Studio 2026](https://visualstudio.microsoft.com/zh-hans/) 及“ASP.NET 和 Web 开发”工作负载，使用其配套 .NET 10 SDK。
+2. 打开仓库中的 `Microi.Server/Microi.net.sln`，等待全部项目加载，右键解决方案执行“还原 NuGet 程序包”。`Microi.Anderson.sln` 是创建人完整源码入口，不适用于公开源码。
+3. 确认 `Dependencies` 与 `Tests/Fixtures` 内的项目没有被卸载；还原成功后，将 `Microi.net.Api` 设为启动项目并生成。
+4. **必须**配置 `Microi.Server/Microi.net.Api/appsettings.json`，说明同上。
+
+::: warning .NET 10 与 IDE 版本
+.NET 10 SDK 10.0.1xx 至少需要 Visual Studio 2026 18.0；后续 SDK 功能带应搭配对应更新的 IDE。Visual Studio 2022 17.14 不支持以 `net10.0` 为目标，即使另外安装 .NET 10 SDK 仍会出现 `NETSDK1233`。可升级 IDE，或使用 .NET CLI / VS Code。详见 [Microsoft SDK 与 Visual Studio 版本矩阵](https://learn.microsoft.com/zh-cn/dotnet/core/porting/versioning-sdk-msbuild-vs)。
+:::
+
+#### 拉取源码后出现 NU1105 / NETSDK1004
+
+`NU1105` 的“找不到项目的信息”不一定是 NuGet 服务器故障。Visual Studio 还原需要解决方案完整列出项目引用链；仅有磁盘上的 `.csproj` 不够。`NETSDK1004` 表示对应项目的 `obj/project.assets.json` 尚未生成，应先修复还原错误。
+
+- 更新并重新加载 `Microi.Server/Microi.net.sln`。方案包含 MongoDB 驱动、NPOI 及其四个子项目、Panel、MemoryDiagnostics 和两个独立测试夹具；这些都是公开项目，不需要获取闭源仓库。
+- 若文件不存在，核对拉取的提交、稀疏检出配置或 ZIP 解压是否完整；若文件存在，检查是否仍打开旧方案或卸载了项目。不要删除项目引用、关闭诊断功能或复制他人的 `obj` 来绕过还原。
+- 在仓库根执行以下命令。还原报错时先处理该错误，再重新生成；命令行通过后仍须使用受支持的 IDE 加载方案。
+
+```powershell
+dotnet --version
+dotnet restore Microi.Server/Microi.net.sln
+dotnet build Microi.Server/Microi.net.sln -c Debug --no-restore
+```
 
 ---
 

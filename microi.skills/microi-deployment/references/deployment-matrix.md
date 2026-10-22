@@ -79,6 +79,9 @@ Obfuscar 路径转换只适用于 Git Bash/MSYS/Cygwin。macOS/Linux 的 `/Users
 后端：
 
 - 使用当前仓库规定的 .NET SDK；
+- 公开源码打开 `Microi.Server/Microi.net.sln`，五个闭源库使用同版本 NuGet；创建人完整源码才使用 `Microi.Anderson.sln`。目标 `net10.0` 需要 Visual Studio 2026 18.0 起及与 SDK 功能带匹配的 IDE，不能把 VS 2022 加装 SDK 视为受支持配置。
+- 排查 `NU1105` / `NETSDK1004` 时，分别检查项目文件是否公开交付、是否完整列入方案、是否被卸载以及还原是否成功。CLI 递归 restore 通过不能证明 VS 方案项目图完整；公开闭包回归还必须检查全部传递依赖及 Debug/Release 配置，包含 `ReferenceOutputAssembly=false` 的独立进程夹具。
+- 修复方案后在不含闭源源码的隔离公开候选中还原、构建；可用 `dotnet restore Microi.Server/Microi.net.sln -p:RestoreRecursive=false` 验证方案列出的全部项目均获得还原资产，再执行 `dotnet build Microi.Server/Microi.net.sln -c Debug --no-restore`。该命令行证据不等于真实 Visual Studio 界面验收，不删除引用或关闭功能来掩盖错误。
 - 配置开发专用数据库/Redis/Mongo/对象存储；
 - 先跑定向测试，再按资源允许程度执行更大构建；
 - 不让本地调试连接生产写库。
