@@ -186,7 +186,11 @@ function getProfileArtifacts(profileId) {
 }
 
 function activateProfile(profileId) {
-  const artifacts = getProfileArtifacts(profileId)
+  return activateProfileArtifacts(getProfileArtifacts(profileId))
+}
+
+// 激活/恢复逻辑与目标目录解耦，回归测试可使用独占夹具，避免改写开发服务器监听中的 src。
+function activateProfileArtifacts(artifacts) {
   const backups = artifacts.map(({ target }) => ({
     target,
     existed: fs.existsSync(target),
@@ -219,6 +223,7 @@ module.exports = {
   loadProfile,
   getProfileArtifacts,
   activateProfile,
+  activateProfileArtifacts,
   generatedProfileSource,
   generatedActiveTabBarSource,
   generatedTenantSource,

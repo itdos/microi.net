@@ -145,6 +145,13 @@ src/tenants/<tenant>/
 
 ## 动态更新链路
 
+Profile 覆盖层回归只在工作区 `.tmp/profile-overrides-*` 独占夹具内激活并恢复，
+不得临时改写正在被 HBuilderX/Vite 监听的真实 `src`。检查同时断言真实源码字节与
+mtime 不变，并覆盖夹具激活失败后的恢复和清理。否则即使源码最终相同，增量编译器
+仍可能留下与模板不一致或仅含变量注释的 WXSS，造成首页图片、字号和布局失效。
+`npm run check:mp-styles` 检查现有微信开发产物的真实样式规则及模板根类名；
+正式构建产物可执行 `node scripts/check-built-profile-styles.cjs build`。
+
 1. 登录后读取当前角色可见的 `sys_menu`。
 2. 根据 `DiyTableId` 批量解析表名，并读取菜单的移动列、搜索列、统计列、
    卡片列和 ViewSchema。

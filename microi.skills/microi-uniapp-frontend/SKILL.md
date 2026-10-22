@@ -58,6 +58,8 @@ Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile
 
 仓库必须提供 AI 与人工协作约束文件、租户脚手架、Profile 构建/同步命令和架构检查。平台层改动至少同时构建标准 Profile 与默认交付 Profile；租户视觉改动还要执行多视口截图回归。这样其他同事使用 Codex、Claude、Copilot、Cursor 等工具继续开发时，会先读取相同规则，而不是依赖某次对话记忆。
 
+Profile 覆盖层回归必须在独占临时夹具中执行，禁止为了测试临时切换正在被 HBuilderX/Vite 监听的真实源码。即使最终恢复字节，也可能触发增量编译缓存不一致，留下空 WXSS。验收须断言真实文件内容与 mtime 均未变化，覆盖夹具成功/失败退出清理，并检查已编译页面含实际样式规则、与当前模板匹配；不能只检查 JS/WXML 或产物是否存在。
+
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=microi-uniapp-frontend-002 sha256=1faa6e553ff61b9043ff7608d02518e815f1dcbe2cc56fefb8adff326c5d1f1f -->
 ## H5 预览壳与底部导航强制规则
