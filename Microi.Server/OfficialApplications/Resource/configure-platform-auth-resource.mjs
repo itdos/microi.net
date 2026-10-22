@@ -10,7 +10,8 @@ const pkg = JSON.parse(fs.readFileSync(resourcePath, 'utf8'));
 function safeLoginHookTemplate(source) {
   const notice = source.match(/\/\* OFFICIAL_CREATE_IF_MISSING_API_ENGINE_NOTICE_V1[\s\S]*?\*\//);
   if (!notice) throw new Error('登录租户 Hook 缺少 CreateIfMissing 官方提示');
-  return `${notice[0]}\nreturn { Code : 1 };\n`;
+  // 沿用已发布包的提示与安全空实现间隔，重复生成不能制造仅空行不同的包正文。
+  return `${notice[0]}\n\nreturn { Code : 1 };\n`;
 }
 const specs = [
   {

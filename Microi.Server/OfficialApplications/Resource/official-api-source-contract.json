@@ -28,7 +28,7 @@
       "SourceRole": "SafeTenantHookTemplate",
       "File": "OfficialApiSources/platform_auth_login_hook.js",
       "Version": "v1.0.3",
-      "Sha256": "9578905ba8e97aecf334d0b277c2bfad83618c097eb9e4f7f1938e8c218c6239",
+      "Sha256": "eb990e13b0ad471649facb1eeca6f5fadb9576c648662d2aa1de53eaa0d77d3f",
       "Package": "app.microi.saas-engine.json"
     },
     {

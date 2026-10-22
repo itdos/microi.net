@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { mergeChatHistory } from "../src/utils/chat-history.js";
 import {
     buildAiOtherInfo,
     cleanupWebSocketEvents,
@@ -92,8 +93,20 @@ test("PC chat has quick contacts, event-driven connection state and visible AI f
     assert.match(source, /onReceiveAIError/);
     assert.match(source, /AI回复失败/);
     assert.match(source, /isLocalRealtime/);
-    assert.match(source, /const localPending = self\.ChatRecord\.filter/);
-    assert.match(source, /const merged = incoming\.slice\(\)/);
+    assert.match(source, /import \{[^}]*mergeChatHistory[^}]*\} from "@\/utils\/chat-history"/);
+    assert.match(source, /this\.ChatRecord = mergeChatHistory\(this\.ChatRecord, rows, this\.GetCurrentUser\.Id, state\.peerId\)/);
+    const pending = { RequestId: "pending-1", tempId: "local-1", FromUserId: "me", ToUserId: "peer", SendFailed: true };
+    const incoming = [{ MessageId: "history-1", FromUserId: "peer", ToUserId: "me" },
+        { MessageId: "foreign-1", FromUserId: "other", ToUserId: "me" }];
+    const merged = mergeChatHistory([pending], incoming, "me", "peer");
+    assert.equal(merged.length, 2);
+    assert.ok(merged.includes(pending), "history refresh preserves the pending local message");
+    assert.ok(merged.every(row => row.MessageId !== "foreign-1"), "other conversations stay isolated");
+    const acknowledged = mergeChatHistory(merged, [{ ...pending, MessageId: "sent-1", tempId: undefined, SendFailed: undefined }], "me", "peer");
+    assert.equal(acknowledged.length, 2);
+    assert.equal(acknowledged.filter(row => row.RequestId === "pending-1").length, 1);
+    assert.equal(acknowledged.find(row => row.MessageId === "sent-1").tempId, undefined);
+    assert.equal(acknowledged.find(row => row.MessageId === "sent-1").SendFailed, undefined);
     assert.match(source, /normalizeChatContact/);
     assert.match(source, /normalizeChatDirectoryUser/);
     assert.match(source, /resolveChatDisplayName\(contact, knownContact/);

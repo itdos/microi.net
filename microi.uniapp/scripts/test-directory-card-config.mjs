@@ -10,6 +10,7 @@ import { compileModuleFilterFields } from '../src/platform/list-filter-fields.mj
 import { mergeModuleFilterFields, buildListFilterWhere } from '../src/platform/list-filter-fields.mjs'
 import * as visibility from '../src/platform/native-field-visibility.mjs'
 import * as treeOptions from '../src/platform/native-tree-options.mjs'
+import { reconcileStatusSelection } from '../src/platform/status-filter-options.mjs'
 
 const enginePath = process.env.DIRECTORY_ENGINE_TEST_FILE || workspacePaths.findSyncedXjyEngine(fileURLToPath(new URL('..', import.meta.url)), 'get-sysUser-list')
 const engine = Function('V8', readFileSync(enginePath, 'utf8'))
@@ -225,6 +226,8 @@ function listPageMethod(name, nextName, deps) {
 test('卡片授权失效清空旧数据，先前在途响应不能重新填充列表', async () => {
   let completeRows
   const loadData = listPageMethod('loadData', 'search', {
+    // 使用页面真实导入的状态协调策略，避免请求开始前因测试沙箱缺依赖而中断。
+    reconcileStatusSelection,
     loadModuleRows: () => new Promise(resolve => { completeRows = resolve })
   })
   const loadViewConfig = listPageMethod('loadViewConfig', 'buildCurrentListOptions', {

@@ -26,8 +26,8 @@
 
             <div class="messages-inner">
                 <div v-if="loading" class="loading-more" v-mci-loading:compact="true"></div>
-                <el-button v-else-if="historyState.error" link type="primary" @click="loadMoreMessages">历史消息加载失败，点击重试</el-button>
-                <el-button v-else-if="historyState.hasMore" link @click="loadMoreMessages">加载更早消息</el-button>
+                <el-button v-else-if="historyState.error" link type="primary" @click="loadMoreMessages">{{ $t("Msg.Mobile.chat.historyLoadFailed") }}</el-button>
+                <el-button v-else-if="historyState.hasMore" link @click="loadMoreMessages">{{ $t("Msg.Mobile.chat.loadEarlier") }}</el-button>
 
                 <div
                     v-for="(msg, index) in messages"

@@ -1400,6 +1400,7 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
     'app.microi.sys-config.json', 'app.microi.message-notification.json', 'app.microi.ai-engine.json',
   ];
   const seenKeys = new Set();
+  const publishedEngines = new Map();
   let managedCount = 0;
   let createIfMissingCount = 0;
   for (const packageName of packageNames) {
@@ -1410,14 +1411,26 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       assert.equal(seenKeys.has(key), false, `${key} 跨包重复`);
       seenKeys.add(key);
       const policy = packageModel.ResourcePolicies?.ApiEngines?.[engine.ApiEngineKey]?.UpgradePolicy;
+      publishedEngines.set(key, { packageName, engine, policy: packageModel.ResourcePolicies.ApiEngines[engine.ApiEngineKey] });
       if (policy === 'Managed') managedCount += 1;
       else if (policy === 'CreateIfMissing') createIfMissingCount += 1;
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 174);
+  assert.equal(seenKeys.size, 176);
   assert.ok(seenKeys.has('mci-tree-drag-sort'));
-  assert.equal(managedCount, 162);
+  assert.equal(managedCount, 164);
+  // 两个已发布许可管理入口归 SaaS 的 Managed 闭包；精确锁定新增归属和权限，不能仅放宽数量。
+  for (const key of ['platform-license-management-state', 'platform-license-server-nodes']) {
+    const actual = publishedEngines.get(key);
+    assert.ok(actual, `${key} 缺少官方投影`);
+    assert.equal(actual.packageName, 'app.microi.saas-engine.json');
+    assert.deepEqual(actual.policy, { Ownership: 'Platform', UpgradePolicy: 'Managed' });
+    assert.equal(actual.engine.Version, 'v1.0.0');
+    assert.equal(actual.engine.ApiRoutes, `/apiengine/${key}`);
+    assert.equal(actual.engine.AllowAnonymous, 0);
+    assert.equal(actual.engine.StopHttp, 0);
+  }
   assert.ok(seenKeys.has('ai_app_cdn_backfill'), '官方 CDN 维护入口必须随商城包投影');
   for (const key of ['official_sms_login', 'official_account_invitations', 'official_account_licenses']) assert.ok(seenKeys.has(key));
   assert.ok(seenKeys.has('official_password_reset_send_sms'), '找回密码入口必须随官方包投影');
@@ -1552,6 +1565,14 @@ test('官网发布接口接受十个官方应用包并拒绝 AI 与首页资源�
   }
 
   const ai = JSON.parse(await readFile(resolve(testDirectory, 'app.microi.ai-engine.json'), 'utf8'));
+  // 生成器保留三代能力声明；发布协议的最低 v1.0.0 能力缺失仍须拒绝。
+  for (const version of ['v1.0.0', 'v1.1.0', 'v1.1.1']) {
+    const capability = `ApiEngine:platform-ai-runtime@${version}`;
+    assert.ok(ai.PackageInfo.RequiredPlatformCapabilities.includes(capability), `AI 包缺少历史能力声明 ${capability}`);
+  }
+  const missingRuntimeCapability = structuredClone(ai);
+  missingRuntimeCapability.PackageInfo.RequiredPlatformCapabilities = missingRuntimeCapability.PackageInfo.RequiredPlatformCapabilities.filter(value => value !== 'ApiEngine:platform-ai-runtime@v1.0.0');
+  assert.throws(() => validatePublishResource('app.microi.ai-engine.json', JSON.stringify(missingRuntimeCapability)), /缺少能力 ApiEngine:platform-ai-runtime@v1\.0\.0/);
   ai.PhysicalColumns = ai.PhysicalColumns.filter((column) => (
     String(column.TABLE_NAME).toLowerCase() !== 'mci_ai_token_log'
     || String(column.COLUMN_NAME).toLowerCase() !== 'promptpreview'
