@@ -251,9 +251,12 @@ public class ApiEngineCacheCompatibilityTests
         var storeSource = File.ReadAllText(Path.Combine(
             serverRoot, "Microi.Core", "ApiEngine", "ApiEngineAuthoritativeStore.cs"));
 
-        Assert.Contains("ApiEngineAuthoritativeStore.GetEnabledModel(client, addressParam)", dynamicRouteSource);
-        Assert.Contains("ApiEngineAuthoritativeStore.GetEnabledByMultiRoute(client, apiAddress)", dynamicRouteSource);
-        Assert.Contains(".GetAuthoritativeApiEngineModel(keyParam)", dynamicRouteSource);
+        // 冷路由必须从主库读取全部已配置资源，显式停用仍占位，不能被当作缺失后回落。
+        Assert.Contains("ApiEngineAuthoritativeStore.GetConfiguredModel(client, addressParam)", dynamicRouteSource);
+        Assert.Contains("ApiEngineAuthoritativeStore.GetConfiguredByMultiRoute(client, apiAddress)", dynamicRouteSource);
+        Assert.Matches(
+            @"fallbackResult\s*=\s*ApiEngineAuthoritativeStore\.GetConfiguredModel\(\s*OsClientExtend\.GetClient\(osClient\),\s*keyParam\);",
+            dynamicRouteSource);
         var addressAuthorityIndex = dynamicRouteSource.IndexOf(
             "var fallbackResult = GetAuthoritativeRouteByAddress",
             StringComparison.Ordinal);
@@ -269,9 +272,20 @@ public class ApiEngineCacheCompatibilityTests
             ".HasConfiguredRoute(OsClientExtend.GetClient(osClient), apiPathLower)",
             StringComparison.Ordinal);
         Assert.True(routeOccupancyIndex > addressAuthorityIndex,
-            "启用地址未命中后必须检查停用地址占用状态。");
+            "完整地址未命中后必须再次确认停用地址占用状态。");
         Assert.True(keyAuthorityIndex > routeOccupancyIndex,
             "只有地址从未配置时才能回退 canonical Key。");
+        // 配置存在但停用时明确拒绝，不能执行脚本，也不能进入编译 Controller 兜底。
+        Assert.Matches(
+            @"if\s*\(!isEnable\)\s*\{\s*values\[""controller""\]\s*=\s*""ApiEngine"";\s*values\[""action""\]\s*=\s*""NotEnable"";\s*return values;\s*\}",
+            dynamicRouteSource);
+        var disabledRouteIndex = dynamicRouteSource.IndexOf("if (!isEnable)", StringComparison.Ordinal);
+        var engineExecutionIndex = dynamicRouteSource.IndexOf("DetermineApiAction(httpContext, apiModel)", StringComparison.Ordinal);
+        var controllerFallbackIndex = dynamicRouteSource.IndexOf("if (TryMapFormEngineRoute(apiPathLower, values))", StringComparison.Ordinal);
+        Assert.True(disabledRouteIndex >= 0 && engineExecutionIndex > disabledRouteIndex,
+            "接口启用检查必须先于脚本执行路由。");
+        Assert.True(controllerFallbackIndex > engineExecutionIndex,
+            "编译 Controller 兜底必须位于已配置接口的拒绝或执行分支之后。");
         Assert.Contains(
             "DynamicRoute.NormalizeApiEngineRouteAddress(requestPath)",
             apiControllerSource);
@@ -293,6 +307,12 @@ public class ApiEngineCacheCompatibilityTests
         Assert.DoesNotContain("MicroiEngine.FormEngine.GetTableDataAsync", initializerSource);
         Assert.Contains("RemoveParentAsync", initializerSource);
         Assert.Contains("client.Db.FromSql(sql)", storeSource);
+        Assert.Matches(
+            @"GetConfiguredModel\(\s*OsClientSecret client,\s*ApiEngineParam param\)\s*=>\s*GetModel\(client, param, false\);",
+            storeSource);
+        Assert.Matches(
+            @"GetConfiguredByMultiRoute\(\s*OsClientSecret client,\s*string apiAddress\)\s*=>\s*GetByMultiRoute\(client, apiAddress, false\);",
+            storeSource);
         Assert.Contains("public static DosResult<bool> HasConfiguredRoute", storeSource);
         Assert.Contains("bool enabledOnly = true", storeSource);
         Assert.DoesNotContain("client.DbRead", storeSource);
