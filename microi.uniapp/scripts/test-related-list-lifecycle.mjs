@@ -49,7 +49,7 @@ function setup(overrides = {}) {
 
 for (const withSummary of [true, false]) {
   test(`initial card metadata preserves complete summary statuses only when configured: ${withSummary}`, async () => {
-    const allStatuses = ['待审批', '已审批', '已驳回', '待审批作废', '已作废', '已到期']
+    const allStatuses = ['待审批', '进行中', '已到期', '终止待审批', '已终止']
     const cardStatuses = allStatuses.slice(0, 4)
     const { context } = setup({
       findMenu: async () => ({ Id: 'menu-1' }),

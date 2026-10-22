@@ -43,14 +43,14 @@ const ordersSource = ordersStart >= 0 && tasksStart > ordersStart
   ? businessSource.slice(ordersStart, tasksStart)
   : ''
 
-test('我的订单不排除终态，并提供已作废和已到期状态筛选', () => {
+test('我的订单不排除终态，并提供五种订单状态筛选', () => {
   assert.ok(ordersSource, '未找到 orders 租户配置')
-  assert.doesNotMatch(ordersSource, /fixedWhere\s*:\s*\[[^\]]*DingdanZT[^\]]*已作废/)
+  assert.doesNotMatch(ordersSource, /fixedWhere\s*:\s*\[[^\]]*DingdanZT[^\]]*已终止/)
   assert.match(
     ordersSource,
-    /statusOptions:\s*\['待审批',\s*'已审批',\s*'已驳回',\s*'待审批作废',\s*'已作废',\s*'已到期'\]/
+    /statusOptions:\s*\['待审批',\s*'进行中',\s*'已到期',\s*'终止待审批',\s*'已终止'\]/
   )
-  assert.match(ordersSource, /summaryFixedWhere:\s*\[\{ Name: 'DingdanZT', Type: '!=', Value: '已作废' \}\]/)
+  assert.match(ordersSource, /summaryFixedWhere:\s*\[\{ Name: 'DingdanZT', Type: '!=', Value: '已终止' \}\]/)
   assert.match(businessListSource, /const localStatusOptions = Array\.isArray\(merged\.statusOptions\) \? merged\.statusOptions : \[\]/)
   assert.match(businessListSource, /merged\.statusOptions = \[\.\.\.new Set\(\[/)
   assert.match(businessListSource, /\.\.\.\(Array\.isArray\(dynamic\.statusOptions\) \? dynamic\.statusOptions : \[\]\)/)

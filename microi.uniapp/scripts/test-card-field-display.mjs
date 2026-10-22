@@ -152,6 +152,8 @@ statusOverrideSources.forEach((file) => {
     source,
     file === '../src/pages/business/list.vue'
       ? /merged\.statusOptions = \[\.\.\.new Set\(\[[\s\S]{0,200}dynamic\.statusOptions/
+      : file.includes('mci-business-related-list')
+        ? /merged\.statusOptions = merged\.relatedSummary\s*\? \[\.\.\.new Set\(\[\.\.\.\(merged\.statusOptions \|\| \[\]\), \.\.\.\(dynamic\.statusOptions \|\| \[\]\)\]\)\]\s*:\s*\(dynamic\.statusOptions \|\| \[\]\)/
       : /merged\.statusOptions = dynamic\.statusOptions \|\| \[\]/,
     `${file} 状态筛选项应同步跟随跨端状态字段`
   )
