@@ -126,12 +126,9 @@ namespace Microi.net
                 try
                 {
                     var databaseType = MicroiJobExtension.ResolveQuartzDatabaseType();
-                    var normalizedConnectionString = ConnectionStringCompatibility.Normalize(
-                        databaseType,
-                        connectionString,
-                        100,
-                        120,
-                        600);
+                    // 延迟初始化和 DI 注册必须共用同一 TLS 兼容策略，不能重建后又恢复驱动缺省值。
+                    var normalizedConnectionString = MicroiJobExtension.NormalizeQuartzConnectionString(
+                        databaseType, connectionString);
                     // 获取原始的 Scheduler
                     _scheduler = await _schedulerFactory.GetScheduler();
                     // 停止原始 Scheduler

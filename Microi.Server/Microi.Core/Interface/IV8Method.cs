@@ -465,5 +465,8 @@ namespace Microi.net
         /// 固定 Quartz 任务将定时备份投递到右上角后台任务中心。
         /// </summary>
         DosResult QueueScheduledDatabaseBackup(dynamic dynamicParam);
+
+        /// <summary>采集规则/任务摘要；强制当前租户与用户的表、字段和行权限。</summary>
+        dynamic ReadSpiderCatalog(dynamic dynamicParam);
     }
 }

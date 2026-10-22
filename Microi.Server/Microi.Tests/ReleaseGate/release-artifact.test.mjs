@@ -11,6 +11,12 @@ test('only an unchanged artifact of the Full-tested candidate can be republished
  assert.throws(()=>verifyArtifact(receipt,candidate,{...files,'publish/api.dll':'changed'}),/changed after/);
  assert.throws(()=>verifyArtifact({},candidate,files),/Full/);
 });
+
+test('legacy SmokeOnly receipts cannot authorize either API or PC publication',()=>{
+ for(const type of ['api','client']){
+  assert.throws(()=>verifyArtifact({...receipt,gate:'SmokeOnly'},candidate,files,type,'SmokeOnly'),/Full/u);
+ }
+});
 test('zero tests, missing summaries and skipped/cancelled/todo tests block publication',()=>{
  const good='# tests 3\n# pass 3\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
  assert.equal(assertTestSummary(good).pass,3);

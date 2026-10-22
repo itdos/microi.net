@@ -37,6 +37,14 @@ namespace Microi.net.Api
             return $"{CacheKeyPrefix}:{osClient}:{ApiEngineCacheKey}:{key}";
         }
 
+        internal static bool IsHdfsUploadProtocolRoute(string requestMethod, string requestPath)
+        {
+            if (!HttpMethods.IsPost(requestMethod)) return false;
+            return string.Equals(requestPath, "/api/hdfs/upload", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(requestPath, "/api/upload", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(requestPath, "/apiengine/platform-hdfs-upload", StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         /// 规范化接口引擎 HTTP 地址，并移除只用于租户选择的路径后缀。
         /// ApiAddress 是显式路由事实源；即使地址恰好是单段 /apiengine/{value}，
@@ -291,6 +299,14 @@ namespace Microi.net.Api
                 // otherwise the controller can only look up by ApiAddress and a
                 // historical duplicate address may execute the wrong policy row.
                 var originalPath = httpContext.Request.Path.Value ?? string.Empty;
+                // 三个精确上传协议交给原 attribute 端点，先验证文件流再建立可信作用域。
+                // 不能返回 HDFS/Upload 动态值：同一 Action 的三个路由别名会被展开成
+                // 同优先级候选而发生歧义。只撤销当前动态候选，不标记整次请求缺失；
+                // 另一层动态路由同样执行本判定，原 HDFS 桥继续权威选择、停用/StopHttp 和失败关闭。
+                if (IsHdfsUploadProtocolRoute(requestMethod, originalPath))
+                {
+                    return null;
+                }
                 if (httpContext.Request.Headers["apiengine"].ToString() == "1"
                     && originalPath.StartsWith(
                         "/api/apiengine/",

@@ -844,6 +844,35 @@ public class PlatformRuntimeUpgradeGateTests
             .Replace("CHAT_SIGNALR_TRUSTED_PROTOCOL_V1", "missing-signalr-protocol");
         Assert.False(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.message-notification.json", missingSignalRProtocol })));
+
+        var missingPartitionCapability = (JObject)package.DeepClone();
+        missingPartitionCapability["PackageInfo"]!["RequiredPlatformCapabilities"] = new JArray(
+            package["PackageInfo"]!["RequiredPlatformCapabilities"]!.Where(item =>
+                item?.ToString() != "V8.MongoDb.GetPartitionedTableData"));
+        Assert.False(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.message-notification.json", missingPartitionCapability })));
+
+        // 逐项破坏分区读写或物理定位；联系人更新仍在，不能误当成消息已读更新。
+        foreach (var requiredCallOrLocation in new[]
+        {
+            "V8.MongoDb.GetPartitionedTableData(request)",
+            "V8.MongoDb.UptFormData({OsClient:V8.OsClient,DbName:readRow._PartitionDb",
+            "readRow._PartitionDb",
+            "readRow._PartitionTable",
+            "readRow._id"
+        })
+        {
+            var missingPartitionContract = (JObject)package.DeepClone();
+            var partitionRuntime = Assert.Single(
+                missingPartitionContract["SysApiEngines"]!.Children<JObject>(),
+                item => item["ApiEngineKey"]?.ToString() == "platform-chat-runtime");
+            var originalCode = partitionRuntime["ApiV8Code"]!.ToString();
+            Assert.Contains(requiredCallOrLocation, originalCode);
+            partitionRuntime["ApiV8Code"] = originalCode.Replace(
+                requiredCallOrLocation, "missing-partition-contract");
+            Assert.False(Assert.IsType<bool>(validate.Invoke(
+                null, new object[] { "app.microi.message-notification.json", missingPartitionContract })));
+        }
     }
 
     [Fact]

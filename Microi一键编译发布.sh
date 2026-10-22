@@ -125,7 +125,7 @@ if [ "${1:-}" = "--mirror-dependencies" ]; then
 fi
 
 # 同版本 Docker 热修复只发布经过完整测试的本地候选，不升版、不发布 NuGet，
-# 不同步官方数据库资源；默认 Full，显式快速发布可跳过 Full，但混淆后冒烟不可跳过。
+# 不同步官方数据库资源；与正式发布相同，必须通过 Full 和最终混淆产物冒烟。
 MICROI_FULL_ONLY=false
 if [ "${1:-}" = "--full-only" ]; then
     MICROI_FULL_ONLY=true
@@ -134,17 +134,14 @@ MICROI_DOCKER_ONLY_HOTFIX=false
 if [ "${1:-}" = "--docker-only-hotfix" ]; then
     MICROI_DOCKER_ONLY_HOTFIX=true
 fi
-MICROI_RELEASE_SKIP_TESTS=false
-if [ "${2:-}" = "--skip-tests" ]; then
-    if [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ]; then
-        echo "--skip-tests 只能与显式 --docker-only-hotfix 配合使用。" >&2
+for _release_argument in "$@"; do
+    if [ "$_release_argument" = "--skip-tests" ]; then
+        echo "--skip-tests 已停用；正式发布及同版本 Docker 热修复都必须通过冻结候选的完整 Full。" >&2
         exit 1
     fi
-    MICROI_RELEASE_SKIP_TESTS=true
-    export MICROI_RELEASE_TEST_POLICY=SmokeOnly
-else
-    export MICROI_RELEASE_TEST_POLICY=Full
-fi
+done
+# 不继承历史进程留下的 SmokeOnly 策略，直接运行脚本也不能削弱发布门禁。
+export MICROI_RELEASE_TEST_POLICY=Full
 
 # Windows (Git Bash) 下：正常结束时暂停便于查看结果；关闭窗口/Ctrl+C 时立即清理，不再卡在 read。
 MICROI_SKIP_EXIT_PAUSE=false
@@ -1151,11 +1148,8 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
     print_phase "发布前全量自动化测试（失败即停止）"
     MICROI_RELEASE_CANDIDATE="$MICROI_RELEASE_GATE_DIR/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
     if ! node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
-        print_fail "无法记录七个仓库的候选源码；已停止发布。"
+        print_fail "无法记录八个仓库的候选源码；已停止发布。"
     fi
-    if [ "$MICROI_RELEASE_SKIP_TESTS" = true ]; then
-        print_warning "用户明确要求跳过 Full；混淆后启动与配置接口冒烟仍必须通过。保留候选一致性、编译、加密和镜像字节检查。"
-    else
     if command -v pwsh >/dev/null 2>&1; then
         _test_powershell="pwsh"
     elif command -v powershell.exe >/dev/null 2>&1; then
@@ -1182,7 +1176,6 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
         print_fail "验收期间源码发生变化；必须重新加载最终候选并重跑 Full。"
     fi
     print_success "Microi.Tests Full 冻结矩阵全量回归通过"
-    fi
 fi
 
 # 插件发行修复等需要复验 Full，但不能重新生成或覆盖已成功发布的不可变平台制品。
@@ -1867,13 +1860,13 @@ docker_push_plan() {
     print_step "构建镜像: $local_image"
     local _docker_build_ok=false
     local _docker_build_attempt=1
-    while [ "$_docker_build_attempt" -le 3 ]; do
+    while [ "$_docker_build_attempt" -le 2 ]; do
         if (cd "$build_dir" && docker build --provenance=false --sbom=false --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0.13" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             _docker_build_ok=true
             break
         fi
-        if [ "$_docker_build_attempt" -lt 3 ]; then
-            print_warning "基础镜像更新检查失败，5 秒后重试（${_docker_build_attempt}/3）..."
+        if [ "$_docker_build_attempt" -lt 2 ]; then
+            print_warning "基础镜像更新检查失败，5 秒后执行唯一一次重试（${_docker_build_attempt}/2）..."
             sleep 5
         fi
         _docker_build_attempt=$((_docker_build_attempt + 1))

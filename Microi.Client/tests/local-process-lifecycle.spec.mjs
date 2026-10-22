@@ -64,7 +64,41 @@ function createFixture() {
     return root;
 }
 
-function removeFixture(root) {
+function removeWindowsFixture(root, timeoutMs) {
+    assert.ok(ownedFixtures.has(root), '只回收本用例登记的夹具');
+    const quote = value => "'" + value.replaceAll("'", "''") + "'";
+    // 同一进程调用原普通删除，不在独立预等待通过后另启删除进程。仅重试原安全
+    // 树检查阶段的真实共享/锁冲突；删除阶段与其他错误立即保留，绝不扩大清理范围。
+    const script = [
+        "$ErrorActionPreference = 'Stop'", '[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)',
+        '. ' + quote(path.join(repoRoot, 'Microi.Server/tools/Microi.ArtifactSafety.ps1')),
+        '$root = ' + quote(root), '$parent = ' + quote(fixtureParent),
+        '$marker = ' + quote(path.join(root, ownerFile)),
+        '$expected = ' + quote(JSON.stringify(ownedFixtures.get(root))) + ' | ConvertFrom-Json',
+        '$clock = [Diagnostics.Stopwatch]::StartNew(); $retries = 0',
+        'while ($true) { try {',
+        '  if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($root)) -cne $parent) { throw "Fixture parent changed" }',
+        '  Assert-MicroiArtifactPath -LiteralPath $root',
+        '  $entry = Get-Item -LiteralPath $marker -Force -ErrorAction Stop',
+        '  if ($entry.PSIsContainer -or ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Fixture owner marker changed" }',
+        '  $owner = Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json',
+        '  if (@($owner.PSObject.Properties).Count -ne 4 -or $owner.kind -cne $expected.kind -or $owner.pid -ne $expected.pid -or $owner.root -cne $expected.root -or $owner.nonce -cne $expected.nonce) { throw "Fixture ownership changed" }',
+        '  Remove-MicroiOrdinaryArtifact -LiteralPath $root -ExpectedParent $parent',
+        '  @{ retries = $retries; removed = $true } | ConvertTo-Json -Compress; break',
+        '} catch {',
+        '  $cause = $_.Exception; while ($cause.InnerException) { $cause = $cause.InnerException }',
+        '  $code = $cause.HResult -band 0xffff',
+        '  $preflight = $_.InvocationInfo.MyCommand.Name -ceq "Assert-MicroiArtifactTree" -and $_.FullyQualifiedErrorId -ceq "IOException,Assert-MicroiArtifactTree"',
+        `  if (-not $preflight -or $cause -isnot [IO.IOException] -or $code -notin @(32, 33) -or $clock.ElapsedMilliseconds -ge ${timeoutMs}) { throw }`,
+        '  $retries++; Start-Sleep -Milliseconds 200',
+        '} }'
+    ].join('\n');
+    return spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], {
+        encoding: 'utf8', windowsHide: true, timeout: timeoutMs + 10000
+    });
+}
+
+function removeFixture(root, timeoutMs = 10000) {
     assert.ok(ownedFixtures.has(root), '只能回收本用例创建的目录');
     assert.equal(path.dirname(path.resolve(root)), fixtureParent);
     assert.ok(path.basename(root).startsWith('microi-process-lifecycle-'));
@@ -76,16 +110,13 @@ function removeFixture(root) {
     assert.deepEqual(JSON.parse(fs.readFileSync(marker, 'utf8')), ownedFixtures.get(root), '夹具所有权标记必须仍属于本用例');
     // Windows 先检查完整目录树及文件占用，再普通删除；避免部分删除后丢失归属标记。
     if (process.platform === 'win32') {
-        const cleanup = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File',
-            path.join(repoRoot, 'Microi.Server/tools/Remove-MicroiReleaseScratch.ps1'),
-            '-LiteralPath', root, '-ExpectedParent', fixtureParent], {
-            encoding: 'utf8', windowsHide: true, timeout: 30000
-        });
+        const cleanup = removeWindowsFixture(root, timeoutMs);
         assert.ifError(cleanup.error);
         assert.equal(cleanup.status, 0, cleanup.stdout + '\n' + cleanup.stderr);
     } else {
         fs.rmSync(root, { recursive: true, force: false, maxRetries: 20, retryDelay: 250 });
     }
+    assert.equal(fs.existsSync(root), false, '普通删除后必须回读夹具目录已不存在');
     ownedFixtures.delete(root);
 }
 
@@ -122,13 +153,20 @@ function runProcessManager(workspaceRoot, action, frontendPort, backendPort = 61
     });
 }
 
-function stopExactProcessTree(child) {
-    if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
-    if (process.platform === 'win32') {
-        spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
-    } else {
-        child.kill('SIGKILL');
+async function stopExactProcessTree(child) {
+    if (!child?.pid) return;
+    let result;
+    if (child.exitCode === null && child.signalCode === null) {
+        if (process.platform === 'win32') {
+            result = spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, encoding: 'utf8', timeout: 10000 });
+        } else {
+            child.kill('SIGKILL');
+        }
     }
+    // taskkill 与已结束的子进程可能相遇；只有本 ChildProcess 的退出事件能确认清理完成。
+    assert.ifError(result?.error);
+    assert.equal(await waitForExit(child, 10000), true,
+        `自有夹具进程 ${child.pid} 未退出，保留目录；taskkill=${result?.status}: ${result?.stderr || ''}`);
 }
 
 test('一键发布按所选范围取得锁并调用精确进程管理器', () => {
@@ -222,12 +260,7 @@ test('临时输出的 Microi.net.Api 仅在 CWD 精确属于当前工作区时�
         assert.equal(externalBackend.exitCode, null, '拒绝后外部临时后端必须继续运行');
     }
     finally {
-        stopExactProcessTree(workspaceBackend);
-        stopExactProcessTree(externalBackend);
-        stopExactProcessTree(otherReleaseBackend);
-        if (workspaceBackend) await waitForExit(workspaceBackend, 5000);
-        if (externalBackend) await waitForExit(externalBackend, 5000);
-        if (otherReleaseBackend) await waitForExit(otherReleaseBackend, 5000);
+        await Promise.all([workspaceBackend, externalBackend, otherReleaseBackend].map(stopExactProcessTree));
         removeFixture(testRoot);
     }
 });
@@ -297,10 +330,7 @@ test('相对入口 Vite 用进程工作目录识别当前工作区，并对外�
         assert.equal(externalVite.exitCode, null, '拒绝后外部 Vite 必须继续运行');
     }
     finally {
-        stopExactProcessTree(workspaceVite);
-        stopExactProcessTree(externalVite);
-        if (workspaceVite) await waitForExit(workspaceVite, 5000);
-        if (externalVite) await waitForExit(externalVite, 5000);
+        await Promise.all([workspaceVite, externalVite].map(stopExactProcessTree));
         removeFixture(testRoot);
     }
 });
@@ -347,6 +377,46 @@ test('DLL 被占用时报告原始路径与占用错误，不因 catch 中的错
     }
 });
 
+// 原安全模块只在 Windows 检查独占文件句柄，此新增原生用例与该平台边界一致。
+if (process.platform === 'win32') test('真实文件占用超时保留完整夹具，句柄释放后原普通删除才成功', async () => {
+    const testRoot = createFixture(), held = path.join(testRoot, 'held.dll');
+    fs.writeFileSync(held, 'real exclusive lock fixture');
+    // 负例只改本用例刚创建的归属标记，不改变任何文件属性或 ACL。
+    const marker = path.join(testRoot, ownerFile), savedOwner = fs.readFileSync(marker, 'utf8');
+    fs.writeFileSync(marker, JSON.stringify({ ...ownedFixtures.get(testRoot), nonce: randomUUID() }));
+    try {
+        assert.throws(() => removeFixture(testRoot), /夹具所有权标记必须仍属于本用例/);
+        assert.ok(fs.existsSync(held));
+    } finally {
+        fs.writeFileSync(marker, savedOwner);
+    }
+    const quote = value => "'" + value.replaceAll("'", "''") + "'";
+    const script = [
+        "$ErrorActionPreference = 'Stop'",
+        '$handle = [IO.File]::Open(' + quote(held) + ', [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)',
+        "try { [Console]::WriteLine('LOCK_READY'); [void][Console]::ReadLine(); Start-Sleep -Milliseconds 2000 } finally { $handle.Dispose() }"
+    ].join('\n');
+    const holder = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], {
+        windowsHide: true, stdio: ['pipe', 'pipe', 'pipe']
+    });
+    try {
+        const ready = await Promise.race([once(holder.stdout, 'data').then(([data]) => String(data)), delay(10000).then(() => '')]);
+        assert.match(ready, /LOCK_READY/);
+        assert.throws(() => removeFixture(testRoot, 200), /IOException,Assert-MicroiArtifactTree/,
+            '真实持续占用必须失败，不能吞掉安全检查');
+        assert.ok(fs.existsSync(held));
+        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(testRoot, ownerFile), 'utf8')), ownedFixtures.get(testRoot));
+        holder.stdin.end('\n');
+        removeFixture(testRoot);
+        assert.equal(await waitForExit(holder), true, '持锁进程必须真实退出');
+        assert.equal(fs.existsSync(testRoot), false, '句柄释放后原普通删除必须完成');
+        assert.equal(ownedFixtures.has(testRoot), false);
+    } finally {
+        await stopExactProcessTree(holder);
+        if (ownedFixtures.has(testRoot)) removeFixture(testRoot);
+    }
+});
+
 for(const scope of ['api','pc'])test(`真实 PrepareRelease ${scope} 只清理自身范围，另一范围服务保持监听`,async()=>{
     const testRoot=createFixture(),workspaceRoot=path.join(testRoot,'workspace');
     const backendRoot=path.join(workspaceRoot,'Microi.Server/Microi.net.Api'),frontendRoot=path.join(workspaceRoot,'Microi.Client');
@@ -372,8 +442,7 @@ for(const scope of ['api','pc'])test(`真实 PrepareRelease ${scope} 只清理�
         assert.equal(retained.exitCode,null,'另一个范围的进程必须保留');
         await waitForPort(scope==='api'?frontendPort:backendPort);
     }finally{
-        stopExactProcessTree(backend);stopExactProcessTree(frontend);
-        if(backend)await waitForExit(backend,5000);if(frontend)await waitForExit(frontend,5000);
+        await Promise.all([backend,frontend].map(stopExactProcessTree));
         removeFixture(testRoot);
     }
 });
@@ -400,8 +469,7 @@ test('Full 独立编译目录的真实 apphost 只按当前工作区与 API CWD 
         assert.notEqual(rejected.status,0,'错误 CWD 必须失败关闭');
         assert.equal(foreign.exitCode,null);await waitForPort(foreignPort);
     }finally{
-        stopExactProcessTree(owned);stopExactProcessTree(foreign);
-        if(owned)await waitForExit(owned,5000);if(foreign)await waitForExit(foreign,5000);
+        await Promise.all([owned,foreign].map(stopExactProcessTree));
         removeFixture(testRoot);
     }
 });

@@ -45,8 +45,7 @@ public sealed class SelectedDependencyVersionTests
         using var matrix = Matrix();
         var expected = matrix.RootElement.GetProperty("dependencies").GetProperty("sqlServer").GetProperty("version").GetString();
         var settings = new System.Data.SqlClient.SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
-        Assert.Matches(@"^127\.0\.0\.1,\d{1,5}$", settings.DataSource);
-        Assert.Equal("upgrade_fixture", settings.InitialCatalog);
+        SqlServerFixtureGuard.Verify(settings);
         using var connection = new System.Data.SqlClient.SqlConnection(settings.ConnectionString);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
         using var query = new System.Data.SqlClient.SqlCommand("SELECT CONVERT(varchar(50), SERVERPROPERTY('ProductVersion'))", connection);

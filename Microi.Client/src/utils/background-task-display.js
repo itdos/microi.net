@@ -1,5 +1,20 @@
 const ACTIVE_STATUSES = new Set(["Pending", "Running", "Retrying"]);
 const TERMINAL_STATUSES = new Set(["Succeeded", "Failed", "Canceled"]);
+const TASK_STATUS_LABELS = Object.freeze({
+    Pending: "排队中", Running: "执行中", Retrying: "等待重试",
+    Succeeded: "已完成", Failed: "执行失败", Canceled: "已停止"
+});
+
+export function getBackgroundTaskStatusText(task, labels = {}) {
+    const status = String(task?.Status || "");
+    const text = String(task?.StatusText || "");
+    // 历史 SQL Server 库可能已经持久化乱码，只修复已知状态的空/全问号标签。
+    // 原始审计与错误正文不改写，未知新状态或包含真实内容的文案保持可见。
+    if ((!text.trim() || /^[?\uFFFD\s]+$/.test(text)) && Object.hasOwn(TASK_STATUS_LABELS, status)) {
+        return labels[status] || TASK_STATUS_LABELS[status];
+    }
+    return text || status;
+}
 
 export function mergeBackgroundTaskSummaries(previousRows, incomingRows) {
     const existing = new Map((previousRows || []).map((row) => [String(row?.Id || ""), row]));

@@ -10,10 +10,11 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.13
+ * Version: v3.0.14
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
+ * - SQL Server 唯一索引先同步声明列，再按真实可空键生成过滤条件；原子修复历史缺失过滤并严格回读，保留非空唯一约束和业务数据。
  */
 
 /* EMPTY_SHARED_TABLE_PREREQUISITE_V1
@@ -5558,14 +5559,61 @@ try {
         var filter = definition.SqlServerFilterColumn;
         if (filter !== undefined && (typeof filter != 'string' || !isSafeIdentifier(filter)
             || columns.indexOf(filter) < 0)) throw new Error('SqlServerFilterColumn必须是声明索引的安全键列');
-        return { Columns: columns, Unique: /^\s*CREATE\s+UNIQUE\s+INDEX/i.test(definition.DDL)
-            || /\bADD\s+UNIQUE\s+(?:INDEX|KEY)\b/i.test(definition.DDL), Filter: filter || '' };
+        var unique = /^\s*CREATE\s+UNIQUE\s+INDEX/i.test(definition.DDL)
+            || /\bADD\s+UNIQUE\s+(?:INDEX|KEY)\b/i.test(definition.DDL);
+        var filters = filter ? [filter] : [];
+        // SQLSERVER_NULLABLE_UNIQUE_INDEX_V1：MySQL 的复合唯一键只约束全部键非空的行，
+        // SQL Server 原生 UNIQUE 却把 NULL 当作可重复冲突的值。以目标真实可空性生成
+        // AND 过滤条件；不回填/删除业务数据，不把非空重复值变成安装成功。
+        // 包的显式过滤声明仍是权威，不能偷偷扩大已声明过滤范围。
+        if (runtimeIsSqlServer && unique && filter === undefined) {
+            var physical = readTargetPhysicalColumns(tableName), byName = Object.create(null);
+            for (var physicalIndex = 0; physicalIndex < physical.length; physicalIndex++) {
+                var physicalColumn = physical[physicalIndex], physicalName = String(physicalColumn.COLUMN_NAME || '').toLowerCase();
+                if (byName[physicalName]) throw new Error('SQL Server 索引列元数据不唯一：' + tableName + '.' + physicalName);
+                byName[physicalName] = physicalColumn;
+            }
+            for (var keyIndex = 0; keyIndex < columns.length; keyIndex++) {
+                var target = byName[columns[keyIndex].toLowerCase()];
+                var nullable = target ? String(target.IS_NULLABLE || '').toUpperCase() : '';
+                if (nullable != 'YES' && nullable != 'NO')
+                    throw new Error('SQL Server 索引列可空性未就绪：' + tableName + '.' + columns[keyIndex]);
+                if (nullable == 'YES') filters.push(columns[keyIndex]);
+            }
+        }
+        return { Columns: columns, Unique: unique, Filter: filter || '', Filters: filters,
+            AutoNullFilter: runtimeIsSqlServer && unique && filter === undefined && filters.length > 0 };
     };
 
-    var requireDeclaredPackageIndexDefinition = function (tableName, indexName, expected) {
+    var buildSqlServerPackageIndexSql = function (tableName, indexName, expected, replaceExisting) {
+        return 'CREATE ' + (expected.Unique ? 'UNIQUE ' : '') + 'INDEX '
+            + quotePhysicalIdentifier(indexName) + ' ON ' + quotePhysicalIdentifier(tableName)
+            + ' (' + expected.Columns.map(quotePhysicalIdentifier).join(',') + ')'
+            + (expected.Filters.length ? ' WHERE ' + expected.Filters.map(function (name) {
+                return quotePhysicalIdentifier(name) + ' IS NOT NULL';
+            }).join(' AND ') : '')
+            + (replaceExisting ? ' WITH (DROP_EXISTING = ON)' : '');
+    };
+
+    var normalizeSqlServerNullIndexFilter = function (value) {
+        var text = String(value || '').replace(/[()]/g, '').trim();
+        if (!text) return '';
+        // SQL Server 会规范括号，等价 AND 项也可能按不同顺序回读；只接受完整的
+        // “键列 IS NOT NULL”合取，不用去空白后的模糊字符串比较放行其它过滤表达式。
+        var parts = text.split(/\s+AND\s+/i), names = [];
+        for (var partIndex = 0; partIndex < parts.length; partIndex++) {
+            var match = /^\s*(?:\[([A-Za-z_][A-Za-z0-9_]*)\]|"([A-Za-z_][A-Za-z0-9_]*)"|([A-Za-z_][A-Za-z0-9_]*))\s+IS\s+NOT\s+NULL\s*$/i.exec(parts[partIndex]);
+            if (!match) return null;
+            names.push(String(match[1] || match[2] || match[3]).toLowerCase());
+        }
+        return names.sort().join(',');
+    };
+
+    var requireDeclaredPackageIndexDefinition = function (tableName, indexName, expected, allowNullRepair) {
         var sql = runtimeIsSqlServer
             ? 'SELECT c.name AS ColumnName,ic.key_ordinal AS SeqInIndex,i.is_unique AS IsUnique,i.is_disabled AS IsDisabled,i.is_hypothetical AS IsHypothetical,'
-                + 'ic.is_descending_key AS IsDescending,ic.is_included_column AS IsIncluded,i.filter_definition AS FilterDefinition '
+                + 'ic.is_descending_key AS IsDescending,ic.is_included_column AS IsIncluded,i.filter_definition AS FilterDefinition,'
+                + 'i.is_primary_key AS IsPrimaryKey,i.is_unique_constraint AS IsUniqueConstraint,i.type AS IndexType '
                 + 'FROM sys.indexes i INNER JOIN sys.tables t ON t.object_id=i.object_id '
                 + 'INNER JOIN sys.index_columns ic ON ic.object_id=i.object_id AND ic.index_id=i.index_id '
                 + 'INNER JOIN sys.columns c ON c.object_id=ic.object_id AND c.column_id=ic.column_id '
@@ -5576,22 +5624,39 @@ try {
                 + 'AND LOWER(TABLE_NAME)=LOWER(@p0) AND LOWER(INDEX_NAME)=LOWER(@p1) ORDER BY SEQ_IN_INDEX';
         var rows = V8.Db.FromSql(sql).AddInParameter('@p0', tableName).AddInParameter('@p1', indexName).ToArray();
         var valid = rows && rows.length == expected.Columns.length;
-        var expectedFilter = expected.Filter ? (expected.Filter + 'ISNOTNULL').toUpperCase() : '';
+        var expectedFilter = expected.Filters.map(function (name) { return name.toLowerCase(); }).sort().join(',');
+        var compatibleLegacyNullIndex = valid && runtimeIsSqlServer && expected.AutoNullFilter && allowNullRepair !== false;
         for (var keyIndex = 0; valid && keyIndex < rows.length; keyIndex++) {
             var row = rows[keyIndex];
             valid = Number(row.SeqInIndex) == keyIndex + 1
                 && String(row.ColumnName || '').toLowerCase() == expected.Columns[keyIndex].toLowerCase();
             if (runtimeIsSqlServer) {
-                var actualFilter = String(row.FilterDefinition || '').replace(/[\[\]"`\s()]/g, '').toUpperCase();
+                var actualFilter = normalizeSqlServerNullIndexFilter(row.FilterDefinition);
                 valid = valid && Number(row.IsUnique) == (expected.Unique ? 1 : 0)
                     && Number(row.IsDisabled) == 0 && Number(row.IsHypothetical) == 0
-                    && Number(row.IsDescending) == 0 && Number(row.IsIncluded) == 0 && actualFilter == expectedFilter;
+                    && Number(row.IsDescending) == 0 && Number(row.IsIncluded) == 0;
+                var isNarrowerNullFilter = actualFilter !== null && actualFilter != expectedFilter
+                    && (actualFilter == '' || actualFilter.split(',').every(function (name) {
+                        return expectedFilter.split(',').indexOf(name) >= 0;
+                    }));
+                compatibleLegacyNullIndex = compatibleLegacyNullIndex && valid && isNarrowerNullFilter
+                    && Number(row.IsPrimaryKey) == 0 && Number(row.IsUniqueConstraint) == 0 && Number(row.IndexType) == 2;
+                // 先验证所有键的结构，再决定是否只修复历史 NULL 语义，不能首列匹配就重建。
+                if (actualFilter != expectedFilter && !compatibleLegacyNullIndex) valid = false;
             } else {
                 valid = valid && Number(row.NonUnique) == (expected.Unique ? 0 : 1)
                     && (row.SubPart === null || row.SubPart === undefined)
                     && String(row.IndexType || '').toUpperCase() == 'BTREE'
                     && String(row.SortOrder || 'A').toUpperCase() == 'A';
             }
+        }
+        if (compatibleLegacyNullIndex) {
+            // DROP_EXISTING 是 SQL Server 的单条原子重建；失败时原约束仍在，避免先 DROP
+            // 再 CREATE 留下无约束窗口。只处理包拥有的相同普通唯一索引：旧无过滤或只
+            // 过滤部分可空键才可补齐；主键、约束及任意其它筛选/键列定义保持失败关闭。
+            V8.Db.FromSql(buildSqlServerPackageIndexSql(tableName, indexName, expected, true)).ExecuteNonQuery();
+            requireDeclaredPackageIndexDefinition(tableName, indexName, expected, false);
+            return;
         }
         if (!valid) throw new Error('应用包索引定义冲突：' + tableName + '.' + indexName
             + '；请核对历史索引，安装器不会覆盖或删除现有索引与业务数据');
@@ -6674,28 +6739,9 @@ try {
         }
 
         if (ddlInfo.Kind == 'index') {
-            var ddlText = String(ddlItem.DDL || '');
-            var columnMatch = ddlText.match(/\(([^\)]+)\)/);
-            if (!columnMatch) throw new Error('SQL Server 索引转换失败：未解析到索引列');
-            var rawColumns = columnMatch[1].split(',');
-            var indexColumns = [];
-            for (var indexColumnIndex = 0; indexColumnIndex < rawColumns.length; indexColumnIndex++) {
-                var indexColumn = String(rawColumns[indexColumnIndex] || '')
-                    .replace(/[`"\[\]]/g, '')
-                    .replace(/\(\d+\)\s*$/g, '')
-                    .replace(/^\s+|\s+$/g, '');
-                if (!isSafeIdentifier(indexColumn)) throw new Error('SQL Server 索引列不安全：' + indexColumn);
-                indexColumns.push(quotePhysicalIdentifier(indexColumn));
-            }
-            var isUniqueIndex = /^\s*CREATE\s+UNIQUE\s+INDEX/i.test(ddlText)
-                || /\bADD\s+UNIQUE\s+(?:INDEX|KEY)\b/i.test(ddlText);
             var declaredIndex = declaredPackageIndex(ddlInfo.TableName, ddlInfo.IndexName);
-            V8.Db.FromSql(
-                'CREATE ' + (isUniqueIndex ? 'UNIQUE ' : '') + 'INDEX '
-                + quotePhysicalIdentifier(ddlInfo.IndexName) + ' ON '
-                + quotePhysicalIdentifier(ddlInfo.TableName) + ' (' + indexColumns.join(',') + ')'
-                + (declaredIndex && declaredIndex.Filter ? ' WHERE ' + quotePhysicalIdentifier(declaredIndex.Filter) + ' IS NOT NULL' : '')
-            ).ExecuteNonQuery();
+            if (!declaredIndex) throw new Error('SQL Server 索引转换失败：缺少已校验声明');
+            V8.Db.FromSql(buildSqlServerPackageIndexSql(ddlInfo.TableName, ddlInfo.IndexName, declaredIndex, false)).ExecuteNonQuery();
             return;
         }
 
@@ -6796,6 +6842,24 @@ try {
         requirePackageDdlObject(tableInfo, null);
         debugLog['ddl_index_table_prerequisite_' + ddlInfo.TableName] = '已按包声明创建并回读索引依赖表';
     };
+    var ensureDeclaredIndexColumns = (function () {
+        var preparedTables = Object.create(null);
+        return function (ddlItem, ddlInfo) {
+            if (ddlInfo.Kind != 'index') return;
+            var unique = /^\s*CREATE\s+UNIQUE\s+INDEX/i.test(String(ddlItem.DDL || ''))
+                || /\bADD\s+UNIQUE\s+(?:INDEX|KEY)\b/i.test(String(ddlItem.DDL || ''));
+            if (ddlItem.ApplicationStreamGateContract !== true && !(runtimeIsSqlServer && unique)) return;
+            var tableKey = String(ddlInfo.TableName).toLowerCase();
+            if (preparedTables[tableKey]) return;
+            // SQLSERVER_NULLABLE_UNIQUE_INDEX_V1：旧列本次也可能由 NOT NULL 放宽为 NULL。
+            // 必须先完成包声明的物理列同步，再按真实目录决定索引过滤，避免首次安装仍留下
+            // 错误约束、第二次安装才自愈；同一分片每表只同步一次，保留原门禁索引的前置行为。
+            var tables = {}; tables[tableKey] = true;
+            var result = syncPhysicalColumnsFromPackage(tables);
+            if (result.Errors > 0) throw new Error('应用包索引依赖物理列未就绪：' + ddlInfo.TableName);
+            preparedTables[tableKey] = true;
+        };
+    })();
     var ddlTablesChecked = {};
     for (var i = 0; i < ddlStatements.length; i++) {
         var ddlItem = ddlStatements[i];
@@ -6807,12 +6871,7 @@ try {
 
         var ddlInfo = classifyDdlStatement(ddlItem.DDL, ddlItem.TableName);
         ensureDeclaredIndexTable(ddlInfo);
-        // 旧租户的表可能尚无 V3 索引列；先按当前包补齐声明列，再建立可选门禁索引。
-        if (ddlInfo.Kind == 'index' && ddlItem.ApplicationStreamGateContract === true) {
-            var gateIndexTables = {};
-            gateIndexTables[String(ddlInfo.TableName).toLowerCase()] = true;
-            syncPhysicalColumnsFromPackage(gateIndexTables);
-        }
+        ensureDeclaredIndexColumns(ddlItem, ddlInfo);
         var ddlLogKey = ddlInfo.TableName + (ddlInfo.IndexName ? '_' + ddlInfo.IndexName : '_' + i);
         var alreadyExists = ddlInfo.Kind == 'table'
             ? ddlTableExists(ddlInfo.TableName)

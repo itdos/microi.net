@@ -382,6 +382,10 @@ namespace Microi.net
         /// </summary>
         [BsonIgnore]
         public virtual int? _PageSize { get; set; }
+        /// <summary>按需读取聊天历史的服务端游标；不包含连接信息或鉴权凭据。</summary>
+        [BsonIgnore]
+        public string HistoryCursor { get; set; }
+
         /// <summary>
         /// 
         /// </summary>

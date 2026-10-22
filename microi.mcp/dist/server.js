@@ -1128,6 +1128,20 @@ export async function runMicroServiceSourceSync(client, input) {
                 + `${initialContextResult.Msg || `Code=${initialContextResult.Code}`}`);
         }
         const rawContext = asJsonRecord(initialContextResult.Data);
+        const observedSourceHash = nullableString(rawContext.SourceManifestHash);
+        const existingSourceCount = Array.isArray(rawContext.Files) ? rawContext.Files.length : 0;
+        if (observedSourceHash !== null || existingSourceCount > 0) {
+            if (!observedSourceHash || !/^[a-f0-9]{64}$/u.test(observedSourceHash)) {
+                throw new Error('远端现有源码缺少可验证的 SourceManifestHash；请升级 API 后完整拉取，禁止覆盖写入。');
+            }
+            if (!input.expectedSourceManifestHash) {
+                throw new Error('SOURCE_EDIT_BASELINE_REQUIRED：修改前必须重新拉取全部远端源码，与本地逐文件校验并合并；同步时传入修改前记录的 expectedSourceManifestHash。');
+            }
+        }
+        if (input.expectedSourceManifestHash !== undefined
+            && input.expectedSourceManifestHash !== observedSourceHash) {
+            throw new Error('SOURCE_EDIT_BASELINE_CHANGED：远端源码已改变；请重新拉取并三方合并后再修改。禁止仅用刚读取的新哈希重试旧代码。');
+        }
         const rawCapabilities = asJsonRecord(rawContext.Capabilities);
         const sourceStreamFlag = rawCapabilities.SourceStreamPublish;
         const sourceStreamProtocolVersion = Number(rawCapabilities.SourceStreamProtocolVersion);
@@ -1136,6 +1150,9 @@ export async function runMicroServiceSourceSync(client, input) {
             throw new Error('远端声明 SourceStreamPublish=true，但缺少合法的 SourceStreamProtocolVersion。');
         }
         const supportsSourceStream = sourceStreamFlag === true;
+        if (!supportsSourceStream && (observedSourceHash !== null || existingSourceCount > 0)) {
+            throw new Error('远端现有源码不支持原子 CAS 同步；请升级 API 的 SourceStreamPublish 协议，禁止通过旧通道覆盖同事代码。');
+        }
         // A genuine old Context may have no CurrentVersion or CAS fields. Parse
         // those strict invariants only after the server explicitly advertises the
         // streaming protocol. Code=1 with no advertised capability is the sole
@@ -3230,7 +3247,7 @@ export function createMcpServer(client, context) {
         try {
             const result = await client.getStatus();
             if (result.Code === 1) {
-                return { content: [{ type: 'text', text: `✅ Server is online.\n\n${JSON.stringify(result.Data, null, 2)}` }] };
+                return { content: [{ type: 'text', text: `${asJsonRecord(result.Data).ApplicationAssetStreamGateReady === false ? '⚠️ Server is online; application publishing is blocked by a platform gate configuration error. Keep this tenant connection; do not request main-tenant credentials.' : '✅ Server is online.'}\n\n${JSON.stringify(result.Data, null, 2)}` }] };
             }
             return { content: [{ type: 'text', text: `⚠️ Server returned Code=${result.Code}: ${result.Msg}` }] };
         }
@@ -7383,16 +7400,18 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 同步微服务源码到在线 AI 应用
     // ========================
-    server.tool('microi_sync_microservice_source', `Sync a local Web, UniApp or MicroService source directory into the online AI Application for OsClient "${osClient}". Prefer directory: MCP detects SourceStreamPublish, streams each original file into the private staged prefix, then atomically finalizes the complete manifest with CurrentVersion/AppVersion/SourceManifestHash CAS. Transport failures are read back before any exact replay. Old servers use bounded legacy JSON only for at most 256 files and 8MiB. AI agents must never read large files into Base64, create .sync-seg-* files, create sync-source-files.json, or split one source file across tool calls.`, {
+    server.tool('microi_sync_microservice_source', `Sync a local Web, UniApp or MicroService source directory into the online AI Application for OsClient "${osClient}". BEFORE EVERY EDIT, pull the complete remote source, compare local files and merge differences; retain that pre-edit SourceManifestHash as expectedSourceManifestHash. Missing/stale edit baselines block existing-source writes. Do not fetch a new hash merely to retry stale local code. Prefer directory: MCP streams original files then atomically finalizes the complete manifest with CAS. Old servers may only initialize an empty source set through bounded legacy JSON (256 files/8MiB). AI agents must never Base64 or manually split source files.`, {
         microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: Description and SourceDirName.'),
         directory: z.string().optional().describe('Preferred. Absolute local project directory; MCP reads it directly and excludes node_modules, dist, build, coverage, caches and VCS data.'),
         sourceFiles: z.array(jsonRecordSchema).optional().describe('Legacy compatibility only. Do not construct this array from manually split files when a local directory is available.'),
+        expectedSourceManifestHash: z.string().regex(/^[a-f0-9]{64}$/u).nullable().optional().describe('Required when remote source exists. Exact SourceManifestHash recorded BEFORE editing, after full remote pull and local comparison. Explicit null is only valid for empty remote source.'),
         replace: z.boolean().optional().describe('Complete directory sync defaults to exact private-source replacement. Explicit false is rejected by the stream protocol; public runtime/build rows are always preserved.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
-    }, async ({ microService, directory, sourceFiles, replace, confirmExecution }) => (runMicroServiceSourceSync(client, {
+    }, async ({ microService, directory, sourceFiles, expectedSourceManifestHash, replace, confirmExecution }) => (runMicroServiceSourceSync(client, {
         microService,
         directory,
         sourceFiles,
+        expectedSourceManifestHash,
         replace,
         confirmExecution,
     })));

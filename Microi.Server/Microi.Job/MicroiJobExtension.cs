@@ -28,12 +28,7 @@ namespace Microi.net
                 // Quartz 直接把连接串交给具体数据库驱动，不会经过 Dos.ORM 的 DbSession。
                 // 因此必须在插件边界按实际数据库类型选择 Provider，并保留 MySQL
                 // 历史连接串兼容处理；SQL Server 连接串绝不能再交给 MySql.Data。
-                var quartzDbConn = ConnectionStringCompatibility.Normalize(
-                    databaseType,
-                    dbConn,
-                    100,
-                    120,
-                    600);
+                var quartzDbConn = NormalizeQuartzConnectionString(databaseType, dbConn);
                 // Quartz 3.19 的 MySQL 方言在“领取下一个到期触发器”时固化
                 // USE INDEX (IDX_{tablePrefix}T_NFT_ST / ..._MISFIRE)。历史租户库只有
                 // 旧 QRTZ_ 前缀索引名时索引缺失，调度器将永远领不到触发器（任务静默不执行）。
@@ -145,6 +140,25 @@ namespace Microi.net
                     $"Quartz 持久化当前仅支持 MySql 与 SqlServer，当前类型：{databaseType}");
             }
             return databaseType;
+        }
+
+        /// <summary>
+        /// 让 Quartz 的数据库驱动沿用平台 ORM 的连接策略，显式 TLS 设置始终优先。
+        /// </summary>
+        internal static string NormalizeQuartzConnectionString(DatabaseType databaseType, string connectionString)
+        {
+            var normalized = ConnectionStringCompatibility.Normalize(databaseType, connectionString, 100, 120, 600);
+            if (databaseType != DatabaseType.SqlServer || string.IsNullOrWhiteSpace(normalized))
+                return normalized;
+
+            // Dos.ORM 使用 System.Data.SqlClient，未配置 Encrypt 时语义为 false；
+            // Quartz 使用 Microsoft.Data.SqlClient，其新版本缺省值已变为 Mandatory。
+            // 只把旧连接串的隐式值显式化，避免业务库可用而安装任务保存时才因证书失败。
+            // 绝不自动信任证书或覆盖显式加密策略；强制 TLS 的服务器仍按原证书策略校验。
+            var builder = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(normalized);
+            if (!builder.ShouldSerialize("Encrypt"))
+                builder.Encrypt = Microsoft.Data.SqlClient.SqlConnectionEncryptOption.Optional;
+            return builder.ConnectionString;
         }
 
         internal static void ConfigurePersistentStore(

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
 import vm from 'node:vm'
+import { reconcileStatusSelection } from '../../../microi.uniapp/src/platform/status-filter-options.mjs'
 import '../../../microi.uniapp/resources/xjy/customer-contract-totals/engine.test.mjs'
 import {
   buildCustomerContractGroups,
@@ -136,6 +137,8 @@ test('列表金额请求延迟期间保持加载态，新搜索完成后旧金�
   const reached = deferred()
   let rowCalls = 0
   const loadData = pageMethod('list', 'loadData', 'search', {
+    // 页面方法抽取不会携带 ES 模块导入；注入同一真实策略，确保竞态断言能进入行请求。
+    reconcileStatusSelection,
     loadModuleRows: async () => ({ rows: [{ Id: ++rowCalls === 1 ? 'old' : 'new' }], count: 1, append: {} }),
     hydrateCustomerContractTotals,
     loadModulePeriodCounts: async () => ({}),

@@ -199,12 +199,37 @@ test('real mixed database theories keep all6 MySQL rows separate from SQL Server
   assert.equal(mysql,6);assert.equal(sqlServer,6);
 });
 
-test('real SQL Server structure theories enumerate14 individual unexecuted data cases',()=>{
-  for(const [name,count,condition]of [['StartupDependencySqlServerIntegrationTests',12,'HasSqlServerTestConnection'],['SqlServerMenuCapacityTests',2,'HasSqlServerFixture']]){
+test('real SQL Server fixture theories retain all18 rows with conditional method gates',()=>{
+  for(const [name,count,condition,method]of [
+    ['StartupDependencySqlServerIntegrationTests',12,'HasSqlServerTestConnection','ManagedStartupClosure_RepairsLegacyVersionStorageAndReplaysWithoutWrites'],
+    ['SqlServerMenuCapacityTests',2,'HasSqlServerFixture','LegacyMenuMigrationWidensBeforeBackfillAndKeepsConstraintsAcrossRestart'],
+    ['MarketplaceSqlServerNullIndexIntegrationTests',4,'HasSqlServerTestConnection','PackageUniqueIndex_UsesRealNullableSemantics_AndReplaysWithoutDdl']]){
     const source=fs.readFileSync(new URL('../Common/'+name+'.cs',import.meta.url),'utf8');
-    assert.doesNotMatch(source,/\[Theory\(Skip\s*=/);
-    assert.equal([...source.matchAll(new RegExp('InlineData[^\\r\\n]+SkipUnless = nameof\\('+condition+'\\)','g'))].length,count);
+    const gated=source.match(new RegExp('\\[Theory\\(Skip = "[^"]+", SkipUnless = nameof\\('+condition+'\\)\\)\\]([\\s\\S]*?)public\\s+(?:async\\s+)?(?:Task|void)\\s+'+method+'\\('));
+    assert.ok(gated,name+' must evaluate the shared fixture condition at method execution');
+    const rows=[...gated[1].matchAll(/\[InlineData\([^\r\n]*\)\]/g)];
+    assert.equal(rows.length,count,name+' must preserve each data case');
+    for(const row of rows)assert.doesNotMatch(row[0],/\bSkip(?:Type|Unless|When)?\s*=/);
+    assert.match(source,/Environment\.GetEnvironmentVariable\("MICROI_UPGRADE_SQLSERVER_TEST_CONN"\)/);
   }
+});
+
+test('all real SQL Server entry points verify the registered fixture before database work',()=>{
+  for(const file of [
+    '../Common/BackgroundTaskUnicodeTests.cs','../Common/DatabasePoolRecoveryIntegrationTests.cs',
+    '../Common/FieldOptionTreePageIntegrationTests.cs','../Common/FormEngineSqlServerWriteTests.cs',
+    '../Common/MarketplaceSqlServerNullIndexIntegrationTests.cs','../Common/RoleLimitActiveSnapshotTests.cs',
+    '../Common/SelectedDependencyVersionTests.cs','../Common/SqlServerMenuCapacityTests.cs',
+    '../Common/StartupDependencySqlServerIntegrationTests.cs','../Common/StartupPhysicalContractTests.cs',
+    '../Common/TenantJwtPersistenceIntegrationTests.cs','../ORM/Compatibility/SqlServerColumnDescriptionIntegrationTests.cs']){
+    const source=fs.readFileSync(new URL(file,import.meta.url),'utf8');
+    assert.match(source,/SqlServerFixtureGuard\.Verify\(/,file);
+    assert.doesNotMatch(source,/Assert\.(?:Equal|Contains)\("(?:Database=)?upgrade_fixture"/,file);
+  }
+  const guard=fs.readFileSync(new URL('../Common/SqlServerFixtureGuard.cs',import.meta.url),'utf8');
+  assert.match(guard,/SELECT FixtureId FROM dbo\.microi_sqlserver_fixture WHERE Id=1/);
+  assert.match(guard,/Assert\.Equal\(owner, Convert\.ToString\(command\.ExecuteScalar\(\)\)\)/);
+  assert.doesNotMatch(guard,/"(?:CREATE|UPDATE|INSERT|DELETE)\s/i);
 });
 
 test('shared Mongo memory fixture uses parent-owned nonces and cleanup after child exit',()=>{

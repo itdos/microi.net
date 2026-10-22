@@ -23,10 +23,11 @@ public sealed class RoleLimitActiveSnapshotTests
         var type = mysql ? DatabaseType.MySql : DatabaseType.SqlServer;
         var connection = Environment.GetEnvironmentVariable(mysql ? "MICROI_UPGRADE_MYSQL_TEST_CONN" : "MICROI_UPGRADE_SQLSERVER_TEST_CONN")!;
         Assert.False(string.IsNullOrWhiteSpace(connection), "所选提供商缺少隔离连接：" + providerName);
+        if (!mysql) SqlServerFixtureGuard.Verify(new SqlConnectionStringBuilder(connection));
         string WithDatabase(string name)
         {
             if (mysql) { var builder = new MySqlConnectionStringBuilder(connection); Assert.Equal("127.0.0.1", builder.Server); builder.Database = name; return builder.ConnectionString; }
-            var sqlBuilder = new SqlConnectionStringBuilder(connection); Assert.StartsWith("127.0.0.1,", sqlBuilder.DataSource); sqlBuilder.InitialCatalog = name; return sqlBuilder.ConnectionString;
+            var sqlBuilder = new SqlConnectionStringBuilder(connection); sqlBuilder.InitialCatalog = name; return sqlBuilder.ConnectionString;
         }
         var master = MicroiORMExtensions.CreateDbSession(WithDatabase(mysql ? "mysql" : "master"), type);
         var quoted = mysql ? "`" + tenant + "`" : "[" + tenant + "]";

@@ -71,6 +71,13 @@ namespace Microi.net
         Task<DosResult> GetMiniMaxMusicTask(string taskId);
         Task<DosResult> RecoverMiniMaxMusicTask(string taskId);
 
+        /// <summary>当前已认证用户可用的脱敏媒体目录，不接受调用方租户或身份。</summary>
+        Task<DosResult> GetMediaModels();
+        /// <summary>使用既有持久任务运行时入队，身份与所有权绑定当前 V8 上下文。</summary>
+        Task<DosResult> GenerateMiniMaxImage(MiniMaxImageGenerateParam param);
+        Task<DosResult> GetMiniMaxImageTask(string taskId);
+        Task<DosResult> RecoverMiniMaxImageTask(string taskId);
+
         /// <summary>
         /// 平台管理员生成固定男女音色的 MiniMax 短对白并转存当前租户 HDFS。
         /// </summary>

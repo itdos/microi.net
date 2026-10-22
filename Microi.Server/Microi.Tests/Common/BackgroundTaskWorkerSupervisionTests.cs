@@ -112,7 +112,8 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("tenantScanBatchSize: forceRecoveryScan", runtime);
         Assert.Contains("ScheduleWorkerWake(item)", runtime);
         Assert.DoesNotContain("var current = BackgroundTaskStore.Get(item.OsClient, item.Id)", runtime);
-        Assert.Contains("Msg='等待同一并发组的上一项任务完成'", store);
+        Assert.Contains("Msg=@waitingForGroup", store);
+        Assert.Contains(".AddInParameter(\"waitingForGroup\", \"等待同一并发组的上一项任务完成\")", store);
         Assert.Contains("AttemptCount>=MaxAttempts", store);
         Assert.Contains("任务已耗尽重试次数，系统已自动终结", store);
         Assert.Contains("ApiEngineKey NOT IN", store);

@@ -15,27 +15,26 @@ public class StartupDependencySqlServerIntegrationTests
     public static bool HasSqlServerTestConnection => !string.IsNullOrWhiteSpace(
         Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN"));
 
-    // 不在 Theory 总层跳过，否则十二种历史结构会折叠成一条未执行，失去精确例外证据。
-    [Theory]
-    [InlineData("nchar(50)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("char(50)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("nvarchar(50)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("nvarchar(1)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("varchar(3)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("nchar(3)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("char(3)", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("nvarchar(1) NOT NULL", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("nvarchar(1) COLLATE Latin1_General_100_BIN2 NOT NULL", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData(null, Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("int", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
-    [InlineData("AS CONVERT(nvarchar(50), 'v0.0.0')", Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    // 环境条件属于方法；InlineData 仅保留各历史结构，避免数据行 Skip 被发现器当作静态跳过。
+    [Theory(Skip = "Requires an isolated SQL Server fixture", SkipUnless = nameof(HasSqlServerTestConnection))]
+    [InlineData("nchar(50)")]
+    [InlineData("char(50)")]
+    [InlineData("nvarchar(50)")]
+    [InlineData("nvarchar(1)")]
+    [InlineData("varchar(3)")]
+    [InlineData("nchar(3)")]
+    [InlineData("char(3)")]
+    [InlineData("nvarchar(1) NOT NULL")]
+    [InlineData("nvarchar(1) COLLATE Latin1_General_100_BIN2 NOT NULL")]
+    [InlineData(null)]
+    [InlineData("int")]
+    [InlineData("AS CONVERT(nvarchar(50), 'v0.0.0')")]
     public async Task ManagedStartupClosure_RepairsLegacyVersionStorageAndReplaysWithoutWrites(string? versionType)
     {
         var connection = new SqlConnectionStringBuilder(
             Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN")!);
-        // 独立任务可使用不同本机端口，避免共享夹具在其它对话重启时打断发布回归。
-        Assert.Matches(@"^127\.0\.0\.1,\d{1,5}$", connection.DataSource);
-        Assert.Equal("upgrade_fixture", connection.InitialCatalog);
+        // 先核验登记库名和持久所有者，再复用已授权 SQL Server 服务创建随机用例库。
+        SqlServerFixtureGuard.Verify(connection);
 
         // 每个用例创建独立库，决不清空传入连接中的数据库或复用其它对话的测试表。
         var databaseName = "microi_upgrade_fixture_" + Guid.NewGuid().ToString("N");
@@ -76,7 +75,11 @@ public class StartupDependencySqlServerIntegrationTests
             Assert.True(UpgradeAppStore.StartupDependenciesReady(client, out var reason), reason);
             var count = database.FromSql("SELECT COUNT(*) FROM sys_apiengine").ToScalar<int>();
             Assert.Equal(UpgradeAppStore.RequiredStartupDependencyEngineKeys.Length, count);
-            Assert.Equal(24, count);
+            // 闭包随已审核的 bootstrap 包演进，精确核验实际 Key，避免旧数量常量掩盖遗漏或额外安装。
+            var installedKeys = database.FromSql("SELECT ApiEngineKey FROM sys_apiengine")
+                .ToDataTable().Rows.Cast<System.Data.DataRow>()
+                .Select(row => Convert.ToString(row["ApiEngineKey"])!).Order(StringComparer.Ordinal).ToArray();
+            Assert.Equal(UpgradeAppStore.RequiredStartupDependencyEngineKeys.Order(StringComparer.Ordinal), installedKeys);
             Assert.Equal(0, database.FromSql("SELECT COUNT(*) FROM sys_apiengine WHERE ApiEngineKey LIKE 'sso[_]%' OR ApiEngineKey LIKE 'database-backup-%'").ToScalar<int>());
 
             var version = database.FromSql("SELECT Version FROM sys_apiengine WHERE ApiEngineKey=@p0")

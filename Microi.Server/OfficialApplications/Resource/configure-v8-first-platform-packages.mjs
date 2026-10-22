@@ -121,7 +121,8 @@ export const packageDefinitions = Object.freeze([
     releaseTime: '2026-09-02 12:05:00',
     capabilities: [
       'ApiEngine:platform-chat-system-message@v1.1.0',
-      'ApiEngine:platform-chat-runtime@v1.0.2',
+      'ApiEngine:platform-chat-runtime@v1.1.0',
+      'V8.MongoDb.GetPartitionedTableData',
       'ApiEngine:platform-message-notification-custom-hook@v1.0.0',
       'ApiEngine:wechat_send_tpl_msg@v1.0.0',
       'V8.Method.SendWeChatTemplateMessage',
@@ -142,7 +143,7 @@ export const packageDefinitions = Object.freeze([
     ],
     engines: [
       { key: 'platform-chat-system-message', name: '平台系统消息编排', source: 'platform-chat-system-message.js', id: '019d2a01-9d63-7f91-8c02-000000000005', version: 'v1.1.0', enableLog: 1, apiRoutes: '/api/DiyChat/SendSystemMessage' },
-      { key: 'platform-chat-runtime', name: '平台聊天 Managed 运行时', source: 'platform-chat-runtime.js', id: '019d2a01-9d63-7f91-8c02-00000000000b', version: 'v1.0.2', enableLog: 1, stopHttp: 1 },
+      { key: 'platform-chat-runtime', name: '平台聊天 Managed 运行时', source: 'platform-chat-runtime.js', id: '019d2a01-9d63-7f91-8c02-00000000000b', version: 'v1.1.0', enableLog: 1, stopHttp: 1 },
       { key: 'platform-message-notification-custom-hook', name: '消息通知个性化扩展', source: 'platform-message-notification-custom-hook.js', id: '019d2a01-9d63-7f91-8c02-000000000006', version: 'v1.0.0', enableLog: 1, stopHttp: 1, ownership: 'Tenant', upgradePolicy: 'CreateIfMissing' },
       { key: 'wechat_send_tpl_msg', name: '微信模板消息可信适配器', source: 'wechat_send_tpl_msg.js', id: '019d2a01-9d63-7f91-8c02-00000000000c', version: 'v1.0.0', enableLog: 1, stopHttp: 1 },
     ],
@@ -186,7 +187,11 @@ export const packageDefinitions = Object.freeze([
       'ServerFeature:AiMediaModelDirectoryV1',
       'ClientFeature:AiMediaModelSelectionV1',
       // 新能力保持正式包追加顺序，重复生成不得仅因数组重排改变包哈希。
-      'ApiEngine:platform-ai-runtime@v1.1.2',
+      'ApiEngine:platform-ai-runtime@v1.1.3',
+      'V8.AI.GetMediaModels',
+      'V8.AI.GenerateMiniMaxImage',
+      'V8.AI.GetMiniMaxImageTask',
+      'V8.AI.RecoverMiniMaxImageTask',
     ],
     exactEngineKeys: [
       'mci_ai_data_assistant',
@@ -216,7 +221,7 @@ export const packageDefinitions = Object.freeze([
         name: 'AI 非流式兼容运行时',
         source: 'platform-ai-runtime.js',
         id: '019d2a01-9d63-7f91-8c02-00000000000a',
-        version: 'v1.1.2',
+        version: 'v1.1.3',
         enableLog: 1,
         history: '2026-09-04 v1.1.1 意图识别改传受限附件摘要并隔离 JS 集合，同时将其它动作的空附件和空历史数组归一化为 null，避免 Jint 绑定 .NET List 时触发 IConvertible 异常。',
       },

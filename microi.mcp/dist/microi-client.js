@@ -1,3 +1,4 @@
+import { withApplicationGateDiagnostic } from './application-gate-diagnostic.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -824,7 +825,7 @@ export class MicroiClient {
                 return this.requestJson(method, reqPath, body, params, nextAuthRecoveryStage(authRecoveryStage), options);
             }
         }
-        return parsed;
+        return withApplicationGateDiagnostic(parsed, this.config);
     }
     /**
      * Stream one local file as multipart without materializing it as Base64 or a
@@ -955,7 +956,7 @@ export class MicroiClient {
                 return this.requestMultipartFile(reqPath, fields, filePath, fileName, nextAuthRecoveryStage(authRecoveryStage), timeoutMs, contentEncoding, allowGzipFallback);
             }
         }
-        return parsed;
+        return withApplicationGateDiagnostic(parsed, this.config);
     }
     async requestJsonNative(method, url, headers, body, timeoutMs) {
         const endpoint = new URL(url);
@@ -1213,7 +1214,7 @@ export class MicroiClient {
                 return this.requestBinaryFileRange(reqPath, query, filePath, start, length, nextAuthRecoveryStage(authRecoveryStage), timeoutMs);
             }
         }
-        return parsed;
+        return withApplicationGateDiagnostic(parsed, this.config);
     }
     isUncertainWriteError(error) {
         return error instanceof MicroiTransportError && error.uncertainOutcome;
@@ -1266,6 +1267,18 @@ export class MicroiClient {
     // ---------- API 方法 ----------
     async getStatus() {
         return this.get(API.GET_STATUS);
+    }
+    async checkApplicationPublishGate() {
+        const status = await this.getStatus();
+        if (status.Code !== 1)
+            return status;
+        const data = status.Data && typeof status.Data === 'object' ? status.Data : {};
+        if (data.ApplicationAssetStreamGateReady !== false)
+            return null;
+        return {
+            ...status, Code: 0,
+            Msg: `${String(data.ApplicationAssetStreamGateReadError || '应用发布门禁不可用')}\n${status.DataAppend?.Hint || ''}`,
+        };
     }
     async getAdministrativeCapabilities() {
         return this.get(API.GET_ADMINISTRATIVE_CAPABILITIES);
@@ -1874,6 +1887,9 @@ export class MicroiClient {
         });
     }
     async uploadApplicationAssetStream(data) {
+        const gateFailure = await this.checkApplicationPublishGate();
+        if (gateFailure)
+            return gateFailure;
         const localPath = path.resolve(data.FilePath);
         const stat = fs.lstatSync(localPath);
         if (!stat.isFile() || stat.isSymbolicLink()) {
@@ -2189,6 +2205,9 @@ export class MicroiClient {
         });
     }
     async publishMicroService(data) {
+        const gateFailure = await this.checkApplicationPublishGate();
+        if (gateFailure)
+            return gateFailure;
         return this.post(API.PUBLISH_MICRO_SERVICE, {
             OsClient: this.config.osClient,
             ...data,

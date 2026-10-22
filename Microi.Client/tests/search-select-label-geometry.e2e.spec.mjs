@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { compileString } from "sass";
+import { releaseBrowserWidths } from "../../Microi.Server/Microi.Tests/ReleaseGate/release-browser-viewports.mjs";
 
 const searchSource = await readFile(new URL("../src/views/form-engine/diy-search.vue", import.meta.url), "utf8");
 const searchStyles = searchSource.match(/<style[^>]*>([^]*?)<\/style>/u)?.[1] || "";
@@ -34,7 +35,7 @@ const fixture = await build({
 });
 const css = compileString(searchStyles.replace(/:deep\(([^)]+)\)/gu, "$1")).css;
 
-for (const width of [1366, 3840]) {
+for (const width of releaseBrowserWidths()) {
     test(`搜索多选标签在 ${width}px 下始终可读，长标签可通过折叠提示查看`, async ({ page }, testInfo) => {
         await page.setViewportSize({width, height: width === 3840 ? 2160 : 900});
         await page.setContent(`<style>${elementStyles}\n${css}</style><div id="fixture"></div>`);

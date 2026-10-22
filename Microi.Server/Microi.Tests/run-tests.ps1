@@ -411,7 +411,7 @@ if ($Mode -eq "Full") {
     node (Join-Path $testRoot 'FullStack\platform-reminders.e2e.mjs') $ResultsDirectory
     if ($LASTEXITCODE -ne 0) { throw "Platform-reminder browser release gate failed with exit code $LASTEXITCODE." }
 
-    Write-Host 'Validating search selection labels in real Element Plus at desktop and 4K resolutions...'
+    Write-Host 'Validating search selection labels in real Element Plus at the selected desktop resolutions...'
     $clientRoot = Join-Path (Split-Path -Parent $serverRoot) 'Microi.Client'
     $geometryReport = Join-Path $ResultsDirectory 'search-select-label-geometry.json'
     Push-Location $clientRoot
@@ -420,7 +420,7 @@ if ($Mode -eq "Full") {
         if ($LASTEXITCODE -ne 0) { throw 'Search selection label browser release gate failed.' }
         $geometry = Get-Content -LiteralPath $geometryReport -Raw | ConvertFrom-Json
         if ($geometry.stats.expected -lt 2 -or $geometry.stats.unexpected -ne 0 -or $geometry.stats.skipped -ne 0 -or $geometry.stats.flaky -ne 0) {
-            throw 'Search selection label browser release gate requires desktop and 4K cases without failures or skips.'
+            throw 'Search selection label browser release gate requires all selected desktop cases without failures or skips.'
         }
     } finally { Pop-Location }
 

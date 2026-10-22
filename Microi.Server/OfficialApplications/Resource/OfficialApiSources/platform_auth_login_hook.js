@@ -4,4 +4,5 @@
  * ApiEngineKey：platform_auth_login_hook
  * 此接口仅在首次安装时创建，之后归当前租户维护；官方更新或重新安装不得覆盖。
  */
+
 return { Code : 1 };

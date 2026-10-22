@@ -1,11 +1,123 @@
 using Dos.Common;
 using Microi.net;
+using Microi.net.Api;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.ApplicationParts;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
 
 public sealed class HdfsUploadCompatibilityTests
 {
+    [Theory]
+    [InlineData("/api/HDFS/upload")]
+    [InlineData("/api/Upload")]
+    [InlineData("/apiengine/platform-hdfs-upload")]
+    [InlineData("/API/HDFS/UPLOAD")]
+    public async Task UploadProtocolRoutesLeaveDynamicSelectionForTheExistingExactHostBridge(string path)
+    {
+        // 不提供缓存/数据库服务：动态候选必须退出，精确 attribute 端点才会唯一选中原协议桥。
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = path;
+        context.Request.ContentType = "multipart/form-data; boundary=fixture";
+        var values = new RouteValueDictionary { ["preserved"] = "fixture" };
+        var result = await new DynamicRoute().TransformAsync(context, values);
+        Assert.Null(result);
+        Assert.Single(values);
+        Assert.Equal("fixture", values["preserved"]);
+        Assert.False(context.Items.ContainsKey(DynamicRoute.ResolvedApiEngineKeyItem));
+        Assert.False(context.Items.ContainsKey("__MicroiConfirmedAbsentRoute"));
+        Assert.False(HdfsUploadRequestContext.HasCurrentRequest);
+    }
+
+    [Fact]
+    public async Task ActualMvcRoutingSelectsOneUploadAliasWhenBothDynamicRoutesAreRegistered()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Services.AddControllers().AddApplicationPart(typeof(HDFSController).Assembly)
+            .ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new HdfsOnlyControllerFeatureProvider()));
+        builder.Services.AddTransient<DynamicRoute>();
+        await using var host = builder.Build();
+        var actions = host.Services.GetRequiredService<IActionDescriptorCollectionProvider>().ActionDescriptors.Items
+            .OfType<ControllerActionDescriptor>()
+            .Where(action => action.ControllerTypeInfo.AsType() == typeof(HDFSController) && action.ActionName == "Upload")
+            .ToArray();
+        // 同一 MethodInfo 的三个 attribute selector 具有相同 controller/action；动态按名称
+        // 选择会展开三个同优先级端点。这里用真实 MVC 路由选择证明每个 URL 只剩一个精确端点。
+        Assert.Equal(3, actions.Length);
+        Assert.Single(actions.Select(action => action.MethodInfo).Distinct());
+        Assert.Equal(new[] { "api/hdfs/upload", "api/upload", "apiengine/platform-hdfs-upload" },
+            actions.Select(action => action.AttributeRouteInfo!.Template!.TrimStart('/').ToLowerInvariant()).OrderBy(value => value, StringComparer.Ordinal));
+        host.UseRouting();
+        host.MapDynamicControllerRoute<DynamicRoute>("apiengine/{*path}", state: null, order: -100);
+        host.MapDynamicControllerRoute<DynamicRoute>("{*path}", state: null, order: -99);
+        host.MapControllers();
+        // 只截取已完成匹配的 endpoint，不执行控制器/过滤器，不需要数据库、登录或存储服务。
+        host.Run(async context =>
+        {
+            var action = context.GetEndpoint()?.Metadata.GetMetadata<ControllerActionDescriptor>();
+            await context.Response.WriteAsJsonAsync(new
+            {
+                controller = action?.ControllerName, action = action?.ActionName,
+                template = action?.AttributeRouteInfo?.Template, method = action?.MethodInfo.Name,
+                confirmedAbsent = context.Items.ContainsKey("__MicroiConfirmedAbsentRoute"),
+                resolvedEngine = context.Items.ContainsKey(DynamicRoute.ResolvedApiEngineKeyItem),
+                scopeCreated = HdfsUploadRequestContext.HasCurrentRequest
+            });
+        });
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        var address = host.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+        using var client = new HttpClient { BaseAddress = new Uri(address) };
+        foreach (var route in new[] { "/api/HDFS/upload", "/api/Upload", "/apiengine/platform-hdfs-upload", "/API/HDFS/UPLOAD" })
+        {
+            using var content = new MultipartFormDataContent();
+            using var response = await client.PostAsync(route, content, TestContext.Current.CancellationToken);
+            Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+            var selected = JObject.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            Assert.Equal("HDFS", selected.Value<string>("controller"));
+            Assert.Equal("Upload", selected.Value<string>("action"));
+            Assert.Equal("Upload", selected.Value<string>("method"));
+            Assert.Equal(route.TrimStart('/').ToLowerInvariant(), selected.Value<string>("template")!.TrimStart('/').ToLowerInvariant());
+            Assert.False(selected.Value<bool>("confirmedAbsent"));
+            Assert.False(selected.Value<bool>("resolvedEngine"));
+            Assert.False(selected.Value<bool>("scopeCreated"));
+        }
+        await host.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    private sealed class HdfsOnlyControllerFeatureProvider : IApplicationFeatureProvider<ControllerFeature>
+    {
+        public void PopulateFeature(IEnumerable<ApplicationPart> parts, ControllerFeature feature)
+        {
+            // 复用真实上传控制器的三份路由元数据；排除无关控制器及其宿主约定，避免夹具扩大依赖。
+            foreach (var controller in feature.Controllers.Where(type => type.AsType() != typeof(HDFSController)).ToArray())
+                feature.Controllers.Remove(controller);
+        }
+    }
+
+    [Theory]
+    [InlineData("GET", "/api/HDFS/upload")]
+    [InlineData("PUT", "/api/Upload")]
+    [InlineData("OPTIONS", "/apiengine/platform-hdfs-upload")]
+    [InlineData("POST", "/api/HDFS/upload/child")]
+    [InlineData("POST", "/api/HDFS/upload-other")]
+    [InlineData("POST", "/api/HDFS/DeleteObject")]
+    [InlineData("POST", "/api/UploadOther")]
+    [InlineData("POST", "/apiengine/platform-hdfs-upload-hook")]
+    [InlineData("POST", "/api/HDFS/upload--OsClient--other--")]
+    public void UploadBridgeDoesNotCaptureOtherMethodsPrefixesOrTenantSuffixes(string method, string path)
+        => Assert.False(DynamicRoute.IsHdfsUploadProtocolRoute(method, path));
+
     [Theory]
     [InlineData(null, false)]
     [InlineData("", false)]

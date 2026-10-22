@@ -202,7 +202,12 @@
                         </div>
                         <!-- <div class="vChat__notice J__vChatNotice">18条新消息</div> -->
                         <div class="fixGeminiscrollHeight" v-show="fixGeminiscrollHeight" style="font-size: 0; height: 1px"></div>
-                        <div class="vChat__main flex1 flexbox flex__direction-column" style="overflow: auto">
+                        <div ref="chatScroller" class="vChat__main flex1 flexbox flex__direction-column" style="overflow: auto" @scroll.passive="onHistoryScroll">
+                            <div class="chat-history-status" aria-live="polite">
+                                <span v-if="historyState.loading">正在加载历史消息…</span>
+                                <el-button v-else-if="historyState.error" link type="primary" @click="loadHistoryPage">历史消息加载失败，点击重试</el-button>
+                                <el-button v-else-if="historyState.hasMore" link @click="loadHistoryPage">加载更早消息</el-button>
+                            </div>
                             <!-- <geminiScrollbar autoshow class="geminiScrollbar flex1" id="J__geminiScrollbar"> -->
                             <!-- <div class="vChat__loading J__vChatLoading">
                             <img src="../../assets/img/deng.gif" /> 数据载入中...
@@ -212,7 +217,7 @@
                                     <!-- <li class="time"><span>2019年04月01日 晚上19:15</span></li>
                                 <li class="notice"><span>当前群聊人数较多，已显示群成员昵称，同时为了信息安全，请注意聊天隐私</span></li> -->
                                     <!-- <li class="time"><span>2019年04月01日 晚上22:30</span></li> -->
-                                    <li v-for="(chat, index) in ChatRecord" :key="chat.FromUserId + index" :class="chat.FromUserId == GetCurrentUser.Id ? 'me' : 'others'">
+                                    <li v-for="(chat, index) in ChatRecord" :key="chatMessageKey(chat) || chat.FromUserId + index" :class="chat.FromUserId == GetCurrentUser.Id ? 'me' : 'others'">
                                         <router-link v-if="chat.FromUserId != GetCurrentUser.Id" class="avatar" to="">
                                             <img :src="getChatAvatar(chat)" style="object-fit: cover" />
                                         </router-link>
@@ -400,6 +405,7 @@ import Swiper from "swiper";
 //import { DiyStore } from 'itdos.diy'
 import _ from "underscore";
 import { useDiyStore } from "@/pinia";
+import { createChatHistoryState, fetchChatHistoryPage, refreshChatHistoryTail, mergeChatHistory, chatMessageKey } from "@/utils/chat-history";
 import drag from "@/utils/dos.common";
 import { 
     formatMessageContent, 
@@ -447,7 +453,7 @@ export default {
             BtnLoading: false,
             kw: "",
             isLoading: false, //加载控制标识
-            tmpList: [],
+            historyState: createChatHistoryState(),
             fixGeminiscrollHeight: true, //解决含有图片资源（高度没及时更新）
             dialogVisible_unlocker: false, //显示解除提示
             dialogVisible_notice: false, //显示公告对话框
@@ -1086,6 +1092,7 @@ export default {
         }
     },
     beforeUnmount() {
+        this.historyState = createChatHistoryState();
         var self = this;
         self.cancelAITypewriter();
         // 移除事件监听
@@ -1435,16 +1442,39 @@ export default {
             self.contactsPageIndex = 1;
             self.GetSysUserPublicInfo(false);
         },
-        loadMore() {
-            this.isLoading = true;
-            for (var i = 0, j = 5; i < j; i++) {
-                this.tmpList.push({
-                    name: "插入行==：" + _count++
-                });
-            }
-            setTimeout(() => {
-                this.isLoading = false;
-            }, 1000);
+        chatMessageKey,
+        onHistoryScroll() {
+            if (this.$refs.chatScroller?.scrollTop < 80 && !this.historyState.error) this.loadHistoryPage();
+            this.refreshReadTail();
+        },
+        async refreshReadTail() {
+            const state = this.historyState, scroller = this.$refs.chatScroller;
+            if (!state.tailPending || this.IsAiAssistantContact || !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight >= 100) return;
+            const ws = this.$websocket || window.__VUE_APP__?.config?.globalProperties?.$websocket;
+            if (!ws?.invoke || ws.state !== 'Connected') return;
+            const rows = await refreshChatHistoryTail(state, ws.invoke.bind(ws), this.GetCurrentUser.Id,
+                candidate => candidate === this.historyState);
+            if (rows && state === this.historyState)
+                this.ChatRecord = mergeChatHistory(this.ChatRecord, rows, this.GetCurrentUser.Id, state.peerId);
+        },
+        async loadHistoryPage() {
+            const state = this.historyState;
+            const ws = this.$websocket || window.__VUE_APP__?.config?.globalProperties?.$websocket;
+            if (!state.peerId || !ws?.invoke || ws.state !== 'Connected') return;
+            const scroller = this.$refs.chatScroller;
+            const initial = !state.cursor;
+            const height = scroller?.scrollHeight || 0;
+            const top = scroller?.scrollTop || 0;
+            const rows = await fetchChatHistoryPage(state, ws.invoke.bind(ws), this.GetCurrentUser.Id,
+                candidate => candidate === this.historyState);
+            if (!rows || state !== this.historyState) return;
+            this.ChatRecord = mergeChatHistory(this.ChatRecord, rows, this.GetCurrentUser.Id, state.peerId);
+            if (this.IsAiAssistantContact)
+                this.ChatRecord = mergePlatformChatRecords(this.ChatRecord, this.platformNotifications, this.GetCurrentUser);
+            await this.$nextTick();
+            if (state !== this.historyState || !scroller) return;
+            if (initial) this.wchat_ToBottom();
+            else scroller.scrollTop = top + scroller.scrollHeight - height;
         },
         SelectCurrentLastContact(contact) {
             var self = this;
@@ -1474,6 +1504,7 @@ export default {
             
             //切换当前聊天人
             self.diyStore.setDiyChatCurrentLastContact(selectedContact);
+            self.historyState = createChatHistoryState(contactUserId, self.historyState.generation + 1);
             self.ChatRecord.splice(0, self.ChatRecord.length);
 
             // 直接使用this.$websocket（已在checkConnection中同步）
@@ -1505,19 +1536,7 @@ export default {
                 return;
             }
             
-            //获取跟这个人的聊天记录
-            console.log('[获取聊天记录] 开始请求', selectedContact.ContactUserName);
-            ws.invoke("SendChatRecordToUser", {
-                    FromUserId: self.GetCurrentUser.Id,
-                    ToUserId: selectedContact.ContactUserId,
-                    OsClient: self.DiyCommon.GetOsClient()
-                })
-                .then((res) => {
-                    console.log('[获取聊天记录] 请求成功，等待ReceiveSendChatRecordToUser事件');
-                })
-                .catch((err) => {
-                    console.error(`获取与[${selectedContact.ContactUserName}]的聊天记录失败：`, err);
-                });
+            self.loadHistoryPage();
         },
         InitSignalROnEvent() {
             var self = this;
@@ -1587,26 +1606,11 @@ export default {
                                 console.log('[AI消息] 收到AI回复');
                                 self.startAITypewriterMessage(message);
                             } else {
-                                // 防止频繁请求聊天记录
-                                if (self._loadingChatRecord) {
-                                    console.log('[防死循环] 正在加载聊天记录，跳过');
-                                    return;
-                                }
-                                
-                                self._loadingChatRecord = true;
-                                // 普通用户消息：重新获取聊天记录
-                                self.$websocket.invoke("SendChatRecordToUser", {
-                                    FromUserId: self.GetCurrentUser.Id,
-                                    ToUserId: self.CurrentLastContact.ContactUserId,
-                                    OsClient: self.DiyCommon.GetOsClient()
-                                }).finally(() => {
-                                    setTimeout(() => {
-                                        self._loadingChatRecord = false;
-                                    }, 500);
-                                });
-                                self.$nextTick(() => {
-                                    self.wchat_ToBottom();
-                                });
+                                const scroller = self.$refs.chatScroller;
+                                const nearBottom = !scroller || scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 100;
+                                self.ChatRecord = mergeChatHistory(self.ChatRecord, [message], self.GetCurrentUser.Id, self.historyState.peerId);
+                                if (String(message.FromUserId) === self.historyState.peerId && String(message.ToUserId) === String(self.GetCurrentUser.Id)) self.historyState.tailPending = true;
+                                if (nearBottom) self.$nextTick(() => { self.wchat_ToBottom(); self.refreshReadTail(); });
                             }
                         } else {
                             console.log('[调试] 消息不属于当前联系人');
@@ -1724,50 +1728,9 @@ export default {
                     },
                     
                     // 接收聊天记录
-                    onReceiveChatRecord: (message) => {
-                        console.log(`[接收聊天记录] 收到${message?.length || 0}条消息`, self.CurrentLastContact.ContactUserName);
-                        
-                        // 重置加载标志
-                        self._loadingChatRecord = false;
-                        
-                        // 首次历史请求可能比刚发出的消息/AI流式回复更晚返回。
-                        // 直接替换会把用户刚看到的成功回复清空；保留本地待发送、
-                        // 实时流和失败气泡，并按发送人/接收人/内容与持久记录去重。
-                        const incoming = Array.isArray(message) ? message : [];
-                        const localPending = self.ChatRecord.filter(item => item && (
-                            item.tempId
-                            || item.isLocalRealtime
-                            || item.isStreaming
-                            || item.isError
-                            || item.SendFailed
-                        ));
-                        const signature = item => [
-                            String(item?.FromUserId || ''),
-                            String(item?.ToUserId || ''),
-                            String(item?.Type || 'text'),
-                            String(item?.Content || '')
-                        ].join('\u001f');
-                        const known = new Set(incoming.map(signature));
-                        const merged = incoming.slice();
-                        localPending.forEach(item => {
-                            const key = signature(item);
-                            if (!known.has(key)) {
-                                known.add(key);
-                                merged.push(item);
-                            }
-                        });
-                        const visibleRecords = self.IsAiAssistantContact
-                            ? mergePlatformChatRecords(
-                                merged,
-                                self.platformNotifications,
-                                self.GetCurrentUser
-                            )
-                            : merged;
-                        self.ChatRecord.splice(0, self.ChatRecord.length, ...visibleRecords);
-                        self.$nextTick(() => {
-                            self.wchat_ToBottom();
-                        });
-                    },
+                    // Legacy broadcasts can come from another window. Cursor pages are
+                    // returned to this connection by GetChatHistoryPage instead.
+                    onReceiveChatRecord: () => {},
                     
                     // 接收最近联系人列表
                     onReceiveLastContacts: (message) => {
@@ -1952,11 +1915,13 @@ export default {
                     FromUserId: self.GetCurrentUser.Id,
                     CreateTime: new Date().toISOString(),
                     LastMessage: _html,
-                    tempId: tempId
+                    tempId: tempId,
+                    RequestId: tempId
                 };
                 self.ChatRecord.push(optimisticMessage);
                 self.$websocket
                     .invoke("SendToUser", {
+                        RequestId: tempId,
                         Content: _html, //msgTpl,
                         OsClient: self.DiyCommon.GetOsClient(),
                         ToUserId: self.GetCurrentLastContact.ContactUserId,
@@ -2136,6 +2101,8 @@ export default {
 @import "@/views/chat/css/fonts/iconfont.css";
 @import "@/views/chat/css/reset.scss";
 @import "@/views/chat/css/layout.scss";
+
+.chat-history-status { min-height: 28px; text-align: center; font-size: 12px; color: var(--el-text-color-secondary); }
 
 .realtime-status-banner {
     min-height: 34px;

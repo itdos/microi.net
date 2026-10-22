@@ -21,7 +21,7 @@ if(aiRuntimeActions[aiRuntimeRoute]) V8.Param.Action = aiRuntimeActions[aiRuntim
 
 
 // Microi官方接口引擎：platform-ai-runtime
-// Version: v1.1.2
+// Version: v1.1.3
 // AI_RUNTIME_MANAGED_NON_STREAM_V1：非流式兼容动作由 V8 编排，身份、租户、密钥和权限由 V8.AI 绑定。
 var param = V8.Param || {};
 var action = text(param.Action);
@@ -34,7 +34,15 @@ var supportedActions = {
   Chat: true,
   NL2SQL: true,
   NL2V8EngineSync: true,
-  ProcessImage: true
+  ProcessImage: true,
+  ListModels: true,
+  GetMediaModels: true,
+  GenerateMiniMaxImage: true,
+  GetMiniMaxImageTask: true,
+  RecoverMiniMaxImageTask: true,
+  GenerateMiniMaxMusic: true,
+  GetMiniMaxMusicTask: true,
+  RecoverMiniMaxMusicTask: true
 };
 
 if (!supportedActions[action]) return { Code: 0, Msg: '不支持的 AI 运行时动作。' };
@@ -111,7 +119,51 @@ if (action === 'NL2SQL') {
 if (action === 'ProcessImage') {
   return processImage(param);
 }
+// AI_RUNTIME_MEDIA_TASKS_V1: scripts orchestrate typed, identity-bound runtime atoms.
+// Credentials, endpoint overrides and user/tenant values never cross this boundary.
+if (action === 'ListModels') {
+  return V8.FormEngine.GetTableData('mic_ai', {
+    _InvokeType: 'Client', _PageIndex: 1, _PageSize: 200,
+    _OrderBy: 'CreateTime', _OrderByType: 'DESC',
+    _SelectFields: ['Id', 'Name', 'AiModel', 'ModelType', 'Provider', 'IsEnable', 'IsRelayModel', 'SupportReasoning']
+  });
+}
+if (action === 'GetMediaModels') return await V8.AI.GetMediaModels();
+if (action === 'GenerateMiniMaxImage') return await V8.AI.GenerateMiniMaxImage(copyImageTaskParam(param));
+if (action === 'GenerateMiniMaxMusic') return await V8.AI.GenerateMiniMaxMusic(copyMusicTaskParam(param));
+if (action === 'GetMiniMaxImageTask') return await V8.AI.GetMiniMaxImageTask(text(param.TaskId).slice(0, 240));
+if (action === 'RecoverMiniMaxImageTask') return await V8.AI.RecoverMiniMaxImageTask(text(param.TaskId).slice(0, 240));
+if (action === 'GetMiniMaxMusicTask') return await V8.AI.GetMiniMaxMusicTask(text(param.TaskId).slice(0, 240));
+if (action === 'RecoverMiniMaxMusicTask') return await V8.AI.RecoverMiniMaxMusicTask(text(param.TaskId).slice(0, 240));
 return await V8.AI.NL2V8(copyNl2V8Param(param));
+
+function copyImageTaskParam(source) {
+  var result = {
+    RequestId: text(source.RequestId), AiModelId: text(source.AiModelId), Prompt: text(source.Prompt),
+    Model: text(source.Model), AspectRatio: text(source.AspectRatio || '1:1'),
+    Resolution: text(source.Resolution), Count: Number(source.Count || 1), Operation: text(source.Operation || 'text-to-image'),
+    PostProcess: text(source.PostProcess), ReferenceImages: null
+  };
+  var images = source.ReferenceImages;
+  if (images && typeof images.length === 'number' && images.length > 0) {
+    if (images.length > 10) throw new Error('参考图片数量超过限制。');
+    result.ReferenceImages = [];
+    for (var i = 0; i < images.length; i++) result.ReferenceImages.push({ FileName: text(images[i].FileName), DataUrl: text(images[i].DataUrl) });
+  }
+  if (source.Width != null) result.Width = Number(source.Width);
+  if (source.Height != null) result.Height = Number(source.Height);
+  if (source.Seed != null) result.Seed = Number(source.Seed);
+  return result;
+}
+
+function copyMusicTaskParam(source) {
+  return {
+    RequestId: text(source.RequestId), AiModelId: text(source.AiModelId), Prompt: text(source.Prompt),
+    Model: text(source.Model), IsInstrumental: source.IsInstrumental !== false,
+    SampleRate: Number(source.SampleRate || 44100), Bitrate: Number(source.Bitrate || 256000),
+    Format: text(source.Format || 'mp3'), DurationSeconds: Number(source.DurationSeconds || 20)
+  };
+}
 
 function text(value) {
   return value === null || value === undefined ? '' : String(value).trim();

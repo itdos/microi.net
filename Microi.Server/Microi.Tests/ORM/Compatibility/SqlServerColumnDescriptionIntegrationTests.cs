@@ -15,8 +15,7 @@ public sealed class SqlServerColumnDescriptionIntegrationTests
     public void ChangeColumn_AddsMissingDescription_UpdatesAndRenamesWithoutLosingData()
     {
         var connection = new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("MICROI_UPGRADE_SQLSERVER_TEST_CONN")!);
-        Assert.Matches(@"^127\.0\.0\.1,\d{1,5}$", connection.DataSource);
-        Assert.Equal("upgrade_fixture", connection.InitialCatalog);
+        Microi.Tests.Common.SqlServerFixtureGuard.Verify(connection);
         var databaseName = "microi_column_fixture_" + Guid.NewGuid().ToString("N");
         connection.InitialCatalog = "master";
         var master = MicroiORMExtensions.CreateDbSession(connection.ConnectionString, DatabaseType.SqlServer);

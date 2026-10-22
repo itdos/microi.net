@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {createMatrixPlan, validateMatrixResults,validateStagedStorageProof} from './release-test-matrix.mjs';
+import {createMatrixPlan, validateMatrixResults,validateStagedStorageProof,verifyMatrixDesktopInputs} from './release-test-matrix.mjs';
+import {snapshotDesktopInputs} from '../../tools/release-desktop-inputs.mjs';
+import {createHash} from 'node:crypto';
 import {preserveHdfsEvidence} from './staged-full-runtime.mjs';
 import os from 'node:os';
 
@@ -33,10 +35,42 @@ test('IoT HTTP integration prerequisites are declared before the expensive Full 
 });
 const suite=names=>({summaryOutcome:'Completed',tests:names.map(testName=>({testName,outcome:'Passed'})),counters:{total:names.length,passed:names.length,executed:names.length,notExecuted:0,failed:0}});
 const fullNames=['Dos.Common.Tests.FieldOptionTreePageIntegrationTests.LargeSourcePagesInDatabaseAndKeepsLookupInsideSourceFilter(provider: "MySql")','Microi.Tests.Common.RoleLimitActiveSnapshotTests.RealRoleLoader_ExcludesDeletedGrantsAndRetainsLegacyNulls(providerName: "MySql")',...['null','empty','blank','short'].map(value=>'Microi.Tests.Common.TenantJwtPersistenceIntegrationTests.NewlyAddedTenant_PersistsWeakKeyAndConvergesCompetingRefreshes(providerName: "MySql", previousSecret: '+value+')'),'Microi.Tests.Common.MongoLegacyCompatibilityTests.RealServers_Authenticate_PersistLogsOnce_PageWithoutDuplicates_AndIsolateTenants(variable: "MICROI_TEST_MONGO_CURRENT", versionVariable: "MICROI_TEST_MONGO_CURRENT_VERSION")','Microi.Tests.Common.MicroiQuartzSchemaRepairIntegrationTests.RealSchedule','Microi.Tests.Common.SelectedDependencyVersionTests.MySqlAndRedisMatchTheFrozenMcpDependencyVersions'];
-const geometry=()=>({stats:{expected:2,unexpected:0,skipped:0,flaky:0},caseTitles:['桌面1366','4K3840']});
+const geometry=()=>({stats:{expected:2,unexpected:0,skipped:0,flaky:0},caseTitles:['桌面1366px','桌面1920px']});
 const outcomes=()=>({quick:suite(['OfflineSqlServerCompiler']),full:suite(fullNames),geometry:geometry()});
 const storage=()=>({schemaVersion:1,sourceHead:'a'.repeat(40),observedAt:'2026-10-16T09:01:00.000Z',passed:true,actualProvider:'Aliyun',apiProbe:{passed:true,currentApiAndHdfsPlugin:true,uploadRoute:'api/HDFS/upload',objectsVerified:4,buildId:'synthetic-parser-fixture',apiDllSha256:'d'.repeat(64),hdfsDllSha256:'e'.repeat(64)},objectProbe:{passed:true,objects:['FullMain_123','FullChild_123'].flatMap(tenant=>['Public','Private'].map(scope=>({tenant,scope,key:tenant.toLowerCase()+'/full/run/'+scope,sha256:'b'.repeat(64),bytes:32,apiUpload:200,apiReadGet:200,authenticatedGet:200,anonymousGet:scope==='Public'?200:403,currentDomainGet:200}))),cleanup:['FullMain_123','FullChild_123'].flatMap(tenant=>['Public','Private'].map(scope=>({scope,key:tenant.toLowerCase()+'/full/run/'+scope,signedHeadAfterCleanup:404})))}});
 const frozen=()=>({...createMatrixPlan(matrix(),environment()),sourceHead:'a'.repeat(40)});
+
+test('Desktop candidate matrix binds the actual Full snapshot and rejects unknown metadata or source drift',async()=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-desktop-matrix-'));
+ try{
+  const init=spawnSync('git',['init','--quiet'],{cwd:directory,windowsHide:true});assert.equal(init.status,0);
+  const desktop=path.join(directory,'Microi.Agent/apps/microi-code');fs.mkdirSync(desktop,{recursive:true});fs.writeFileSync(path.join(desktop,'package.json'),'{}');
+  const files=await snapshotDesktopInputs(directory),input=matrix();
+  input.candidateInputs={desktop:{fileCount:Object.keys(files).length,filesSha256:createHash('sha256').update(JSON.stringify(files)).digest('hex'),formalCandidateModule:'Microi.Server/tools/release-desktop-inputs.mjs'}};
+  const plan={...createMatrixPlan(input,environment()),sourceHead:'a'.repeat(40)};
+  assert.deepEqual(validateMatrixResults(plan,outcomes(),storage()).candidateInputs,input.candidateInputs);
+  await verifyMatrixDesktopInputs(input,directory);
+  for(const mutate of [m=>{m.candidateInputs.extra={}},m=>{m.candidateInputs.desktop.fileCount=0},m=>{m.candidateInputs.desktop.filesSha256='unknown'},m=>{m.candidateInputs.desktop.formalCandidateModule='arbitrary.mjs'},m=>{m.candidateInputs.desktop.Token='secret'}]){
+   const invalid=structuredClone(input);mutate(invalid);assert.throws(()=>createMatrixPlan(invalid,environment()));
+  }
+  fs.writeFileSync(path.join(desktop,'package.json'),'{"version":"changed"}');
+  await assert.rejects(verifyMatrixDesktopInputs(input,directory),/Desktop Full/u);
+ }finally{fs.rmSync(directory,{recursive:true,force:true});}
+});
+
+test('常规桌面足以验收，显式4K选择冻结并要求额外用例',()=>{
+ const common=frozen();assert.deepEqual(common.browserGeometryWidths,[1366,1920]);
+ assert.doesNotThrow(()=>validateMatrixResults(common,outcomes(),storage()));
+ const selected={...createMatrixPlan(matrix(),{...environment(),MICROI_TEST_BROWSER_4K:'1'}),sourceHead:'a'.repeat(40)};
+ assert.deepEqual(selected.browserGeometryWidths,[1366,1920,3840]);
+ assert.throws(()=>validateMatrixResults(selected,outcomes(),storage()),/浏览器/u);
+ const complete=outcomes();complete.geometry.stats.expected=3;complete.geometry.caseTitles.push('4K3840px');
+ assert.doesNotThrow(()=>validateMatrixResults(selected,complete,storage()));
+ for(const mutate of [v=>{v.geometry.stats.skipped=1},v=>{v.geometry.caseTitles[0]='桌面11366px'},v=>{v.geometry.caseTitles.pop()}]){
+  const value=outcomes();mutate(value);assert.throws(()=>validateMatrixResults(common,value,storage()),/浏览器/u);
+ }
+ assert.throws(()=>createMatrixPlan(matrix(),{...environment(),MICROI_TEST_BROWSER_4K:'maybe'}),/4K/u);
+});
 
 test('常规矩阵只执行当前Mongo和MySQL，SQLServer不适用且不是跳过例外',()=>{
  const plan=frozen();assert.equal(plan.fullFilter,'Category=FullStack&DatabaseProvider!=SqlServer');assert.equal(plan.dependencies.sqlServer.status,'NotApplicable');

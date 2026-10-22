@@ -170,7 +170,7 @@
                         </el-table-column>
                         <el-table-column :label="$t('Msg.BackgroundTaskStatus')" width="90">
                             <template #default="{ row }">
-                                <el-tag size="small" :type="getTaskStatusType(row.Status)">{{ row.StatusText || row.Status }}</el-tag>
+                                <el-tag size="small" :type="getTaskStatusType(row.Status)">{{ getTaskStatusText(row) }}</el-tag>
                             </template>
                         </el-table-column>
                         <el-table-column :label="$t('Msg.BackgroundTaskProgress')" min-width="150">
@@ -394,6 +394,7 @@ import { isFormMaskBlurDisabled } from "@/utils/form-mask-blur.js";
 import {
     getBackgroundTaskEta,
     getBackgroundTaskProgress,
+    getBackgroundTaskStatusText,
     mergeBackgroundTaskSummaries,
     isActiveBackgroundTask,
     isTerminalBackgroundTask
@@ -1392,6 +1393,9 @@ export default {
             if (status === "Failed" || status === "Canceled") return "danger";
             if (status === "Running" || status === "Pending" || status === "Retrying") return "warning";
             return "info";
+        },
+        getTaskStatusText(item) {
+            return getBackgroundTaskStatusText(item);
         },
         formatTaskResult(item) {
             if (!item?.Result) return item?.Msg || "-";

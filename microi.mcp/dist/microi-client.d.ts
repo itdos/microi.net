@@ -571,6 +571,7 @@ export declare class MicroiClient {
     private recoveredWriteResult;
     private uncertainWriteFailure;
     getStatus(): Promise<ApiResponse>;
+    private checkApplicationPublishGate;
     getAdministrativeCapabilities(): Promise<ApiResponse>;
     administerTableData(input: {
         operation: 'query' | 'get' | 'add' | 'update' | 'delete';

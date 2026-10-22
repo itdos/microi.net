@@ -1064,10 +1064,10 @@ namespace Microi.net
                     ?? new JArray();
                 return systemCode.Contains("platform-chat-runtime")
                     && System.Version.TryParse(runtimeVersionText, out var runtimeVersion)
-                    && runtimeVersion >= new System.Version(1, 0, 2)
+                    && runtimeVersion >= new System.Version(1, 1, 0)
                     && capabilities.Any(item => string.Equals(
                         item?.ToString(),
-                        "ApiEngine:platform-chat-runtime@v1.0.2",
+                        "ApiEngine:platform-chat-runtime@v1.1.0",
                         StringComparison.Ordinal))
                     && capabilities.Any(item => string.Equals(
                         item?.ToString(),
@@ -1077,7 +1077,20 @@ namespace Microi.net
                     && runtimeCode.Contains("PLATFORM_CHAT_LOCAL_TIME_V1")
                     && runtimeCode.Contains("RequireManagedProtocolContext")
                     && runtimeCode.Contains("platform-message-notification-custom-hook")
-                    && runtimeCode.Contains("V8.MongoDb.UptFormDataByWhere")
+                    // 分区历史只能标记本页来信，不能要求旧的整年批量已读实现。
+                    // 能力声明、实际分页调用与同一次更新的库/集合/Id 必须完整对应。
+                    && capabilities.Any(item => string.Equals(
+                        item?.ToString(),
+                        "V8.MongoDb.GetPartitionedTableData",
+                        StringComparison.Ordinal))
+                    && Regex.IsMatch(runtimeCode,
+                        @"\bV8\.MongoDb\.GetPartitionedTableData\s*\(\s*request\s*\)")
+                    && Regex.IsMatch(runtimeCode,
+                        @"\bV8\.MongoDb\.UptFormData\s*\(\s*\{\s*OsClient\s*:\s*V8\.OsClient\s*,"
+                        + @"\s*DbName\s*:\s*readRow\._PartitionDb\s*,"
+                        + @"\s*TableName\s*:\s*readRow\._PartitionTable\s*,"
+                        + @"\s*Id\s*:\s*String\s*\(\s*readRow\._id\s*\)\s*,"
+                        + @"\s*_FormData\s*:\s*\{\s*IsRead\s*:\s*true\s*\}\s*\}\s*\)")
                     && runtimeCode.Contains("V8.MongoDb.DelFormDataByWhere")
                     && wechatCode.Contains("platform-message-notification-custom-hook")
                     && wechatCode.Contains("V8.Method.SendWeChatTemplateMessage")

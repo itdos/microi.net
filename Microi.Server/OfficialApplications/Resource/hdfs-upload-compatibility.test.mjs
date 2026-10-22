@@ -20,6 +20,28 @@ async function run(result, enabled, hook = { Code: 1 }) {
 const file = { Path: '/tenant/img/202609/前.jpg', Name: '前.jpg', Size: 575599,
   Id: 'new-id', Url: 'https://example.test/private-ticket', Limit: true, OriginalSize: 600000 };
 
+test('三个精确 POST 上传地址先进入可信文件流桥，再由桥权威选择接口引擎', () => {
+  const route = fs.readFileSync(new URL('../../Microi.net.Api/Handler/DynamicApiEngine.cs', import.meta.url), 'utf8');
+  const matcher = route.match(/internal static bool IsHdfsUploadProtocolRoute\([^)]*\)\s*\{([\s\S]*?)\n\s*\}/);
+  assert.ok(matcher, 'DynamicRoute 必须保留精确上传协议桥，不能直接执行依赖流上下文的 Managed V8');
+  assert.match(matcher[1], /if\s*\(!HttpMethods\.IsPost\(requestMethod\)\)\s*return false;/);
+  assert.deepEqual([...matcher[1].matchAll(/string\.Equals\(requestPath, "([^"]+)", StringComparison\.OrdinalIgnoreCase\)/g)]
+    .map(match => match[1]).sort(), ['/api/hdfs/upload', '/api/upload', '/apiengine/platform-hdfs-upload']);
+  assert.doesNotMatch(matcher[1], /StartsWith|Regex|NormalizeApiEngineRouteAddress/);
+  const dispatch = route.indexOf('if (IsHdfsUploadProtocolRoute(requestMethod, originalPath))');
+  assert.ok(dispatch >= 0 && dispatch < route.indexOf('var addressCacheKey ='), '文件流协议桥必须先于通用缓存路由执行');
+  assert.match(route, /if \(IsHdfsUploadProtocolRoute\(requestMethod, originalPath\)\)\s*\{\s*return null;\s*\}/,
+    '三个协议必须撤销动态候选，交精确 attribute 上传端点唯一匹配，不能按 controller/action 展开全部别名');
+  const bridge = fs.readFileSync(new URL('../../Microi.net.Api/Controllers/HDFSController.UploadApiEngine.cs', import.meta.url), 'utf8');
+  assert.match(bridge, /ResolveConfiguredEngine/);
+  assert.match(bridge, /GetConfiguredModel/);
+  assert.match(bridge, /GetConfiguredByMultiRoute/);
+  assert.match(bridge, /if \(configured.Code != 1\) return Json\(configured\);/);
+  assert.ok(bridge.indexOf('if (configured.Data == null)') < bridge.indexOf('"CompiledFallback"'));
+  assert.ok(bridge.indexOf('"IsEnable"') < bridge.indexOf('HdfsUploadRequestContext.Enter'));
+  assert.ok(bridge.indexOf('"StopHttp"') < bridge.indexOf('HdfsUploadRequestContext.Enter'));
+});
+
 test('开关关闭保留新版对象及数组协议', async () => {
   for (const data of [file, [file]]) {
     const input = { Code: 1, Data: data, DataAppend: { Preserved: true } };

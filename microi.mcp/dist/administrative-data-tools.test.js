@@ -34,7 +34,7 @@ test('administrative data tools are discoverable, confirmation-scoped and routed
     };
     const server = createMcpServer(fakeClient, {
         osClient: 'iTdos',
-        apiBaseUrl: 'https://api.itdos.com',
+        apiBaseUrl: 'https://api.microi.net',
         label: '吾码官方',
         codexMode: true,
     });

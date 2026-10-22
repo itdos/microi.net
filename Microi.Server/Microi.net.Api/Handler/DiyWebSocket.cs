@@ -1016,6 +1016,30 @@ namespace Microi.net
         /// </summary>
         /// <param name="msg"></param>
         /// <returns></returns>
+        public async Task<object> GetChatHistoryPage(MessageBody msg)
+        {
+            var identity = await RequireIdentityAsync().ConfigureAwait(false);
+            msg ??= new MessageBody();
+            if (IsBlank(msg.ToUserId)) throw new HubException("聊天对象不能为空。");
+            // 新协议直接响应当前调用者，避免同一账号的另一窗口收到历史页后覆盖自己的会话。
+            var result = await RunChatRuntimeAsync("GetHistoryAndMarkRead", new JObject
+            {
+                ["PeerUserId"] = msg.ToUserId,
+                ["Cursor"] = msg.HistoryCursor ?? string.Empty,
+                ["CursorMode"] = true,
+                ["PageSize"] = msg._PageSize ?? 30
+            }, identity.CurrentUser, identity.OsClient).ConfigureAwait(false);
+            var data = result["Data"] as JObject;
+            await DeliverRuntimeResultAsync(result, identity.OsClient, false).ConfigureAwait(false);
+            return new
+            {
+                PeerUserId = msg.ToUserId,
+                Messages = data?["Messages"]?.ToObject<List<MessageBodyDto>>() ?? new List<MessageBodyDto>(),
+                HasMore = data?["HasMore"]?.Value<bool>() == true,
+                NextCursor = data?["NextCursor"]?.Value<string>() ?? string.Empty
+            };
+        }
+
         public async Task SendChatRecordToUser(MessageBody msg)
         {
             var identity = await RequireIdentityAsync().ConfigureAwait(false);
