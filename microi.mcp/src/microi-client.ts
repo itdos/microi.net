@@ -1,3 +1,4 @@
+import { withApplicationGateDiagnostic } from './application-gate-diagnostic.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -1450,7 +1451,7 @@ export class MicroiClient {
         );
       }
     }
-    return parsed;
+    return withApplicationGateDiagnostic(parsed, this.config);
   }
 
   /**
@@ -1630,7 +1631,7 @@ export class MicroiClient {
         );
       }
     }
-    return parsed;
+    return withApplicationGateDiagnostic(parsed, this.config);
   }
 
   private async requestJsonNative(
@@ -1932,7 +1933,7 @@ export class MicroiClient {
         );
       }
     }
-    return parsed;
+    return withApplicationGateDiagnostic(parsed, this.config);
   }
 
   private isUncertainWriteError(error: unknown): error is MicroiTransportError {
@@ -2007,6 +2008,17 @@ export class MicroiClient {
 
   async getStatus(): Promise<ApiResponse> {
     return this.get(API.GET_STATUS);
+  }
+
+  private async checkApplicationPublishGate(): Promise<ApiResponse | null> {
+    const status = await this.getStatus();
+    if (status.Code !== 1) return status;
+    const data = status.Data && typeof status.Data === 'object' ? status.Data as Record<string, unknown> : {};
+    if (data.ApplicationAssetStreamGateReady !== false) return null;
+    return {
+      ...status, Code: 0,
+      Msg: `${String(data.ApplicationAssetStreamGateReadError || '应用发布门禁不可用')}\n${status.DataAppend?.Hint || ''}`,
+    };
   }
 
   async getAdministrativeCapabilities(): Promise<ApiResponse> {
@@ -2711,6 +2723,8 @@ export class MicroiClient {
   }
 
   async uploadApplicationAssetStream(data: ApplicationAssetStreamUploadRequest): Promise<ApiResponse> {
+    const gateFailure = await this.checkApplicationPublishGate();
+    if (gateFailure) return gateFailure;
     const localPath = path.resolve(data.FilePath);
     const stat = fs.lstatSync(localPath);
     if (!stat.isFile() || stat.isSymbolicLink()) {
@@ -3087,6 +3101,8 @@ export class MicroiClient {
   }
 
   async publishMicroService(data: Record<string, unknown>): Promise<ApiResponse> {
+    const gateFailure = await this.checkApplicationPublishGate();
+    if (gateFailure) return gateFailure;
     return this.post(API.PUBLISH_MICRO_SERVICE, {
       OsClient: this.config.osClient,
       ...data,

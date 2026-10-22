@@ -1119,6 +1119,16 @@ AI 应用工作台“发布应用商城”
 
 先检查 `sys_microiservice.StorageMode`。`microi-platform-service` 等受信任平台启动包使用 `StorageMode=db、MsUrl=db` 从目标租户数据库内联产物运行，安装器可将 `PublicPublishPath` 保存为 `micro-app/{AppKey}/{Version}`；该值没有租户前缀不等于缺文件。不要直接补前缀或切换为 file。普通 file 应用应核对 `AssetsJson/AssetManifestJson` 内每项 `HdfsPath/FilePathName`、当前租户 `FileServer` 与实际对象，按正常重新安装或发布流程修复；单改商城展示字段不能证明运行入口恢复。
 
+### 子租户发布提示 `sys_osclients 门禁行数量必须为1，Actual=0`
+
+这是服务端应用发布门禁未读到有效配置的错误，不表示正常子租户必须使用主租户账号。服务器在线、管理员有效与发布能力就绪是不同状态，应同时查看 `ApplicationAssetStreamGateReady` 和原始错误。
+
+租户登记的权威来源是 API 启动主租户的 SaaS 主控库。后端以当前子租户的 `OsClient + OsClientType + OsClientNetwork` 查询唯一启用且未删除的登记行；应用、私有源码、版本和公有编译文件仍属于子租户。旧后端错误地查询业务库同名表时，即使主控登记完整也会报 `Actual=0`。升级包含该修复的后端后，应在原子租户 MCP 回读状态，再使用最新发布基线重试；集群应统一更新节点，避免新旧代码使用不同配置源。
+
+不要为此切换主租户 MCP、索要主租户账号或 SSH、复制业务库登记行、调用补登记接口或绕过门禁。`EnsureOwnedTenantRuntimeRegistration` 是独立的主控恢复操作，其权限要求不能作为子租户发布的前置条件。门禁列和审计结构缺失由平台核验主控库责任包；真正缺少子租户应用表时再升级目标租户应用商城。
+
+新租户的主控登记使用 `LegacyOpen / 2 / 0` 默认值，不继承父租户的发布状态和代次。修复不重置已有门禁，也不改变发布权限；重复、禁用、软删除或坐标不匹配仍拒绝发布。源码同步或本地预览成功不能作为正式上线回执。
+
 ### 页面空白
 
 先检查菜单动态路由是否带有 `MicroAppUrl`、`MicroServiceRoutePath` 等 meta，以及 `ComponentPath` 是否为 `/micro-app/host`。若首次进入正常、连续切换后无数据、永久骨架屏或白屏，而刷新恢复，应继续检查缓存所有权：Vue 外层宿主必须 `keepAlive:false`，`<micro-app>` 才能使用原生 `keep-alive`；不能同时缓存两层，也不能给不同顶部 Tab 复用同一个固定实例名。宿主还应在恢复时强制同步上下文并复核真实可见 DOM。若宿主把菜单 Id 当成 AppKey，通常是菜单绑定字段不完整。

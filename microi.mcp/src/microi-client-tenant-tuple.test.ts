@@ -24,7 +24,7 @@ test('省略Type/Network保留旧 Login/Refresh/JSON/multipart/binary wire',asyn
       await c.requestBinaryFileRange('/fixture-legacy-binary',{Part:'1'},file,0,2,'initial',1000);
       await c.uploadApplicationAssetStream({FilePath:file,AppIdOrKey:'fixture-app',VersionNo:'1.0.0',RelativePath:'assets/fixture.bin',ExpectedSha256:'a'.repeat(64),RequestId:'fixed-request',TimeoutMs:1000});
       await c.stageMicroServiceSourceFile({FilePath:file,AppIdOrKey:'fixture-app',RelativePath:'src/fixture.ts',ExpectedSha256:'a'.repeat(64),ExpectedSize:Buffer.byteLength('file-fixture-012345'),DeliveryBatchId:'fixed-batch',TimeoutMs:1000});
-      const captured=rows.slice(start);assert.equal(captured.length,8);
+      const all=rows.slice(start);assert.equal(all.filter(r=>r.url.includes("/GetStatus")).length,1);const captured=all.filter(r=>!r.url.includes("/GetStatus"));assert.equal(captured.length,8);
       for(const r of captured){assert.equal(r.headers.osclient,osClient);assert.equal(r.headers.osclienttype,undefined);assert.equal(r.headers.osclientnetwork,undefined);assert.ok(!r.body.toString().includes('OsClientType'));assert.ok(!r.body.toString().includes('OsClientNetwork'));}
       assert.deepEqual(JSON.parse(captured[2].body.toString()),{A:1});
       assert.equal(new URLSearchParams(captured[0].body.toString()).get('OsClient'),osClient||null);

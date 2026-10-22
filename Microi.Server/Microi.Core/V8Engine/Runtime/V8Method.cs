@@ -493,7 +493,7 @@ namespace Microi.net
             if (denied != null) return denied;
             if (!string.Equals(osClient, OsClientDefault.OsClient, StringComparison.OrdinalIgnoreCase)
                 || !PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(osClient, currentUser))
-                return new DosResult(1002, null, "仅主租户有效超级管理员可以补齐运行登记。");
+                return new DosResult(1002, null, "仅主租户有效超级管理员可以补齐运行登记。本操作是主控恢复运维，不是正常子租户应用发布的前置条件；发布门禁读取异常应保持原子租户 MCP 并由平台核查，勿据此索要主租户账号。");
             try
             {
                 var json = ToJObject(param);
