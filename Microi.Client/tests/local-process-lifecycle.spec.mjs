@@ -64,22 +64,32 @@ function createFixture() {
     return root;
 }
 
-function waitForFixtureFilesUnlocked(root, timeoutMs = 10000) {
-    assert.ok(ownedFixtures.has(root), '只等待本用例登记的夹具');
+function removeWindowsFixture(root, timeoutMs) {
+    assert.ok(ownedFixtures.has(root), '只回收本用例登记的夹具');
     const quote = value => "'" + value.replaceAll("'", "''") + "'";
-    // 进程 exit 回调不保证 Windows 映像/扫描句柄已释放。只重试真实共享/锁冲突，
-    // 每轮仍执行原安全树检查；路径、属性、Git、链接或权限错误立即保留并报错。
+    // 同一进程调用原普通删除，不在独立预等待通过后另启删除进程。仅重试原安全
+    // 树检查阶段的真实共享/锁冲突；删除阶段与其他错误立即保留，绝不扩大清理范围。
     const script = [
         "$ErrorActionPreference = 'Stop'", '[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)',
         '. ' + quote(path.join(repoRoot, 'Microi.Server/tools/Microi.ArtifactSafety.ps1')),
+        '$root = ' + quote(root), '$parent = ' + quote(fixtureParent),
+        '$marker = ' + quote(path.join(root, ownerFile)),
+        '$expected = ' + quote(JSON.stringify(ownedFixtures.get(root))) + ' | ConvertFrom-Json',
         '$clock = [Diagnostics.Stopwatch]::StartNew(); $retries = 0',
         'while ($true) { try {',
-        '  Assert-MicroiArtifactTree -LiteralPath ' + quote(root),
-        '  @{ retries = $retries; unlocked = $true } | ConvertTo-Json -Compress; break',
+        '  if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($root)) -cne $parent) { throw "Fixture parent changed" }',
+        '  Assert-MicroiArtifactPath -LiteralPath $root',
+        '  $entry = Get-Item -LiteralPath $marker -Force -ErrorAction Stop',
+        '  if ($entry.PSIsContainer -or ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw "Fixture owner marker changed" }',
+        '  $owner = Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json',
+        '  if (@($owner.PSObject.Properties).Count -ne 4 -or $owner.kind -cne $expected.kind -or $owner.pid -ne $expected.pid -or $owner.root -cne $expected.root -or $owner.nonce -cne $expected.nonce) { throw "Fixture ownership changed" }',
+        '  Remove-MicroiOrdinaryArtifact -LiteralPath $root -ExpectedParent $parent',
+        '  @{ retries = $retries; removed = $true } | ConvertTo-Json -Compress; break',
         '} catch {',
         '  $cause = $_.Exception; while ($cause.InnerException) { $cause = $cause.InnerException }',
         '  $code = $cause.HResult -band 0xffff',
-        `  if ($cause -isnot [IO.IOException] -or $code -notin @(32, 33) -or $clock.ElapsedMilliseconds -ge ${timeoutMs}) { throw }`,
+        '  $preflight = $_.InvocationInfo.MyCommand.Name -ceq "Assert-MicroiArtifactTree" -and $_.FullyQualifiedErrorId -ceq "IOException,Assert-MicroiArtifactTree"',
+        `  if (-not $preflight -or $cause -isnot [IO.IOException] -or $code -notin @(32, 33) -or $clock.ElapsedMilliseconds -ge ${timeoutMs}) { throw }`,
         '  $retries++; Start-Sleep -Milliseconds 200',
         '} }'
     ].join('\n');
@@ -88,7 +98,7 @@ function waitForFixtureFilesUnlocked(root, timeoutMs = 10000) {
     });
 }
 
-function removeFixture(root) {
+function removeFixture(root, timeoutMs = 10000) {
     assert.ok(ownedFixtures.has(root), '只能回收本用例创建的目录');
     assert.equal(path.dirname(path.resolve(root)), fixtureParent);
     assert.ok(path.basename(root).startsWith('microi-process-lifecycle-'));
@@ -100,19 +110,13 @@ function removeFixture(root) {
     assert.deepEqual(JSON.parse(fs.readFileSync(marker, 'utf8')), ownedFixtures.get(root), '夹具所有权标记必须仍属于本用例');
     // Windows 先检查完整目录树及文件占用，再普通删除；避免部分删除后丢失归属标记。
     if (process.platform === 'win32') {
-        const readiness = waitForFixtureFilesUnlocked(root);
-        assert.ifError(readiness.error);
-        assert.equal(readiness.status, 0, readiness.stdout + '\n' + readiness.stderr);
-        const cleanup = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-File',
-            path.join(repoRoot, 'Microi.Server/tools/Remove-MicroiReleaseScratch.ps1'),
-            '-LiteralPath', root, '-ExpectedParent', fixtureParent], {
-            encoding: 'utf8', windowsHide: true, timeout: 30000
-        });
+        const cleanup = removeWindowsFixture(root, timeoutMs);
         assert.ifError(cleanup.error);
         assert.equal(cleanup.status, 0, cleanup.stdout + '\n' + cleanup.stderr);
     } else {
         fs.rmSync(root, { recursive: true, force: false, maxRetries: 20, retryDelay: 250 });
     }
+    assert.equal(fs.existsSync(root), false, '普通删除后必须回读夹具目录已不存在');
     ownedFixtures.delete(root);
 }
 
@@ -374,9 +378,18 @@ test('DLL 被占用时报告原始路径与占用错误，不因 catch 中的错
 });
 
 // 原安全模块只在 Windows 检查独占文件句柄，此新增原生用例与该平台边界一致。
-if (process.platform === 'win32') test('真实文件占用超时保留完整夹具，句柄释放后安全检查才允许继续', async () => {
+if (process.platform === 'win32') test('真实文件占用超时保留完整夹具，句柄释放后原普通删除才成功', async () => {
     const testRoot = createFixture(), held = path.join(testRoot, 'held.dll');
     fs.writeFileSync(held, 'real exclusive lock fixture');
+    // 负例只改本用例刚创建的归属标记，不改变任何文件属性或 ACL。
+    const marker = path.join(testRoot, ownerFile), savedOwner = fs.readFileSync(marker, 'utf8');
+    fs.writeFileSync(marker, JSON.stringify({ ...ownedFixtures.get(testRoot), nonce: randomUUID() }));
+    try {
+        assert.throws(() => removeFixture(testRoot), /夹具所有权标记必须仍属于本用例/);
+        assert.ok(fs.existsSync(held));
+    } finally {
+        fs.writeFileSync(marker, savedOwner);
+    }
     const quote = value => "'" + value.replaceAll("'", "''") + "'";
     const script = [
         "$ErrorActionPreference = 'Stop'",
@@ -389,21 +402,18 @@ if (process.platform === 'win32') test('真实文件占用超时保留完整夹�
     try {
         const ready = await Promise.race([once(holder.stdout, 'data').then(([data]) => String(data)), delay(10000).then(() => '')]);
         assert.match(ready, /LOCK_READY/);
-        const blocked = waitForFixtureFilesUnlocked(testRoot, 200);
-        assert.ifError(blocked.error);
-        assert.notEqual(blocked.status, 0, '真实持续占用必须失败，不能吞掉安全检查');
+        assert.throws(() => removeFixture(testRoot, 200), /IOException,Assert-MicroiArtifactTree/,
+            '真实持续占用必须失败，不能吞掉安全检查');
         assert.ok(fs.existsSync(held));
         assert.deepEqual(JSON.parse(fs.readFileSync(path.join(testRoot, ownerFile), 'utf8')), ownedFixtures.get(testRoot));
         holder.stdin.end('\n');
-        const released = waitForFixtureFilesUnlocked(testRoot, 10000);
-        assert.ifError(released.error);
-        assert.equal(released.status, 0, released.stdout + '\n' + released.stderr);
-        assert.equal(JSON.parse(released.stdout).unlocked, true);
+        removeFixture(testRoot);
         assert.equal(await waitForExit(holder), true, '持锁进程必须真实退出');
-        assert.ok(fs.existsSync(held), '等待过程不得删除文件');
+        assert.equal(fs.existsSync(testRoot), false, '句柄释放后原普通删除必须完成');
+        assert.equal(ownedFixtures.has(testRoot), false);
     } finally {
         await stopExactProcessTree(holder);
-        removeFixture(testRoot);
+        if (ownedFixtures.has(testRoot)) removeFixture(testRoot);
     }
 });
 
