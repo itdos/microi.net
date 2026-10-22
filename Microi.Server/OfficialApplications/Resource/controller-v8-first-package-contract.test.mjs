@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { selectMonotonicPackageVersion } from './package-version-monotonic.mjs';
+import { configurePackageModel, packageDefinitions } from './configure-v8-first-platform-packages.mjs';
 
 const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(resourceDir, '..', '..', '..');
@@ -34,6 +35,7 @@ const MESSAGE_SELECTED_API_ENGINE_KEYS = Object.freeze([
   'msg_internal_mark_read',
   'platform-chat-system-message',
   'platform-chat-runtime',
+  'platform-chat-maintenance',
   'platform-message-notification-config',
   'platform-message-notification-custom-hook',
   'platform-reminder-official-feed',
@@ -157,6 +159,38 @@ test('message-notification and Store selected ApiEngine key sets stay exact and 
   assert.match(String(storePackage.PackageInfo.ChangeHistory || ''), /v7\.7\.27/);
 });
 
+test('regenerating chat resources retains the independently maintained reminder resources', () => {
+  const definition = packageDefinitions.find(item => item.file === 'app.microi.message-notification.json');
+  const regenerated = configurePackageModel(structuredClone(messagePackage), definition);
+  assertPackageKeyClosure(regenerated, MESSAGE_SELECTED_API_ENGINE_KEYS);
+  for (const key of [
+    'platform-message-notification-config', 'platform-reminder-official-feed',
+    'platform-reminder-runtime', 'platform-reminder-tick',
+  ]) {
+    assert.deepEqual(engine(regenerated, key), engine(messagePackage, key), `${key}: preserve the complete resource`);
+    assert.deepEqual(regenerated.ResourcePolicies.ApiEngines[key], messagePackage.ResourcePolicies.ApiEngines[key]);
+  }
+  assert.deepEqual(regenerated.ScheduleJobs, messagePackage.ScheduleJobs);
+  assert.deepEqual(regenerated.DiyTables, messagePackage.DiyTables);
+  assert.deepEqual(regenerated.DiyFields, messagePackage.DiyFields);
+  assert.deepEqual(regenerated.DDLStatements, messagePackage.DDLStatements);
+  assert.deepEqual(configurePackageModel(structuredClone(regenerated), definition), regenerated);
+});
+
+test('chat maintenance regeneration raises the required server version without lowering a newer prerequisite', () => {
+  const definition = packageDefinitions.find(item => item.file === 'app.microi.message-notification.json');
+  assert.equal(definition.serverMinVersion, '8.6.4');
+  assert.equal(messagePackage.PackageInfo.ServerMinVersion, '8.6.4');
+  for (const [previous, expected] of [['8.5.2', '8.6.4'], ['', '8.6.4'], ['8.7.0', '8.7.0']]) {
+    const candidate = structuredClone(messagePackage);
+    candidate.PackageInfo.ServerMinVersion = previous;
+    const regenerated = configurePackageModel(candidate, definition);
+    assert.equal(regenerated.PackageInfo.ServerMinVersion, expected);
+    assert.equal(regenerated.PackageInfo.ClientMinVersion, messagePackage.PackageInfo.ClientMinVersion);
+    assert.deepEqual(configurePackageModel(structuredClone(regenerated), definition), regenerated);
+  }
+});
+
 test('application stream physical ledger and export helper belong only to the Store package', () => {
   const helperOwners = [];
   for (const packageModel of officialPackages) {
@@ -224,16 +258,27 @@ test('official Managed cores and CreateIfMissing hooks carry immutable package c
     Ownership: 'Platform',
     UpgradePolicy: 'Managed',
   });
-  assert.equal(chatRuntime.Version, 'v1.1.0');
+  assert.equal(chatRuntime.Version, 'v1.2.0');
   assert.equal(chatRuntime.StopHttp, 1);
   assert.equal(chatRuntime.AllowAnonymous, 0);
   assert.equal(chatRuntime.ApiV8Code, normalizeSource(readResource('platform-chat-runtime.js')));
   assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
-    'ApiEngine:platform-chat-runtime@v1.1.0',
+    'ApiEngine:platform-chat-runtime@v1.2.0',
   ));
   assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
     'V8.Method.RequireManagedProtocolContext',
   ));
+  const maintenance = engine(messagePackage, 'platform-chat-maintenance');
+  assert.deepEqual(messagePackage.ResourcePolicies.ApiEngines[maintenance.ApiEngineKey], {
+    Ownership: 'Platform', UpgradePolicy: 'Managed',
+  });
+  assert.equal(maintenance.AllowAnonymous, 0);
+  assert.equal(maintenance.StopHttp, 0);
+  assert.equal(maintenance.ApiV8Code, normalizeSource(readResource('platform-chat-maintenance.js')));
+  for (const capability of [
+    'ApiEngine:platform-chat-maintenance@v1.0.0',
+    'V8.Method.ManageManagedStorageMaintenance', 'V8.Method.RequireManagedStorageMaintenance',
+  ]) assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(capability));
   assert.ok(messagePackage.PackageInfo.RequiredPlatformCapabilities.includes(
     'V8.MongoDb.UptFormDataByWhere',
   ));

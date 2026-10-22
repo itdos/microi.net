@@ -37,23 +37,36 @@ export function verifyHdfsEvidence(build){
  if(fs.existsSync(live))check(hash(read(live))===digest,'Live and preserved Full HDFS bytes differ.');
  return digest;
 }
-// 回执只记录归属；必须重读存活进程的创建时间、父进程和监听端口，防止 PID 复用冒充原桥接协调器。
-function validateSupervisor(ready,actual,environment){
+export function nativeBridgePorts(credentials){
+ const configured=credentials?.nativeBridgePorts;
+ if(configured===undefined)return [63960,63962,63963,63964];
+ const names=['mysql','redis','mongo','scheduleRedis'];
+ check(configured&&typeof configured==='object'&&!Array.isArray(configured)&&JSON.stringify(Object.keys(configured).sort())===JSON.stringify([...names].sort()),'Native bridge profile must declare exactly mysql, redis, mongo and scheduleRedis.');
+ const ports=names.map(name=>configured[name]);
+ check(ports.every(port=>Number.isInteger(port)&&port>=1024&&port<=65535)&&new Set(ports).size===4,'Native bridge profile ports must be four distinct integers in range.');
+ return ports.sort((a,b)=>a-b);
+}
+function validateCredentialBinding(build,ready,credentials,environment){
+ check(credentials.sourceHead===build.sourceHead&&credentials.buildId===build.buildId&&credentials.credentialsRefreshedAt===ready.credentialsRefreshedAt&&Date.parse(credentials.credentialsRefreshedAt)>=Date.parse(build.builtAt),'Fresh login did not occur after the final Full build.');
+ for(const name of ['MICROI_TEST_OSCLIENT','MICROI_TEST_CHILD_OSCLIENT','MICROI_TEST_DID'])check(credentials.env[name]===environment[name],'Staged login tenant/device drift: '+name);
+}
+// 端口仅来自已冻结且由 CLI 校验 ACL/SHA 的凭据 profile；不能从任意继承 env 改验收目标。
+// 回执只记录归属；仍重读创建时间、父进程、CWD 与监听端口，防止 PID 复用冒充原协调器。
+function validateSupervisor(ready,actual,environment,ports){
  const expected=ready.supervisor,profile=path.dirname(path.dirname(environment.MICROI_TEST_RUNTIME_ENVIRONMENT_FILE||''));
  const expectedExe=path.join(environment.MICROI_DESKTOP_NODE_HOME||'',process.platform==='win32'?'node.exe':'node');
  check(expected&&actual&&expected.pid===ready.supervisorPid&&actual.pid===expected.pid&&actual.parentPid===expected.parentPid&&actual.parentPid>0&&actual.creationDate===expected.creationDate&&actual.commandLine===expected.commandLine&&same(actual.cwd,profile)&&same(expected.cwd,profile)&&same(actual.exe,expectedExe)&&same(expected.exe,expectedExe)&&actual.commandLine.includes(path.join(profile,'runtime-coordinator.mjs')),'Native transport supervisor PID, parent, CWD, executable or command line differs.');
- const ports=[63960,63962,63963,63964],ordered=value=>[...(value||[])].sort((a,b)=>a-b);
+ const ordered=value=>[...(value||[])].sort((a,b)=>a-b);
  check(JSON.stringify(ordered(actual.listeningPorts))===JSON.stringify(ports),'The original native transport supervisor must own exactly the four bridge ports.');
 }
 export function validateReady(build,ready,credentials,current,environment){
  check(build.schemaVersion===1&&ready.schemaVersion===1&&ready.sourceHead===build.sourceHead&&ready.buildId===build.buildId,'Staged ready receipt belongs to another candidate/build.');
  check(ready.apiDllSha256===build.apiDllSha256&&ready.runtimeManifestSha256===build.runtimeManifestSha256,'Staged runtime DLL or dependency fingerprint differs from the final Full build.');
- check(credentials.sourceHead===build.sourceHead&&credentials.buildId===build.buildId&&credentials.credentialsRefreshedAt===ready.credentialsRefreshedAt&&Date.parse(credentials.credentialsRefreshedAt)>=Date.parse(build.builtAt),'Fresh login did not occur after the final Full build.');
- for(const name of ['MICROI_TEST_OSCLIENT','MICROI_TEST_CHILD_OSCLIENT','MICROI_TEST_DID'])check(credentials.env[name]===environment[name],'Staged login tenant/device drift: '+name);
+ validateCredentialBinding(build,ready,credentials,environment);
  check(ready.health?.api===true&&ready.health?.peerApi===true&&ready.health?.frontend===true,'Both APIs and frontend must be healthy before Full.');
  check(ready.processes?.length===3&&new Set(ready.processes.map(row=>row.pid)).size===3,'Staged runtime requires three distinct owned processes.');
  check(typeof ready.task==='string'&&ready.task.length>0&&ready.attempt===path.basename(path.dirname(environment.MICROI_TEST_RUNTIME_BUILD_FILE||''))&&!ready.processes.some(row=>row.pid===ready.supervisorPid),'Staged runtime task, attempt or supervisor identity differs.');
- validateSupervisor(ready,current.find(row=>row.pid===ready.supervisorPid),environment);
+ validateSupervisor(ready,current.find(row=>row.pid===ready.supervisorPid),environment,nativeBridgePorts(credentials));
  const specs=[['api',environment.MICROI_TEST_API_BASE,'Microi.Server/Microi.net.Api'],['peerApi',environment.MICROI_TEST_PEER_API_BASE,'Microi.Server/Microi.net.Api'],['frontend',environment.MICROI_TEST_FRONTEND_BASE,'Microi.Client']];
  for(const [kind,url,cwd]of specs){
   const records=ready.processes.filter(row=>row.kind===kind);check(records.length===1,'Missing staged process role.');const record=records[0],actual=current.find(row=>row.pid===record.pid),port=Number(new URL(url).port);
@@ -65,14 +78,16 @@ export function validateReady(build,ready,credentials,current,environment){
 }
 // Full 完成后退出加载 DLL 的双 API 和 Vite，释放发行构建文件锁；四个原生依赖桥保留给加密后冒烟。
 // “已停止”回执不能代替实时 PID 不存在及原协调器仍持有桥接端口的独立核验。
-export function validateTransportOnly(build,ready,transport,supervisor,remaining,environment,accepted,receiptSha256){
+export function validateTransportOnly(build,ready,transport,supervisor,remaining,environment,accepted,receiptSha256,credentials){
  check(build.schemaVersion===1&&ready.schemaVersion===1&&transport.schemaVersion===1&&ready.sourceHead===build.sourceHead&&ready.buildId===build.buildId&&transport.sourceHead===build.sourceHead&&transport.buildId===build.buildId,'Transport-only receipt belongs to another candidate/build.');
  check(transport.task===ready.task&&transport.attempt===ready.attempt&&ready.attempt===path.basename(path.dirname(environment.MICROI_TEST_RUNTIME_BUILD_FILE||''))&&transport.supervisorPid===ready.supervisorPid&&transport.ownerPid===ready.supervisor?.parentPid&&transport.phase==='TransportOnlyForEncryptedSmoke'&&transport.runtimeStopped===true,'Transport-only task, attempt or owner differs.');
  check(accepted?.accepted===true&&accepted.sourceHead===build.sourceHead&&accepted.runtimeBuildId===build.buildId&&/^[a-f0-9]{64}$/.test(receiptSha256)&&transport.fullReceiptSha256===receiptSha256&&Number.isFinite(Date.parse(transport.at))&&Date.parse(transport.at)>=Date.parse(accepted.verifiedAt),'Transport-only proof predates or differs from the accepted Full receipt.');
  check(ready.processes?.length===3&&new Set(ready.processes.map(row=>row.pid)).size===3&&Array.isArray(remaining)&&remaining.length===0,'Owned API/Vite PIDs must independently be absent before PrepareRelease.');
  check(transport.cleanup?.length===3&&ready.processes.every(process=>transport.cleanup.filter(row=>row.kind===process.kind&&row.pid===process.pid&&(row.stopped===true||row.alreadyExited===true)).length===1),'Transport-only proof is missing an owned runtime exit.');
- check(JSON.stringify([...(transport.retainedBridgePorts||[])].sort((a,b)=>a-b))===JSON.stringify([63960,63962,63963,63964]),'Transport-only bridge port scope differs.');
- validateSupervisor(ready,supervisor,environment);return true;
+ if(credentials!==undefined)validateCredentialBinding(build,ready,credentials,environment);
+ const ports=nativeBridgePorts(credentials);
+ check(JSON.stringify([...(transport.retainedBridgePorts||[])].sort((a,b)=>a-b))===JSON.stringify(ports),'Transport-only bridge port scope differs.');
+ validateSupervisor(ready,supervisor,environment,ports);return true;
 }
 export async function waitForTransportOnly(file,failedFile,timeoutMs=60000,pollMs=100){
  const deadline=Date.now()+timeoutMs;
@@ -113,7 +128,9 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   const build=json(buildFile),ready=json(readyFile),transport=json(transportFile);
   check(build.sourceHead===head()&&runtimeManifest(build.runtimeDirectory).sha256===build.runtimeManifestSha256&&same(acceptedFile,path.join(build.resultsDirectory,'release-test-matrix-result.json')),'Full candidate, runtime or accepted receipt changed before PrepareRelease.');
   const bytes=read(acceptedFile),accepted=JSON.parse(bytes);
-  validateTransportOnly(build,ready,transport,processIdentities([ready.supervisorPid])[0],processIdentities(ready.processes.map(row=>row.pid),{allowMissing:true}),process.env,accepted,hash(bytes));
+  const credentialsFile=process.env.MICROI_TEST_RUNTIME_ENVIRONMENT_FILE;verifyPrivate(credentialsFile);const credentialBytes=read(credentialsFile);
+  check(hash(credentialBytes)===ready.credentialsFileSha256,'Fresh credential file differs from ready receipt.');
+  validateTransportOnly(build,ready,transport,processIdentities([ready.supervisorPid])[0],processIdentities(ready.processes.map(row=>row.pid),{allowMissing:true}),process.env,accepted,hash(bytes),JSON.parse(credentialBytes));
   console.log('PrepareRelease barrier passed: owned runtime PIDs exited and the original four native bridges remain ready.');
  }else throw Error('Usage: staged-full-runtime.mjs announce | verify-ready | verify-transport-only');
 }

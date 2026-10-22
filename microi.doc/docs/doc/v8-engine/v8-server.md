@@ -1606,6 +1606,29 @@ var result = V8.MongoDb.GetPartitionedTableData({
 
 平台聊天的接入及滚动历史规则见[消息通知](../system-engine/message-notification#跨月跨年的聊天历史)。该接口依赖对应 Core/MongoDB/API 组件与 Managed 运行时版本；未部署时不能用本地测试结论替代线上可用性。
 
+#### 物理审计与索引集合模式
+
+同一 `GetPartitionedTableData` 原子提供两种明确的高级模式，不能同时启用。它们只解决存储读取，业务权限、维护状态和对外字段仍由接口引擎负责。
+
+| 模式 | 参数与边界 |
+| --- | --- |
+| `PhysicalRows:true` | 按物理分区与原生 `_id` 扫描，保留不同分区的同 Id 副本；`PageSize` 默认及上限 100，`MaxPartitions` 默认及上限 8 |
+| 物理扫描范围 | `_Where` 可省略，只有无条件的全物理扫描才返回 `FullPhysicalScope=true`；带条件不能证明全租户迁移完成，不支持 `_WhereAny` 或 `CountOnly` |
+| 物理扫描游标 | 返回 `DirectoryHash`、`NextCursor`、`HasMore`；后续带回目录哈希和游标。目录或集合身份变化、非法原生 Id 均失败，不能跳过后宣告完成 |
+| `CollectionPage:true` | 固定当前租户基础库及可信 `TableName`；`IndexFields` 为 1–4 个字段，`_Where` 必须完整等值匹配这些前缀，不支持 `_WhereAny` |
+| 索引分页 | `SortField` 是不在索引前缀内的文本字段，按该字段和原生 `_id` 倒序；`PageSize` 默认 30、范围 1–100，普通页不计数 |
+| 索引准备与计数 | 维护阶段显式 `EnsureIndex:true`；普通读取只使用已存在的索引。`CountOnly:true` 单独计数，准备和计数均不能携带分页游标 |
+
+返回的物理库、集合与内部定位元数据不能直接透传给浏览器。新增迁移应在明确的维护窗口内扫描，正常用户翻历史不能触发全库扫描或临时建大索引。
+
+#### Managed 存储维护准入
+
+适用版本：后端 **8.6.4 及以上**，并安装消息通知应用 **v8.3.25 及以上**。全部服务节点必须先完成二进制升级。
+
+`V8.Method.ManageManagedStorageMaintenance` 与 `V8.Method.RequireManagedStorageMaintenance` 是可信宿主原子，仅供固定 `platform-chat-maintenance` 接口使用。前者接受固定 `Scope='platform-chat-runtime'` 和 `Operation=Begin/Drain/Status/End`；后者核验排空状态与预期 `ExpectedEpoch`。普通自建引擎、伪造角色/租户参数、匿名与访问密钥会话均不能获得维护权限。
+
+准入和活动票据由共享存储保存；MongoDB 写入、嵌套调用及正常异步调用继承当前可信上下文。脚本不能通过禁止上下文流动的线程 API 脱离边界，也不能通过普通 MongoDB CRUD 改写宿主控制集合。结束维护需实际排空和最新修订号，不接受客户端自报“已完成”。这些原子不替代业务迁移校验，不应由客户端直接拼参数调用；完整顺序见[旧消息定位索引维护](../system-engine/message-notification#旧消息定位索引的维护窗口)。
+
 ### 查询单条数据 GetFormData
 ```javascript
 V8.MongoDb.GetFormData({

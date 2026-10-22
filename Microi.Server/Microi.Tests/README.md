@@ -224,6 +224,48 @@ MySQL 升级夹具支持 `MICROI_TEST_UPGRADE_DATABASE=microi_test_upgrade_<任�
 `MICROI_TEST_API_ENGINE_RESPONSE_MODE=Any`，此时仍校验 GET/POST HTTP 与
 JSON 传输，但不会伪造不存在的 DosResult 断言。
 
+## Admission fixture：真实维护准入 HTTP 门禁
+
+Full 的维护准入门禁由 `run-tests.ps1` 自动调用正式
+`ReleaseGate/fixtures/admission/runtime.mjs`，不依赖某次任务目录的脚本。
+当前支持 staged runtime：最终构建后核验同次双 API、前端、桥进程、源码 HEAD、
+DLL 指纹与 fresh login，再创建独占 `StdAdmission_<32位nonce>` 租户。
+非 staged Full 或缺失 profile 会在重型构建前明确失败；该测试不能 Skip。
+
+在已有可信 staged Full 配置上设置 `MICROI_ADMISSION_PROFILE_FILE` 为绝对路径。
+文件须为私有普通文件（Windows 仅当前 SID 与 SYSTEM；POSIX 当前用户 0600），内容例如：
+
+```json
+{
+  "schema": 1,
+  "task": "your-isolated-full-task",
+  "expectedParentOwner": "your-registered-fixture-owner",
+  "python": "C:/your-private-runtime/python.exe",
+  "bootstrapFiles": ["C:/private/api-a/appsettings.json", "C:/private/api-b/appsettings.json"]
+}
+```
+
+`task` 必须等于同次 runtime-ready 的任务，长度 8–67；`expectedParentOwner`
+必须与已登记父测试库 `_ui_full_owner.TaskId` 相同。Python 需要 `pymysql`、`redis`。
+两份 API 配置仅使用既有十项 bootstrap 字段，均指向已授权 loopback 依赖，
+配置正文、端口、实际 ACL 和源码依赖在预检时冻结。不会认领旧数据库或创建新依赖服务。
+
+正式入口在 FullStack 前按顺序完成：父夹具只读归属核验、创建普通 owner、
+确认新租户/物理库不存在、调用正式 Managed 开通升级、读取真实注册及继承配置、
+登记新库所有权、真实登录与 AccessKey 最小授权。所有密码/Token、逐阶段意图、
+完整原文及 CAS 备份仅保存在本次结果目录 `admission/private`，创建后立即验证实际 ACL。
+`admission-ready.json` 独立绑定原 runtime-ready 的 SHA，不修改既有 ready 协议。
+
+HTTP 用例实际覆盖普通、分布式锁、Hub 兼容三条路径和在途排空；只在新租户中
+对两个固定 Managed Key 做逐字节 CAS 替换/恢复，并用 HTTP 回读确认 API 节点缓存已恢复。
+测试取消时使用独立有界清理 token；无法确认在途归零时保持维护关闭并保留备份，禁止强制解除。
+FullStack 退出后正式入口撤销本次 AccessKey、删除新租户普通测试用户；新租户、
+主测试库中的 owner 和精确资源清单保留供人工审查，不清空借用主/子库或伪造生产删除接口。
+
+任何未知写入只留意图并停止，不自动重放租户开通。失败后先核对 private 中的原始回执，
+按已冻结 context 与精确资源身份恢复；不得重新取当前哈希覆盖冲突或删除整套共享夹具。
+离线契约测试只证明守卫与控制语义，不能代替同次 Full 的实际 HTTP/Mongo/Redis 通过证据。
+
 ## 敏感信息规则
 
 - `Microi.Tests` 不保存任何真实账号、密码、Token、数据库连接串或私钥。

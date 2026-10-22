@@ -64,6 +64,49 @@ function transportFixture(){
  value.currentSupervisor=structuredClone(value.ready.supervisor);return value;
 }
 const verifyTransport=value=>runtime.validateTransportOnly(value.build,value.ready,value.transport,value.currentSupervisor,value.remaining,value.environment,value.accepted,value.receiptHash);
+test('frozen credential profile supports independent bridge ports in both real exported validators',()=>{
+ const value=transportFixture(),ports={mysql:64160,redis:64162,mongo:64163,scheduleRedis:64164},list=Object.values(ports);
+ value.credentials.nativeBridgePorts=ports;
+ value.ready.supervisor.listeningPorts=list;
+ value.current.find(row=>row.pid===99).listeningPorts=list;
+ value.currentSupervisor.listeningPorts=list;
+ value.transport.retainedBridgePorts=list;
+ assert.deepEqual(Object.keys(validate(value)),['MICROI_TEST_TOKEN','MICROI_TEST_CHILD_TOKEN']);
+ assert.equal(runtime.validateTransportOnly(value.build,value.ready,value.transport,value.currentSupervisor,value.remaining,value.environment,value.accepted,value.receiptHash,value.credentials),true);
+});
+test('native bridge profile rejects partial, ambiguous and out-of-range ports',()=>{
+ assert.deepEqual(runtime.nativeBridgePorts(),[63960,63962,63963,63964]);
+ const ports={mysql:64160,redis:64162,mongo:64163,scheduleRedis:64164};
+ assert.deepEqual(runtime.nativeBridgePorts({nativeBridgePorts:ports}),[64160,64162,64163,64164]);
+ for(const configured of [null,[],{}, {...ports,mysql:undefined}, {...ports,mysql:'64160'}, {...ports,mysql:1023},
+  {...ports,mysql:65536},{...ports,mysql:64162},{...ports,mysql:64160.5},{...ports,extra:64165}]){
+  const value=fixture();value.credentials.nativeBridgePorts=configured;
+  assert.throws(()=>validate(value),/bridge profile/i);
+ }
+});
+test('configured bridge validators retain process, receipt and profile authority checks',()=>{
+ function configured(){const v=transportFixture(),ports={mysql:64160,redis:64162,mongo:64163,scheduleRedis:64164};
+  v.credentials.nativeBridgePorts=ports;v.ready.supervisor.listeningPorts=Object.values(ports);
+  v.current.find(row=>row.pid===99).listeningPorts=Object.values(ports);v.currentSupervisor.listeningPorts=Object.values(ports);
+  v.transport.retainedBridgePorts=Object.values(ports);return v;}
+ const transport=v=>runtime.validateTransportOnly(v.build,v.ready,v.transport,v.currentSupervisor,v.remaining,v.environment,v.accepted,v.receiptHash,v.credentials);
+ for(const change of [v=>v.currentSupervisor.parentPid=1,v=>v.currentSupervisor.creationDate='reused',
+  v=>v.currentSupervisor.cwd=root,v=>v.currentSupervisor.commandLine='foreign',v=>v.currentSupervisor.exe='foreign',
+  v=>v.currentSupervisor.listeningPorts.push(64165),v=>v.transport.retainedBridgePorts=[63960,63962,63963,63964],
+  v=>v.credentials.sourceHead='f'.repeat(40),v=>v.credentials.buildId='old',v=>v.credentials.env.MICROI_TEST_DID='other',
+  v=>v.credentials.credentialsRefreshedAt='2025-01-01T00:00:00Z',v=>v.remaining=[v.ready.processes[0]]]){
+  const value=configured();change(value);assert.throws(()=>transport(value));
+ }
+ for(const change of [v=>v.current.find(row=>row.pid===99).parentPid=1,v=>v.current.find(row=>row.pid===99).creationDate='reused',
+  v=>v.current.find(row=>row.pid===99).listeningPorts=[63960,63962,63963,63964],v=>v.current[0].cwd=root,
+  v=>v.ready.runtimeManifestSha256='f'.repeat(64)]){const value=configured();change(value);assert.throws(()=>validate(value));}
+});
+test('inherited environment cannot redefine the native bridge scope',()=>{
+ const value=fixture();value.environment.MICROI_TEST_NATIVE_BRIDGE_PORTS='[64160,64162,64163,64164]';
+ assert.deepEqual(Object.keys(validate(value)),['MICROI_TEST_TOKEN','MICROI_TEST_CHILD_TOKEN']);
+ value.current.find(row=>row.pid===99).listeningPorts=[64160,64162,64163,64164];
+ assert.throws(()=>validate(value),/four bridge ports/);
+});
 test('PrepareRelease barrier requires independently exited runtime PIDs and same-owner live native bridges',()=>{
  assert.equal(typeof runtime.validateTransportOnly,'function');assert.equal(verifyTransport(transportFixture()),true);
  for(const change of [v=>v.transport.sourceHead='b'.repeat(40),v=>v.transport.buildId='old',v=>v.transport.attempt='old-attempt',v=>v.transport.ownerPid=1,v=>v.transport.task='other',v=>v.transport.runtimeStopped=false,v=>v.transport.cleanup.pop(),v=>v.transport.cleanup[0].pid=200,v=>v.transport.cleanup[0].stopped=false,v=>v.currentSupervisor.parentPid=1,v=>v.currentSupervisor.creationDate='reused',v=>v.currentSupervisor.cwd=root,v=>v.currentSupervisor.exe=path.join(root,'foreign.exe'),v=>v.currentSupervisor.commandLine='foreign.js',v=>v.currentSupervisor.listeningPorts=[63960],v=>v.remaining=[v.ready.processes[0]],v=>v.accepted.accepted=false,v=>v.receiptHash='0'.repeat(64),v=>v.transport.at='2026-10-16T09:59:00Z']){

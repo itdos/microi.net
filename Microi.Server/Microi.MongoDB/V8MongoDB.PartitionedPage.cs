@@ -52,6 +52,12 @@ namespace Microi.net
             {
                 using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(20));
                 JObject input = JsonHelper.ToJObject(dynamicParam);
+                RejectHostStoragePage(input);
+                // 通用物理审计保留全部副本；业务状态与鉴权由 Managed 引擎控制。
+                if (input.Value<bool?>("PhysicalRows") == true && input.Value<bool?>("CollectionPage") == true)
+                    return new DosResult(0, null, "MongoDB 分页模式不能同时选择。");
+                if (input.Value<bool?>("PhysicalRows") == true) return GetPartitionedPhysicalRows(input, deadline.Token);
+                if (input.Value<bool?>("CollectionPage") == true) return GetIndexedCollectionPage(input, deadline.Token);
                 var tenant = ResolveV8MongoTenant(input.Value<string>("OsClient"));
                 var databasePrefix = input.Value<string>("DatabasePrefix");
                 var tablePrefix = input.Value<string>("TablePrefix");

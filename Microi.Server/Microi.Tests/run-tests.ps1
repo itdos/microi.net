@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet("Quick", "Full", "Panel")]
     [string]$Mode = "Quick",
@@ -104,6 +104,11 @@ if ($Mode -eq "Full") {
     if ($stagedRuntime -and ((Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_READY_FILE) -or (Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_BUILD_FILE))) {
         throw 'Staged Full requires new signal files; previous runtime/build receipts cannot be reused.'
     }
+    # 新 HTTP 门禁仅支持已经具备最终 DLL/进程/凭据身份核验的 staged runtime。
+    # 预检在所有构建/数据库写入前失败，不把缺夹具变成 Skip。
+    $admissionTool = Join-Path $testRoot 'ReleaseGate/fixtures/admission/runtime.mjs'
+    node $admissionTool preflight $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'Full admission fixture preflight failed. See Microi.Tests/README.md: Admission fixture.' }
     if ([string]::IsNullOrWhiteSpace($TestMatrixFile)) {
         throw 'Full requires MICROI_TEST_MATRIX_FILE with the verified MCP dependency versions and isolated fixture coordinates.'
     }
@@ -380,16 +385,39 @@ if ($Mode -eq "Full") {
         if ($missingAfterRuntime.Count -gt 0) { throw "Full runtime is missing prerequisites: $($missingAfterRuntime -join ', ')" }
     }
 
+    # 只有同次 verify-ready 成功后才允许准备独占租户；正式入口承担该生命周期。
+    $admissionJson = node $admissionTool prepare $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'Full admission fixture preparation failed; preserve its private receipts before retrying.' }
+    $admissionReady = $admissionJson | ConvertFrom-Json
+    $env:MICROI_ADMISSION_READY_FILE = $admissionReady.MICROI_ADMISSION_READY_FILE
+    $env:MICROI_ADMISSION_ENVIRONMENT_FILE = $admissionReady.MICROI_ADMISSION_ENVIRONMENT_FILE
+
     Write-Host "Running isolated-tenant FormEngine and ApiEngine full-stack tests..."
-    dotnet test $project `
-        -c $Configuration `
-        --no-build `
-        --no-restore `
-        --filter $matrixPlan.fullFilter `
-        --results-directory $ResultsDirectory `
-        --logger "trx;LogFileName=microi-full-stack.trx" `
-        -m:1
-    if ($LASTEXITCODE -ne 0) { throw "Full-stack release gate failed with exit code $LASTEXITCODE." }
+    $fullStackExit = $null
+    $fullStackLaunchError = $null
+    $admissionCleanupExit = $null
+    try {
+        dotnet test $project `
+            -c $Configuration `
+            --no-build `
+            --no-restore `
+            --filter $matrixPlan.fullFilter `
+            --results-directory $ResultsDirectory `
+            --logger "trx;LogFileName=microi-full-stack.trx" `
+            -m:1
+        $fullStackExit = $LASTEXITCODE
+    } catch {
+        $fullStackLaunchError = $_
+    } finally {
+        try {
+            node $admissionTool cleanup $ResultsDirectory
+            $admissionCleanupExit = $LASTEXITCODE
+        } catch { $admissionCleanupExit = 'LaunchFailed' }
+    }
+    # 清理失败不能掩盖原始测试退出码；TRX、私有意图与两个阶段结果均保留。
+    if ($fullStackLaunchError -or $fullStackExit -ne 0 -or $admissionCleanupExit -ne 0) {
+        throw "Full-stack failed: testExit=$fullStackExit; testLaunchFailed=$([bool]$fullStackLaunchError); admissionCleanupExit=$admissionCleanupExit. Preserve TRX and admission/private receipts."
+    }
 
     Write-Host "Validating incident evidence rendering, storage failures and mobile layout..."
     node (Join-Path $testRoot 'FullStack\incident-observability-component.mjs') $ResultsDirectory

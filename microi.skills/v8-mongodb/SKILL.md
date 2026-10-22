@@ -178,6 +178,18 @@ return { Code: 1, Data: {
 
 ## 实战模式
 
+### 物理审计与权威索引分页
+
+`GetPartitionedTableData` 的高级模式需在可信接口引擎完成业务权限校验后使用，不能把客户端参数直接作为库、集合或索引定义：
+
+- `PhysicalRows:true` 保留同 Id 的所有物理副本，按分区和 `_id` 扫描。`PageSize` 默认/上限 100，`MaxPartitions` 默认/上限 8；不接受 `_WhereAny` 或 `CountOnly`。只有省略 `_Where` 的完整扫描才有 `FullPhysicalScope=true`，带条件的扫描不能证明全租户迁移完成。
+- 物理扫描返回 `DirectoryHash/NextCursor/HasMore`，继续时原样带回；目录或集合身份变化、非法 `_id` 必须失败关闭，不得跳过再宣称迁移完成。
+- `CollectionPage:true` 使用可信 `DatabasePrefix/TableName`，`IndexFields` 为 1–4 个字段，`_Where` 必须完整等值匹配这些前缀。`SortField` 是不在前缀内的文本字段，与原生 `_id` 倒序分页。`PageSize` 默认 30、上限 100，普通页不计数。
+- 索引必须在维护阶段用 `EnsureIndex:true` 显式准备；普通读取仅 Hint 已存在的索引。`CountOnly:true` 单独执行索引计数；准备与计数不接受游标。不把首次用户页面加载变成全量索引构建。
+- 两种模式互斥，返回的 `_PartitionDb/_PartitionTable` 仅供可信内部逻辑，公开 DTO 显式选字段。
+
+平台聊天迁移通过固定 Managed `platform-chat-maintenance` 编排。`V8.Method.ManageManagedStorageMaintenance` / `V8.Method.RequireManagedStorageMaintenance` 只接受真实当前租户、固定 Key、超级管理员及非访问密钥会话；普通 V8 MongoDB CRUD 不得读写宿主准入集合。先核实所有写节点升级，再关闭准入、真实排空、分批迁移、完整验证、条件释放；具体流程见 `../message-notification/references/contracts.md`。不能用客户端布尔值、TTL 或清空票据冒充排空。
+
 ### IoT 设备日志存储
 
 ```javascript

@@ -109,6 +109,11 @@ namespace Microi.net
             "Microi.net.IoTDownlinkPolicy",
             "Microi.net.V8TenantContext",
             "Microi.net.V8TrustedExecutionContext",
+            "Microi.net.ManagedStorageAdmissionRuntime",
+            "Microi.net.IManagedStorageAdmissionStore",
+            "Microi.net.MongoManagedStorageAdmissionStore",
+            "Microi.net.ManagedStorageTicket",
+            "Microi.net.ManagedStorageGate",
         };
 
         /// <summary>
@@ -127,6 +132,14 @@ namespace Microi.net
             var fullName = t.FullName;
             if (string.IsNullOrEmpty(fullName)) return false;
             if (_blockedExactTypes.Contains(fullName)) return true;
+            // 这些 API 会主动脱离 AsyncLocal，导致回调丢失可信租户和存储准入上下文。
+            // 只阻止脱离上下文的入口，保留正常 Task.Run、Thread.Start/Sleep 和安全队列调用。
+            if (fullName == "System.Threading.ExecutionContext" && member.Name == "SuppressFlow") return true;
+            if (fullName == "System.Threading.Thread" && member.Name == "UnsafeStart") return true;
+            if (fullName == "System.Threading.ThreadPool"
+                && (member.Name == "UnsafeQueueUserWorkItem"
+                    || member.Name == "UnsafeQueueNativeOverlapped"
+                    || member.Name == "UnsafeRegisterWaitForSingleObject")) return true;
             for (int i = 0; i < _blockedNamespacePrefixes.Length; i++)
             {
                 if (fullName.StartsWith(_blockedNamespacePrefixes[i], StringComparison.Ordinal))

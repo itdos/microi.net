@@ -37,6 +37,8 @@ description: 设计、实现、迁移和验收 Microi 多通道消息通知与�
 
 完整字段、接口和可靠性契约见 [references/contracts.md](references/contracts.md)。
 
+旧聊天跨年定位迁移须使用官方 Managed `platform-chat-maintenance`，先升级全部写节点，再执行单租户准入关闭、真实排空、分批扫描、完整校验和条件恢复。不得将“能翻到旧消息”视为“旧消息幂等迁移完成”，也不自动迁移所有租户；参数、冲突和恢复边界见 [历史聊天定位维护](references/contracts.md#历史聊天定位维护)。
+
 ## 实现流程
 
 ### 1. 合并结构

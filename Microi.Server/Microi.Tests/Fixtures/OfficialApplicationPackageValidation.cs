@@ -703,7 +703,12 @@ namespace Microi.net
                         "msg_internal_mark_read",
                         "platform-chat-system-message",
                         "platform-chat-runtime",
+                        "platform-chat-maintenance",
+                        "platform-message-notification-config",
                         "platform-message-notification-custom-hook",
+                        "platform-reminder-official-feed",
+                        "platform-reminder-runtime",
+                        "platform-reminder-tick",
                         "wechat_send_tpl_msg"
                     }
                 },
@@ -1057,17 +1062,35 @@ namespace Microi.net
             {
                 var systemCode = byKey["platform-chat-system-message"].Value<string>("ApiV8Code") ?? string.Empty;
                 var runtimeCode = byKey["platform-chat-runtime"].Value<string>("ApiV8Code") ?? string.Empty;
+                var maintenance = byKey["platform-chat-maintenance"];
+                var maintenanceCode = maintenance.Value<string>("ApiV8Code") ?? string.Empty;
+                var serverMinimumText = (package["PackageInfo"]?["ServerMinVersion"]?.ToString() ?? string.Empty)
+                    .TrimStart('v', 'V');
                 var wechatCode = byKey["wechat_send_tpl_msg"].Value<string>("ApiV8Code") ?? string.Empty;
                 var runtimeVersionText = (byKey["platform-chat-runtime"].Value<string>("Version") ?? string.Empty)
                     .TrimStart('v', 'V');
                 var capabilities = package["PackageInfo"]?["RequiredPlatformCapabilities"] as JArray
                     ?? new JArray();
                 return systemCode.Contains("platform-chat-runtime")
+                    // 维护入口必须与宿主准入能力成套交付；缺权限或依赖声明的包不能进入 Full。
+                    && System.Version.TryParse(serverMinimumText, out var serverMinimum)
+                    && serverMinimum >= new System.Version(8, 6, 4)
+                    && maintenance.Value<int?>("StopHttp") == 0
+                    && maintenance.Value<int?>("AllowAnonymous") == 0
+                    && maintenanceCode.Contains("V8.Method.ManageManagedStorageMaintenance")
+                    && maintenanceCode.Contains("V8.Method.RequireManagedStorageMaintenance")
+                    && new[]
+                    {
+                        "ApiEngine:platform-chat-maintenance@v1.0.0",
+                        "V8.Method.ManageManagedStorageMaintenance",
+                        "V8.Method.RequireManagedStorageMaintenance"
+                    }.All(required => capabilities.Any(item => string.Equals(
+                        item?.ToString(), required, StringComparison.Ordinal)))
                     && System.Version.TryParse(runtimeVersionText, out var runtimeVersion)
-                    && runtimeVersion >= new System.Version(1, 1, 0)
+                    && runtimeVersion >= new System.Version(1, 2, 0)
                     && capabilities.Any(item => string.Equals(
                         item?.ToString(),
-                        "ApiEngine:platform-chat-runtime@v1.1.0",
+                        "ApiEngine:platform-chat-runtime@v1.2.0",
                         StringComparison.Ordinal))
                     && capabilities.Any(item => string.Equals(
                         item?.ToString(),
