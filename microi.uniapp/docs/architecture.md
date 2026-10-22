@@ -99,6 +99,21 @@ src/tenants/<tenant>/
 事务逻辑。定制详情可组合硬编码 Hero/流程区和动态元数据分组，新增后台字段
 会自动进入折叠区。
 
+设备详情的基础操作按完整表单定义定位“设备信息”分组，不按当前 Tab 的首个
+可见分组兜底。因此关联 IoT、商品预览、二维码不会随 Tab 切换迁移。
+`device-iot-controls.vue` 在后台控制字段所属 Tab 提供原生远程控制，字段显隐、角色和
+服务端 `xjy-device-iot-control` 的能力结果共同决定按钮目录；普通 V8 按钮仍不执行。
+开机/关机使用双列，滤芯复位独立成行；超过四个动作时，温控/待机等低频动作收进
+“更多控制”，展开后仍按电源、温度、维护分组。刷新与状态查询独立成工具行，
+反馈保留指令编号、回执与耗材复核状态，触摸高度至少 44px。
+
+远程控制沿用后端当前仅平台管理员开放的规则；客户端不能扩权。操作前重新 Inspect，
+确认后使用同一编号依次 Prepare、Dispatch、Status。网络超时只查询原编号，不自动
+重发；切换 Tab、离页或更换设备时销毁会话，迟到响应不继续下发。滤芯由用户选择
+服务端返回的单级选项，只提交 FilterLevel/ResetBasis，成功回执与耗材清零复核分开。
+定向回归入口为 `npm run check:device-detail-actions`，覆盖取消、重复点击、离线、撤权、
+编号不匹配和超时恢复；真实设备控制仍需在可控环境做硬件验收。
+
 集福鲤客户合同金额由 `src/tenants/xjy/customer-contract-totals.mjs` 与租户组件
 共同适配，客户列表和详情共用 `xjy-customer-contract-totals` 只读聚合接口。
 同页批量传入 `CustomerIds` 和真实 `CustomerSysMenuId`，服务端负责授权、合同

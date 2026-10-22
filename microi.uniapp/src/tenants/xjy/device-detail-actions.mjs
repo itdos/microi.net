@@ -9,6 +9,16 @@ function normalizedId(value) {
   return String(value || '').trim()
 }
 
+export function deviceActionSectionKey(definition = {}) {
+  // 必须从完整定义定位设备资料分组；按当前 Tab 的首组兜底会把二维码和关联按钮带到其它页签。
+  const groups = definition.relatedGroups || definition.groups || []
+  const fieldNames = group => (group.fields || []).map(field => String(field.Name || '').toLowerCase())
+  const group = groups.find(item => String(item.name || '').trim() === '设备信息')
+    || groups.find(item => fieldNames(item).includes('shebeibh'))
+    || groups.find(item => fieldNames(item).includes('shebeiewmpath'))
+  return group?.key || ''
+}
+
 export function canGenerateDeviceQrCode(menuId, user = {}, mode = 'Edit') {
   // 入口与服务端都沿用设备列表表单权限；新增态校验 Add，已有记录校验 Edit。
   return String(mode || '').toLowerCase() === 'add'

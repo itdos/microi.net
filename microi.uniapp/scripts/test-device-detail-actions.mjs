@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import './test-device-iot-actions.mjs'
+import './test-device-iot-control.mjs'
 import { fileURLToPath } from 'node:url'
 import {
   canGenerateDeviceQrCode,
