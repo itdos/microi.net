@@ -7,7 +7,7 @@
  * 请新增独立租户接口并由官方接口通过受支持扩展点调用，禁止直接修改本接口。
  */
 
-/* V8 ApiEngine | ApiEngineKey: platform-chat-runtime | Version: v1.0.2 */
+/* V8 ApiEngine | ApiEngineKey: platform-chat-runtime | Version: v1.1.0 */
 
 var param = V8.Param || {};
 var RUNTIME_KEY = 'platform-chat-runtime';
@@ -28,7 +28,8 @@ function nowText(format) {
   return now.toISOString().replace('T', ' ').substring(0, 19);
 }
 
-var MESSAGE_TABLE = 'chat_' + nowText('yyyy');
+var LEGACY_MESSAGE_TABLE = 'chat_' + nowText('yyyy');
+var MESSAGE_LOCATION_TABLE = 'chat_message_location';
 var CONTACT_TABLE = 'chat_last_contact';
 
 function fail(message, code) {
@@ -133,9 +134,9 @@ function query(tableName, where, pageIndex, pageSize, orderBy, orderByType) {
 function unreadCount(userId, peerUserId) {
   var where = [['ToUserId', '=', userId], ['IsRead', '=', false]];
   if (peerUserId) where.push(['FromUserId', '=', peerUserId]);
-  var result = query(MESSAGE_TABLE, where, 1, 1, 'CreateTime', 'DESC');
+  var result = V8.MongoDb.GetPartitionedTableData({ OsClient: V8.OsClient, DatabasePrefix: 'diy_chat', TablePrefix: 'chat', _Where: where, IndexFields: ['ToUserId', 'IsRead', 'FromUserId'], CountOnly: true, MaxPartitions: 128 });
   if (!result || result.Code !== 1) return { Code: result && result.Code || 0, Msg: result && result.Msg || '读取未读数失败。' };
-  return { Code: 1, Data: Number(result.DataCount || 0) };
+  return { Code: 1, Data: Number(result.Data && result.Data.Count || 0) };
 }
 
 function hookPayload(stage, action, actorUserId, peerUserId, messageId, messageType) {
@@ -181,35 +182,48 @@ function samePersistedMessage(existing, expected) {
     && text(existing.PayloadHash, 100) === expected.PayloadHash;
 }
 
+// Mongo Find 的权威不存在结果是 Code=1/Data=null；旧 Code=2 仅保留无正文兼容。
+// 缺字段、错误码和异常均不是“不存在”，不得据此写入或生成新的消息身份。
+function mongoMissing(result) {
+  return !!result && (result.Code === 1 && result.Data === null
+    || result.Code === 2 && (result.Data === null || typeof result.Data === 'undefined'));
+}
+function mongoFound(result) {
+  return !!result && result.Code === 1 && !!result.Data && typeof result.Data === 'object';
+}
+
 function persistMessageRecord(message) {
-  var existingResult = V8.MongoDb.GetFormData({
-    OsClient: V8.OsClient, DbName: DB_NAME, TableName: MESSAGE_TABLE, Id: message.MessageId
-  });
-  if (existingResult && existingResult.Code === 1 && existingResult.Data) {
-    return samePersistedMessage(existingResult.Data, message)
-      ? { Code: 1, Data: existingResult.Data, Duplicate: true }
-      : fail('RequestId 已被其它聊天消息占用。');
+  // 先保留固定 Id 的分区指针：跨月重试必须继续原月份，不重复创建正文。
+  var pointerRequest = { OsClient: V8.OsClient, DbName: DB_NAME, TableName: MESSAGE_LOCATION_TABLE, Id: message.MessageId };
+  var pointer = V8.MongoDb.GetFormData(pointerRequest);
+  if (mongoMissing(pointer)) {
+    var legacy = V8.MongoDb.GetFormData({OsClient:V8.OsClient,DbName:DB_NAME,TableName:LEGACY_MESSAGE_TABLE,Id:message.MessageId});
+    if (mongoFound(legacy)) return samePersistedMessage(legacy.Data, message)
+      ? {Code:1,Data:legacy.Data,Duplicate:true} : fail('RequestId 已被其它聊天消息占用。');
+    if (!mongoMissing(legacy)) return fail(legacy && legacy.Msg || '读取历史消息失败。');
+    var month = nowText('yyyy-MM-dd HH:mm:ss').substring(0,7).replace('-', '');
+    pointerRequest._FormData = { Month: month, PayloadHash: message.PayloadHash };
+    // 新增返回未知也只回读同一 Id；不在当前调用里重发写入。
+    try { V8.MongoDb.AddFormData(pointerRequest); } catch (pointerWriteUnknown) {}
+    pointer = V8.MongoDb.GetFormData(pointerRequest);
   }
-
-  var addResult = V8.MongoDb.AddFormData({
-    OsClient: V8.OsClient,
-    DbName: DB_NAME,
-    TableName: MESSAGE_TABLE,
-    Id: message.MessageId,
-    _FormData: message
-  });
-  if (addResult && addResult.Code === 1) {
-    return { Code: 1, Data: addResult.Data || message, Duplicate: false };
-  }
-
-  // 唯一 _id 并发碰撞时只复用完全一致的事实；其它错误保持失败关闭。
-  var racedResult = V8.MongoDb.GetFormData({
-    OsClient: V8.OsClient, DbName: DB_NAME, TableName: MESSAGE_TABLE, Id: message.MessageId
-  });
-  if (racedResult && racedResult.Code === 1 && samePersistedMessage(racedResult.Data, message)) {
-    return { Code: 1, Data: racedResult.Data, Duplicate: true };
-  }
-  return fail(addResult && addResult.Msg || '聊天消息持久化失败。');
+  if (!mongoFound(pointer)) return fail(pointer && pointer.Msg || '消息分区保存未确认，请使用相同 RequestId 重试。');
+  var location = pointer.Data;
+  if (!/^[0-9]{4}(0[1-9]|1[0-2])$/.test(String(location.Month)) || location.PayloadHash !== message.PayloadHash)
+    return fail('RequestId 已被其它聊天消息占用。');
+  var request = { OsClient:V8.OsClient, DbName:DB_NAME+'_'+String(location.Month).substring(0,4), TableName:'chat_'+location.Month, Id:message.MessageId, OccurredAt:location.CreateTime };
+  var existing = V8.MongoDb.GetFormData(request);
+  if (mongoFound(existing)) return samePersistedMessage(existing.Data, message)
+    ? {Code:1,Data:existing.Data,Duplicate:true} : fail('RequestId 已被其它聊天消息占用。');
+  if (!mongoMissing(existing)) return fail(existing && existing.Msg || '读取消息失败。');
+  request._FormData = message;
+  var added;
+  try { added = V8.MongoDb.AddFormData(request); } catch (messageWriteUnknown) {}
+  // Mongo 正文不参加 SQL 事务，只有固定 Id 与原请求摘要读回匹配才能确认成功。
+  var persisted = V8.MongoDb.GetFormData(request);
+  if (mongoFound(persisted) && samePersistedMessage(persisted.Data, message))
+    return {Code:1,Data:persisted.Data,Duplicate:!added || added.Code !== 1};
+  return fail(added && added.Msg || '聊天消息持久化未确认，请使用相同 RequestId 重试。');
 }
 
 function updateContact(existingId, formData) {
@@ -357,21 +371,19 @@ function timestamp(value) {
 }
 
 function history(actor, peer, pageIndex, pageSize) {
-  var take = Math.min(1000, pageIndex * pageSize);
-  var outgoing = query(MESSAGE_TABLE, [
-    ['FromUserId', '=', actor.Id], ['ToUserId', '=', peer.Id]
-  ], 1, take, 'CreateTime', 'DESC');
-  if (!outgoing || outgoing.Code !== 1) return fail(outgoing && outgoing.Msg || '读取聊天记录失败。');
-  var incoming = query(MESSAGE_TABLE, [
-    ['FromUserId', '=', peer.Id], ['ToUserId', '=', actor.Id]
-  ], 1, take, 'CreateTime', 'DESC');
-  if (!incoming || incoming.Code !== 1) return fail(incoming && incoming.Msg || '读取聊天记录失败。');
-
-  var combined = toArray(outgoing.Data).concat(toArray(incoming.Data));
-  combined.sort(function (left, right) { return timestamp(right.CreateTime) - timestamp(left.CreateTime); });
-  var start = (pageIndex - 1) * pageSize;
-  var selected = combined.slice(start, start + pageSize);
-  selected.sort(function (left, right) { return timestamp(left.CreateTime) - timestamp(right.CreateTime); });
+  if (typeof V8.MongoDb.GetPartitionedTableData !== 'function') return fail('聊天历史分页需要升级平台 MongoDB 组件，请管理员更新后重试。');
+  // 业务双方来自 DiyToken 和权威用户回查；存储游标绑定完整租户/过滤条件，不能跨对话复用。
+  var request = { OsClient:V8.OsClient, DatabasePrefix:'diy_chat', TablePrefix:'chat', IndexFields:['FromUserId','ToUserId'], PageSize:pageSize, Cursor:String(param.Cursor||''),
+    _WhereAny:[[['FromUserId','=',actor.Id],['ToUserId','=',peer.Id]],[['FromUserId','=',peer.Id],['ToUserId','=',actor.Id]]] };
+  var result;
+  // 旧客户端的页码保留有界兼容；新客户端固定游标读取，不反复下载全部已读正文。
+  for (var page=0;page<(param.CursorMode===true||request.Cursor?1:pageIndex);page++) {
+    result=V8.MongoDb.GetPartitionedTableData(request);
+    if(!result||result.Code!==1||!result.Data)return result||fail('读取聊天记录失败。');
+    if(!result.Data.HasMore)break;
+    request.Cursor=String(result.Data.NextCursor||'');
+  }
+  var selected = toArray(result.Data.Rows).reverse();
   var messages = [];
   for (var index = 0; index < selected.length; index++) {
     var row = selected[index];
@@ -383,7 +395,10 @@ function history(actor, peer, pageIndex, pageSize) {
   return {
     Code: 1,
     Data: messages,
-    DataCount: Number(outgoing.DataCount || 0) + Number(incoming.DataCount || 0)
+    Rows:selected,
+    DataCount:messages.length,
+    HasMore:result.Data.HasMore===true,
+    NextCursor:String(result.Data.NextCursor||'')
   };
 }
 
@@ -513,12 +528,13 @@ if (action === 'GetHistoryAndMarkRead') {
   var pageSize = boundedInt(param.PageSize || param._PageSize, 20, 1, 100);
   var historyResult = history(actor, peer, pageIndex, pageSize);
   if (!historyResult || historyResult.Code !== 1) return historyResult;
-  var markRead = V8.MongoDb.UptFormDataByWhere({
-    OsClient: V8.OsClient, DbName: DB_NAME, TableName: MESSAGE_TABLE,
-    _Where: [['FromUserId', '=', peer.Id], ['ToUserId', '=', actor.Id], ['IsRead', '=', false]],
-    _FormData: { IsRead: true }
-  });
-  if (!markRead || markRead.Code !== 1) return fail(markRead && markRead.Msg || '更新聊天已读状态失败。');
+  // 只标记本页已展示的收件消息；不能把未加载的跨月历史提前标记为已读。
+  for (var readIndex=0;readIndex<historyResult.Rows.length;readIndex++) {
+    var readRow=historyResult.Rows[readIndex];
+    if(String(readRow.FromUserId)!==peer.Id||String(readRow.ToUserId)!==actor.Id||readRow.IsRead===true)continue;
+    var markRead=V8.MongoDb.UptFormData({OsClient:V8.OsClient,DbName:readRow._PartitionDb,TableName:readRow._PartitionTable,Id:String(readRow._id),_FormData:{IsRead:true}});
+    if(!markRead||markRead.Code!==1)return fail(markRead&&markRead.Msg||'更新聊天已读状态失败。');
+  }
   var historyWarnings = [];
   addWarning(historyWarnings, upsertContact(actor, peer, null, false), '刷新聊天联系人失败。');
   var historyContacts = listContacts(actor.Id, 1, 20);
@@ -528,6 +544,9 @@ if (action === 'GetHistoryAndMarkRead') {
   return complete(action, actor.Id, peer.Id, '', '', {
     Messages: historyResult.Data,
     DataCount: historyResult.DataCount,
+    HasMore:historyResult.HasMore,
+    NextCursor:historyResult.NextCursor,
+    PeerUserId:peer.Id,
     ActorUserId: actor.Id,
     Contacts: historyContacts && historyContacts.Code === 1 ? historyContacts.Data : [],
     UnreadCount: historyUnread && historyUnread.Code === 1 ? historyUnread.Data : 0

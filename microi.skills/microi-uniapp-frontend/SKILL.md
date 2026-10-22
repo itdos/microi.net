@@ -26,7 +26,7 @@ UniApp/H5/小程序必须通过项目统一 `microi.v8.js` 的 `V8.uploadFile` /
 创建、重构或修复任何 Microi 移动端项目前，必须同时应用 `microi.skills/microi-mobile-app-quality/SKILL.md`，并读取其[首版交付与外部服务验收](../microi-mobile-app-quality/references/mobile-first-delivery.md)。手机号快捷登录、会话续签、导航几何、真实地图、页面动效和公开发布回读从首版纳入需求与测试，不能先交静态占位版，再等待用户逐页指出问题。涉及后台与第三方服务时按实际业务范围执行，既有授权和租户策略优先。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-uniapp-frontend-001 sha256=acfd8dd91195e7930896bd54e6ae7ce3d3982bdeb0d674d98337878eab1a5e82 -->
+<!-- microi-progressive:chunk id=microi-uniapp-frontend-001 sha256=ad6d719fd27c252c1916c54d65185ecf90846e5f780a81b671a6e0540fbea4a6 -->
 ## 标准产品、视图协议与租户扩展
 
 地图提供行政区与附近距离两类筛选时，应复用省市区字典，并允许省、市、区逐级选“全部”；省级“全部”须显式启用，不能改变普通地址录入的默认值。行政区域查询不依赖手机定位、不叠加附近半径，空地区仍可保留既有附近模式。范围筛选必须在原有菜单/租户/行权限内执行，分批读取并丢弃迟到响应；来源列表存在同表不同菜单时，地图入口与查询应保留准确的来源菜单和固定业务条件。验收覆盖全国、全省、全市、区县、直辖市、定位拒绝、旧接口兼容和快速切换。

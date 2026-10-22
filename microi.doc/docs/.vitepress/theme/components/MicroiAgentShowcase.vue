@@ -17,7 +17,7 @@
           </div>
         </div>
         <p class="microi-code-store-install"><a href="https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge" target="_blank" rel="noopener noreferrer">微软签名 EXE 在线安装器 <span aria-hidden="true">↗</span></a><span>商店版 1.3.3 · Windows 10 2004+ / 11 · x64 · 需联网</span></p>
-        <p class="microi-code-store-note">下载按钮实时显示各平台已发布版本，并始终下载 latest。官网 Windows 完整 EXE 当前未签名；微软签名在线安装器提供商店版。macOS 已发布 DMG 的签名与公证状态见版本记录，Mac 商店尚未开放下载。</p>
+        <p class="microi-code-store-note">Windows 与 macOS 分别提供已发布的安装包；版本记录可查看校验值与自动更新状态。官网 Windows 完整 EXE 当前未签名；微软签名在线安装器提供商店版。macOS 已发布 DMG 的签名与公证状态见版本记录，Mac 商店尚未开放下载。</p>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
@@ -77,29 +77,31 @@
 </template>
 
 <script setup>
-import { computed, h, onMounted, reactive, ref } from 'vue'
-import { installerFromYaml } from '../utils/microi-agent-download.mjs'
+import { computed, h, onMounted, ref } from 'vue'
+import { installerFromYaml, selectWindowsDownload } from '../utils/microi-agent-download.mjs'
 import { getDocAssetUrl } from '../doc-assets.js'
 
 const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true', fill }, [h('path', { d: path })])
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
 
-// 更新清单由 iTdos 接口引擎发布；版本发布后官网源码无需随之改动。
-const liveVersions = reactive({ windows: '', mac: '' })
-// 下载按钮始终使用永久入口；点击时由官方清单选择当前安装包，首屏不依赖异步请求。
-const downloadUrls = reactive({
-  windows: 'https://microi.net/download/microi-agent/latest.html?platform=windows',
+// 手动发行与自动更新频道分别记录；只从下方已发布版本记录选择不可变 Windows 包。
+const windowsFeedYaml = ref('')
+const macVersion = ref('')
+const windowsDownload = computed(() => selectWindowsDownload(releases, windowsFeedYaml.value))
+const liveVersions = computed(() => ({ windows: windowsDownload.value.version, mac: macVersion.value }))
+const downloadUrls = computed(() => ({
+  windows: windowsDownload.value.url,
   mac: 'https://microi.net/download/microi-agent/latest.html?platform=mac'
-})
+}))
 const UPDATE_BASE = 'https://api.microi.net/microi-code/updates/latest/'
 function versionFromYaml(yaml) {
   return /^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\s*$/m.exec(yaml)?.[1] || ''
 }
 onMounted(async () => {
   await Promise.all([
-    fetch(UPDATE_BASE + 'latest.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => { if (installerFromYaml(yaml, 'windows')) liveVersions.windows = versionFromYaml(yaml) || liveVersions.windows }).catch(() => {}),
+    fetch(UPDATE_BASE + 'latest.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => { windowsFeedYaml.value = yaml }).catch(() => {}),
     fetch(UPDATE_BASE + 'latest-mac.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => {
-      if (installerFromYaml(yaml, 'mac')) liveVersions.mac = versionFromYaml(yaml) || liveVersions.mac
+      if (installerFromYaml(yaml, 'mac')) macVersion.value = versionFromYaml(yaml) || macVersion.value
     }).catch(() => {})
   ])
 })

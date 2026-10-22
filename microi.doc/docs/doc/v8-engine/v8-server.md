@@ -1581,6 +1581,8 @@ V8.MongoDb.GetFormData({
 });
 ```
 
+单条查询不存在时，MongoDB 返回 `{ Code: 1, Data: null }`；这与 `V8.FormEngine.GetFormData` 的 `Code=2` 不同。必须同时检查 `Code` 与 `Data`，不能将查询失败、异常、空响应或缺失 `Data` 误判为不存在并继续新增。消息等幂等写入使用固定业务标识和分区；写入响应未知时只回读同一 `_id` 并核对载荷摘要，不得换 Id 或月份盲目重发。
+
 `GetFormData` 和 `GetTableData` 属于 dynamic 无模式读取。服务端会在 MongoDB 投影阶段过滤 BSON 内部 `_t` CLR 类型判别字段，避免存量强类型 C# 写入留下的旧类型名称触发反序列化失败。`_t` 不是 V8 业务契约；业务需要类型标记时应使用自有字段（例如 `DocumentType`），不得读取、筛选或依赖 `_t`。强类型 C# MongoDB 模型仍按自身的多态映射处理。
 
 MongoDB 调用使用当前 V8 租户上下文；非主库租户脚本传入其它 `OsClient` 不能跨租户访问。MongoDB 不参与 `V8.DbTrans`：批量写方法返回 `Code=1` 时应视为已提交事实，后续关系库 Hook、SignalR 或外部投递失败不得伪装成“整体未发生”并盲目重试；需要重试时使用稳定业务 Id 实现幂等。

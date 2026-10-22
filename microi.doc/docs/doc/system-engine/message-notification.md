@@ -356,7 +356,11 @@ SignalR 连接必须同时携带当前最新 DiyToken 和显式 `OsClient`，服
 
 SignalR Hub 调用聊天运行时仍保留 `Client` 权限语义，但不能因此把 `StopHttp` 改为 `0`。v1.0.9 由宿主在 DiyToken 和租户核验后，建立绑定固定 `platform-chat-runtime` Key、权威 `OsClient` 与当前用户快照的一次性可信协议上下文；V8 运行时先调用 `V8.Method.RequireManagedProtocolContext()` 原子消费，再执行聊天动作。普通 HTTP、伪造 `_CurrentUser` / `_InvokeType`、错误租户、错误 Key 和重放调用仍在进入业务代码前失败关闭；`platform-chat-system-message` 的内部 `Server` 嵌套调用不消费该 SignalR 上下文。
 
-运行时支持 `PersistMessage` / `PersistSystemMessage` / `PersistAssistantMessage` / `GetHistoryAndMarkRead` / `GetUnreadCount` / `TouchContact` / `ListContacts` / `DeleteContact`。用户和租户只取 `V8.CurrentUser` 与 `V8.OsClient`，忽略客户端伪造的发送人、用户 Id 和 `OsClient`。发送端应提供稳定 `RequestId`；运行时把“租户 + RequestId”哈希成确定性 Mongo `_id`，相同请求仅复用完全一致的已持久事实，载荷不一致则失败关闭。旧客户端未传 `RequestId` 时，兼容 Hub/Controller 会生成 ULID；这只保证单次调用，不能跨 HTTP/SignalR 重试去重。
+运行时支持 `PersistMessage` / `PersistSystemMessage` / `PersistAssistantMessage` / `GetHistoryAndMarkRead` / `GetUnreadCount` / `TouchContact` / `ListContacts` / `DeleteContact`。用户和租户只取 `V8.CurrentUser` 与 `V8.OsClient`，忽略客户端伪造的发送人、用户 Id 和 `OsClient`。发送端应提供稳定 `RequestId`；运行时把“租户 + RequestId”哈希成确定性 Mongo `_id`，在当前旧年度集合或持久定位索引能够定位原记录时，相同请求仅复用完全一致的已持久事实，载荷不一致则失败关闭。旧客户端未传 `RequestId` 时，兼容 Hub/Controller 会生成 ULID；这只保证单次调用，不能跨 HTTP/SignalR 重试去重。
+
+**旧年度消息的重放边界：** 旧运行时 v1.0.2 只在 `chat_当年` 检查请求标识。分区版为新写消息保存 `chat_message_location`，但没有自动为全部旧年度消息补齐定位索引。旧 `chat_yyyy` 中没有定位记录的消息，在以后年度重放原 `RequestId` 仍可能写出新的月表副本，正文冲突也可能未被识别。
+
+跨月、跨年历史分页用于继续读取旧消息，不等于旧消息的写入索引已经迁移。历史发送结果不明确时，应先核对原消息，不能依赖重新发送来确认。新消息发送不逐条扫描全部历史；升级验收须把“历史能读到”和“旧年度请求重放不重复”分别记录。
 
 租户定制统一写入 `platform-message-notification-custom-hook`。该接口使用 `CreateIfMissing`，首次安装后的源码、启用状态和软删除状态都归租户维护；默认正文精确为 `return { Code : 1 };`。运行时在 `BeforeChatRuntime` 与 `AfterChatRuntime` 阶段调用 Hook。Before 失败会在 MongoDB 写入前阻断；MongoDB 不参与 `V8.DbTrans`，所以已持久之后的 After/联系人投影失败不会把主结果反转为失败，而是以 `Code=1` 并在 `DataAppend.HookWarning` / `ProjectionWarnings` 返回告警。
 
@@ -369,7 +373,7 @@ Hook 只接收 `Stage`、`SourceApiEngineKey`、`Action`、`ActorUserId`、`Peer
 - 在线用户即时收到；离线用户、断网重连和 SignalR 故障后仍能从列表恢复。
 - 事务回滚不推送；提交后节点退出，持久日志仍可审计。
 - 用户不能读取或标记他人的通知；危险链接和超限参数被拒绝。
-- 无 Token、访问密钥、伪造租户/发送人被拒绝；相同 `RequestId` 并发只生成一条消息，不同载荷不得复用。
+- 无 Token、访问密钥、伪造租户/发送人被拒绝；当前写分区或持久定位命中时，相同 `RequestId` 并发只生成一条消息，不同载荷不得复用；旧年度无定位记录的限制单独记录。
 - 公众号/服务号发送主体与小程序跳转分别验证。
 - 源码测试、后端编译、远端回读、真实浏览器和商城安装/校验分别记录，不用本地成功冒充生产部署。
 

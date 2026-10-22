@@ -119,7 +119,9 @@ await V8.Notification.MarkRead({ All: true });
 
 系统聊天门面 `platform-chat-system-message`（`Managed`）完成平台超级管理员校验后，只转调本应用单一拥有的 `platform-chat-runtime`（`Managed`）。运行时统一编排 `PersistMessage / PersistSystemMessage / PersistAssistantMessage / GetHistoryAndMarkRead / GetUnreadCount / TouchContact / ListContacts / DeleteContact`；Hub/Controller 旧入口只保留 DiyToken 认证、SignalR 投递和 AI 流式协议，不得直连 MongoDB/FormEngine 复制业务。访问密钥会话、空 Token、伪造租户/发送人必须失败关闭。
 
-`platform-chat-runtime` 以 `V8.CurrentUser` / `V8.OsClient` 为唯一身份与租户事实源，对“租户 + 稳定 RequestId”生成确定性 Mongo `_id`；只有全部载荷哈希一致才复用旧记录。MongoDB 不参与 `V8.DbTrans`，因此消息/已读/联系人成功后即是已提交事实；SignalR、投影或 After Hook 失败必须保持 `Code=1` 并通过 `DataAppend.HookWarning` / `ProjectionWarnings` 告警，不得伪装未发生而引导盲目重试。调用 `V8.MongoDb.UptFormDataByWhere` / `DelFormDataByWhere` 时必须使用包含当前用户/权威资源边界的非空参数化 `_Where`，规则详见 `../v8-mongodb/SKILL.md`。
+`platform-chat-runtime` 以 `V8.CurrentUser` / `V8.OsClient` 为唯一身份与租户事实源，对“租户 + 稳定 RequestId”生成确定性 Mongo `_id`；在当前旧年度集合或持久定位索引能够定位原记录时，只有全部载荷哈希一致才复用旧记录。MongoDB 不参与 `V8.DbTrans`，因此消息/已读/联系人成功后即是已提交事实；SignalR、投影或 After Hook 失败必须保持 `Code=1` 并通过 `DataAppend.HookWarning` / `ProjectionWarnings` 告警，不得伪装未发生而引导盲目重试。调用 `V8.MongoDb.UptFormDataByWhere` / `DelFormDataByWhere` 时必须使用包含当前用户/权威资源边界的非空参数化 `_Where`，规则详见 `../v8-mongodb/SKILL.md`。
+
+旧年度重放有独立兼容边界：v1.0.2 只在 `chat_当年` 内检查确定性 `_id`；分区版的新写通过 `chat_message_location` 保留跨年定位，但不会在发送时为全部旧 `chat_yyyy` 回填索引。若旧记录在以前年度且没有定位索引，跨年重放原 `RequestId` 仍可能产生一份新月表正文，冲突正文也可能未被识别。跨月、跨年历史分页兼容不代表旧存量的全生命周期重放已安全迁移；不要把这一边界写成已解决。未知历史请求先核对原消息，不盲目补发；不能用每条发送扫描全部历史或阻断全部正常新消息掩盖迁移缺口。验收应分别统计物理集合记录数，不能只看按 Id 去重的界面或 Map。
 
 `platform-chat-runtime` 必须保持 `StopHttp=1`、`AllowAnonymous=0`。SignalR Hub 在 DiyToken 与租户核验后，通过宿主一次性可信协议作用域调用，并携带宿主生成的权威当前用户快照；V8 对 `_InvokeType=Client` 的调用必须先执行 `V8.Method.RequireManagedProtocolContext()` 原子消费。不得为修复 Hub 误报“禁止 HTTP 调用”而开放 `StopHttp`，也不得接受 Param 中的信任布尔值、用户或租户覆盖；接口引擎内部 `Server` 嵌套调用保持原有语义。
 
@@ -153,4 +155,4 @@ await V8.Notification.MarkRead({ All: true });
 4. 用户只能查询和标记自己的通知；危险链接、超长正文、跨租户接收人和匿名调用被拒绝。
 5. 公众号/服务号发送主体与小程序跳转目标分别验证，不把 `MiniProgramAppId` 当作模板发送主体。
 6. 源码定向测试、后端编译、远端 MCP 回读、真实浏览器点击和商城安装/校验分别报告；未执行的生产发布不得写成已上线。
-7. 聊天空 Token/访问密钥/伪造租户失败关闭；相同 `RequestId` 并发只有一份 Mongo 事实，不同载荷冲突拒绝；已持久后 SignalR/After Hook 失败仍返回成功并可回读。
+7. 聊天空 Token/访问密钥/伪造租户失败关闭；当前写分区或持久定位命中时，相同 `RequestId` 并发只有一份 Mongo 事实，不同载荷冲突拒绝；旧年度无定位记录的重放限制单独记录；已持久后 SignalR/After Hook 失败仍返回成功并可回读。

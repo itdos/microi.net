@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { installerFromYaml } from '../docs/.vitepress/theme/utils/microi-agent-download.mjs'
+import { installerFromYaml, compareReleaseVersions, selectWindowsDownload, WINDOWS_LATEST_URL } from '../docs/.vitepress/theme/utils/microi-agent-download.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspaceRoot = path.resolve(projectRoot, '..')
@@ -30,12 +30,14 @@ test('agent release history stays at the end of the guide and preserves both pla
   assert.match(history, /客户 Windows 原生安装与启动仍待确认/)
 })
 
-test('Agent history starts with the three latest released Windows archives and their guide checksums', () => {
+test('Agent history keeps released Windows archives ordered and preserves their guide checksums', () => {
   const component = read('docs/.vitepress/theme/components/MicroiAgentShowcase.vue')
   const guide = read('docs/doc/v8-engine/microi-agent.md')
   const catalog = component.match(/const releases = \[([\s\S]*?)\n\]/)?.[1] || ''
   const entries = [...catalog.matchAll(/\{ version: '([^']+)', platform: '([^']+)', note: '([^']+)', url: '([^']+)', sha256: '([a-f0-9]{64})' \}/g)]
-  assert.deepEqual(entries.slice(0, 3).map(entry => [entry[1], entry[2]]), [['1.4.2', 'Windows x64'], ['1.4.1', 'Windows x64'], ['1.4.0', 'Windows x64']])
+  const windows = entries.filter(entry => entry[2] === 'Windows x64')
+  assert.ok(windows.length >= 3)
+  for (let index = 1; index < windows.length; index++) assert.equal(compareReleaseVersions(windows[index - 1][1], windows[index][1]), 1)
   for (const [version, hash] of [['1.4.2', 'e0bb17a31d453e3c496cc0168be07bec5bbb81b329d01530ea22fa4af2a222de'], ['1.4.1', '03bfb220f43c95000f1b8e6df2e02595589792cc5ef23b823c24a052b54a1c32'], ['1.4.0', '5f39653d339a56056a1967cfcc79622ea4830fa0040761ad272135b0036cf014']]) {
     const matches = entries.filter(entry => entry[1] === version && entry[2] === 'Windows x64')
     assert.equal(matches.length, 1, 'each released Windows archive appears exactly once')
@@ -98,9 +100,11 @@ test('homepage presents Microi as an open-source AI development framework', () =
   assert.match(microiCodeShowcase, /:href="downloadUrls\.windows"/)
   assert.match(microiCodeShowcase, /:href="downloadUrls\.mac"/)
   assert.match(microiCodeShowcase, /latest-mac\.yml/)
-  assert.match(microiCodeShowcase, /https:\/\/microi\.net\/download\/microi-agent\/latest\.html\?platform=windows/)
+  assert.equal(WINDOWS_LATEST_URL, 'https://microi.net/download/microi-agent/latest.html?platform=windows')
+  assert.match(microiCodeShowcase, /selectWindowsDownload\(releases, windowsFeedYaml\.value\)/)
   assert.match(microiCodeShowcase, /https:\/\/microi\.net\/download\/microi-agent\/latest\.html\?platform=mac/)
-  assert.doesNotMatch(microiCodeShowcase, /downloadUrls\.(?:windows|mac)\s*=/, 'buttons keep their permanent resolver when update labels refresh')
+  assert.match(microiCodeShowcase, /windows: windowsDownload\.value\.url/)
+  assert.doesNotMatch(microiCodeShowcase, /downloadUrls\.mac\s*=/, 'Mac retains its independent permanent resolver')
   const latestRedirect = read('docs/public/download/microi-agent/latest.html')
   assert.match(latestRedirect, /latest-mac\.yml/)
   assert.match(latestRedirect, /latest\.yml/)
@@ -260,4 +264,82 @@ test('source architecture keeps the detailed selection guidance off the homepage
   assert.match(architecture, /V8 在线编程/)
   assert.match(architecture, /专业源码扩展/)
   assert.match(architecture, /Fusion Development/)
+})
+
+// 使用仓库中真实已发布的 1.4.1/1.4.2 归档测试选择，不虚构 1.4.3 的 CDN 地址或发布结论。
+function publishedWindowsFixtures() {
+  const component = read('docs/.vitepress/theme/components/MicroiAgentShowcase.vue')
+  return [...component.matchAll(/\{ version: '([^']+)', platform: 'Windows x64', note: '[^']+', url: '([^']+)', sha256: '([a-f0-9]{64})' \}/g)]
+    .map(([, version, url, sha256]) => ({ version, url, sha256, platform: 'Windows x64' }))
+    .filter(release => ['1.4.1', '1.4.2'].includes(release.version))
+}
+
+test('Windows manual archive remains usable before the channel catches up or while its read fails', () => {
+  const releases = publishedWindowsFixtures()
+  const latest = releases.find(release => release.version === '1.4.2')
+  const old = releases.find(release => release.version === '1.4.1')
+  const feed = `version: ${old.version}\nfiles:\n  - url: ${old.url}\n`
+  for (const yaml of ['', feed, 'unavailable', 'version: 1.4.3\nfiles: []\n']) {
+    assert.deepEqual(selectWindowsDownload(releases, yaml), { version: latest.version, url: latest.url, source: 'archive' })
+  }
+})
+
+test('equal or newer Windows feed selects the permanent channel and never pins future releases', () => {
+  const releases = publishedWindowsFixtures()
+  const latest = releases.find(release => release.version === '1.4.2')
+  const old = releases.find(release => release.version === '1.4.1')
+  const yaml = `version: ${latest.version}\r\nfiles:\r\n  - url: ${latest.url}\r\n`
+  for (const archives of [[latest], [old], []]) {
+    assert.deepEqual(selectWindowsDownload(archives, yaml), { version: latest.version, url: WINDOWS_LATEST_URL, source: 'channel' })
+  }
+})
+
+test('Windows release selection is numeric, strict and independent of catalog ordering', () => {
+  for (const [left, right, result] of [['1.4.3', '1.4.2', 1], ['1.4.10', '1.4.9', 1], ['2.0.0', '1.99.99', 1], ['1.4.3', '1.4.3', 0], ['1.4.3', '1.5.0', -1]]) {
+    assert.equal(compareReleaseVersions(left, right), result)
+  }
+  for (const invalid of ['', '1.4', 'v1.4.3', '1.4.3-rc.1', '01.4.3', '1.4.3.0', '9007199254740992.0.0', 143, null]) {
+    assert.equal(compareReleaseVersions(invalid, '1.4.2'), null)
+  }
+  const releases = publishedWindowsFixtures()
+  assert.deepEqual(selectWindowsDownload(releases), selectWindowsDownload([...releases].reverse()))
+})
+
+test('Windows ignores unverified, candidate, other-platform and mismatched archive entries', () => {
+  const release = publishedWindowsFixtures().find(value => value.version === '1.4.2')
+  for (const altered of [
+    { platform: 'Windows x64 候选' }, { platform: 'macOS Universal' }, { sha256: '' },
+    { version: '1.4.3' }, { url: WINDOWS_LATEST_URL },
+    { url: release.url.replace('file.microi.net', 'example.invalid') },
+    { url: release.url.replace('file.microi.net', 'file.microi.net:444') },
+    { url: release.url.replace('file.microi.net', 'user@file.microi.net') },
+    { url: release.url + '?signature=private' }, { url: release.url + '#fragment' },
+    { url: release.url.replace('/tenants/itdos/', '/tenants/other/') }
+  ]) {
+    assert.deepEqual(selectWindowsDownload([{ ...release, ...altered }]), { version: '', url: WINDOWS_LATEST_URL, source: 'channel' })
+  }
+})
+
+test('Windows does not treat malformed or ambiguous feeds as a newer published release', () => {
+  const releases = publishedWindowsFixtures()
+  const release = releases.find(value => value.version === '1.4.2')
+  for (const yaml of [
+    `version: 1.4.3-rc.1\nfiles:\n  - url: ${release.url}\n`,
+    `version: 1.4.3\nversion: 1.4.4\nfiles:\n  - url: ${release.url}\n`,
+    `version: 1.4.3\nfiles:\n  - url: https://example.invalid/agent.exe\n`,
+    `version: 1.4.3\nfiles:\n  - url: ${release.url}?token=private\n`
+  ]) assert.equal(selectWindowsDownload(releases, yaml).source, 'archive')
+})
+
+test('Windows rejects a channel version whose installer filename names another release', () => {
+  const releases = publishedWindowsFixtures()
+  const latest = releases.find(value => value.version === '1.4.2')
+  const old = releases.find(value => value.version === '1.4.1')
+  for (const yaml of [
+    `version: 1.4.3\nfiles:\n  - url: ${latest.url}\n`,
+    `version: ${latest.version}\nfiles:\n  - url: ${old.url}\n`
+  ]) {
+    assert.deepEqual(selectWindowsDownload(releases, yaml), { version: latest.version, url: latest.url, source: 'archive' })
+    assert.deepEqual(selectWindowsDownload([], yaml), { version: '', url: WINDOWS_LATEST_URL, source: 'channel' })
+  }
 })
