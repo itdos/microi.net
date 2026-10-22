@@ -181,6 +181,14 @@ namespace Microi.net
 
         /// <summary>仅供官方启动接口读取浏览器安全的系统设置投影。</summary>
         DosResult GetPublicSysConfig(string lang = null);
+        DosResult ProjectPublicSysConfig(object configuration);
+        string GetLoginEncryptionPublicKey();
+        string GetPlatformEdition();
+        DosResult ReadLicenseVerification();
+        DosResult ReadLicenseSubject();
+        DosResult ReadAiLicenseVerification();
+        DosResult ReadLicenseAccessScope();
+        DosResult ReadLicenseServerNodes();
 
         /// <summary>读取当前租户的语言词条包。</summary>
         DosResult GetLangBundle(string lang = null, string prefix = "Msg.");

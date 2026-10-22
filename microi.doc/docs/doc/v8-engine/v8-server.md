@@ -76,6 +76,8 @@ ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
 
 接口缓存会同时按记录 Id、`ApiEngineKey`、主路由和全部多路由命中同一份代码。路由按完整路径、不区分大小写精确匹配；Query 不属于路由。主路由与多路由不得重复或与其它启用接口冲突，保存和启动缓存遇到冲突会失败关闭。新代码仍应使用稳定 Key 地址，多路由只用于旧客户端和已登记第三方回调兼容。
 
+同地址存在 Controller 时，当前租户的接口引擎优先；只有权威查询确认引擎缺失，才执行原 Controller，两者均不存在返回 404。引擎停用、禁止 HTTP、鉴权失败或执行异常不触发降级，路由存储故障返回 503。包括 `/api/License/GetManagementState` 在内的地址不再按 Controller 前缀跳过动态解析。此优先级需要更新后端二进制，不能仅修改应用包就视为宿主路由已更新。
+
 若旧租户仅更新后端程序，应用自动升级尚未完成，后端保留 `LegacyMobileCompatibilityController` 作为临时启动兼容入口。`/api/SysUser/Login`、续签、Token 登录、退出、公开系统设置、语言包、登录壁纸、域名租户解析、当前用户及菜单读取，在主库确认对应地址与固定接口 Key 均缺失时复用现有可信后端能力，仍执行密码、验证码、DiyToken 和菜单权限校验。管理员登录后可进入应用商城安装或更新平台应用；资源齐备后立即优先使用接口引擎。已禁用、禁止 HTTP、权限拒绝、数据库异常及接口执行失败不会触发兜底。
 
 历史 `/api/SysUser/*` 地址固定绑定对应会话动作，不能用请求体 `Action` 改成其它操作，并支持 `--OsClient--{OsClient}--` 租户后缀。路径与 Query 同时指定租户时必须一致。兼容 Controller 随后端程序交付，商城 SaaS 应用交付接口源码与多路由；两者需要分别更新。此 Controller 仅用于兼容，未来可能整体删除，新业务继续使用接口引擎。
@@ -782,6 +784,10 @@ var sendResult = V8.Method.SendWeChatTemplateMessage({
 `platform-private-file-url` 不接受“已登录即可签任意路径”。`FormField` 必须提交菜单、表、记录和字段四元组并命中字段原值；`FormFieldDerivedPreview` 还必须提交字段保存的原文件，宿主只重算 DWG→`_preview.dxf`、STEP/STP→`_preview.stl` 的唯一同目录派生对象；`FileManagerObject` 要求单个大小写精确对象 Key、能力探针返回的当前租户文件柜菜单、对象实际存在，并且只接受平台超级管理员 DiyToken，访问密钥即使带 `file:read` 也不能打开文件柜对象。
 
 其中涉及宿主秘密、不可伪造状态或受限匿名投影的能力分别使用 `V8.Method.ResolveOsClientByDomain`、`GetPublicSysConfig`、`GetLangBundle`、`GetLoginWallpapers`、`GetLegacyInitMenuTree` 和 `GetAuthorizedPrivateFileUrl`。这些不是通用 V8 API：宿主会同时校验当前 `OsClient` 与固定 `ApiEngineKey`，其它接口引擎、表单事件或直接调用一律失败关闭。`GetLegacyInitMenuTree(rawToken, osClient?)` 只允许 `microi-init` 调用，内部再次验证原始 DiyToken、拒绝访问密钥与跨租户请求，并用 `SysMenuLogic.GetSysMenuStep` 按权威角色权限构树；它不是通用菜单查询器。`GetLoginWallpapers` 在 Core 内固定查询启用且未删除的壁纸，只投影 `Id/Name/Category/ImgUrl` 并限制 200 条；它不会、也不要求把 `diy_wallpaper.IsAnonymousRead` 打开。公共用户目录继续由已鉴权的 Managed 接口使用 FormEngine 做固定投影与有界分页。
+
+`platform-sys-config` 从 v1.1.0 开始在 V8 内调用 `V8.FormEngine.GetSysConfig` 读取配置、分类失败、组装响应；新宿主的 `ProjectPublicSysConfig(configuration)` 只隔离密钥和服务端脚本，`GetLoginEncryptionPublicKey()` 只读公钥，`GetPlatformEdition()` 只读发行类型。不能直接返回 `V8.SysConfig` 或未经投影的读取结果。旧 `GetPublicSysConfig` 仅保留给旧后端滚动升级和缺引擎兼容入口；新原子链失败不会转调旧门面。该接口唯一归属“SaaS引擎”应用，`Microi.Upgrade` 只从它投影必要启动接口，不默认安装整套 SaaS 管理界面或其它可选应用。
+
+SaaS 应用的 `platform-license-management-state`、`platform-license-server-nodes` 使用旧 License 地址作为 `ApiAddress`，同时保留稳定 Key 地址。前者在 V8 组装只读授权状态；后者对非主租户管理员返回空节点列表。签名校验、授权主体及节点读取继续由固定引擎、可信 DiyToken 和租户边界保护。普通账号不会因此获得签发、刷新、写授权文件或修改服务器节点的权限。这两个可选接口不进入启动恢复包；需要包含 `ReadLicense*` 原子的后端，缺少时返回明确兼容提示，不伪造授权成功。
 
 需要鉴权且允许个性化扩展的 Managed 接口会调用 `platform-runtime-custom-hook`。匿名启动接口（包括登录壁纸和 `microi-init`）不调用租户 Hook，避免匿名请求触发写表、通知或外呼副作用；`microi-init` 即使携带有效 Token，也只执行固定兼容聚合，不把 Token、用户投影或菜单交给租户 Hook。该 Hook 以 `CreateIfMissing` 首次创建，默认只有 `return { Code : 1 };`，之后归租户维护且官方升级不会覆盖。官方 Managed 接口顶部会明确提示其所属应用；从可信官方源安装、更新或重新安装应用会恢复官方代码，因此个性化逻辑必须写入 Hook，不能直接修改 Managed 接口。Hook 只接收阶段、来源 Key、当前用户 Id 或结果数量等脱敏元数据，不得传入 DiyToken、密码、Secret、原始 SSO 断言或私有文件短链。
 

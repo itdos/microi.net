@@ -315,7 +315,8 @@ public static class MicroiApiHostExtensions
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapMicroiApiRootPage();
-        app.MapDynamicControllerRoute<DynamicRoute>("apiengine/{*path}");
+        // 负顺序确保先判当前租户接口引擎，不能让同地址的 attribute Controller 抢先。
+        app.MapDynamicControllerRoute<DynamicRoute>("apiengine/{*path}", state: null, order: -100);
         app.MapControllerRoute("default", "{controller=Home}/{action=Index}/{id?}");
         return app;
     }
@@ -324,13 +325,7 @@ public static class MicroiApiHostExtensions
     {
         try
         {
-            app.MapDynamicControllerRoute<DynamicRoute>("{controller}");
-            app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}");
-            app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}");
-            app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}");
-            app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}/{param3}");
-            app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}/{param3}/{param4}");
-            app.MapDynamicControllerRoute<DynamicRoute>("{controller}/{action}/{param1}/{param2}/{param3}/{param4}/{param5}");
+            app.MapDynamicControllerRoute<DynamicRoute>("{*path}", state: null, order: -99);
             Console.WriteLine("Microi：【成功】接口引擎、数据源引擎动态接口地址配置成功！");
         }
         catch (Exception ex)

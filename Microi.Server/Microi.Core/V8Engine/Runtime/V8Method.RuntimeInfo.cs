@@ -18,6 +18,10 @@ namespace Microi.net
             return GetCurrentBackendVersion();
         }
 
+        /// <summary>仅返回授权内核认定的公开版本标签，不返回证书或宿主信息。</summary>
+        public string GetPlatformEdition() => MicroiEngine.TryGetService<IPlatformProductEditionProvider>()
+            ?.GetProductEdition() ?? "开源版";
+
         /// <summary>
         /// 宿主固定健康入口复用同一版本投影，不创建 V8 上下文，也不读取租户配置。
         /// </summary>

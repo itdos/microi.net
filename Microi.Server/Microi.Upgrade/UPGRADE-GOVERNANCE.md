@@ -1,6 +1,6 @@
 # Microi.Upgrade 必要启动边界与审计
 
-最后审计：2026-10-11
+最后审计：2026-10-22
 
 ## 必要升级范围
 
@@ -28,7 +28,7 @@ MQTT 开关空值语义属于一次性核心协议兼容例外：旧版空值表
 
 `app.microi.bootstrap` 是从完整官方资源投影生成的恢复包，不能独立手工维护。
 
-- 24 个启动、密码登录、会话、菜单和商城协议接口；租户 Hook 继续遵守 `CreateIfMissing`。
+- 26 个启动、密码登录、会话、菜单和商城协议接口；租户 Hook 继续遵守 `CreateIfMissing`。
 - 21 张核心表的元数据及运行时实体读取必需的物理列；不携带租户配置值或业务种子数据。
 - 商城菜单及其必要父菜单；运行路由仅 `/marketplace`。
 - 商城入口的真实编译字节；不携带可选应用菜单、计划任务或整套官方应用安装清单。
@@ -41,6 +41,32 @@ node Microi.Server/OfficialApplications/Resource/build-bootstrap-package.mjs --c
 ```
 
 完整官方应用仍由该资源目录的同步器维护和发布；`.resource-sync-base` 只能由同步器推进。移动源码目录不改变既有包的拥有者、版本或官方远端状态。
+
+## 核心接口职责核对（2026-10-22）
+
+`platform-sys-config` 的官方唯一拥有者是 `app.microi.saas-engine`，不是 `app.microi.sys-config`。启动包投影它的完整源码及策略，不安装完整 SaaS 包。新增 License 两个只读接口仍属于可选 SaaS 管理能力，不能加入 `bootstrapEngines`。
+
+| 启动接口（覆盖全部 26 个 Key） | V8 与可信内核边界 |
+| --- | --- |
+| `platform-sys-config` | v1.1.0 的配置读取、错误分类、响应拼装在 V8；C# 仅提供秘密投影、公钥和发行类型。旧门面仅用于旧二进制兼容，不能用新原子执行失败触发回退 |
+| `platform-os-client-by-domain` | 跨租户主库域名精确匹配、冲突与默认租户选择仍在可信边界；不向 V8 暴露 SaaS 行或连接串 |
+| `platform-lang-bundle`、`platform-login-wallpapers` | 当前租户词条缓存读取、固定公开壁纸投影；壁纸查询受 200 条上限约束，不开放整表匿名读取 |
+| `platform-current-user`、`platform-sys-user-public-info` | V8 使用当前用户或有界 FormEngine 查询组装公开数据；不能回传密码材料 |
+| `platform-private-file-url` | V8 参数/Hook 编排；对象引用、菜单/表/行/字段权限和短链签发在可信原子 |
+| `microi-init` | V8 聚合配置、用户、菜单；后端只负责原始 Token 重验与授权菜单树，不接受伪造用户对象 |
+| `platform-service-health` | V8 固定健康响应，后端只读程序集版本；不依赖业务查询 |
+| `platform-sys-user-session` | V8 历史路由到动作映射；密码校验、验证码消费、DiyToken 签发/续签/吊销在会话内核 |
+| `platform_auth_login_event` | V8 审计及登录 Hook 调用，不暴露凭据 |
+| `platform-sys-menu` | V8 动作与 Hook 编排；现有目录原子保留权威角色过滤、树与权限缓存一致性。属于历史较宽适配层，不能将新增普通业务继续塞入它 |
+| `platform-background-task` | V8 动作白名单及公开任务摘要；任务所有者、共享租约、幂等和执行器保持内核能力 |
+| `platform-marketplace-source` | V8 默认值、Hook、审计；认证源连接与凭据保存/使用留在可信运行时 |
+| `platform-tenant-system-settings` | V8 非秘密设置 CRUD；敏感 Key、加密、一次性验证和身份复核留在可信运行时 |
+| `get-microi-store`、`get-microi-store-model`、`get-microi-store-versions` | V8 分页、选择、查询和响应拼装；文件访问使用已有受限原子 |
+| `get-microi-store-legacy-route` | V8 兼容分发至商城接口，不复制业务实现 |
+| `import-microi-store-package`、`bulk-import-microi-store-packages`、`microi-store-package-storage` | V8 包校验、资源策略、安装编排、进度与存储指针；物理/存储原子和共享任务协议不搬到 Controller |
+| `platform-runtime-custom-hook`、`platform_auth_login_hook`、`platform-marketplace-source-hook`、`platform-system-settings-custom-hook` | 4 个租户扩展点，`CreateIfMissing`，不覆盖现有租户代码 |
+
+该核对不是“全部 Controller 业务已经迁完”的证明。会话、系统目录等历史适配器仍存在，后续拆分应逐项保持协议与权限回归；本次不以删除兼容代码破坏旧客户端。新增业务不得再添加完整响应型 V8 门面。路由的执行错误、停用、StopHttp、权限失败不能被当作“引擎不存在”。
 
 ## 启动与恢复顺序
 
