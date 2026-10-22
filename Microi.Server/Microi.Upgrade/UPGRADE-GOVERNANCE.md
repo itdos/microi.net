@@ -87,3 +87,13 @@ node Microi.Server/OfficialApplications/Resource/build-bootstrap-package.mjs --c
 每次变更至少检查：生产程序集类型与嵌入资源边界、生成包的菜单/接口/物理闭包、不同历史版本直升、已完整当前版本零写入、更高应用版本不降级、租约丢失与失败不推进、损坏资产恢复，以及隔离 MySQL/SQL Server 与双节点回归。完整官方包的业务回归继续执行，但其验证代码和源码不进入生产自动升级程序集。
 
 平台源码测试、NuGet、Docker、官方应用发布、客户租户安装和服务器部署是分别验收的边界。本项目不会因为框架正式发布而自动部署客户服务器或更新可选应用。
+
+## 2026-10-22 交付回执
+
+- 源码候选：公开根仓 `0c7fd7886`；内部授权实现仓 `4984b6d`。对应原 `master` 分支已推送并独立回读。
+- 官方 MCP 坐标：`https://api.microi.net` / `iTdos`。14 项资源对账仅 SaaS 包需要发布；未执行客户安装、子租户批量更新或容器重启。
+- `app.microi.saas-engine`：`v8.4.37`，4,300,430 字节，SHA-256 `bd2dd69bccfb7c5c6922b23ebc5d16acf6ce5602ff86f5620e0db5630fce3c91`。发布后的 176 项在线引擎投影已回读，12 项租户 Hook 按 `CreateIfMissing` 保留。
+- 在线 `platform-sys-config v1.1.0` 实际调用 `Code=1`；未返回 `ServerPrivateSettings`。旧后端仍使用脚本内受控兼容分支，不能据此宣称新后端原子已部署。
+- 两个 License 引擎 `v1.0.0` 的地址、启用和登录限制已回读。当前线上 `v8.6.2` 二进制缺少新原子，调用返回 `LicenseReadAtomsUnavailable`；需要后续后端制品发布和部署才能完成功能验收。
+- 两组相关 .NET 回归分别 57/57、81/81 通过（有重叠，不累加）；新 JS 行为用例 6/6、配套源码/包闭包用例 13/13、14 项资源契约和启动包一致性通过。实际 Jint 测试验证公开投影和 CLR 原子互操作。
+- 中文文档与 Skill 已同步；整站 `docs:build` 被既有 `microi-deployment/references/deployment-matrix.md` 的工作区/打包插件哈希差异拦截，未发布官网。未发布 NuGet/Docker，未回测客户浏览器，不能把源码测试或包发布视为这些层次已通过。
