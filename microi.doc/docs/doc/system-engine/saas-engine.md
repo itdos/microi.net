@@ -533,6 +533,8 @@ var currentUser = V8.CurrentUser;
 
 吾码官网个人中心按用途分为账户概览、我的系统、创建系统、系统授权、邀请关系、AI 工作台和账户设置。概览提供入口；系统页管理云端租户；AI 密钥、对话与消费记录集中在 AI 工作台。
 
+拥有官方租户「Star活动登记查看」角色并获授对应模块查询权限的帐号，还可在个人中心打开「Star活动登记」。此入口与后台活动登记模块共用数据，支持公司、姓名、电话、登记编号搜索，Star/公众号核验与领取状态筛选、分页和完整资料展开。接口每次从主库核验当前帐号、专属角色及菜单授权；撤销角色或模块授权后停止返回数据。该角色只提供查询权限，个人中心不修改登记或核验结果。
+
 创建页向 `platform-background-task` 提交 `Action: 'RunApiEngine'`、`TargetApiEngineKey: 'official_create_tenant_worker'`，并在 `Param` 中传租户 Key、名称及进度标识。队列目标必须与底层开通原子校验的工作器 Key 一致，不能改为兼容提交器。路由调度器与后台目标必须分别传递，不能用请求正文的 `ApiEngineKey` 覆盖调度路由。每次创建仍需要绑定本次租户 Key 的 Gitee OAuth/Star 一次性验证；历史 Star 标记不能代替本次授权。
 
 Gitee OAuth 仅申请 `user_info` 来确认当前 Gitee 身份，Star 状态通过公开 Star 页面分页校验，不需要项目写入、公钥、Webhook、组织、企业或邮箱权限。应用创建者还需在 Gitee 的「第三方应用 → 我的应用」中将该应用登记权限收窄为 `user_info`：仅在授权 URL 中传 `scope=user_info`，不能保证 Gitee 授权页取消其它登记权限的默认勾选。上线验收须核对实际授权页，而非仅检查请求 URL。

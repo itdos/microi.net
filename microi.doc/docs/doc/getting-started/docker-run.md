@@ -69,8 +69,12 @@ Docker 的 `cpus`、`mem_limit` 是**单容器**上限。如果给 API 和数据
 - 安装器创建持久化的 `/etc/systemd/system/microi.slice`。Docker 使用 `systemd` cgroup 驱动时，Compose 写入 `cgroup_parent: microi.slice`；使用 `cgroupfs` 时写入 `cgroup_parent: /microi.slice`。
 - 当前一键安装只支持由宿主机 systemd 管理的 rootful Docker；检测到 rootless Docker 或不具备 CPU/内存 cgroup 控制器时，会在写入 Slice 和启动新容器前停止。
 - cgroup v2 会设置父级 `MemoryMax`、`CPUQuota` 和 `MemorySwapMax=0`；cgroup v1 会设置 `MemoryLimit`、`CPUQuota`，内核启用 swap accounting 时再把父级内存与 Swap 合计限制为同一数值。
-- Redis、MongoDB、Web、MinIO、OCR、LibreTranslate、Ollama、Qdrant 以及临时工具容器都不加入这个共享池，也不由本方案新增 Docker CPU/内存硬限制。
+- Redis、MongoDB、Web、MinIO、Ollama、Qdrant 以及临时工具容器不加入这个共享池，也不由本方案新增 Docker CPU/内存硬限制；OCR 和 LibreTranslate 使用下述独立模型限制。
 - Microi.Panel（兼容原 Microi.Ops）使用独立编排和独立资源限制（默认 512 MiB / 1 CPU），不加入 API/主数据库共享池，避免平台升级或该池耗尽时连带中断运维入口。
+- OCR 和 LibreTranslate 使用独立内存保护：实际物理内存低于 **7680 MiB**（兼容标称 8 GiB 主机的内核保留量），或模型启动前可用内存低于 **2048 MiB** 时，安装器直接跳过模型拉取、初始化和启动；已有同名安装容器会停止并关闭自动重启。当前安装一旦降级，即使停止模型后空闲内存增加也不会重新启动。
+- 低内存时，唯一活动主租户回读后设置 `OcrEnabled=0`、`TranslateProvider=None`，保留端点、密钥、模型和数据。禁用配置写后回读成功才刷新 API；禁用失败会明确警告，不能把“容器已停止”当成“租户配置已关闭”。`None` 是显式关闭，空 Provider 会按已保存的 URL 自动回退，不能代替它。
+- 内存充足时，OCR 默认限制 **1024 MiB RAM / 1536 MiB RAM+Swap / 0.75 CPU**，翻译限制 **768 MiB RAM / 1280 MiB RAM+Swap / 0.75 CPU**，并各自保持单模型线程。实际内存低于 7680 MiB 时，新建 MySQL 的 InnoDB buffer pool 至多 **384 MiB**；已有外置数据库保持原配置。
+- 低内存且完全没有 Swap 时，仅在 ext4/XFS 根分区剩余至少 4 GiB、目标文件不存在且 `fstab` 备份成功后，尝试创建权限 `600` 的 **2 GiB `/swapfile.microi`** 并登记开机启用；不会覆盖已有文件或扩大核心共享池的 Swap 上限。Swap 创建失败不取消模型停用，不能用 Swap 替代物理内存门槛。
 - 复用已有 MySQL 时，外部数据库不在安装器管理的本机父 cgroup 内，因此本机共享池实际只约束吾码 API；外部数据库必须在它自己的宿主机或服务平台单独保护。
 - 安装器在启动容器前回读父级 CPU、内存和 Swap 控制文件，启动每个编排前执行 `docker compose config`，启动后再用 `docker inspect` 确认 API 与本脚本创建的主数据库已进入同一 `CgroupParent`。
 

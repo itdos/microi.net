@@ -8,6 +8,9 @@
 | `officialNugetStatsRefresh` | 同上 | `jobs/official-nuget-stats.json` |
 | `get-client-ip` | `microi_xjy` / `xjy` | `api-engines/get-client-ip.js` |
 | `dns_sync_ip` 的上游读取段 | `microi_itdos_api_itdos_com` / `iTdos` | `api-engines/dns-sync-ip-upstream.patch` |
+| `official_star_gift_records` | `microi_itdos_api_microi_net` / `iTdos` | `api-engines/official-star-gift-records.js` |
+
+活动登记工作台专供官方运营：角色 `ba43c735-d03e-4aa1-bc86-e185b5aaf014` 为「Star活动登记查看」，复用后台模块 `01M5K8MNSRFF9WSHHSBZZ8F8VC`。角色、模块只授查询权限；接口以当前 DiyToken 的用户 Id 从主库重新检查角色与授权，不依赖用户等级或浏览器角色快照。`Capabilities` 返回入口能力，`List` 提供全部登记字段、结构化筛选和有界分页。官网页面通过既有会话请求层处理 Token 续签；回归入口为 `npm run test:star-gift`。
 
 NuGet 定时任务按北京时间每天 00、03、06、09、12、15、18、21 点执行。官网只调用 `Action: Snapshot` 读取数据库最新成功快照；普通访问者的旧版 `Refresh` 请求也降为只读。官网显示采集时间，采集成功不保证 NuGet 内部各统计层同时更新。
 

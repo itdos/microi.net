@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Alibaba Cloud Linux 3 / Anolis、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-10-23 12:04:38
+# 版本：v2026-10-23 18:43:18
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -113,7 +113,7 @@ microi_install_ops() {
 }
 
 
-SCRIPT_VERSION="v2026-10-23 12:04:38"
+SCRIPT_VERSION="v2026-10-23 18:43:18"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -1456,6 +1456,8 @@ OPTIONAL_RUNTIME_NETWORK_READY=0
 OPTIONAL_COMPONENT_PHASE_STARTED=0
 OPTIONAL_COMPONENT_FAILURE_COUNT=0
 OPTIONAL_COMPONENT_WARNINGS=()
+OPTIONAL_MODELS_MEMORY_BLOCKED=0
+OPTIONAL_MODELS_CONFIG_CHANGED=0
 
 # OCR 与 LibreTranslate 是默认安装的附加能力，但不属于 API/Web 的启动前置。
 # 失败时保留现场、记录原因并继续核心平台；不得把附加组件失败伪装成成功。
@@ -1466,6 +1468,125 @@ record_optional_component_failure() {
   OPTIONAL_COMPONENT_WARNINGS+=("${component}: ${reason}")
   echo "Microi：警告：${component}${reason}"
   echo 'Microi：该附加组件不会被启用；数据库、Redis、MongoDB、MinIO、API 与 Web 的安装将继续。'
+}
+
+# 模型首次推理的工作集远大于 idle/healthy；Swap 不能代替物理 RAM。
+# 7680MiB 兼容标称 8GiB 主机的内核保留内存，启动前另留 2GiB 可用量。
+# 一旦本次安装降级就保持关闭，不能因 stop 释放了内存而自动重新启动模型。
+evaluate_optional_model_memory() {
+  OPTIONAL_MODELS_HOST_MB="${MICROI_HOST_MEMORY_MB_OVERRIDE:-}"
+  OPTIONAL_MODELS_AVAILABLE_MB="${MICROI_HOST_AVAILABLE_MEMORY_MB_OVERRIDE:-}"
+  if [[ ! "${OPTIONAL_MODELS_HOST_MB}" =~ ^[1-9][0-9]*$ ]]; then
+    OPTIONAL_MODELS_HOST_MB=$(awk '/^MemTotal:/ {print int($2/1024); exit}' /proc/meminfo 2>/dev/null || true)
+  fi
+  if [[ ! "${OPTIONAL_MODELS_AVAILABLE_MB}" =~ ^[0-9]+$ ]]; then
+    OPTIONAL_MODELS_AVAILABLE_MB=$(awk '/^MemAvailable:/ {print int($2/1024); exit}' /proc/meminfo 2>/dev/null || true)
+  fi
+  if [[ ! "${OPTIONAL_MODELS_HOST_MB}" =~ ^[1-9][0-9]*$ ]] ||
+      [[ ! "${OPTIONAL_MODELS_AVAILABLE_MB}" =~ ^[0-9]+$ ]]; then
+    OPTIONAL_MODELS_MEMORY_BLOCKED=1
+    OPTIONAL_MODELS_MEMORY_REASON='无法可靠读取物理/可用内存'
+  elif [ "${OPTIONAL_MODELS_HOST_MB}" -lt 7680 ] || [ "${OPTIONAL_MODELS_AVAILABLE_MB}" -lt 2048 ]; then
+    OPTIONAL_MODELS_MEMORY_BLOCKED=1
+    OPTIONAL_MODELS_MEMORY_REASON="物理 ${OPTIONAL_MODELS_HOST_MB}MiB、可用 ${OPTIONAL_MODELS_AVAILABLE_MB}MiB；要求至少 7680/2048MiB"
+  fi
+}
+
+enforce_optional_model_memory_guard() {
+  local names cname state
+  evaluate_optional_model_memory
+  [ "${OPTIONAL_MODELS_MEMORY_BLOCKED:-0}" = 1 ] || return 0
+  echo "Microi：内存保护：${OPTIONAL_MODELS_MEMORY_REASON}，停用 OCR 和 LibreTranslate。"
+  names=$(docker ps -a --format '{{.Names}}') || return 1
+  # 只允许精确的一键安装容器名；不 down、不删卷，也不停止数据库/API。
+  for cname in "${OCR_CONTAINER_NAME}" "${LIBRETRANSLATE_CONTAINER_NAME}"; do
+    if printf '%s\n' "${names}" | grep -Fxq "${cname}"; then
+      docker stop -t 15 "${cname}" > /dev/null || return 1
+      docker update --restart=no "${cname}" > /dev/null || return 1
+      state=$(docker inspect "${cname}" --format '{{.State.Running}} {{.HostConfig.RestartPolicy.Name}}') || return 1
+      if [ "${state}" != 'false no' ]; then
+        echo "Microi：错误：${cname} 停止状态未通过回读，停止继续安装。" >&2
+        return 1
+      fi
+    fi
+  done
+  OCR_SERVICE_READY=0
+  LIBRETRANSLATE_SERVICE_READY=0
+  OCR_SAAS_CONFIG_READY=0
+  TRANSLATE_SAAS_CONFIG_READY=0
+  OCR_INSTALL_STATUS="已停用（内存保护）"
+  LIBRETRANSLATE_INSTALL_STATUS="已停用（内存保护）"
+}
+
+# 仅为低内存宿主且完全没有 Swap 时准备 2GiB 应急空间；不放大核心 cgroup
+# 的既有内存/swap 上限。文件已存在、文件系统不支持或磁盘不足时不覆盖、不强行创建。
+prepare_low_memory_swap() {
+  local swap_kb free_kb fs backup swap_file='/swapfile.microi'
+  [ "${OPTIONAL_MODELS_MEMORY_BLOCKED:-0}" = 1 ] || return 0
+  swap_kb=$(awk '/^SwapTotal:/ {print $2; exit}' /proc/meminfo 2>/dev/null || true)
+  [[ "${swap_kb}" =~ ^[0-9]+$ ]] || return 0
+  [ "${swap_kb}" -eq 0 ] || return 0
+  if [ -e "${swap_file}" ] || [ -L "${swap_file}" ]; then
+    echo "Microi：Swap 未启用，但 ${swap_file} 已存在；保留原文件，请运维检查。"
+    return 0
+  fi
+  fs=$(findmnt -n -o FSTYPE -T / 2>/dev/null || true)
+  free_kb=$(df -Pk / | awk 'NR==2 {print $4}')
+  case "${fs}" in ext4|xfs) ;; *) echo 'Microi：当前文件系统不自动创建 Swap，模型仍保持停用。'; return 0 ;; esac
+  if [[ ! "${free_kb}" =~ ^[0-9]+$ ]] || [ "${free_kb}" -lt 4194304 ]; then
+    echo 'Microi：可用磁盘不足 4GiB，不自动创建 Swap，模型仍保持停用。'
+    return 0
+  fi
+  backup="/etc/fstab.microi-before-swap.$(date +%Y%m%d%H%M%S)"
+  if [ -e "${backup}" ] || ! (umask 077; cp /etc/fstab "${backup}" && chmod 600 "${backup}"); then
+    echo 'Microi：fstab 备份未完成，不创建 Swap。'
+    return 0
+  fi
+  if ! (umask 077; set -o noclobber; : > "${swap_file}"); then return 0; fi
+  if ! chmod 600 "${swap_file}" || ! fallocate -l 2G "${swap_file}" ||
+      ! mkswap "${swap_file}" > /dev/null || ! swapon "${swap_file}"; then
+    # 此分支仅清理刚刚独占创建且尚未启用的文件，不触碰任何既存 Swap。
+    rm -- "${swap_file}"
+    echo 'Microi：Swap 创建未完成，模型仍保持停用。'
+    return 0
+  fi
+  if ! grep -Eq '^[[:space:]]*/swapfile[.]microi[[:space:]]' /etc/fstab; then
+    if ! printf '\n/swapfile.microi none swap sw 0 0\n' >> /etc/fstab; then
+      echo "Microi：Swap 已启用，但开机登记失败；原 fstab 备份：${backup}。"
+      return 0
+    fi
+  fi
+  systemctl daemon-reload || true
+  echo "Microi：2GiB Swap 已启用并登记；fstab 备份：${backup}。"
+}
+
+# 在核心升级完成后只关闭唯一活动主租户的模型开关。None 明确禁用翻译，
+# 不能写空 Provider（空值会按保留的 URL 自动回退）；URL、Key 和模型均保留。
+disable_memory_blocked_model_config() {
+  local table ql qr tenant enabled deleted ocr provider where marker verify
+  [ "${OPTIONAL_MODELS_MEMORY_BLOCKED:-0}" = 1 ] || return 0
+  case "${DATABASE_CHOICE}" in
+    1|2) table='sys_osclients'; ql=''; qr='' ;;
+    3) table='[dbo].[sys_osclients]'; ql='['; qr=']' ;;
+    5|6) table='"sys_osclients"'; ql='"'; qr='"' ;;
+    *) return 1 ;;
+  esac
+  tenant="${ql}OsClient${qr}='${OS_CLIENT}' AND ${ql}OsClientType${qr}='${RUNTIME_OS_CLIENT_TYPE}' AND ${ql}OsClientNetwork${qr}='${RUNTIME_OS_CLIENT_NETWORK}'"
+  enabled="${ql}IsEnable${qr}"
+  deleted="${ql}IsDeleted${qr}"
+  ocr="${ql}OcrEnabled${qr}"
+  provider="${ql}TranslateProvider${qr}"
+  where="${tenant} AND COALESCE(${enabled},0)=1 AND COALESCE(${deleted},0)=0"
+  marker="SELECT 'MICROI_MODEL_TENANT_OK' AS Marker FROM ${table} WHERE ${where} GROUP BY ${ql}OsClient${qr},${ql}OsClientType${qr},${ql}OsClientNetwork${qr} HAVING COUNT(*)=1;"
+  if ! verify=$(database_exec_sql "${marker}") || ! printf '%s\n' "${verify}" | grep -Eq '^[[:space:]]*MICROI_MODEL_TENANT_OK[[:space:]]*$'; then
+    echo 'Microi：内存保护的活动租户唯一性回读失败，未写入配置。' >&2
+    return 1
+  fi
+  database_exec_sql "UPDATE ${table} SET ${ocr}=0, ${provider}='None' WHERE ${where};" > /dev/null || return 1
+  marker="SELECT 'MICROI_MODELS_DISABLED' AS Marker FROM ${table} WHERE ${where} AND ${ocr}=0 AND ${provider}='None' GROUP BY ${ql}OsClient${qr},${ql}OsClientType${qr},${ql}OsClientNetwork${qr} HAVING COUNT(*)=1;"
+  if ! verify=$(database_exec_sql "${marker}") || ! printf '%s\n' "${verify}" | grep -Eq '^[[:space:]]*MICROI_MODELS_DISABLED[[:space:]]*$'; then return 1; fi
+  OPTIONAL_MODELS_CONFIG_CHANGED=1
+  echo 'Microi：内存保护配置回读成功：OcrEnabled=0，TranslateProvider=None。'
 }
 
 cleanup_database_import_temp() {
@@ -2913,6 +3034,8 @@ generate_mysql_config() {
   fi
   buffer_pool_mb=$((resource_memory_mb * buffer_pool_percent / 100))
   [ "${buffer_pool_mb}" -lt 128 ] && buffer_pool_mb=128
+  # 小规格共机优先给 API、MongoDB、MinIO 与宿主留工作集；不影响已有外置 MySQL。
+  if [ "${total_mem_mb}" -lt 7680 ] && [ "${buffer_pool_mb}" -gt 384 ]; then buffer_pool_mb=384; fi
 
   max_connections=$((logical_cpus * 25))
   [ "${max_connections}" -lt 500 ] && max_connections=500
@@ -3705,6 +3828,10 @@ else
   echo "Microi：Docker 已安装: $(docker --version) ✓"
 fi
 ensure_docker_daemon
+
+# 尽早处理遗留模型，且在模型拉取/密钥初始化前再次检查可用内存。
+enforce_optional_model_memory_guard
+prepare_low_memory_swap
 
 # === 检查并安装 Docker Compose V2 ===
 if microi_compose version > /dev/null 2>&1; then
@@ -5818,6 +5945,8 @@ INSTALL_CURRENT_STAGE="步骤10/11 部署平台应用（API + Web）"
 
 # --- PaddleX / PaddleOCR ---
 deploy_optional_ocr() {
+enforce_optional_model_memory_guard || return 1
+if [ "${OPTIONAL_MODELS_MEMORY_BLOCKED}" = 1 ]; then return 0; fi
 echo ''
 echo 'Microi：部署 PaddleX/PaddleOCR CPU 文字识别服务（默认安装）'
 echo '------------------------------------------------------------------'
@@ -5863,6 +5992,9 @@ services:
     container_name: ${OCR_CONTAINER_NAME}
 ${OCR_COMPOSE_SERVICE_NETWORK}
     init: true
+    mem_limit: 1024m
+    memswap_limit: 1536m
+    cpus: "0.75"
     # 原生数学库默认线程可能高于小规格宿主可承受并发；只限制模型线程，不改 API 配置。
     environment:
       - OMP_NUM_THREADS=1
@@ -6081,6 +6213,8 @@ echo 'Microi：已固定跳过 Ollama、nomic-embed-text 与 Qdrant。'
 
 # --- LibreTranslate ---
 deploy_optional_libretranslate() {
+enforce_optional_model_memory_guard || return 1
+if [ "${OPTIONAL_MODELS_MEMORY_BLOCKED}" = 1 ]; then return 0; fi
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   echo ''
   echo 'Microi：部署 LibreTranslate 开源翻译服务'
@@ -6108,6 +6242,9 @@ services:
     image: ${LIBRETRANSLATE_IMAGE}
     container_name: ${LIBRETRANSLATE_CONTAINER_NAME}
 ${OCR_COMPOSE_SERVICE_NETWORK}
+    mem_limit: 768m
+    memswap_limit: 1280m
+    cpus: "0.75"
     user: "0:0"
     security_opt:
       - apparmor=unconfined
@@ -6564,12 +6701,17 @@ INSTALL_CURRENT_STAGE="步骤10/11 部署 OCR 与 LibreTranslate 附加能力"
 OPTIONAL_COMPONENT_PHASE_STARTED=1
 deploy_optional_ocr
 deploy_optional_libretranslate
+if [ "${OPTIONAL_MODELS_MEMORY_BLOCKED}" = 1 ]; then
+  if ! disable_memory_blocked_model_config; then
+    record_optional_component_failure '内存保护配置：' '模型已停止，但租户禁用配置未通过回读，请检查数据库字段与唯一租户。'
+  fi
+fi
 configure_optional_ocr
 configure_optional_libretranslate
 
 # SaaS 租户配置在 API 启动时加载。只有配置已成功写入并回读时才重启 API；
 # 重启命令本身失败时先尝试恢复现有核心容器，最终仍以 API readiness 为准。
-if [ "${OCR_SAAS_CONFIG_READY}" = "1" ] || [ "${TRANSLATE_SAAS_CONFIG_READY}" = "1" ]; then
+if [ "${OCR_SAAS_CONFIG_READY}" = "1" ] || [ "${TRANSLATE_SAAS_CONFIG_READY}" = "1" ] || [ "${OPTIONAL_MODELS_CONFIG_CHANGED}" = 1 ]; then
   echo 'Microi：重启新安装 API，使已成功回读的附加能力配置立即生效...'
   API_READINESS_READY=0
   if ! docker restart microi-install-api > /dev/null; then
@@ -6612,11 +6754,18 @@ echo '=================================================================='
 if [ "${OPTIONAL_COMPONENT_FAILURE_COUNT}" -gt 0 ]; then
   echo 'Microi：核心平台已成功安装；附加能力存在警告。'
 else
-  echo 'Microi：核心平台与所选附加能力已成功安装或接入！'
+  if [ "${OPTIONAL_MODELS_MEMORY_BLOCKED}" = 1 ]; then
+    echo 'Microi：核心平台已成功安装；OCR 与 LibreTranslate 因内存保护保持停用。'
+  else
+    echo 'Microi：核心平台与所选附加能力已成功安装或接入！'
+  fi
 fi
 echo '=================================================================='
 echo ''
 print_generated_install_configuration "success"
+if [ "${OPTIONAL_MODELS_MEMORY_BLOCKED}" = 1 ]; then
+  echo "内存保护:    OCR 与 LibreTranslate 已停用（${OPTIONAL_MODELS_MEMORY_REASON}）；保留已有模型与数据。"
+fi
 if [ "${OCR_SAAS_CONFIG_READY}" = "1" ]; then
   echo "OCR:         容器 ${OCR_CONTAINER_NAME}, 本机端口 127.0.0.1:${OCR_PORT}"
   echo "             国内镜像: ${OCR_IMAGE}"

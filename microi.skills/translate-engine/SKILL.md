@@ -74,6 +74,8 @@ LibreTranslate 是动态翻译供应商，不是 `diy_lang` 的替代品。一�
 
 用户可追加经过白名单校验的语言 Key。语言越多，首次模型下载越慢；一键安装不得等待模型下载或 HTTP 就绪。应先用同版本镜像独立初始化持久化 `api_keys.db`、写入并回读随机 API Key，再启动正式容器并确认其进入运行状态，让语言模型在容器中继续初始化，不阻塞吾码主体安装。
 
+默认部署服从内存保护：新安装的物理内存低于 7680MiB 或模型启动前可用内存低于 2048MiB 时，本次安装始终停用 OCR/LibreTranslate，不拉取/初始化/启动模型；已有同名安装容器精确停止并关闭自动重启，保留模型和密钥库。核心升级后唯一活动主租户的 `TranslateProvider` 设置为 `None` 并回读，再刷新 API；保留 URL/Key，不能写空 Provider，因为空值会按保留 URL 自动回退。内存保护已触发时不做真实模型推理验收。内存充足时 LibreTranslate 默认限制 768MiB RAM、1280MiB RAM+Swap、0.75CPU，保持 `LT_THREADS=1` 和原生模型单线程；Swap 不计入物理内存准入。
+
 服务端统一从 SaaS 引擎租户配置读取 `TranslateProvider`、`TranslateUrl`（兼容 `TranslateApiUrl` / `LibreTranslateUrl`）、`TranslateApiKey`（兼容 `TranslateKey`）和 `TranslateTimeout`；不要再为翻译供应商增加 API 容器环境变量。密钥不得进入前端、日志或文档示例的固定默认值。
 
 一键安装先部署平台 API/Web，并通过 liveness、完整 `ServerVersion` 升级链和 readiness；随后才预初始化并回读 API Key 数据库、启动 LibreTranslate 容器，再回读 Upgrade31 的 4 个翻译物理字段。字段每秒回读一次且最多 15 秒，正常升级应首轮命中，镜像过旧或迁移失败应快速关闭翻译能力。只有数据库回读确认字段已存在，才能把当前 `OsClient` 的 `TranslateProvider=LibreTranslate`、Docker 内网 `TranslateUrl`、匹配的 `TranslateApiKey` 和超时写入并立即回读一致性。禁止在 API/Upgrade 启动前直接更新新字段，也禁止遇到 `Unknown column` 后由安装器伪造元数据。LibreTranslate 的网络、镜像、Key、容器、字段或配置任一步失败都应保持翻译能力未启用、记录附加能力警告并继续核心安装。日志只显示 Provider 与 URL，禁止输出密钥。模型尚未完成时翻译能力可以暂时不可用，但不得拖住其它服务的安装。
