@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: service_statusStatistics
- * Version: v1.1.1
+ * Version: v1.2.0
  * Function:
  * - 按任务责任范围、客户、类型、关键词和时间统计各状态数量；规范化业务参数以隔离宿主属性，兼容聚合列别名大小写
  */
