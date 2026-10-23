@@ -147,8 +147,16 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 服务器暂未部署修复且普通应用产物很小时，可把 `StorageMode=db` 与内联 `ContentBase64` 作为短期恢复手段；必须明确记录为临时方案。修复部署后重新流式发布到公有 HDFS，并恢复 `StorageMode=file`。只有上一条满足严格资源策略的受信任平台启动应用允许长期保留小型数据库产物；禁止借此把普通或大体积 JS/CSS 长期放进数据库 JSON。
 - 子租户发布时，源码、版本资产、回读验签、页面与缓存全部绑定当前 Token 的 `OsClient`；禁止回退到主租户或宿主服务器默认租户。切换前必须由当前 API 节点通过该子租户 HDFS 配置读回每个版本文件并校验大小/SHA-256。
 - CDN 同一不可变对象返回 200 而 API 稳定入口返回 404 时，先检查 API 读取到的当前租户 `FileServer`（含公有桶路径）和已提交 `ReleasePrefix`，不能把默认域名回退当作恢复。配置读取必须将 dynamic 数据显式转为 object/JObject，再调用扩展方法；缺失或无效配置失败关闭。
+- MinIO 首次 CDN 投影的目标尚不存在时，只有明确 S3 `NoSuchKey` 才允许从已校验版本补写；普通代理 404、缺桶、拒绝访问和不完整读取仍失败关闭。旧 API 把该错误丢失为通用 HTTP 404 时需升级全部 API 节点。恢复 `RepairRequired / ProjectionPending` 前回读原任务，再保留首次 finalize 的 RequestId、版本、清单哈希与原前置条件重放；禁止手工改状态、删除版本或新建同版本发布。验收必须含 Completed、投影完成、服务/页面登记、稳定/版本入口和资产哈希及真实交互。
 - `microi-platform-service` 等受信任 DatabaseOnly 平台包以 `sys_microiservice.StorageMode=db / MsUrl=db` 和内联已验签字节为运行事实。安装后的 `PublicPublishPath=micro-app/{AppKey}/{Version}` 可以没有租户前缀；不能仅凭该字段补前缀或强改为 file。普通 file 应用则核对每项 HdfsPath/FilePathName、当前租户 FileServer 与真实对象。
 - HTML/JS/CSS 被对象存储标为 `application/octet-stream` 时，文件字节可能完全正确。新上传统一设置对象 MIME；运行网关只对已提交资产的空/二进制通用标签按文件路径归一，保留类型兼容、HTML 完整性、大小、哈希及 `nosniff`。需更新全部 API 节点；旧对象的 CDN 直接入口另需修正元数据或正常发布新版本，不能把 API 兼容称为 CDN 已修复。
+
+### 复盘：MinIO 首次 CDN 投影停在 HTTP 404
+
+- 触发场景：不可变版本资产已校验，首次复制的 CDN 目标尚不存在，发布却停在 `RepairRequired / ProjectionPending`。
+- 根因：可信 HDFS 签名读取将明确的 S3 `NoSuchKey` 丢失为通用 HTTP 404，发布器因无法区分代理或权限故障而拒绝补写。
+- 通用规则：只对有界、合法且对象身份匹配的 S3 错误保留缺对象语义；部署全部 API 节点后回读并恢复原任务，不改业务源码或发布状态。
+- 自动化检查：`MicroiHdfsMinioStreamReadTests` 覆盖缺对象与发布器判定、错误 XML、错误桶/Key、超限正文、取消和超时；完整发布与页面验收继续独立执行。
 
 ### 宿主路由查询参数
 

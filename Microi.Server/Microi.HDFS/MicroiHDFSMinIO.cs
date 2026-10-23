@@ -376,8 +376,16 @@ namespace Microi.net
 
                 // 不把错误 XML、重定向或非预期的部分响应写入会话/ZIP 目标流。
                 if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    // CDN 首次投影以明确的 NoSuchKey 决定是否补写；普通代理 404、缺桶和权限
+                    // 错误不能获得此语义。只解析有界 S3 错误，不回显正文或临时签名凭据。
+                    var missingKey = response.StatusCode == HttpStatusCode.NotFound
+                        && await IsSignedObjectMissingAsync(response.Content, bucketName, objectName,
+                            timeout.Token).ConfigureAwait(false);
                     return new DosResult(0, null, $"MinIO Stream Read Error:对象读取返回 HTTP {(int)response.StatusCode}"
+                        + (missingKey ? "（NoSuchKey）" : "")
                         + $"（Bucket={bucketName}，Object={objectName}）。请检查对象读取权限与存储代理。");
+                }
 
                 var expectedLength = response.Content.Headers.ContentLength;
                 using var source = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
@@ -420,6 +428,65 @@ namespace Microi.net
                 // 网络与 SDK 异常可能带完整签名 URL，诊断只记录类型，禁止回显临时凭据。
                 return new DosResult(0, null, "MinIO Stream Read Error:对象流式读取失败（ExceptionType="
                     + ex.GetType().Name + "）。");
+            }
+        }
+
+        /// <summary>
+        /// 只归一化当前精确对象的 S3 NoSuchKey；限制错误正文大小、禁止 DTD/外部实体，
+        /// 并保留取消、超时和截断读取的失败语义，不把不明 404 当作可覆盖的空对象。
+        /// </summary>
+        private static async Task<bool> IsSignedObjectMissingAsync(
+            HttpContent content, string bucketName, string objectName, CancellationToken token)
+        {
+            const int maxErrorBytes = 8 * 1024;
+            var declaredLength = content.Headers.ContentLength;
+            if (declaredLength.HasValue && (declaredLength.Value <= 0 || declaredLength.Value > maxErrorBytes))
+                return false;
+
+            using var source = await content.ReadAsStreamAsync().ConfigureAwait(false);
+            // 多读一个字节用于识别未声明长度的超限正文；内存和网络读取均有固定上限。
+            var bytes = new byte[maxErrorBytes + 1];
+            var length = 0;
+            while (length < bytes.Length)
+            {
+                var read = await source.ReadAsync(bytes, length, bytes.Length - length, token).ConfigureAwait(false);
+                if (read == 0) break;
+                length += read;
+            }
+            token.ThrowIfCancellationRequested();
+            if (length == 0 || length > maxErrorBytes || (declaredLength.HasValue && length != declaredLength.Value))
+                return false;
+
+            try
+            {
+                using var buffer = new MemoryStream(bytes, 0, length, writable: false);
+                using var reader = XmlReader.Create(buffer, new XmlReaderSettings
+                {
+                    DtdProcessing = DtdProcessing.Prohibit,
+                    XmlResolver = null,
+                    MaxCharactersInDocument = maxErrorBytes
+                });
+                var root = XDocument.Load(reader).Root;
+                if (root == null || root.Name.LocalName != "Error"
+                    || (root.Name.NamespaceName != "" && root.Name.NamespaceName != "http://s3.amazonaws.com/doc/2006-03-01/"))
+                    return false;
+                var codes = root.Elements().Where(element => element.Name.LocalName == "Code").ToArray();
+                if (codes.Length != 1 || codes[0].Name.Namespace != root.Name.Namespace
+                    || codes[0].HasElements || codes[0].Value != "NoSuchKey")
+                    return false;
+                // S3 可省略 Key/BucketName；存在时必须唯一且与本次签名请求完全一致。
+                foreach (var identity in new[] { new { Name = "Key", Value = objectName }, new { Name = "BucketName", Value = bucketName } })
+                {
+                    var fields = root.Elements().Where(element => element.Name.LocalName == identity.Name).ToArray();
+                    if (fields.Length > 1 || (fields.Length == 1
+                        && (fields[0].Name.Namespace != root.Name.Namespace || fields[0].HasElements || fields[0].Value != identity.Value)))
+                        return false;
+                }
+                return true;
+            }
+            catch (XmlException)
+            {
+                return false;
             }
         }
 

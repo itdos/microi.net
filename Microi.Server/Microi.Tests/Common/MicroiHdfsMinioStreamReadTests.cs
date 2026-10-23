@@ -111,6 +111,40 @@ public class MicroiHdfsMinioStreamReadTests
             new object?[] { client, "private", ObjectPath["/private/".Length..], target, timeout, token, http })!;
     }
 
+    // 未知长度的错误流用于验证真实读取上限；有完整 XML 也必须等到 EOF 才能确认语义。
+    private sealed class ErrorSource(string text, bool stallAtEnd = false) : Stream
+    {
+        private readonly MemoryStream _inner = new(System.Text.Encoding.UTF8.GetBytes(text));
+        public int BytesRead { get; private set; }
+        public TaskCompletionSource EndReached { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken token)
+        {
+            var read = await _inner.ReadAsync(buffer, offset, count, token);
+            BytesRead += read;
+            if (read == 0 && stallAtEnd)
+            {
+                EndReached.TrySetResult();
+                await Task.Delay(Timeout.Infinite, token);
+            }
+            return read;
+        }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -165,6 +199,122 @@ public class MicroiHdfsMinioStreamReadTests
         Assert.Equal(0, result.Code);
         Assert.Contains($"HTTP {status}", result.Msg);
         Assert.DoesNotContain("error-body-with-secret", result.Msg);
+        Assert.Empty(destination.Bytes);
+        Assert.Single(handler.Requests);
+    }
+
+    // 发布器必须能区分首次 CDN 投影尚未创建的对象与代理/权限故障；不接受仅凭 404 放行。
+    private static bool PublisherTreatsAsMissing(string message)
+    {
+        var method = typeof(V8McpLogic).GetMethod("IsApplicationCdnMissingPublicObject",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (bool)method.Invoke(null, new object[] { message })!;
+    }
+
+    [Theory]
+    [InlineData("<Error><Code>NoSuchKey</Code></Error>")]
+    [InlineData("<?xml version=\"1.0\"?><Error><Code>NoSuchKey</Code><Key>tenant/.microi-upload/session.json</Key><BucketName>private</BucketName><Message>secret-error-detail</Message></Error>")]
+    [InlineData("<Error xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"><Code>NoSuchKey</Code></Error>")]
+    public async Task ExactS3MissingKeyRemainsAFailedReadButAllowsFirstCdnProjection(string xml)
+    {
+        var handler = new ObjectOnlyHandler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+        {
+            Content = new StringContent(xml, System.Text.Encoding.UTF8, "application/xml")
+        }));
+        using var http = new HttpClient(handler);
+        using var client = CreateClient(http);
+        using var destination = new NonSeekableDestination();
+        var result = await ReadAsync(client, http, destination);
+        Assert.Equal(0, result.Code);
+        Assert.Contains("HTTP 404", result.Msg);
+        Assert.Contains("NoSuchKey", result.Msg);
+        Assert.True(PublisherTreatsAsMissing(result.Msg));
+        Assert.DoesNotContain("secret-error-detail", result.Msg);
+        Assert.Empty(destination.Bytes);
+        Assert.False(destination.Closed);
+        Assert.Single(handler.Requests);
+    }
+
+    [Theory]
+    [InlineData(404, "<Error><Code>NoSuchBucket</Code></Error>")]
+    [InlineData(404, "<Error><Code>AccessDenied</Code><Message>NoSuchKey</Message></Error>")]
+    [InlineData(403, "<Error><Code>NoSuchKey</Code></Error>")]
+    [InlineData(500, "<Error><Code>NoSuchKey</Code></Error>")]
+    [InlineData(404, "<html><Code>NoSuchKey</Code></html>")]
+    [InlineData(404, "<Error><Message>NoSuchKey</Message></Error>")]
+    [InlineData(404, "<Error><Code>NoSuchKey</Code><Code>AccessDenied</Code></Error>")]
+    [InlineData(404, "<Error><Code><Value>NoSuchKey</Value></Code></Error>")]
+    [InlineData(404, "<Error><Code>NoSuchKey</Code><Key>another-tenant/object</Key></Error>")]
+    [InlineData(404, "<Error><Code>NoSuchKey</Code><BucketName>another-bucket</BucketName></Error>")]
+    [InlineData(404, "<Error><Code>NoSuchKey</Code><Key>tenant/.microi-upload/session.json</Key><Key>tenant/.microi-upload/session.json</Key></Error>")]
+    [InlineData(404, "<Error xmlns=\"urn:proxy\"><Code>NoSuchKey</Code></Error>")]
+    [InlineData(404, "<!DOCTYPE Error [<!ENTITY code 'NoSuchKey'>]><Error><Code>&code;</Code></Error>")]
+    [InlineData(404, "<Error><Code>NoSuchKey</Code>")]
+    [InlineData(404, "proxy: NoSuchKey secret-error-detail")]
+    public async Task UntrustedOrNonMissingErrorsCannotAuthorizeCdnOverwrite(int status, string xml)
+    {
+        var handler = new ObjectOnlyHandler(_ => Task.FromResult(new HttpResponseMessage((HttpStatusCode)status)
+        {
+            Content = new StringContent(xml)
+        }));
+        using var http = new HttpClient(handler);
+        using var client = CreateClient(http);
+        using var destination = new NonSeekableDestination();
+        var result = await ReadAsync(client, http, destination);
+        Assert.Equal(0, result.Code);
+        Assert.Contains($"HTTP {status}", result.Msg);
+        Assert.False(PublisherTreatsAsMissing(result.Msg));
+        Assert.DoesNotContain("secret-error-detail", result.Msg);
+        Assert.Empty(destination.Bytes);
+        Assert.Single(handler.Requests);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task OversizedS3ErrorCannotAuthorizeCdnProjection(bool declaredLength)
+    {
+        var xml = "<Error><Code>NoSuchKey</Code><Message>" + new string('x', 16384) + "</Message></Error>";
+        var source = new ErrorSource(xml);
+        var handler = new ObjectOnlyHandler(_ =>
+        {
+            var content = new StreamContent(source);
+            content.Headers.ContentLength = declaredLength ? System.Text.Encoding.UTF8.GetByteCount(xml) : null;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound) { Content = content });
+        });
+        using var http = new HttpClient(handler);
+        using var client = CreateClient(http);
+        using var destination = new NonSeekableDestination();
+        var result = await ReadAsync(client, http, destination);
+        Assert.Equal(0, result.Code);
+        Assert.False(PublisherTreatsAsMissing(result.Msg));
+        Assert.Empty(destination.Bytes);
+        Assert.Single(handler.Requests);
+        Assert.Equal(declaredLength ? 0 : 8193, source.BytesRead);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task S3ErrorBodyHonorsCancellationAndTimeoutBeforeRecognizingXml(bool cancel)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var source = new ErrorSource("<Error><Code>NoSuchKey</Code></Error>", stallAtEnd: true);
+        var handler = new ObjectOnlyHandler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+        {
+            Content = new StreamContent(source)
+        }));
+        using var http = new HttpClient(handler);
+        using var client = CreateClient(http);
+        using var destination = new NonSeekableDestination();
+        var pending = ReadAsync(client, http, destination, cancellation.Token, timeout: cancel ? 10 : 1);
+        await source.EndReached.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        if (cancel) cancellation.Cancel();
+        var result = await pending.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(0, result.Code);
+        Assert.Contains(cancel ? "已取消" : "超时", result.Msg);
+        Assert.False(PublisherTreatsAsMissing(result.Msg));
         Assert.Empty(destination.Bytes);
         Assert.Single(handler.Requests);
     }
