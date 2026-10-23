@@ -128,6 +128,40 @@ class PrivateFilesTests(unittest.TestCase):
         self.assertEqual(context.load('safe-result.json'), {'value': 1})
         with self.assertRaises(ValueError): context.save('safe-result.json', {'value': 2})
 
+    def test_engine_snapshot_inherits_the_verified_private_directory_acl(self):
+        # 使用真实 Windows/POSIX 权限与实际 Context，覆盖旧测试替身没有触及的子目录创建。
+        import admission_engine_fixture as engine
+        from test_admission_engine_fixture import Store, request
+        path, digest, value = self.fixture()
+        context = g.Context(path, digest)
+        store = Store(); store.context = context
+        journal = self.private / ('admission-engines-' + value['owner32'] + '-' + request('snapshot')['runId'])
+        result = engine.run(request('snapshot'), store, journal)
+        self.assertEqual(result['Code'], 1)
+        self.assertFalse(result['mutated'])
+        self.assertEqual(store.calls, 0)
+        g.check(journal, directory=True)
+        g.check(journal / 'original.json', directory=False)
+        self.assertEqual(engine.read(journal / 'original.json', context)['rows'], store.actual)
+
+    def test_engine_snapshot_rejects_an_existing_nonprivate_journal(self):
+        import admission_engine_fixture as engine
+        from test_admission_engine_fixture import Store, request
+        path, digest, value = self.fixture()
+        context = g.Context(path, digest)
+        store = Store(); store.context = context
+        journal = self.private / ('admission-engines-' + value['owner32'] + '-' + request('snapshot')['runId'])
+        journal.mkdir()
+        if os.name == 'nt':
+            subprocess.run(['icacls', str(journal), '/grant', '*S-1-1-0:R'], check=True,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        else:
+            journal.chmod(0o755)
+        with self.assertRaises(Exception): engine.run(request('snapshot'), store, journal)
+        with self.assertRaises(Exception): g.check(journal)
+        self.assertFalse((journal / 'original.json').exists())
+        self.assertEqual(store.calls, 0)
+
     def test_actual_cli_directory_and_file_contract(self):
         path, digest, _ = self.fixture()
         for action in (['directory'], ['file', 'context.json']):

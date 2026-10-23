@@ -334,7 +334,9 @@ def run(request, store, folder):
         expected = context.private / ('admission-engines-' + config['owner'] + '-' + request.get('runId', ''))
         require(folder == expected and re.fullmatch('[a-f0-9]{32}', request.get('runId', '')), 'Wrong journal directory')
         context.owned_path(folder, creating=not folder.exists())
-    folder.mkdir(mode=0o700, exist_ok=True)
+    # Windows 的 Python 0o700 会另建包含管理员组的 DACL，破坏已验证父目录的两主体边界。
+    # 新子目录沿用父目录继承；POSIX 仍使用 0700。既有目录不改权限，随后严格复核。
+    folder.mkdir(mode=0o777 if sys.platform == 'win32' else 0o700, exist_ok=True)
     if context:
         context.owned_path(folder)
     backup = folder / 'original.json'
