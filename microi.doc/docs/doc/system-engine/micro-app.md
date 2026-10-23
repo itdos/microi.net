@@ -1158,9 +1158,16 @@ AI 应用工作台“发布应用商城”
 
 ### MinIO 发布停在 CDN 历史版本对象读取，返回 HTTP 404
 
-若不可变版本资产已全部校验，而发布状态为 `RepairRequired / ProjectionPending`，并提示“CDN 历史版本对象读取失败”，应区分首次复制时目标对象尚不存在与存储故障。MinIO 的明确 S3 `NoSuchKey` 表示可以从已校验版本补写目标对象；代理返回的普通 404、`NoSuchBucket`、`AccessDenied`、超时和不完整响应都不能作为覆盖依据。
+若不可变版本资产已全部校验，而发布状态为 `RepairRequired / ProjectionPending`，并提示“CDN 历史版本对象读取失败”，应区分首次复制时目标对象尚不存在与存储故障。只有提供商验证的明确缺对象结果，才允许从已校验版本补写目标对象。
 
-平台修复会对 HTTP 404 的有界 S3 XML 错误保留 `NoSuchKey` 语义，不将错误正文写入资产，也不回显签名 URL。升级全部 API 节点后，保留原 `RequestId`、版本、清单哈希及首次 finalize 的前置条件，先回读状态，再原样重放该 finalize 请求恢复投影。不要手工修改发布状态、删除版本或重建同版本任务。
+| 存储提供商 | 允许补写所需的缺对象证据 |
+| --- | --- |
+| MinIO / Amazon S3 | 实际签名 GET 返回 HTTP 404，且完整、不超过 8 KiB 的 S3 XML 中含精确 `NoSuchKey`；若提供 Key 或 BucketName，还必须匹配本次请求。 |
+| 阿里云 OSS | 实际 OSS SDK 服务异常的 `ErrorCode` 精确等于 `NoSuchKey`。 |
+
+HDFS 将已验证结果放入结构化 `DataAppend.StorageReadErrorCode`；MinIO/S3 同时给出 `StorageReadHttpStatusCode=404`。发布器不从诊断 `Msg`、对象路径或桶名中的文字推断缺对象；普通代理 404、`NoSuchBucket`、`AccessDenied`、错误 XML、超限、截断和超时仍失败关闭。错误正文不写入资产，签名 URL 不回显。
+
+升级全部 API 节点后，保留原 `RequestId`、版本、清单哈希及首次 finalize 的前置条件，先回读状态，再原样重放该 finalize 请求恢复投影。不要手工修改发布状态、删除版本或重建同版本任务。
 
 完成后应同时确认 `Completed=true`、投影不再待处理、运行服务与页面登记完整、稳定/版本入口及 JS/CSS 字节哈希一致，并在业务页面验证交互。文件上传成功或入口返回 200 仍不足以确认发布完成。
 

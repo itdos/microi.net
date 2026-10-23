@@ -352,19 +352,21 @@ namespace Microi.net
         /// <summary>
         /// 签名 URL 只在服务端内存中使用；HTTP 状态和完整长度校验通过才返回成功。
         /// 不依赖流的 Length/Position，支持哈希流、限额流与大文件，不缓冲整个对象。
+        /// MinIO 与 Amazon S3 共用此协议边界，避免 SDK 丢弃错误码后把普通 404 误判为空对象。
         /// </summary>
-        private static async Task<DosResult> CopySignedObjectToStreamAsync(
+        internal static async Task<DosResult> CopySignedObjectToStreamAsync(
             IMinioClient client,
             string bucketName,
             string objectName,
             Stream destination,
             int? timeoutSeconds,
             CancellationToken cancellationToken,
-            HttpClient httpClient)
+            HttpClient httpClient = null)
         {
             var seconds = timeoutSeconds.GetValueOrDefault() > 0 ? timeoutSeconds.Value : 600;
             try
             {
+                httpClient = httpClient ?? ObjectReadHttpClient;
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 timeout.CancelAfter(TimeSpan.FromSeconds(seconds));
                 timeout.Token.ThrowIfCancellationRequested();
@@ -382,9 +384,16 @@ namespace Microi.net
                     var missingKey = response.StatusCode == HttpStatusCode.NotFound
                         && await IsSignedObjectMissingAsync(response.Content, bucketName, objectName,
                             timeout.Token).ConfigureAwait(false);
-                    return new DosResult(0, null, $"MinIO Stream Read Error:对象读取返回 HTTP {(int)response.StatusCode}"
+                    return new DosResult(0, null, $"S3对象流读取失败：对象读取返回 HTTP {(int)response.StatusCode}"
                         + (missingKey ? "（NoSuchKey）" : "")
-                        + $"（Bucket={bucketName}，Object={objectName}）。请检查对象读取权限与存储代理。");
+                        + "。请检查对象读取权限与存储代理。")
+                    {
+                        // 对象路径与桶名可以包含任意业务词；机器判定只使用本原子验证后的语义，
+                        // 不扫描 Msg，避免 assets/nosuchkey.js 等合法路径获得补写权限。
+                        DataAppend = missingKey
+                            ? new { StorageReadErrorCode = "NoSuchKey", StorageReadHttpStatusCode = 404 }
+                            : null
+                    };
                 }
 
                 var expectedLength = response.Content.Headers.ContentLength;

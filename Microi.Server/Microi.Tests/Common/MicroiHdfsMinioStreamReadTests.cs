@@ -14,7 +14,9 @@ public class MicroiHdfsMinioStreamReadTests
     private const string ObjectPath = "/private/tenant/.microi-upload/session.json";
 
     // 同一凭据允许 GET 对象、拒绝桶级/HEAD 请求，重现存储代理和最小权限策略。
-    private sealed class ObjectOnlyHandler(Func<CancellationToken, Task<HttpResponseMessage>> response) : HttpMessageHandler
+    private sealed class ObjectOnlyHandler(
+        Func<CancellationToken, Task<HttpResponseMessage>> response,
+        string expectedPath = ObjectPath) : HttpMessageHandler
     {
         public List<(HttpMethod Method, string Path, bool Signed)> Requests { get; } = new();
 
@@ -22,7 +24,7 @@ public class MicroiHdfsMinioStreamReadTests
         {
             var uri = request.RequestUri!;
             Requests.Add((request.Method, uri.AbsolutePath, uri.Query.Contains("X-Amz-Signature=", StringComparison.OrdinalIgnoreCase)));
-            if (request.Method != HttpMethod.Get || uri.AbsolutePath != ObjectPath)
+            if (request.Method != HttpMethod.Get || uri.AbsolutePath != expectedPath)
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden)
                 {
                     RequestMessage = request,
@@ -103,12 +105,13 @@ public class MicroiHdfsMinioStreamReadTests
 
     private static async Task<DosResult> ReadAsync(
         IMinioClient client, HttpClient http, Stream target,
-        CancellationToken token = default, int? timeout = null)
+        CancellationToken token = default, int? timeout = null,
+        string bucket = "private", string objectName = "tenant/.microi-upload/session.json")
     {
         var method = typeof(MicroiHDFSMinIO).GetMethod("CopySignedObjectToStreamAsync", BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
         return await (Task<DosResult>)method.Invoke(null,
-            new object?[] { client, "private", ObjectPath["/private/".Length..], target, timeout, token, http })!;
+            new object?[] { client, bucket, objectName, target, timeout, token, http })!;
     }
 
     // 未知长度的错误流用于验证真实读取上限；有完整 XML 也必须等到 EOF 才能确认语义。
@@ -204,12 +207,118 @@ public class MicroiHdfsMinioStreamReadTests
     }
 
     // 发布器必须能区分首次 CDN 投影尚未创建的对象与代理/权限故障；不接受仅凭 404 放行。
-    private static bool PublisherTreatsAsMissing(string message)
+    private static bool PublisherTreatsAsMissing(DosResult result)
     {
         var method = typeof(V8McpLogic).GetMethod("IsApplicationCdnMissingPublicObject",
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
-        return (bool)method.Invoke(null, new object[] { message })!;
+        return (bool)method.Invoke(null, new object[] { result })!;
+    }
+
+    private static async Task<DosResult> ReadS3Async(
+        IMinioClient client, HttpClient http, Stream target,
+        CancellationToken token = default, int? timeout = null)
+    {
+        var method = typeof(MicroiHDFSAmazonS3).GetMethod("CopyObjectToStreamWithClientAsync",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return await (Task<DosResult>)method.Invoke(null, new object[]
+        {
+            client, "private", new HDFSParam
+            {
+                FileFullPath = "/tenant/.microi-upload/session.json", FileStream = target,
+                CancellationToken = token, TimeoutSeconds = timeout
+            }, http
+        })!;
+    }
+
+    [Theory]
+    [InlineData(200, "complete-object", false)]
+    [InlineData(404, "<Error><Code>NoSuchKey</Code></Error>", true)]
+    [InlineData(404, "", false)]
+    [InlineData(404, "<html>NoSuchKey</html>", false)]
+    [InlineData(403, "<Error><Code>NoSuchKey</Code></Error>", false)]
+    [InlineData(404, "<Error><Code>NoSuchBucket</Code></Error>", false)]
+    [InlineData(404, "<Error><Code>AccessDenied</Code></Error>", false)]
+    [InlineData(500, "<Error><Code>NoSuchKey</Code></Error>", false)]
+    public async Task AmazonS3UsesExplicitObjectResponseWithoutSdkHeadInference(
+        int status, string body, bool missing)
+    {
+        // Amazon S3 路径必须直接验证 GET，既保留成功字节/ETag，也不沿用 SDK 对空404的猜测。
+        var bytes = System.Text.Encoding.UTF8.GetBytes(body);
+        var handler = new ObjectOnlyHandler(_ => Task.FromResult(new HttpResponseMessage((HttpStatusCode)status)
+        {
+            Content = new ByteArrayContent(bytes), Headers = { ETag = new EntityTagHeaderValue("\"s3-etag\"") }
+        }));
+        using var http = new HttpClient(handler);
+        using var client = CreateClient(http);
+        using var destination = new NonSeekableDestination();
+        var result = await ReadS3Async(client, http, destination);
+        Assert.Equal(status == 200 ? 1 : 0, result.Code);
+        Assert.Equal(missing, PublisherTreatsAsMissing(result));
+        Assert.Equal(status == 200 ? bytes : Array.Empty<byte>(), destination.Bytes);
+        Assert.False(destination.Closed);
+        Assert.Equal((HttpMethod.Get, ObjectPath, true), Assert.Single(handler.Requests));
+        if (status == 200)
+        {
+            var metadata = JObject.FromObject((object)result.Data);
+            Assert.Equal(bytes.LongLength, (long?)metadata["Size"]);
+            Assert.Equal("s3-etag", (string?)metadata["ETag"]);
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AmazonS3ReadKeepsCancellationAndTimeoutSemantics(bool cancel)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new ObjectOnlyHandler(async token =>
+        {
+            entered.SetResult();
+            await Task.Delay(Timeout.Infinite, token);
+            throw new InvalidOperationException();
+        });
+        using var http = new HttpClient(handler);
+        using var client = CreateClient(http);
+        using var destination = new NonSeekableDestination();
+        var pending = ReadS3Async(client, http, destination, cancellation.Token, timeout: cancel ? 10 : 1);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        if (cancel) cancellation.Cancel();
+        var result = await pending.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(0, result.Code);
+        Assert.Contains(cancel ? "已取消" : "超时", result.Msg);
+        Assert.False(PublisherTreatsAsMissing(result));
+        Assert.Empty(destination.Bytes);
+        Assert.Single(handler.Requests);
+    }
+
+    [Theory]
+    [InlineData(403, "private", "assets/nosuchkey.js", "AccessDenied")]
+    [InlineData(404, "private", "assets/nosuchkey.js", "AccessDenied")]
+    [InlineData(403, "nosuchkey", "assets/app.js", "AccessDenied")]
+    [InlineData(404, "nosuchkey", "assets/app.js", "AccessDenied")]
+    [InlineData(404, "private", "assets/nosuchkey.js", "NoSuchBucket")]
+    [InlineData(404, "nosuchkey", "assets/app.js", "NoSuchBucket")]
+    [InlineData(404, "private", "assets/nosuchkey.js", "")]
+    [InlineData(404, "nosuchkey", "assets/app.js", "")]
+    public async Task ObjectAndBucketNamesCannotAuthorizeMissingObject(
+        int status, string bucket, string objectName, string code)
+    {
+        // 路径是业务输入；即使碰巧含有错误码，权限/代理故障也必须阻断 CDN 首次复制。
+        var handler = new ObjectOnlyHandler(_ => Task.FromResult(new HttpResponseMessage((HttpStatusCode)status)
+        {
+            Content = new StringContent(code.Length == 0 ? "" : $"<Error><Code>{code}</Code></Error>")
+        }), "/" + bucket + "/" + objectName);
+        using var http = new HttpClient(handler);
+        using var client = CreateClient(http);
+        using var destination = new NonSeekableDestination();
+        var result = await ReadAsync(client, http, destination, bucket: bucket, objectName: objectName);
+        Assert.Equal(0, result.Code);
+        Assert.False(PublisherTreatsAsMissing(result));
+        Assert.Empty(destination.Bytes);
+        Assert.Single(handler.Requests);
     }
 
     [Theory]
@@ -229,7 +338,10 @@ public class MicroiHdfsMinioStreamReadTests
         Assert.Equal(0, result.Code);
         Assert.Contains("HTTP 404", result.Msg);
         Assert.Contains("NoSuchKey", result.Msg);
-        Assert.True(PublisherTreatsAsMissing(result.Msg));
+        Assert.True(PublisherTreatsAsMissing(result));
+        var error = JObject.FromObject(result.DataAppend);
+        Assert.Equal("NoSuchKey", (string?)error["StorageReadErrorCode"]);
+        Assert.Equal(404, (int?)error["StorageReadHttpStatusCode"]);
         Assert.DoesNotContain("secret-error-detail", result.Msg);
         Assert.Empty(destination.Bytes);
         Assert.False(destination.Closed);
@@ -264,7 +376,7 @@ public class MicroiHdfsMinioStreamReadTests
         var result = await ReadAsync(client, http, destination);
         Assert.Equal(0, result.Code);
         Assert.Contains($"HTTP {status}", result.Msg);
-        Assert.False(PublisherTreatsAsMissing(result.Msg));
+        Assert.False(PublisherTreatsAsMissing(result));
         Assert.DoesNotContain("secret-error-detail", result.Msg);
         Assert.Empty(destination.Bytes);
         Assert.Single(handler.Requests);
@@ -288,7 +400,7 @@ public class MicroiHdfsMinioStreamReadTests
         using var destination = new NonSeekableDestination();
         var result = await ReadAsync(client, http, destination);
         Assert.Equal(0, result.Code);
-        Assert.False(PublisherTreatsAsMissing(result.Msg));
+        Assert.False(PublisherTreatsAsMissing(result));
         Assert.Empty(destination.Bytes);
         Assert.Single(handler.Requests);
         Assert.Equal(declaredLength ? 0 : 8193, source.BytesRead);
@@ -314,7 +426,7 @@ public class MicroiHdfsMinioStreamReadTests
         var result = await pending.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(0, result.Code);
         Assert.Contains(cancel ? "已取消" : "超时", result.Msg);
-        Assert.False(PublisherTreatsAsMissing(result.Msg));
+        Assert.False(PublisherTreatsAsMissing(result));
         Assert.Empty(destination.Bytes);
         Assert.Single(handler.Requests);
     }

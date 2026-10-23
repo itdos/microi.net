@@ -28,6 +28,9 @@ namespace Microi.net
         /// complete object as byte[].  This is the storage-level primitive used
         /// by cross-node resumable uploads and multi-gigabyte integrity checks.
         /// Pass ClientModel, Limit, FileFullPath, FileStream and CancellationToken.
+        /// 缺对象仍返回 Code=0。仅提供商验证明确 NoSuchKey 后，才可写入
+        /// DataAppend.StorageReadErrorCode=NoSuchKey；可得 HTTP 状态时同时给出
+        /// StorageReadHttpStatusCode=404。调用方不得按诊断 Msg、桶名或路径推断补写权限。
         /// </summary>
         Task<DosResult> CopyObjectToStream(HDFSParam param);
         /// <summary>

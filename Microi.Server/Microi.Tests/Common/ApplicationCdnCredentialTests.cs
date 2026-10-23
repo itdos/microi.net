@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using Dos.Common;
 using Microi.net;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -8,22 +9,72 @@ namespace Microi.Tests.Common;
 
 public class ApplicationCdnCredentialTests
 {
-    private static bool IsMissingPublicObject(string error)
+    private static bool IsMissingPublicObject(DosResult result)
     {
         var method = typeof(V8McpLogic).GetMethod("IsApplicationCdnMissingPublicObject",
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
-        return (bool)method.Invoke(null, new object[] { error })!;
+        return (bool)method.Invoke(null, new object[] { result })!;
     }
 
     [Fact]
     public void PublicProjectionCopiesOnlyAfterExplicitMissingKey()
     {
-        Assert.True(IsMissingPublicObject("The specified key does not exist."));
-        Assert.True(IsMissingPublicObject("NoSuchKey"));
-        Assert.False(IsMissingPublicObject("AccessDenied"));
-        Assert.False(IsMissingPublicObject("Socket timeout"));
+        Assert.True(IsMissingPublicObject(new DosResult(0)
+        {
+            DataAppend = new { StorageReadErrorCode = "NoSuchKey", StorageReadHttpStatusCode = 404 }
+        }));
+        // OSS SDK 只公开明确的 ErrorCode；已由提供商验证后仍可沿原协议补写。
+        Assert.True(IsMissingPublicObject(new DosResult(0)
+        {
+            DataAppend = new { StorageReadErrorCode = "NoSuchKey" }
+        }));
         Assert.False(IsMissingPublicObject(null));
+    }
+
+    [Theory]
+    [InlineData("NoSuchKey")]
+    [InlineData("The specified key does not exist.")]
+    [InlineData("对象不存在")]
+    [InlineData("HTTP 403，Bucket=nosuchkey，Object=assets/nosuchkey.js")]
+    [InlineData("AccessDenied; Object=assets/对象不存在.js")]
+    [InlineData("HTTP 404; Object=assets/The specified key does not exist.js")]
+    [InlineData("Socket timeout")]
+    public void DiagnosticTextNeverAuthorizesCdnObjectCopy(string message)
+    {
+        Assert.False(IsMissingPublicObject(new DosResult(0, null, message)));
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("[]")]
+    [InlineData("\"NoSuchKey\"")]
+    [InlineData("{\"StorageReadErrorCode\":\"AccessDenied\"}")]
+    [InlineData("{\"StorageReadErrorCode\":\"NoSuchBucket\"}")]
+    [InlineData("{\"StorageReadErrorCode\":\"nosuchkey\"}")]
+    [InlineData("{\"StorageReadErrorCode\":\" NoSuchKey\"}")]
+    [InlineData("{\"StorageReadErrorCode\":404}")]
+    [InlineData("{\"StorageReadErrorCode\":\"NoSuchKey\",\"StorageReadHttpStatusCode\":403}")]
+    [InlineData("{\"StorageReadErrorCode\":\"NoSuchKey\",\"StorageReadHttpStatusCode\":\"404\"}")]
+    [InlineData("{\"StorageReadErrorCode\":\"NoSuchKey\",\"StorageReadHttpStatusCode\":9223372036854775808}")]
+    public void MissingObjectMetadataFailsClosedOnUnknownOrConflictingValues(string metadata)
+    {
+        Assert.False(IsMissingPublicObject(new DosResult(0, null, "NoSuchKey")
+        {
+            DataAppend = JToken.Parse(metadata)
+        }));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(1002)]
+    public void OnlyAFailedReadCanCarryMissingObjectSemantics(int code)
+    {
+        Assert.False(IsMissingPublicObject(new DosResult(code)
+        {
+            DataAppend = new { StorageReadErrorCode = "NoSuchKey", StorageReadHttpStatusCode = 404 }
+        }));
     }
 
     private static (string Id, string Secret, string Error) Resolve(JObject settings, JObject saas)

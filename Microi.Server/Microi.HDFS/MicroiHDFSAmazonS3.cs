@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -210,23 +211,11 @@ namespace Microi.net
                     builder = builder.WithSSL();
                 if (!clientModel.OsClientModel["MinIORegion"].Val<string>().DosIsNullOrWhiteSpace())
                     builder = builder.WithRegion(clientModel.OsClientModel["MinIORegion"].Val<string>());
-                var client = builder.Build();
+                using var client = builder.Build();
                 var bucketName = param.Limit == true
                     ? clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>()
                     : clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
-                var args = new GetObjectArgs()
-                    .WithBucket(bucketName)
-                    .WithObject(param.FileFullPath.DosTrimStart('/'))
-                    .WithCallbackStream(async (source, callbackToken) =>
-                    {
-                        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
-                            callbackToken,
-                            param.CancellationToken);
-                        await source.CopyToAsync(param.FileStream, 128 * 1024, linked.Token)
-                            .ConfigureAwait(false);
-                    });
-                var stat = await client.GetObjectAsync(args, param.CancellationToken).ConfigureAwait(false);
-                return new DosResult(1, new { Size = stat.Size, ETag = stat.ETag });
+                return await CopyObjectToStreamWithClientAsync(client, bucketName, param).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -236,6 +225,19 @@ namespace Microi.net
             {
                 return new DosResult(0, null, "Amazon S3 Stream Read Error:" + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// MinIO SDK 7 把明确 NoSuchKey 和无正文 404 都转为丢失状态的 ObjectNotFoundException；
+        /// 因此共用有界签名 GET 原子验证实际状态、完整 XML 与对象身份，不能按异常类型猜码。
+        /// 桶、端点和凭据仍由本提供商的既有配置选择，成功时直接写调用方目标流。
+        /// </summary>
+        private static Task<DosResult> CopyObjectToStreamWithClientAsync(
+            IMinioClient client, string bucketName, HDFSParam param, HttpClient httpClient = null)
+        {
+            return MicroiHDFSMinIO.CopySignedObjectToStreamAsync(
+                client, bucketName, param.FileFullPath.DosTrimStart('/'), param.FileStream,
+                param.TimeoutSeconds, param.CancellationToken, httpClient);
         }
 
         public async Task<DosResult> PutObject(HDFSParam param)

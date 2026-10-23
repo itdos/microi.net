@@ -53,6 +53,21 @@ namespace Microi.net
                    && message.IndexOf("Access Denied", StringComparison.OrdinalIgnoreCase) < 0;
         }
 
+        /// <summary>
+        /// OSS SDK 不公开 HTTP 状态；只接受实际服务异常中的精确错误码，消息、对象名和桶名
+        /// 均不参与缺对象判定。保留原诊断，同时向内部发布器传递受信任的结构化语义。
+        /// </summary>
+        private static DosResult BuildObjectStreamReadFailure(HDFSParam param, string bucketName, Exception exception)
+        {
+            return new DosResult(0, null, BuildOssFailureMessage("对象流式读取", param, bucketName, exception))
+            {
+                DataAppend = exception is OssException oss
+                    && string.Equals(oss.ErrorCode, "NoSuchKey", StringComparison.Ordinal)
+                    ? new { StorageReadErrorCode = "NoSuchKey" }
+                    : null
+            };
+        }
+
         private static ClientConfiguration CreateObjectExistClientConfiguration(bool privateBucket)
         {
             return new ClientConfiguration
@@ -232,11 +247,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                return new DosResult(0, null, BuildOssFailureMessage(
-                    "对象流式读取",
-                    param,
-                    bucketName,
-                    ex));
+                return BuildObjectStreamReadFailure(param, bucketName, ex);
             }
         }
 
