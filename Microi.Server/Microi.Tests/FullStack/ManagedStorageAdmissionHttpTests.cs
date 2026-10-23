@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Net.WebSockets;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
@@ -131,6 +132,13 @@ public sealed class ManagedStorageAdmissionHttpTests
             using var response = await http.PostAsync(route, content, operationToken);
             response.EnsureSuccessStatusCode();
             var result = JObject.Parse(await response.Content.ReadAsStringAsync(operationToken));
+            if (success && result.Value<int>("Code") != 1)
+            {
+                // 仅输出固定形状与已知禁用文案的相等位，不输出请求、Token 或任意业务正文。
+                var isStopHttpDenial = result["Data"]?.Type == JTokenType.String
+                    && result.Value<string>("Data") == "此接口已禁止http调用！";
+                Console.Error.WriteLine($"Owned admission HTTP rejected: Code={result.Value<int>("Code")}; MsgType={result["Msg"]?.Type.ToString() ?? "Missing"}; DataType={result["Data"]?.Type.ToString() ?? "Missing"}; StopHttpDenial={isStopHttpDenial}");
+            }
             if (success) Assert.Equal(1, result.Value<int>("Code"));
             return result;
         }
@@ -198,6 +206,7 @@ public sealed class ManagedStorageAdmissionHttpTests
         var exists = await Post("api/FormEngine/GetFormData", new JObject { ["FormEngineKey"] = "sys_apiengine",
             ["OsClient"] = tenant, ["_Where"] = new JArray { new JArray("ApiEngineKey", "=", probe) } }, false);
         Assert.Equal(2, exists.Value<int>("Code"));
+        ExceptionDispatchInfo? primaryFailure = null;
         try
         {
             JObject Fixture(string body) => new()
@@ -323,48 +332,86 @@ public sealed class ManagedStorageAdmissionHttpTests
                 }
             }
         }
+        catch (Exception error)
+        {
+            // 清退仍按原顺序执行，但不能让 finally 的第二个错误掩盖主路径首错。
+            primaryFailure = ExceptionDispatchInfo.Capture(error);
+        }
         finally
         {
-            Assert.True(restorePermitted, "Actual admission drain is unknown; retain the owned probe, maintenance gate and original source receipts for recovery");
-            using var finalCleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try
             {
-                // 只删除本测试刚创建的 probe。官方两个固定 Key 始终保留，恢复原文不走删除重建。
-                // Add 响应未知也先按发送前固定 Id 回读；不盲目再 Add，未确认身份不得删除。
-                if (probeAttempted)
+                Assert.True(restorePermitted, "Actual admission drain is unknown; retain the owned probe, maintenance gate and original source receipts for recovery");
+                using var finalCleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                try
                 {
-                    var model = await Post("api/FormEngine/GetFormData", new JObject { ["FormEngineKey"] = "sys_apiengine", ["OsClient"] = tenant, ["Id"] = ids[probe] }, false, finalCleanup.Token);
-                    if (model.Value<int>("Code") != 2)
+                    // 只删除本测试刚创建的 probe。官方两个固定 Key 始终保留，恢复原文不走删除重建。
+                    // Add 响应未知也先按发送前固定 Id 回读；不盲目再 Add，未确认身份不得删除。
+                    if (probeAttempted)
                     {
-                        Assert.Equal(1, model.Value<int>("Code"));
-                        Assert.Equal(probe, model["Data"]?.Value<string>("ApiEngineKey"));
-                        Assert.Equal("admission-fixture-" + nonce, model["Data"]?.Value<string>("ApiName"));
-                        await Probe("Cleanup", finalCleanup.Token);
-                        await Post("api/FormEngine/DelFormData", new JObject { ["FormEngineKey"] = "sys_apiengine", ["OsClient"] = tenant, ["Id"] = ids[probe] }, cancellation: finalCleanup.Token);
+                        var model = await Post("api/FormEngine/GetFormData", new JObject { ["FormEngineKey"] = "sys_apiengine", ["OsClient"] = tenant, ["Id"] = ids[probe] }, false, finalCleanup.Token);
+                        if (model.Value<int>("Code") != 2)
+                        {
+                            Assert.Equal(1, model.Value<int>("Code"));
+                            Assert.Equal(probe, model["Data"]?.Value<string>("ApiEngineKey"));
+                            Assert.Equal("admission-fixture-" + nonce, model["Data"]?.Value<string>("ApiName"));
+                            await Probe("Cleanup", finalCleanup.Token);
+                            await Post("api/FormEngine/DelFormData", new JObject { ["FormEngineKey"] = "sys_apiengine", ["OsClient"] = tenant, ["Id"] = ids[probe] }, cancellation: finalCleanup.Token);
+                        }
+                    }
+                }
+                finally
+                {
+                    if (snapshotReady)
+                    {
+                        // 即便 probe 清理失败也恢复原始 Managed 正文；未知状态/CAS 冲突保留原文并失败。
+                        var restored = await Native("restore");
+                        Assert.Equal(originalRowsHash, restored.Value<string>("rowsHash"));
+                        foreach (var key in new[] { runtime, maintenance })
+                        {
+                            var model = await Post("api/FormEngine/GetFormData", new JObject { ["FormEngineKey"] = "sys_apiengine", ["OsClient"] = tenant, ["Id"] = ids[key] }, cancellation: finalCleanup.Token);
+                            Assert.Equal(key, model["Data"]?.Value<string>("ApiEngineKey"));
+                            Assert.Equal(originalBodies[key], Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(model["Data"]!.Value<string>("ApiV8Code")!))).ToLowerInvariant());
+                            // 启用位也必须还原；只允许 bool=true 或数据库整数 1，不能容忍缺失或其它值。
+                            var restoredIsEnable = model["Data"]?["IsEnable"];
+                            Assert.NotNull(restoredIsEnable);
+                            Assert.True(restoredIsEnable.Type is JTokenType.Boolean or JTokenType.Integer);
+                            Assert.True(restoredIsEnable.Type == JTokenType.Boolean
+                                ? restoredIsEnable.Value<bool>() : restoredIsEnable.Value<int>() == 1);
+                            if (key == runtime)
+                            {
+                                // MySQL BIT 可按 bool 或整数投影；两种表示都必须明确还原为禁止 HTTP。
+                                var restoredStopHttp = model["Data"]?["StopHttp"];
+                                Assert.NotNull(restoredStopHttp);
+                                Assert.True(restoredStopHttp.Type is JTokenType.Boolean or JTokenType.Integer);
+                                Assert.True(restoredStopHttp.Type == JTokenType.Boolean
+                                    ? restoredStopHttp.Value<bool>() : restoredStopHttp.Value<int>() == 1);
+                            }
+                        }
+                        // 原 Managed 策略为 StopHttp=1，真实节点应在进入 JS 之前拒绝；
+                        // 若 L1 仍残留 StopHttp=0 的 fixture，Code/固定拒绝正文/nonce 断言不能通过。
+                        var originalRuntime = await Post(Route(runtime), new JObject { ["Action"] = "Ping" }, false, finalCleanup.Token);
+                        Assert.Equal(JTokenType.Integer, originalRuntime["Code"]?.Type);
+                        Assert.Equal(0, originalRuntime.Value<int>("Code"));
+                        Assert.Equal(JTokenType.String, originalRuntime["Data"]?.Type);
+                        // bool 断言保持精确相等，却不让 xUnit 在失败时输出任意响应正文。
+                        Assert.True(string.Equals("此接口已禁止http调用！", originalRuntime.Value<string>("Data"), StringComparison.Ordinal),
+                            "恢复后的 HTTP 必须精确返回既有 StopHttp 拒绝文案；不输出实际正文。");
+                        Assert.True(originalRuntime["Msg"] is null || originalRuntime["Msg"]!.Type == JTokenType.Null,
+                            "既有 StopHttp 拒绝协议的 Msg 必须为空或省略。");
+                        Assert.False(originalRuntime.ToString(Formatting.None).Contains(nonce, StringComparison.Ordinal),
+                            "恢复后的实际 HTTP 结果不得包含本轮 fixture 标识；不输出实际正文。");
                     }
                 }
             }
-            finally
+            catch (Exception cleanupError)
             {
-                if (snapshotReady)
-                {
-                    // 即便 probe 清理失败也恢复原始 Managed 正文；未知状态/CAS 冲突保留原文并失败。
-                    var restored = await Native("restore");
-                    Assert.Equal(originalRowsHash, restored.Value<string>("rowsHash"));
-                    foreach (var key in new[] { runtime, maintenance })
-                    {
-                        var model = await Post("api/FormEngine/GetFormData", new JObject { ["FormEngineKey"] = "sys_apiengine", ["OsClient"] = tenant, ["Id"] = ids[key] }, cancellation: finalCleanup.Token);
-                        Assert.Equal(key, model["Data"]?.Value<string>("ApiEngineKey"));
-                        Assert.Equal(originalBodies[key], Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(model["Data"]!.Value<string>("ApiV8Code")!))).ToLowerInvariant());
-                    }
-                    // 真正命中本次 API 节点，确保 L1 也没有残留 fixture；Redis DEL 本身不算验收。
-                    var originalRuntime = await Post(Route(runtime), new JObject { ["Action"] = "Ping" }, false, finalCleanup.Token);
-                    Assert.Equal(0, originalRuntime.Value<int>("Code"));
-                    Assert.Equal("不支持的聊天动作。", originalRuntime.Value<string>("Msg"));
-                    Assert.NotEqual(nonce, originalRuntime["Data"]?.Value<string>("Nonce"));
-                }
+                if (primaryFailure != null)
+                    throw new AggregateException("Admission 主路径及清退均失败；两份原异常必须同时保留。", primaryFailure.SourceException, cleanupError);
+                throw;
             }
         }
+        primaryFailure?.Throw();
     }
 
     private sealed class HubWire : IAsyncDisposable
