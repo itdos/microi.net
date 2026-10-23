@@ -179,9 +179,9 @@ test('regenerating chat resources retains the independently maintained reminder 
 
 test('chat maintenance regeneration raises the required server version without lowering a newer prerequisite', () => {
   const definition = packageDefinitions.find(item => item.file === 'app.microi.message-notification.json');
-  assert.equal(definition.serverMinVersion, '8.6.4');
-  assert.equal(messagePackage.PackageInfo.ServerMinVersion, '8.6.4');
-  for (const [previous, expected] of [['8.5.2', '8.6.4'], ['', '8.6.4'], ['8.7.0', '8.7.0']]) {
+  assert.equal(definition.serverMinVersion, '8.6.5');
+  assert.equal(messagePackage.PackageInfo.ServerMinVersion, '8.6.5');
+  for (const [previous, expected] of [['8.5.2', '8.6.5'], ['8.6.4', '8.6.5'], ['', '8.6.5'], ['8.6.5', '8.6.5'], ['8.7.0', '8.7.0']]) {
     const candidate = structuredClone(messagePackage);
     candidate.PackageInfo.ServerMinVersion = previous;
     const regenerated = configurePackageModel(candidate, definition);

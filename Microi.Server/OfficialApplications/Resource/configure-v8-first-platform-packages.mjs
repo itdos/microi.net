@@ -110,7 +110,7 @@ export const packageDefinitions = Object.freeze([
     file: 'app.microi.message-notification.json',
     name: '消息通知',
     version: 'v8.3.25',
-    serverMinVersion: '8.6.4',
+    serverMinVersion: '8.6.5',
     changeType: 'Fix',
     bootstrapUrl: 'https://static.itdos.com/itdos/microi-store/packages/01kz2t8tmetfx9m815r2rxttbz/202608/app_microi_message-notification-v1_0_5-db93ddd22b5fc2fb.json',
     bootstrapSha256: 'db93ddd22b5fc2fbf21b451e50b9fd1ce78cea970a4bea0d509f4386b99b2301',
