@@ -10,7 +10,7 @@ const read = name => fs.readFileSync(new URL(`../docs/.vitepress/theme/${name}`,
 const profile = read('components/ProfilePage.vue');
 const invitation = read('components/InvitationTree.vue');
 const login = read('components/LoginPage.vue');
-test('个人中心正式源码必须包含七页与邀请注册', () => validatePortalSource(profile, invitation, login));
+test('个人中心正式源码必须包含八页、角色限定活动登记与邀请注册', () => validatePortalSource(profile, invitation, login));
 test('旧版四页源码即使构建成功也拒绝发布', () => {
   const old = profile.replace(/const menuKeys\s*=\s*\[[^\]]+\]/, "const menuKeys = ['overview', 'create', 'ai', 'account']");
   assert.throws(() => validatePortalSource(old, invitation, login), /缺少路由/);
