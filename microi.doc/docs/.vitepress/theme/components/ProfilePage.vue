@@ -64,6 +64,11 @@
           <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="navigateProfile('create')" />
         </section>
 
+        <section v-if="activeMenu === 'star-gift-registration'" class="content-panel">
+          <ProfileStarGiftRecords v-if="starGiftCanView" :request="portalRequest" @denied="starGiftCanView = false" />
+          <div v-else class="state-panel" role="status"><h2>{{ starGiftAccessLoading ? '正在核验访问权限…' : '暂无访问权限' }}</h2><p>{{ starGiftAccessError || '此功能仅对拥有 Star活动登记查看 角色的帐号开放。' }}</p><button type="button" class="ghost-action" @click="refreshStarGiftAccess">重新核验</button></div>
+        </section>
+
         <section v-if="activeMenu === 'licenses'" class="content-panel">
           <div class="panel-head"><div><h2>帐号的系统授权</h2><p>与吾码框架「授权记录」使用同一份记录，包含个人版和企业版。</p></div><span class="record-count">{{ licenseTotal }} 条记录</span></div>
           <p v-if="licenseError" class="error-box" role="alert">{{ licenseError }}</p>
@@ -318,6 +323,7 @@ import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, wa
 import ProfileAiChat from './ProfileAiChat.vue'
 import ProfileAiSummary from './ProfileAiSummary.vue'
 import InvitationTree from './InvitationTree.vue'
+import ProfileStarGiftRecords from './ProfileStarGiftRecords.vue'
 import { buildSiteSessionHeaders, getOrCreateSiteDid } from '../utils/site-session.js'
 import { getInitialProfileLocale, normalizeProfileLocale, translateProfile } from '../profile-i18n'
 import { createOpenClawAuthBridge, isOpenClawBridgeMode } from '../openclaw-auth-bridge'
@@ -332,6 +338,9 @@ const t = (key, params = {}) => translateProfile(locale.value, key, params)
 const authToken = ref('')
 const currentUser = ref(null)
 const tenantCenter = ref({})
+const starGiftCanView = ref(false)
+const starGiftAccessLoading = ref(false)
+const starGiftAccessError = ref('')
 const tenants = ref([])
 const tenantAdminCredentials = ref({})
 const isLoading = ref(false)
@@ -404,11 +413,12 @@ const menus = computed(() => [
   { key: 'create', name: t('createTenant'), icon: '+' },
   { key: 'licenses', name: '系统授权', icon: '✓' },
   { key: 'invitations', name: '邀请关系', icon: '♧' },
+  ...(starGiftCanView.value ? [{ key: 'star-gift-registration', name: 'Star活动登记', icon: '☆' }] : []),
   { key: 'ai', name: t('aiRelay'), icon: 'AI' },
   { key: 'account', name: t('account'), icon: '◉' }
 ])
 
-const menuKeys = ['overview', 'systems', 'create', 'licenses', 'invitations', 'ai', 'account']
+const menuKeys = ['overview', 'systems', 'create', 'licenses', 'invitations', 'star-gift-registration', 'ai', 'account']
 const routeAliases = { tenants: 'systems', billing: 'licenses' }
 
 const tenantStepMessages = {
@@ -478,6 +488,7 @@ const pageTitle = computed(() => {
     systems: '我的系统',
     licenses: '系统授权',
     invitations: '邀请关系',
+    'star-gift-registration': 'Star活动登记',
     create: t('createTenant'),
     ai: t('aiRelay'),
     account: t('account')
@@ -487,6 +498,7 @@ const pageTitle = computed(() => {
 const pageDesc = computed(() => {
   if (!isAuthed.value) return t('loginPageDesc')
   if (activeMenu.value === 'create') return t('createPageDesc')
+  if (activeMenu.value === 'star-gift-registration') return '活动登记资料与核验进度，仅授权角色可见。'
   const descriptions = { overview: '你的系统、授权与邀请，一个清晰的工作空间。', systems: '管理你已创建的云端系统。', licenses: '查看这个帐号的全部系统授权和申请进度。', invitations: '分享吾码，查看你的多级邀请关系。', ai: '专注对话和创作，按需查看使用记录。', account: '管理公开资料与账户设置。' }
   return descriptions[activeMenu.value] || t('pageDesc', { name: profileName.value })
 })
@@ -1045,6 +1057,8 @@ function clearSession() {
   currentUser.value = null
   tenants.value = []
   tenantCenter.value = {}
+  starGiftCanView.value = false
+  starGiftAccessError.value = ''
   window.dispatchEvent(new CustomEvent('microi-auth-expired'))
   openClawAuthBridge?.notify()
 }
@@ -1123,6 +1137,7 @@ async function acknowledgeTenantBootstrapCredential(traceId, deliveryId) {
 
 async function refreshCenter() {
   if (!isAuthed.value) return
+  await refreshStarGiftAccess()
   isLoading.value = true
   profileError.value = ''
   try {
@@ -1158,6 +1173,16 @@ async function refreshCenter() {
 
 const licenses = ref([]), licenseTotal = ref(0), licensePage = ref(1), licenseLoading = ref(false), licenseError = ref('')
 const invitationRefreshKey = ref(0)
+// 能力来自服务端主库复核，浏览器缓存里的 RoleIds 不决定入口是否可见。
+async function refreshStarGiftAccess() {
+  starGiftCanView.value = false
+  starGiftAccessError.value = ''
+  if (!isAuthed.value) return
+  starGiftAccessLoading.value = true
+  try { const data = await portalRequest('official_star_gift_records', { Action: 'Capabilities' }); starGiftCanView.value = data.CanView === true }
+  catch (error) { starGiftAccessError.value = error.message }
+  finally { starGiftAccessLoading.value = false }
+}
 const invitationLink = computed(() => typeof window === 'undefined' ? '' : `${window.location.origin}/login.html?tab=register&invite=${encodeURIComponent(currentUser.value?.Id || '')}`)
 async function portalRequest(key, params = {}) {
   const response = await authenticatedFetch(apiEngineUrl(key), { method: 'POST', body: JSON.stringify(params) })

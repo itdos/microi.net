@@ -2012,6 +2012,7 @@ test("field conflict maps survive retries without process memory", () => {
 
 test("PageEngine diytable rows follow the installed menu table binding", () => {
   const queries = [];
+  const transaction = {};
   const remapContext = {
     idMaps: {
       Table: {},
@@ -2030,9 +2031,12 @@ test("PageEngine diytable rows follow the installed menu table binding", () => {
     menuJsonFields: [],
     fieldJsonFields: [],
     V8: {
+      DbTrans: transaction,
       FormEngine: {
-        GetFormData(tableName, query) {
+        GetFormData(tableName, query, trans) {
           queries.push([tableName, query.Id]);
+          // 菜单与表绑定可以仍在当前安装片中；独立连接不可读取未提交结果。
+          if (trans !== transaction) return { Code: 0, Msg: 'pending binding requires shared transaction' };
           if (tableName === "sys_menu" && query.Id === "target-menu") {
             return {
               Code: 1,

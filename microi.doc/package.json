@@ -33,6 +33,7 @@
 		"test:site-api": "node --test tests/site-api-base.test.mjs",
 		"test:nuget": "node --test tests/nuget-downloads.test.mjs tests/official-nuget-stats.test.mjs",
 		"test:dns-upstream": "node --test server/tests/dns-ip-upstream.test.mjs",
+		"test:star-gift": "node --test server/tests/star-gift-records.test.mjs",
 		"test:microservice-docs": "node --test tests/microservice-docs.test.mjs",
 		"test:image-lightbox": "node --test tests/doc-image-lightbox.test.mjs",
 		"test:ai-media": "node --test tests/ai-media-docs.test.mjs",
@@ -48,7 +49,7 @@
 		"test:marketplace": "node --test tests/marketplace-query-state.test.mjs tests/site-session.test.mjs",
 		"docs:dev": "vitepress dev docs --host",
 		"dev": "vitepress dev docs --host",
-		"docs:build": "node scripts/check-account-portal.mjs && node --test tests/account-portal-release.test.mjs && npm run check:content && npm run test:seo && vitepress build docs && node scripts/check-account-portal.mjs --dist && npm run check:theme && npm run check:seo",
+		"docs:build": "node scripts/check-account-portal.mjs && node --test tests/account-portal-release.test.mjs && npm run test:star-gift && npm run check:content && npm run test:seo && vitepress build docs && node scripts/check-account-portal.mjs --dist && npm run check:theme && npm run check:seo",
 		"build": "npm run docs:build",
 		"docs:preview": "vitepress preview docs"
 	},
