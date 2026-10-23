@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Net.WebSockets;
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
@@ -14,6 +15,51 @@ namespace Microi.Tests.FullStack;
 [Trait("Category", "FullStack")]
 public sealed class ManagedStorageAdmissionHttpTests
 {
+    private static readonly HashSet<string> SafeControlErrorTypes = new(StringComparer.Ordinal)
+    {
+        "BoundaryError", "ValueError", "PermissionError", "FileNotFoundError", "FileExistsError",
+        "NotADirectoryError", "IsADirectoryError", "OSError", "RuntimeError", "AssertionError",
+        "TypeError", "KeyError", "AttributeError", "ImportError", "ModuleNotFoundError",
+        "JSONDecodeError", "UnicodeDecodeError", "OperationalError", "ProgrammingError",
+        "IntegrityError", "DataError", "InternalError", "InterfaceError", "DatabaseError",
+        "ConnectionError", "ConnectionRefusedError", "ConnectionResetError", "BrokenPipeError",
+        "TimeoutError", "RedisError", "ResponseError", "AuthenticationError"
+    };
+
+    /// <summary>
+    /// helper 已由源码哈希绑定，但其异常仍可能含数据库口令或原文；只采纳固定类型与有界数值，
+    /// 不将原 stderr、Message、命令、路径或 JSON 解析异常加入公共测试诊断。
+    /// </summary>
+    internal static string DescribeControlFailure(int exitCode, string? stderr)
+    {
+        var detail = "exitCode=" + exitCode.ToString(CultureInfo.InvariantCulture);
+        const string suffix = "; preserve its private intent/readback receipts (no automatic mutation retry)";
+        string Message() => "Owned fixture control failed (" + detail + ")" + suffix;
+        if (string.IsNullOrWhiteSpace(stderr) || stderr.Length > 2048) return Message();
+        try
+        {
+            using var text = new StringReader(stderr);
+            using var reader = new JsonTextReader(text) { MaxDepth = 4, DateParseHandling = DateParseHandling.None };
+            var value = JObject.Load(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+            // 顶层失败标记必须来自完整单一 JSON；日志前缀、尾随文本和重复字段均不能补票。
+            if (reader.Read() || value["Code"]?.Type != JTokenType.Integer || value["Code"]!.ToString() != "0") return Message();
+            var type = value["errorType"];
+            if (type?.Type != JTokenType.String || ((string)type!).Length > 64
+                || !SafeControlErrorTypes.Contains((string)type!)) return Message();
+            detail += "; errorType=" + (string)type!;
+            var code = value["errorCode"];
+            if (code?.Type == JTokenType.Integer
+                && int.TryParse(code.ToString(Formatting.None), NumberStyles.None, CultureInfo.InvariantCulture, out var number)
+                && number is >= 0 and <= 65535)
+                detail += "; errorCode=" + number.ToString(CultureInfo.InvariantCulture);
+        }
+        catch (JsonException)
+        {
+            // 原始错误输出只留在受限 helper 回执；失败诊断永远不展开解析异常。
+        }
+        return Message();
+    }
+
     [Fact]
     public async Task Authenticated_plain_locked_and_Hub_compatibility_paths_share_durable_admission()
     {
@@ -86,8 +132,8 @@ public sealed class ManagedStorageAdmissionHttpTests
             var stdout = child.StandardOutput.ReadToEndAsync(); var stderr = child.StandardError.ReadToEndAsync();
             // helper 每个网络操作有界；取消时仍等原子写入/回读落下结果，不因测试取消杀死未知提交。
             await child.WaitForExitAsync(CancellationToken.None);
-            var raw = await stdout; _ = await stderr;
-            Assert.True(child.ExitCode == 0, "Owned fixture control failed; preserve its private intent/readback receipts (no automatic mutation retry)");
+            var raw = await stdout; var failure = await stderr;
+            Assert.True(child.ExitCode == 0, DescribeControlFailure(child.ExitCode, failure));
             var result = JObject.Parse(raw); Assert.Equal(1, result.Value<int>("Code"));
             Assert.Equal(tenant, result.Value<string>("tenant")); Assert.Equal(nonce, result.Value<string>("owner"));
             return result;
