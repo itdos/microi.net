@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import {requireStaged,validateProfile,mysqlConnection,bootstrapSettings,regular,createPrivate} from './runtime.mjs';
-import {configureContext} from './contracts.mjs';
+import {configureContext,ACCOUNTS} from './contracts.mjs';
 
 test('non-staged Full fails before any transport or build and identifies the formal configuration',()=>{
   assert.throws(()=>requireStaged({}),/staged runtime.*MICROI_ADMISSION_PROFILE_FILE/);
@@ -31,6 +31,14 @@ test('bootstrap uses actual ten-field tuple and preserves effective Redis databa
 test('the per-run contract changes owner and tenant without any fixed historical task identity',()=>{
   for(const owner32 of ['a'.repeat(32),'b'.repeat(32)])assert.equal(configureContext({schema:1,task:'future-full-run',owner32,tenant:'StdAdmission_'+owner32,mainTenant:'IsolatedMain',parentDatabase:'owned_main',redis:{host:'127.0.0.1',port:63962,database:2},base:'http://127.0.0.1:64171/'}).owner32,owner32);
   assert.throws(()=>configureContext({schema:1,task:'future-full-run',owner32:'a'.repeat(32),tenant:'StdAdmission_'+'b'.repeat(32)}));
+});
+test('real admission accounts fit the unchanged production 2 to 20 character contract',()=>{
+  const accounts=[];
+  for(const owner32 of ['a'.repeat(32),'b'.repeat(32)]){
+    configureContext({schema:1,task:'future-full-run',owner32,tenant:'StdAdmission_'+owner32,mainTenant:'IsolatedMain',parentDatabase:'owned_main',redis:{host:'127.0.0.1',port:63962,database:2},base:'http://127.0.0.1:64171/'});
+    for(const account of Object.values(ACCOUNTS)){assert.match(account,/^[a-z0-9]{2,20}$/);accounts.push(account);}
+  }
+  assert.equal(new Set(accounts).size,4,'Owners and ordinary users remain distinct across attempts');
 });
 test('ordinary fixture files are accepted and ancestor links are rejected',()=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'admission-path-test-'));

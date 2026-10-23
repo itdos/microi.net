@@ -14,7 +14,9 @@ export function configureContext(value) {
   assert.ok(Number(base.port)>=1024&&Number(base.port)<=65535);assert.equal(base.pathname,'/');assert.equal(base.username+base.password+base.search+base.hash,'');
   CONTEXT=structuredClone(value);TASK=value.task;OWNER=value.owner32;TENANT=value.tenant;MAIN=value.mainTenant;
   MARKER=TASK+':'+OWNER;DID='MCP:admission-'+OWNER;
-  ACCOUNTS={owner:'admissiono'+OWNER.slice(0,15),ordinary:'admissionu'+OWNER.slice(0,15)};
+  // 正式账号 API 固定要求 2–20 字符；短角色前缀保留 60 位任务区分，完整
+  // owner 仍由 Remark/MARKER 校验，不能为测试夹具放宽生产账号长度限制。
+  ACCOUNTS={owner:'admo'+OWNER.slice(0,15),ordinary:'admu'+OWNER.slice(0,15)};
   return CONTEXT;
 }
 export const PROTOCOL_PATHS = [
