@@ -474,6 +474,9 @@ function validateV8FirstPackage(name, packageModel) {
     if (declaresMaintenance) notificationKeys.push(maintenanceKey);
     assertExactEngineKeys(packageModel, notificationKeys, name);
     if (declaresMaintenance) {
+      if (!/^v?\d+\.\d+\.\d+$/i.test(text(info.ServerMinVersion)) || compareVersions(info.ServerMinVersion, "8.6.5") < 0) {
+        throw new Error("升级资源[" + name + "]聊天维护最低后端版本必须为 8.6.5 或更高");
+      }
       var maintenancePolicy = packageModel.ResourcePolicies.ApiEngines[maintenanceKey];
       if (!maintenanceEngine || text(maintenanceEngine.Id) !== "019e29b3-2400-7b91-9801-000000000001"
           || text(maintenanceEngine.Version) !== "v1.0.0"

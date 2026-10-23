@@ -356,6 +356,14 @@ export function validateOfficialPackageInstallContracts(name, content) {
   }
 
   if (name === 'app.microi.saas-engine.json') assertLicenseLayoutPhysicalClosure(packageModel);
+  // 维护原子首次进入 8.6.5；仅列能力名不能让缺少该宿主能力的旧版本安装新入口。
+  if (name === 'app.microi.message-notification.json'
+      && getMessageNotificationContractKeys(packageModel).includes('platform-chat-maintenance')) {
+    const minimum = semanticVersionParts(packageModel.PackageInfo?.ServerMinVersion, '聊天维护最低后端版本');
+    if (compareSemanticVersionParts(minimum, [8, 6, 5]) < 0) {
+      throw new Error('聊天维护最低后端版本必须为 8.6.5 或更高');
+    }
+  }
   const gateAuditTable = 'mci_app_stream_gate_transition';
   if ((packageModel.DiyTables || []).some(row => String(row.Name || '').toLowerCase() === gateAuditTable)
       || (packageModel.DiyFields || []).some(row => String(row.TableName || '').toLowerCase() === gateAuditTable)

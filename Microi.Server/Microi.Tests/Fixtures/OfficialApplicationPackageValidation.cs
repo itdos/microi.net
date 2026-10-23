@@ -1074,7 +1074,7 @@ namespace Microi.net
                 return systemCode.Contains("platform-chat-runtime")
                     // 维护入口必须与宿主准入能力成套交付；缺权限或依赖声明的包不能进入 Full。
                     && System.Version.TryParse(serverMinimumText, out var serverMinimum)
-                    && serverMinimum >= new System.Version(8, 6, 4)
+                    && serverMinimum >= new System.Version(8, 6, 5)
                     && maintenance.Value<int?>("StopHttp") == 0
                     && maintenance.Value<int?>("AllowAnonymous") == 0
                     && maintenanceCode.Contains("V8.Method.ManageManagedStorageMaintenance")

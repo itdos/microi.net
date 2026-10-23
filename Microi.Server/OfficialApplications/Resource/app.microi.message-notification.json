@@ -48,7 +48,7 @@
     "Description": "统一消息通知：系统公告、邮件/短信/微信/平台内部业务通知与投递记录；保留原配置，支持 MCP、跨租户帐号范围及后端重启后首次登录提醒。需要平台接收协议 2。",
     "JobCount": 1,
     "IncludeSource": false,
-    "ServerMinVersion": "8.6.4",
+    "ServerMinVersion": "8.6.5",
     "ClientMinVersion": "8.5.2"
   },
   "DDLStatements": [

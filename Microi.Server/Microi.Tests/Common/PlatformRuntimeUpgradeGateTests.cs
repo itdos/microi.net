@@ -884,7 +884,7 @@ public class PlatformRuntimeUpgradeGateTests
         Assert.True(Assert.IsType<bool>(validate.Invoke(
             null, new object[] { "app.microi.message-notification.json", package })));
 
-        foreach (var minimum in new string?[] { null, "", "8.5.2", "8.6.3", "invalid" })
+        foreach (var minimum in new string?[] { null, "", "8.5.2", "8.6.3", "8.6.4", "invalid" })
         {
             var broken = (JObject)package.DeepClone();
             broken["PackageInfo"]!["ServerMinVersion"] = minimum;
