@@ -101,7 +101,13 @@ export function getMessageNotificationContractKeys(packageModel) {
   // 旧包仍兼容；统一中心版本必须完整交付四个接口，不能通过同时漏掉表和接口绕过闭包。
   const hasReminder = unified || (packageModel.DiyTables || []).some(table => table.Name === 'mci_platform_reminder')
     || (packageModel.SysApiEngines || []).some(engine => reminderKeys.includes(engine.ApiEngineKey));
-  return hasReminder ? keys.concat(reminderKeys) : keys;
+  const expected = hasReminder ? keys.concat(reminderKeys) : keys;
+  // 维护入口属于 v8.3.25 的固定 Managed 闭包；版本、接口或能力任一声明均要求完整交付，不能删掉接口后绕过校验。
+  const maintenanceKey = 'platform-chat-maintenance';
+  const hasMaintenance = compareSemanticVersionParts(semanticVersionParts(packageModel.PackageInfo?.Version, '消息通知版本', true), [8, 3, 25]) >= 0
+    || (packageModel.SysApiEngines || []).some(engine => engine.ApiEngineKey === maintenanceKey)
+    || (packageModel.PackageInfo?.RequiredPlatformCapabilities || []).some(value => String(value).startsWith(`ApiEngine:${maintenanceKey}@`));
+  return hasMaintenance ? expected.concat(maintenanceKey) : expected;
 }
 
 function semanticVersionParts(value, label, allowEmpty = false) {

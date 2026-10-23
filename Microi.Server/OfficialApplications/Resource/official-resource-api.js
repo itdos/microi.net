@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-upgrade-resource
- * Version: v1.4.4
+ * Version: v1.4.5
  * Function:
  * - 官方固定资源发布与投影控制面。默认九应用全量投影保持不变；SystemLog作用范围只接受app.microi.sys-log.json及同一PackageInfo.AppId，在可信官方管理员、完整已发布SHA和事务锁下复用现有Managed/CIM投影及缓存失效。
  */
@@ -463,7 +463,29 @@ function validateV8FirstPackage(name, packageModel) {
       if (findEngine(packageModel, reminderKeys[reminderIndex])) declaresReminders = true;
     }
     if (declaresReminders) notificationKeys = notificationKeys.concat(reminderKeys);
+    // 与离线发布契约保持同一精确闭包；维护入口不得在新版本中丢失，也不能被替换成匿名或租户 Hook。
+    var maintenanceKey = "platform-chat-maintenance";
+    var maintenanceEngine = findEngine(packageModel, maintenanceKey);
+    var declaresMaintenance = compareVersions(info.Version, "v8.3.25") >= 0 || !!maintenanceEngine;
+    var maintenanceCapabilities = asArray(info.RequiredPlatformCapabilities);
+    for (var maintenanceIndex = 0; maintenanceIndex < maintenanceCapabilities.length; maintenanceIndex++) {
+      if (text(maintenanceCapabilities[maintenanceIndex]).indexOf("ApiEngine:" + maintenanceKey + "@") === 0) declaresMaintenance = true;
+    }
+    if (declaresMaintenance) notificationKeys.push(maintenanceKey);
     assertExactEngineKeys(packageModel, notificationKeys, name);
+    if (declaresMaintenance) {
+      var maintenancePolicy = packageModel.ResourcePolicies.ApiEngines[maintenanceKey];
+      if (!maintenanceEngine || text(maintenanceEngine.Id) !== "019e29b3-2400-7b91-9801-000000000001"
+          || text(maintenanceEngine.Version) !== "v1.0.0"
+          || text(maintenanceEngine.ApiAddress) !== "/apiengine/platform-chat-maintenance"
+          || Number(maintenanceEngine.AllowAnonymous) !== 0 || Number(maintenanceEngine.StopHttp) !== 0
+          || text(maintenanceEngine.ApiRole) !== '["$authenticated"]'
+          || text(maintenancePolicy.Ownership) !== "Platform" || text(maintenancePolicy.UpgradePolicy) !== "Managed"
+          || maintenanceCapabilities.indexOf("ApiEngine:platform-chat-maintenance@v1.0.0") < 0
+          || text(maintenanceEngine.ApiV8Code).indexOf("V8.Method.ManageManagedStorageMaintenance") < 0) {
+        throw new Error("升级资源[" + name + "]聊天维护接口身份、权限或宿主准入能力契约不完整");
+      }
+    }
   }
   if (name === "app.microi.ai-engine.json") {
     assertExactEngineKeys(packageModel, [
