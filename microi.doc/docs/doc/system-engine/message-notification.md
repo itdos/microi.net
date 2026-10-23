@@ -352,11 +352,29 @@ SignalR 连接必须同时携带当前最新 DiyToken 和显式 `OsClient`，服
 
 ### 官方聊天运行时与租户扩展
 
-“消息通知” v1.0.9 单一拥有两个 `Managed` 核心：`platform-chat-system-message` 是旧系统消息 Controller 的最小门面，完成超级管理员校验后只转调 `platform-chat-runtime`；`platform-chat-runtime` 统一编排普通消息持久化、联系人、未读数、历史和已读、删除。两者均 `StopHttp=1`，源码顶部明确提示官方应用安装/更新/重装会恢复官方版，不应直接写入租户定制逻辑。v1.0.8 为聊天运行时分配了跨官方应用全局唯一的稳定 Id，避免与 AI 运行时在同一租户安装时发生主键冲突。
+“消息通知”应用单一拥有三个 `Managed` 聊天接口。它们随应用安装、更新或重装恢复官方正文，租户定制逻辑应放入专用 Hook。
+
+| 接口 | 职责与边界 |
+| --- | --- |
+| `platform-chat-system-message` | 旧系统消息入口的最小门面；验证超级管理员后转调聊天运行时，禁止匿名 |
+| `platform-chat-runtime` v1.2.0 | 消息持久化、联系人、未读数、历史、已读与删除；`StopHttp=1`，仅可信协议或内部调用 |
+| `platform-chat-maintenance` v1.0.0 | 单租户历史定位维护；禁止匿名，原生原子再次验证固定 Key、真实超级管理员及非访问密钥会话 |
+
+聊天运行时使用跨官方应用全局唯一的稳定 Id，避免与 AI 运行时在同一租户安装时发生主键冲突。
+
+#### 可信协议与消息身份
 
 SignalR Hub 调用聊天运行时仍保留 `Client` 权限语义，但不能因此把 `StopHttp` 改为 `0`。v1.0.9 由宿主在 DiyToken 和租户核验后，建立绑定固定 `platform-chat-runtime` Key、权威 `OsClient` 与当前用户快照的一次性可信协议上下文；V8 运行时先调用 `V8.Method.RequireManagedProtocolContext()` 原子消费，再执行聊天动作。普通 HTTP、伪造 `_CurrentUser` / `_InvokeType`、错误租户、错误 Key 和重放调用仍在进入业务代码前失败关闭；`platform-chat-system-message` 的内部 `Server` 嵌套调用不消费该 SignalR 上下文。
 
-运行时支持 `PersistMessage` / `PersistSystemMessage` / `PersistAssistantMessage` / `GetHistoryAndMarkRead` / `GetUnreadCount` / `TouchContact` / `ListContacts` / `DeleteContact`。用户和租户只取 `V8.CurrentUser` 与 `V8.OsClient`，忽略客户端伪造的发送人、用户 Id 和 `OsClient`。发送端应提供稳定 `RequestId`；运行时把“租户 + RequestId”哈希成确定性 Mongo `_id`，相同请求仅复用完全一致的已持久事实，载荷不一致则失败关闭。旧客户端未传 `RequestId` 时，兼容 Hub/Controller 会生成 ULID；这只保证单次调用，不能跨 HTTP/SignalR 重试去重。
+运行时支持 `PersistMessage` / `PersistSystemMessage` / `PersistAssistantMessage` / `GetHistoryAndMarkRead` / `GetUnreadCount` / `TouchContact` / `ListContacts` / `DeleteContact`。用户和租户只取 `V8.CurrentUser` 与 `V8.OsClient`，忽略客户端伪造的发送人、用户 Id 和 `OsClient`。发送端应提供稳定 `RequestId`；运行时把“租户 + RequestId”哈希成确定性 Mongo `_id`，在当前旧年度集合或持久定位索引能够定位原记录时，相同请求仅复用完全一致的已持久事实，载荷不一致则失败关闭。旧客户端未传 `RequestId` 时，兼容 Hub/Controller 会生成 ULID；这只保证单次调用，不能跨 HTTP/SignalR 重试去重。
+
+#### 旧消息兼容边界
+
+旧运行时 v1.0.2 只在 `chat_当年` 检查请求标识。未启动历史定位维护的租户继续旧兼容协议；没有定位记录的旧消息，在以后年度重放原 `RequestId` 仍可能产生月表副本。安装新版应用本身不会自动扫描、迁移或宣告全部旧消息幂等。
+
+跨月、跨年历史分页用于继续读取旧消息，不等于旧消息的写入索引已经迁移。历史发送结果不明确时，应先核对原消息，不能依赖重新发送来确认。新消息发送不逐条扫描全部历史；升级验收须把“历史能读到”和“旧年度请求重放不重复”分别记录。
+
+#### 租户 Hook 与投递
 
 租户定制统一写入 `platform-message-notification-custom-hook`。该接口使用 `CreateIfMissing`，首次安装后的源码、启用状态和软删除状态都归租户维护；默认正文精确为 `return { Code : 1 };`。运行时在 `BeforeChatRuntime` 与 `AfterChatRuntime` 阶段调用 Hook。Before 失败会在 MongoDB 写入前阻断；MongoDB 不参与 `V8.DbTrans`，所以已持久之后的 After/联系人投影失败不会把主结果反转为失败，而是以 `Code=1` 并在 `DataAppend.HookWarning` / `ProjectionWarnings` 返回告警。
 
@@ -364,15 +382,38 @@ Hook 只接收 `Stage`、`SourceApiEngineKey`、`Action`、`ActorUserId`、`Peer
 
 ### 跨月跨年的聊天历史
 
-聊天消息新写入 `diy_chat_{租户小写}_{yyyy}` 年度库的 `chat_{yyyyMM}` 月度集合，时间取原始持久事实。旧 `diy_chat_{租户小写}` 库中的 `chat_{yyyy}` 年集合及月集合继续兼容读取，升级无需先把所有历史迁入新库。联系人和稳定消息分区定位保留在旧基础库；同一 `RequestId` 跨月、跨年重试仍复用原始分区，不会再生成一条消息。
+聊天消息新写入 `diy_chat_{租户小写}_{yyyy}` 年度库的 `chat_{yyyyMM}` 月度集合，时间取原始持久事实。旧 `diy_chat_{租户小写}` 库中的 `chat_{yyyy}` 年集合及月集合继续兼容读取，升级无需先把所有历史迁入新库。联系人与稳定消息分区定位保留在旧基础库；已经由定位记录验证的 `RequestId` 跨月、跨年重试复用原始分区，未建立定位的旧消息仍受上面的兼容边界限制。
 
-`platform-chat-runtime` 的 `GetHistoryAndMarkRead` 使用 [V8.MongoDb.GetPartitionedTableData](../v8-engine/v8-server#跨年跨月分页-getpartitionedtabledata) 做时间、原生 Id 双字段游标分页；业务鉴权和双向消息条件由 Managed 接口引擎负责，C# 只提供租户边界、固定命名、索引和有界读取能力。不能只读当前月份，也不能用“本月已读到第一天”代表全部历史结束。
+旧兼容模式下，`platform-chat-runtime` 的 `GetHistoryAndMarkRead` 使用 [V8.MongoDb.GetPartitionedTableData](../v8-engine/v8-server#跨年跨月分页-getpartitionedtabledata) 做时间、原生 Id 双字段游标分页；完成定位维护后改用权威目录的索引游标及原文回查。两种模式的业务鉴权和双向消息条件均由 Managed 接口引擎负责，C# 只提供租户边界、固定命名、索引和有界读取能力。不能只读当前月份，也不能用“本月已读到第一天”代表全部历史结束。
 
 PC 和移动端通过 SignalR `GetChatHistoryPage` 直接获取本次调用的结果：`{ PeerUserId, Messages, HasMore, NextCursor }`。首请求 `HistoryCursor=''`，后续原样带回游标，每页默认 30 条；滚到顶部再异步加载，并补偿前插消息的滚动高度。`Messages=[]` 且 `HasMore=true` 时继续翻页；查询失败保留游标供重试。相同时间消息按稳定 Id 排序，重复消息按 `MessageId/RequestId/_id` 合并，不按正文去重。联系人切换、旧请求迟到和另一窗口的历史广播都不得覆盖当前会话。
 
 实时消息增量合并到列表，不全量重载历史；查看最新消息时，以独立的有界最新页更新已读回执，不重置向前翻页的游标。只标记实际返回页内、来自当前对话人的来信；未加载的旧消息保持未读。SignalR 负责即时投递，MongoDB 是消息持久事实，断线后应回读而不是把一次投递成功作为历史保存证明。
 
 部署时需要同时具备新的 MongoDB/Core/API 原子与对应“消息通知” Managed 运行时，然后更新 PC/移动前端。源码回归、真实 MongoDB 分区测试、在线资源回读、SignalR 与浏览器滚动验收分别记录，不能只更新前端就宣称跨年历史修复已在线生效。
+
+### 旧消息定位索引的维护窗口
+
+消息通知应用 **v8.3.25 及以上**的维护入口要求后端 **8.6.4 及以上**。先完成所有服务节点的二进制升级，再安装应用资源；应用包不会代替服务器升级，也不会自动迁移租户数据。
+
+维护只建立权威定位及分页索引，保留旧消息原文与物理分区。必须先核实所有写入节点已部署新的 Core、MongoDB、API 组件，旧进程和外部直接写库者已经退出；新节点的准入闸门不能约束仍运行旧代码的节点。
+
+使用当前租户超级管理员，经 MCP `microi_run_engine` 调用固定 `platform-chat-maintenance`。每一步核对 `Code`、当前租户、`Epoch` 与状态；结果不明确时先读取 `GateStatus` / `Status`，不要换操作标识重试。
+
+| 顺序 | `Operation` 与验收条件 |
+| --- | --- |
+| 1 | `Begin`：传稳定的 32 位小写十六进制 `OperationId`，保存返回的 `Epoch`；关闭本租户聊天运行时的新调用准入，历史读取也暂时拒绝 |
+| 2 | `Drain`：传同一 `Epoch`，等待真实活动调用归零且 `WritersDrained=true`，不能由客户端提交布尔值冒充排空 |
+| 3 | `Start`：显式传 `MaintenanceConfirmed=true` 与 8–100 位字母、数字、下划线或连字符的 `FenceId`；预建索引并保存目录快照 |
+| 4 | `Step`：每批传独立稳定的 `OperationId`（8–100 位字母、数字、下划线或连字符）和上次迁移 `Revision` 作为 `ExpectedRevision`；每批最多 100 行、8 个分区，未知结果重试同一批标识，遇冲突停止 |
+| 5 | `Status`：读取 `Data.Gate` 与 `Data.Migration`；迁移须满足 `Phase=Completed`、`ScanComplete=true`、`Conflicts=0`、`IndexesReady=true`，且 `FenceEpoch` 与当前闸门一致 |
+| 6 | `End`：传同一 `Epoch`；接口使用刚读到的闸门修订号做条件写，成功后恢复准入 |
+
+同一消息 Id 在不同物理分区存在多份，即使正文一样也记录冲突并保留全部原文。历史无时区时间、非法 Id、目录变化、未知存储响应或缺失索引均不能算作完成；需要核实原始事实后处理，不能自动删副本或猜测时区。只在尚无迁移状态、同一 Epoch 已完成 Drain 且无活动持有者时允许 `AbortUnstarted`，开始后应恢复原维护任务。
+
+进程异常退出留下的持久活动票据不会按 TTL 自动忽略。管理员必须先核实原写入者确已退出，再按运维证据恢复；不要清空闸门集合强行放行。维护期间其它租户保持各自准入状态。
+
+迁移完成后，历史页从权威定位索引按游标读取，再取对应原文；普通页不做全量计数，未读计数单独执行。未读数查询失败时保留未知状态，实时推送不能把未知值变成 `0`。
 
 ## 验收清单
 
@@ -381,7 +422,7 @@ PC 和移动端通过 SignalR `GetChatHistoryPage` 直接获取本次调用的�
 - 在线用户即时收到；离线用户、断网重连和 SignalR 故障后仍能从列表恢复。
 - 事务回滚不推送；提交后节点退出，持久日志仍可审计。
 - 用户不能读取或标记他人的通知；危险链接和超限参数被拒绝。
-- 无 Token、访问密钥、伪造租户/发送人被拒绝；相同 `RequestId` 并发只生成一条消息，不同载荷不得复用。
+- 无 Token、访问密钥、伪造租户/发送人被拒绝；当前写分区或持久定位命中时，相同 `RequestId` 并发只生成一条消息，不同载荷不得复用；旧年度无定位记录的限制单独记录。
 - 跨月、跨年、空月与旧年度集合连续翻页，无重复或缺页；同时间多消息、失败重试、切换联系人迟到请求和实时消息并发加载均保留正确顺序与滚动位置。
 - 实时已读回执不重置历史游标，不把未展示的旧消息批量标记已读；跨月重试仍只产生一条持久消息。
 - 公众号/服务号发送主体与小程序跳转分别验证。

@@ -371,14 +371,14 @@ namespace Microi.net
             if (data["Contacts"] != null)
                 await PushContactsAsync(osClient, actorUserId, ReadContacts(data, "Contacts"), externalContext)
                     .ConfigureAwait(false);
-            if (data["ActorUnreadCount"] != null)
-                await PushUnreadAsync(osClient, actorUserId, data["ActorUnreadCount"].Val<long>(), externalContext)
+            if (ChatUnreadProjection.TryGetCount(data["ActorUnreadCount"], out var actorUnreadCount))
+                await PushUnreadAsync(osClient, actorUserId, actorUnreadCount, externalContext)
                     .ConfigureAwait(false);
-            if (data["TargetUnreadCount"] != null)
-                await PushUnreadAsync(osClient, targetUserId, data["TargetUnreadCount"].Val<long>(), externalContext)
+            if (ChatUnreadProjection.TryGetCount(data["TargetUnreadCount"], out var targetUnreadCount))
+                await PushUnreadAsync(osClient, targetUserId, targetUnreadCount, externalContext)
                     .ConfigureAwait(false);
-            if (data["UnreadCount"] != null)
-                await PushUnreadAsync(osClient, actorUserId, data["UnreadCount"].Val<long>(), externalContext)
+            if (ChatUnreadProjection.TryGetCount(data["UnreadCount"], out var unreadCount))
+                await PushUnreadAsync(osClient, actorUserId, unreadCount, externalContext)
                     .ConfigureAwait(false);
         }
 
@@ -784,9 +784,9 @@ namespace Microi.net
                     await hubContext.Clients.Clients(client.ConnectionIds)
                         .ReceiveSendLastContacts(ReadContacts(data, "TargetContacts"))
                         .ConfigureAwait(false);
-                if (data["TargetUnreadCount"] != null)
+                if (ChatUnreadProjection.TryGetCount(data["TargetUnreadCount"], out var targetUnreadCount))
                     await hubContext.Clients.Clients(client.ConnectionIds)
-                        .ReceiveSendUnreadCountToUser(data["TargetUnreadCount"].Val<long>())
+                        .ReceiveSendUnreadCountToUser(targetUnreadCount)
                         .ConfigureAwait(false);
             }
             catch (Exception ex)

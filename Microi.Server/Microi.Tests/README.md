@@ -1,5 +1,7 @@
 # Microi.Tests
 
+原生 Full 宿主的进程观察器在每轮就绪校验中批量读取一次 CIM 进程表及 TCP 监听表，再逐 PID 校验原有身份、原生 CWD 和全部端口；不放宽 20 秒原生查询、30 秒夹具子命令及原身份断言。准入入口的子命令失败会把有界 stderr、退出码/信号和原生错误码保存到经 ACL 验证的私有 profile 目录 `admission-failure-*.json`，控制台只显示固定分类。stdout、命令参数明文和连接凭据不进入公开日志；私有诊断不得提交 Git 或上传公有证据桶。该诊断不代替重新执行原 Full。
+
 `Microi.Tests` 是吾码后端统一自动化测试入口，合并了原
 `Dos.Common.Tests` 与 `Dos.ORM.Tests`，并在私有源码存在时条件纳入
 `Microi.AI.Tests`、FormEngine、ApiEngine、安全与多租户边界回归。
@@ -120,9 +122,9 @@ Full 的 SDK 输出统一位于本次结果目录 `.net-artifacts`。`run-tests.
 隔离输出中同名的项目目录当成源码。内存诊断仍在独立子进程执行，并按当前测试
 程序集的 Configuration 与输出布局选定唯一夹具 DLL；产物缺失时失败，不借用旧 Debug。
 
-分阶段 Full 的原生依赖桥默认使用历史四端口。共享工作区并发时，可通过测试进程变量
-`MICROI_TEST_NATIVE_BRIDGE_PORTS='[63980,63982,63983,63984]'` 声明独占端口，并同步测试连接与
-协调器监听；显式配置必须四项有效、互异且不与本次双 API/Vite 端口重叠。端口集合以冻结环境为准，
+分阶段 Full 的原生依赖桥默认使用历史四端口。共享工作区并发时，在已冻结且经过私有 ACL/SHA
+校验的凭据 profile 中设置 `nativeBridgePorts:{mysql,redis,mongo,scheduleRedis}`，同步测试连接与
+协调器监听；显式配置必须完整四项且为互异有效整数。端口集合以冻结凭据为准，继承的进程环境不能改写验收目标，
 就绪及加密冒烟阶段均独立核对原协调器的真实 PID、父进程、创建时间、CWD、命令行和精确监听集合。
 该变量仅供测试工具使用，不是生产 API 配置；原 Full、存储证明、加密和发布门禁全部保留。
 
@@ -229,6 +231,48 @@ MySQL 升级夹具支持 `MICROI_TEST_UPGRADE_DATABASE=microi_test_upgrade_<任�
 原始值的历史测试接口，可设置
 `MICROI_TEST_API_ENGINE_RESPONSE_MODE=Any`，此时仍校验 GET/POST HTTP 与
 JSON 传输，但不会伪造不存在的 DosResult 断言。
+
+## Admission fixture：真实维护准入 HTTP 门禁
+
+Full 的维护准入门禁由 `run-tests.ps1` 自动调用正式
+`ReleaseGate/fixtures/admission/runtime.mjs`，不依赖某次任务目录的脚本。
+当前支持 staged runtime：最终构建后核验同次双 API、前端、桥进程、源码 HEAD、
+DLL 指纹与 fresh login，再创建独占 `adm_<32位nonce>` 租户。短前缀保留完整归属 nonce，并兼容存量 `sys_user.TenantId` 的36字符边界；临时账号不超过20字符，临时密码采用20字符强随机格式。 新租户先通过独立登记/物理库校验，再经正式应用导入接口安装源码闭包绑定的完整消息通知包；安装后仍必须通过聊天接口、归属和身份校验，禁止用SQL补接口。
+非 staged Full 或缺失 profile 会在重型构建前明确失败；该测试不能 Skip。
+
+在已有可信 staged Full 配置上设置 `MICROI_ADMISSION_PROFILE_FILE` 为绝对路径。
+文件须为私有普通文件（Windows 仅当前 SID 与 SYSTEM；POSIX 当前用户 0600），内容例如：
+
+```json
+{
+  "schema": 1,
+  "task": "your-isolated-full-task",
+  "expectedParentOwner": "your-registered-fixture-owner",
+  "python": "C:/your-private-runtime/python.exe",
+  "bootstrapFiles": ["C:/private/api-a/appsettings.json", "C:/private/api-b/appsettings.json"]
+}
+```
+
+`task` 必须等于同次 runtime-ready 的任务，长度 8–67；`expectedParentOwner`
+必须与已登记父测试库 `_ui_full_owner.TaskId` 相同。Python 需要 `pymysql`、`redis`。
+两份 API 配置仅使用既有十项 bootstrap 字段，均指向已授权 loopback 依赖，
+配置正文、端口、实际 ACL 和源码依赖在预检时冻结。不会认领旧数据库或创建新依赖服务。
+
+正式入口在 FullStack 前按顺序完成：父夹具只读归属核验、创建普通 owner、
+确认新租户/物理库不存在、调用正式 Managed 开通升级、读取真实注册及继承配置、
+登记新库所有权、真实登录与 AccessKey 最小授权。所有密码/Token、逐阶段意图、
+完整原文及 CAS 备份仅保存在本次结果目录 `admission/private`，创建后立即验证实际 ACL。
+`admission-ready.json` 独立绑定原 runtime-ready 的 SHA，不修改既有 ready 协议。
+
+HTTP 用例实际覆盖普通、分布式锁、Hub 兼容三条路径和在途排空；只在新租户中
+对两个固定 Managed Key 做逐字节 CAS 替换/恢复，并用 HTTP 回读确认 API 节点缓存已恢复。
+测试取消时使用独立有界清理 token；无法确认在途归零时保持维护关闭并保留备份，禁止强制解除。
+FullStack 退出后正式入口撤销本次 AccessKey、删除新租户普通测试用户；新租户、
+主测试库中的 owner 和精确资源清单保留供人工审查，不清空借用主/子库或伪造生产删除接口。
+
+任何未知写入只留意图并停止，不自动重放租户开通。失败后先核对 private 中的原始回执，
+按已冻结 context 与精确资源身份恢复；不得重新取当前哈希覆盖冲突或删除整套共享夹具。
+离线契约测试只证明守卫与控制语义，不能代替同次 Full 的实际 HTTP/Mongo/Redis 通过证据。
 
 ## 敏感信息规则
 

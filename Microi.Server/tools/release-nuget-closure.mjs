@@ -9,7 +9,7 @@ import { enumeratePendingPackages, readPendingPackageList } from './release-encr
 const sha = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
 // 只读取实际 ZIP 中唯一的包清单；不根据文件名或旧 obj 推测依赖。
-function packageMetadata(files) {
+export function packageMetadata(files) {
     const pythonScript = `import json, sys, zipfile, xml.etree.ElementTree as ET
 result=[]
 for filename in json.load(sys.stdin):

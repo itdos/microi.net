@@ -109,19 +109,22 @@ export const packageDefinitions = Object.freeze([
   Object.freeze({
     file: 'app.microi.message-notification.json',
     name: '消息通知',
-    version: 'v1.0.15',
+    version: 'v8.3.25',
+    serverMinVersion: '8.6.5',
     changeType: 'Fix',
     bootstrapUrl: 'https://static.itdos.com/itdos/microi-store/packages/01kz2t8tmetfx9m815r2rxttbz/202608/app_microi_message-notification-v1_0_5-db93ddd22b5fc2fb.json',
     bootstrapSha256: 'db93ddd22b5fc2fbf21b451e50b9fd1ce78cea970a4bea0d509f4386b99b2301',
     bootstrapSize: 250807,
-    history: '2026-09-02 v1.0.15 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。',
-    changeLogTitle: 'WebOS iOS 拟物透明图标升级',
-    changeType: 'Optimize',
-    changeLogContent: '将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。',
-    releaseTime: '2026-09-02 12:05:00',
+    history: '2026-10-23 v8.3.25 聊天历史按游标跨月跨年读取；未知未读数不广播为零。新增超级管理员单租户历史定位维护入口，显式排空写入后分批建立规范索引，保留原消息和冲突。所有服务节点需先升级宿主准入能力，安装应用不会自动迁移租户；未迁移租户继续兼容旧协议。保留既有平台提醒与租户 Hook。',
+    changeLogTitle: '聊天历史游标与可恢复索引维护',
+    changeLogContent: '支持跨月跨年游标历史与显式单租户索引维护；规范索引激活后，重复发送沿用原始消息，历史与未读数使用同一消息事实。维护要求全部服务节点升级、真实写入排空；冲突或未知状态不自动放行。不移动原聊天正文，不自动迁移其它租户，保留平台提醒配置与个性化 Hook。',
+    releaseTime: '2026-10-23 04:20:00',
     capabilities: [
       'ApiEngine:platform-chat-system-message@v1.1.0',
-      'ApiEngine:platform-chat-runtime@v1.1.0',
+      'ApiEngine:platform-chat-runtime@v1.2.0',
+      'ApiEngine:platform-chat-maintenance@v1.0.0',
+      'V8.Method.ManageManagedStorageMaintenance',
+      'V8.Method.RequireManagedStorageMaintenance',
       'V8.MongoDb.GetPartitionedTableData',
       'ApiEngine:platform-message-notification-custom-hook@v1.0.0',
       'ApiEngine:wechat_send_tpl_msg@v1.0.0',
@@ -138,12 +141,19 @@ export const packageDefinitions = Object.freeze([
       'msg_internal_mark_read',
       'platform-chat-system-message',
       'platform-chat-runtime',
+      'platform-chat-maintenance',
+      'platform-message-notification-config',
       'platform-message-notification-custom-hook',
+      'platform-reminder-official-feed',
+      'platform-reminder-runtime',
+      'platform-reminder-tick',
       'wechat_send_tpl_msg',
     ],
     engines: [
       { key: 'platform-chat-system-message', name: '平台系统消息编排', source: 'platform-chat-system-message.js', id: '019d2a01-9d63-7f91-8c02-000000000005', version: 'v1.1.0', enableLog: 1, apiRoutes: '/api/DiyChat/SendSystemMessage' },
-      { key: 'platform-chat-runtime', name: '平台聊天 Managed 运行时', source: 'platform-chat-runtime.js', id: '019d2a01-9d63-7f91-8c02-00000000000b', version: 'v1.1.0', enableLog: 1, stopHttp: 1 },
+      { key: 'platform-chat-runtime', name: '平台聊天 Managed 运行时', source: 'platform-chat-runtime.js', id: '019d2a01-9d63-7f91-8c02-00000000000b', version: 'v1.2.0', enableLog: 1, stopHttp: 1 },
+      // 固定身份供宿主核验；即使持有访问密钥或伪造 V8.Param，也不能取得维护权限。
+      { key: 'platform-chat-maintenance', name: '聊天历史索引维护', source: 'platform-chat-maintenance.js', id: '019e29b3-2400-7b91-9801-000000000001', version: 'v1.0.0', enableLog: 1, apiRole: '["$authenticated"]' },
       { key: 'platform-message-notification-custom-hook', name: '消息通知个性化扩展', source: 'platform-message-notification-custom-hook.js', id: '019d2a01-9d63-7f91-8c02-000000000006', version: 'v1.0.0', enableLog: 1, stopHttp: 1, ownership: 'Tenant', upgradePolicy: 'CreateIfMissing' },
       { key: 'wechat_send_tpl_msg', name: '微信模板消息可信适配器', source: 'wechat_send_tpl_msg.js', id: '019d2a01-9d63-7f91-8c02-00000000000c', version: 'v1.0.0', enableLog: 1, stopHttp: 1 },
     ],
@@ -888,6 +898,11 @@ export function configurePackageModel(packageModel, definition) {
   const info = packageModel.PackageInfo;
   const preserveNewerRelease = compareSemanticVersions(info.Version, definition.version) > 0;
   if (!preserveNewerRelease) info.Version = definition.version;
+  // 新的宿主原子必须先部署；重生成不得撤销之后版本声明的更高依赖。
+  if (definition.serverMinVersion
+      && compareSemanticVersions(info.ServerMinVersion, definition.serverMinVersion) < 0) {
+    info.ServerMinVersion = definition.serverMinVersion;
+  }
   info.ApiEngineCount = packageModel.SysApiEngines.length;
   const capabilityName = value => String(value || '').split('@')[0];
   const replacedCapabilityNames = new Set(definition.capabilities.map(capabilityName));

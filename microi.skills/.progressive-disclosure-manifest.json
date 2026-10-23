@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-23T15:59:19.620Z",
+  "generatedAt": "2026-10-23T18:37:10.792Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -3241,7 +3241,7 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "36659b4191923a4defec0132aff43e647cb7e127c5517a28bb828074dd79a957",
+      "originalSha256": "4d8d06f972f07a2ef9a97e3e27d09c9ed5ea1f3f17fda02c225210f8ee8d6b6a",
       "originalLines": 713,
       "prefixSha256": "c5d7890a69e031a8c9f63dc24982542084bd330d6b90b663b7f9187e597ae176",
       "prefixBytes": 15123,
@@ -3563,7 +3563,7 @@
           "id": "workspace-conventions-039",
           "ordinal": 39,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "d4b5a2a2aff6e403f15d6b4d91e1d04a8a9c10394a24a4edc6b57f1791a6bc4e",
+          "sha256": "709deb0b4a17de0548c17f7cb44f923543dd75a7927f15b4afe2da9fb597efd8",
           "lines": 17,
           "heading": "本地测试程序与依赖生命周期（强制）"
         }

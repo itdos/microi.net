@@ -101,7 +101,13 @@ export function getMessageNotificationContractKeys(packageModel) {
   // 旧包仍兼容；统一中心版本必须完整交付四个接口，不能通过同时漏掉表和接口绕过闭包。
   const hasReminder = unified || (packageModel.DiyTables || []).some(table => table.Name === 'mci_platform_reminder')
     || (packageModel.SysApiEngines || []).some(engine => reminderKeys.includes(engine.ApiEngineKey));
-  return hasReminder ? keys.concat(reminderKeys) : keys;
+  const expected = hasReminder ? keys.concat(reminderKeys) : keys;
+  // 维护入口属于 v8.3.25 的固定 Managed 闭包；版本、接口或能力任一声明均要求完整交付，不能删掉接口后绕过校验。
+  const maintenanceKey = 'platform-chat-maintenance';
+  const hasMaintenance = compareSemanticVersionParts(semanticVersionParts(packageModel.PackageInfo?.Version, '消息通知版本', true), [8, 3, 25]) >= 0
+    || (packageModel.SysApiEngines || []).some(engine => engine.ApiEngineKey === maintenanceKey)
+    || (packageModel.PackageInfo?.RequiredPlatformCapabilities || []).some(value => String(value).startsWith(`ApiEngine:${maintenanceKey}@`));
+  return hasMaintenance ? expected.concat(maintenanceKey) : expected;
 }
 
 function semanticVersionParts(value, label, allowEmpty = false) {
@@ -350,6 +356,14 @@ export function validateOfficialPackageInstallContracts(name, content) {
   }
 
   if (name === 'app.microi.saas-engine.json') assertLicenseLayoutPhysicalClosure(packageModel);
+  // 维护原子首次进入 8.6.5；仅列能力名不能让缺少该宿主能力的旧版本安装新入口。
+  if (name === 'app.microi.message-notification.json'
+      && getMessageNotificationContractKeys(packageModel).includes('platform-chat-maintenance')) {
+    const minimum = semanticVersionParts(packageModel.PackageInfo?.ServerMinVersion, '聊天维护最低后端版本');
+    if (compareSemanticVersionParts(minimum, [8, 6, 5]) < 0) {
+      throw new Error('聊天维护最低后端版本必须为 8.6.5 或更高');
+    }
+  }
   const gateAuditTable = 'mci_app_stream_gate_transition';
   if ((packageModel.DiyTables || []).some(row => String(row.Name || '').toLowerCase() === gateAuditTable)
       || (packageModel.DiyFields || []).some(row => String(row.TableName || '').toLowerCase() === gateAuditTable)

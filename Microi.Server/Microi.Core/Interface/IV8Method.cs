@@ -15,6 +15,8 @@ namespace Microi.net
     /// </summary>
     public interface IV8Method
     {
+        DosResult RequireManagedStorageMaintenance(dynamic dynamicParam);
+        DosResult ManageManagedStorageMaintenance(dynamic dynamicParam);
         /// <summary>当前 HTTP 上传请求的可信文件流入口，不接受可覆盖身份或桶策略的参数。</summary>
         Task<DosResult> UploadCurrentRequestAsync();
         /// <summary>读取当前上传请求的租户兼容开关。</summary>

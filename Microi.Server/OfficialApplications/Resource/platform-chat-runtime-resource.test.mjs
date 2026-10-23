@@ -82,7 +82,7 @@ export function createRuntime({
     GetFormData(request) {
       calls.push(['GetFormData', clone(request)]);
       const row = collection(request.TableName).get(request.Id);
-      return row ? { Code: 1, Data: clone(row) } : { Code: 2 };
+      return row ? { Code: 1, Data: clone(row) } : { Code: 1, Data: null };
     },
     AddFormData(request) {
       calls.push(['AddFormData', clone(request)]);
@@ -360,4 +360,103 @@ test('source contract uses exact deterministic ids and never trusts Param actor 
   assert.match(source, /DbName:readRow\._PartitionDb/);
   assert.match(source, /V8\.MongoDb\.DelFormDataByWhere/);
   assert.doesNotMatch(source, /param\.(?:OsClient|FromUserId|UserId)\b/);
+});
+
+// PLATFORM_CHAT_NATIVE_MISSING_REGRESSIONS
+// 缺失、失败、未知 ACK 和重复请求必须分别验证，避免模拟器再次掩盖真实 Mongo 契约。
+const pointer='chat_message_location';
+const input={Action:'PersistMessage',RequestId:'owned-null-contract',ToUserId:'user-2',Content:'独立测试消息'};
+const isBody=r=>/^chat_\d{6}$/.test(r.TableName);
+const writes=h=>h.calls.filter(([name,r])=>name==='AddFormData'&&(r.TableName===pointer||isBody(r)));
+
+test('首次创建指针及正文，完整回读才确认；身份与年度库月集合绑定',()=>{
+  const h=createRuntime(),r=h.run({...input,FromUserId:'forged',OsClient:'forged'});
+  assert.equal(r.Code,1);assert.equal(r.DataAppend.StorageCommitted,true);
+  assert.equal(writes(h).length,2);assert.equal(h.messages.size,1);
+  const body=writes(h).find(([,r])=>isBody(r))[1];
+  assert.equal(body.DbName,'diy_chat_tenant-a_2026');assert.equal(body.TableName,'chat_202608');
+  assert.equal(body.OccurredAt,'2026-08-25 12:00:00');assert.equal(body._FormData.FromUserId,'user-1');
+  assert.ok(h.calls.every(([,r])=>r.OsClient==='tenant-a'));
+});
+
+test('同 RequestId 重放不重建指针或正文；冲突内容与收件人不能覆盖',()=>{
+  const h=createRuntime(),first=h.run(input),body=JSON.stringify([...h.messages]),count=writes(h).length;
+  const replay=h.run(input);assert.equal(replay.Code,1);assert.equal(replay.DataAppend.Duplicate,true);
+  assert.equal(first.Data.Message.MessageId,replay.Data.Message.MessageId);assert.equal(writes(h).length,count);
+  for(const delta of [{Content:'不同内容'},{ToUserId:'user-3'}]){
+    const bad=h.run({...input,...delta});assert.equal(bad.Code,0);assert.match(bad.Msg,/RequestId/);
+    assert.equal(JSON.stringify([...h.messages]),body);assert.equal(writes(h).length,count);
+  }
+});
+
+test('旧 Code2 无正文仍兼容；Code1 不带 Data 不是可信不存在',()=>{
+  const legacy=createRuntime(),get=legacy.v8.MongoDb.GetFormData;
+  legacy.v8.MongoDb.GetFormData=r=>{const v=get(r);return v.Code===1&&v.Data===null?{Code:2}:v};
+  assert.equal(legacy.run(input).Code,1);
+  const broken=createRuntime();broken.v8.MongoDb.GetFormData=()=>({Code:1});
+  assert.equal(broken.run(input).Code,0);assert.equal(writes(broken).length,0);
+});
+
+for(const location of ['pointer','legacy','body'])for(const outcome of ['failed','absent-response','malformed-success']){
+  test(`${location} 读取 ${outcome} 必须停止，不能误判为缺失并新增`,()=>{
+    const h=createRuntime(),get=h.v8.MongoDb.GetFormData;
+    h.v8.MongoDb.GetFormData=r=>{
+      const selected=location==='pointer'?r.TableName===pointer:location==='legacy'?r.TableName==='chat_2026':isBody(r);
+      return selected?(outcome==='failed'?{Code:0,Data:null,Msg:'测试读取失败'}:outcome==='absent-response'?null:{Code:1}):get(r);
+    };
+    assert.equal(h.run(input).Code,0);
+    assert.equal(writes(h).filter(([,r])=>isBody(r)).length,0);
+    assert.equal(writes(h).filter(([,r])=>r.TableName===pointer).length,location==='body'?1:0);
+  });
+}
+
+for(const location of ['pointer','body'])for(const outcome of ['ack-error','ack-throw']){
+  test(`${location} 写入成功但 ${outcome}：仅固定 Id 回读确认，不重发`,()=>{
+    const h=createRuntime(),add=h.v8.MongoDb.AddFormData;
+    h.v8.MongoDb.AddFormData=r=>{
+      const result=add(r),selected=location==='pointer'?r.TableName===pointer:isBody(r);
+      if(selected){if(outcome==='ack-throw')throw Error('测试丢失 ACK');return{Code:0,Msg:'测试丢失 ACK'}}return result;
+    };
+    const result=h.run(input);assert.equal(result.Code,1);assert.equal(h.messages.size,1);assert.equal(writes(h).length,2);
+    assert.equal(h.run(input).Code,1);assert.equal(writes(h).length,2);
+  });
+}
+
+for(const location of ['pointer','body'])test(`${location} 写入结果未知且未提交，不确认成功；相同请求后续可恢复`,()=>{
+  const h=createRuntime(),add=h.v8.MongoDb.AddFormData;let interrupted=false,attempts=0;
+  h.v8.MongoDb.AddFormData=r=>{
+    if((location==='pointer'?r.TableName===pointer:isBody(r))&&!interrupted){attempts++;interrupted=true;throw Error('测试未知写入')}
+    return add(r);
+  };
+  assert.equal(h.run(input).Code,0);assert.equal(attempts,1);assert.equal(h.messages.size,0);
+  assert.equal(h.run(input).Code,1);assert.equal(h.messages.size,1);assert.equal(h.collection(pointer).size,1);
+});
+
+test('指针已写但回读失败，跨年重试沿用原指针和发生时间，不生成次月消息',()=>{
+  let time='2026-12-31 23:59:59',block=true,created=false;
+  const h=createRuntime({system:{DateTime:{Now:{ToString:f=>f==='yyyy'?time.slice(0,4):time}}}});
+  const add=h.v8.MongoDb.AddFormData,get=h.v8.MongoDb.GetFormData;
+  h.v8.MongoDb.AddFormData=r=>{const v=add(r);if(r.TableName===pointer)created=true;return v};
+  h.v8.MongoDb.GetFormData=r=>r.TableName===pointer&&created&&block?{Code:0,Data:null}:get(r);
+  assert.equal(h.run(input).Code,0);assert.equal(h.messages.size,0);
+  block=false;time='2027-01-01 00:00:01';assert.equal(h.run(input).Code,1);
+  const body=writes(h).filter(([,r])=>isBody(r));assert.equal(body.length,1);
+  assert.equal(body[0][1].TableName,'chat_202612');assert.equal(body[0][1].OccurredAt,'2026-12-31 23:59:59');
+  assert.equal(h.collection('chat_202701').size,0);
+});
+
+test('正文已写但回读失败，恢复后重放只回读一次消息事实',()=>{
+  const h=createRuntime(),add=h.v8.MongoDb.AddFormData,get=h.v8.MongoDb.GetFormData;let written=false,blocked=true;
+  h.v8.MongoDb.AddFormData=r=>{const v=add(r);if(isBody(r))written=true;return v};
+  h.v8.MongoDb.GetFormData=r=>isBody(r)&&written&&blocked?{Code:0,Data:null}:get(r);
+  assert.equal(h.run(input).Code,0);assert.equal(h.messages.size,1);const count=writes(h).length;
+  blocked=false;const replay=h.run(input);assert.equal(replay.Code,1);assert.equal(replay.DataAppend.Duplicate,true);
+  assert.equal(writes(h).length,count);assert.equal(h.messages.size,1);
+});
+
+test('并发占用相同指针 Id 的不同摘要必须拒绝，不能新增或覆盖正文',()=>{
+  const h=createRuntime(),add=h.v8.MongoDb.AddFormData;
+  h.v8.MongoDb.AddFormData=r=>r.TableName===pointer?add({...r,_FormData:{...r._FormData,PayloadHash:'other'}}):add(r);
+  assert.equal(h.run(input).Code,0);assert.equal(h.messages.size,0);assert.equal(h.collection(pointer).size,1);
+  assert.equal([...h.collection(pointer).values()][0].PayloadHash,'other');
 });

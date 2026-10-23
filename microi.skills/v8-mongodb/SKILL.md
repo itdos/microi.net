@@ -114,6 +114,10 @@ var result = V8.MongoDb.GetFormData({
 });
 ```
 
+`GetFormData` 的原生不存在结果是 `{ Code: 1, Data: null }`；只有 `Code=1` 且 `Data` 是文档时才表示找到记录。不要套用 `V8.FormEngine.GetFormData` 的 `Code=2` 约定。查询失败、异常、空响应或缺失 `Data` 字段不能当作记录不存在并继续新增。兼容旧适配器时，仅接受 `Code=2` 且没有正文的明确不存在结果。
+
+聊天等幂等写入先使用固定业务标识定位分区；首次不存在时才新增。Mongo 写入结果未知时只回读同一 `_id` 并比对完整载荷摘要，禁止换 Id 或月份盲重发。正文已持久化但联系人、实时推送或后置 Hook 失败时保留已提交事实；业务层分别返回投影警告，不能宣称消息没有写入。
+
 ## 查询文档列表
 
 ```javascript
@@ -173,6 +177,18 @@ return { Code: 1, Data: {
 该原子需部署相应 Core/MongoDB/API 组件并更新 Managed 应用运行时。源码测试不等于线上 MongoDB、SignalR 或浏览器验收；至少覆盖跨月、跨年、空月、同时间多消息、旧年度集合、重复迁移数据、跨租户拒绝、断线重试和滚动位置。
 
 ## 实战模式
+
+### 物理审计与权威索引分页
+
+`GetPartitionedTableData` 的高级模式需在可信接口引擎完成业务权限校验后使用，不能把客户端参数直接作为库、集合或索引定义：
+
+- `PhysicalRows:true` 保留同 Id 的所有物理副本，按分区和 `_id` 扫描。`PageSize` 默认/上限 100，`MaxPartitions` 默认/上限 8；不接受 `_WhereAny` 或 `CountOnly`。只有省略 `_Where` 的完整扫描才有 `FullPhysicalScope=true`，带条件的扫描不能证明全租户迁移完成。
+- 物理扫描返回 `DirectoryHash/NextCursor/HasMore`，继续时原样带回；目录或集合身份变化、非法 `_id` 必须失败关闭，不得跳过再宣称迁移完成。
+- `CollectionPage:true` 使用可信 `DatabasePrefix/TableName`，`IndexFields` 为 1–4 个字段，`_Where` 必须完整等值匹配这些前缀。`SortField` 是不在前缀内的文本字段，与原生 `_id` 倒序分页。`PageSize` 默认 30、上限 100，普通页不计数。
+- 索引必须在维护阶段用 `EnsureIndex:true` 显式准备；普通读取仅 Hint 已存在的索引。`CountOnly:true` 单独执行索引计数；准备与计数不接受游标。不把首次用户页面加载变成全量索引构建。
+- 两种模式互斥，返回的 `_PartitionDb/_PartitionTable` 仅供可信内部逻辑，公开 DTO 显式选字段。
+
+平台聊天迁移通过固定 Managed `platform-chat-maintenance` 编排。`V8.Method.ManageManagedStorageMaintenance` / `V8.Method.RequireManagedStorageMaintenance` 只接受真实当前租户、固定 Key、超级管理员及非访问密钥会话；普通 V8 MongoDB CRUD 不得读写宿主准入集合。先核实所有写节点升级，再关闭准入、真实排空、分批迁移、完整验证、条件释放；具体流程见 `../message-notification/references/contracts.md`。不能用客户端布尔值、TTL 或清空票据冒充排空。
 
 ### IoT 设备日志存储
 

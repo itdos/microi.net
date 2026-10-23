@@ -9,6 +9,19 @@ import {parsePrivateConfig,resolvePublishEndpoint,pushPackage} from '../../tools
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const cli=path.join(root,'Microi.Server/tools/secure-nuget-push.mjs');
 const releaseScript=fs.readFileSync(path.join(root,'Microi一键编译发布.sh'),'utf8');
+function writePackage(file){
+ const name=Buffer.from('Example.nuspec'),data=Buffer.from('<package><metadata><id>Example</id><version>8.5.7</version></metadata></package>');
+ let crc=0xffffffff;for(const byte of data){crc^=byte;for(let n=0;n<8;n++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}crc=(crc^0xffffffff)>>>0;
+ const local=Buffer.alloc(30),central=Buffer.alloc(46),end=Buffer.alloc(22);
+ local.writeUInt32LE(0x04034b50);local.writeUInt16LE(20,4);local.writeUInt32LE(crc,14);local.writeUInt32LE(data.length,18);local.writeUInt32LE(data.length,22);local.writeUInt16LE(name.length,26);
+ central.writeUInt32LE(0x02014b50);central.writeUInt16LE(20,4);central.writeUInt16LE(20,6);central.writeUInt32LE(crc,16);central.writeUInt32LE(data.length,20);central.writeUInt32LE(data.length,24);central.writeUInt16LE(name.length,28);
+ end.writeUInt32LE(0x06054b50);end.writeUInt16LE(1,8);end.writeUInt16LE(1,10);end.writeUInt32LE(central.length+name.length,12);end.writeUInt32LE(local.length+name.length+data.length,16);
+ const bytes=Buffer.concat([local,name,data,central,name,end]);fs.writeFileSync(file,bytes);return bytes;
+}
+const serviceIndex=()=>new Response(JSON.stringify({resources:[
+ {'@id':'https://push.example.test/api/v2/package','@type':'PackagePublish/2.0.0'},
+ {'@id':'https://flat.example.test/','@type':'PackageBaseAddress/3.0.0'}
+]}));
 
 async function withFixture(run){
  const base=path.join(root,'.tmp');fs.mkdirSync(base,{recursive:true});
@@ -72,19 +85,18 @@ test('official NuGet source may redirect its keyless index but cannot redirect t
 for(const status of [201,202,409])test(`streamed upload handles HTTP ${status} without exposing key`,async()=>withFixture(async directory=>{
  const secret='fictional-upload-key';
  const file=path.join(directory,'Example.8.5.7.nupkg');
- const packageBytes=Buffer.from([0x50,0x4b,0x03,0x04,0x00,0xff,0x2d,0x2d,0x0a]);
- fs.writeFileSync(file,packageBytes);
+ const packageBytes=writePackage(file);let uploaded=false;
  const fetches=[];
  const fetchImpl=async(url,options)=>{
   fetches.push({url:String(url),options});
-  if(options.method==='GET')return new Response(JSON.stringify({resources:[{'@id':'https://push.example.test/api/v2/package','@type':'PackagePublish/2.0.0'}]}),{status:200});
+  if(options.method==='GET')return String(url).endsWith('/index.json')?serviceIndex():uploaded?new Response(packageBytes):new Response(null,{status:404});
   const pieces=[];for await(const piece of options.body)pieces.push(Buffer.from(piece));
   fetches.at(-1).bytes=Buffer.concat(pieces);
-  return new Response(null,{status});
+  uploaded=true;return new Response(null,{status});
  };
  const result=await pushPackage(file,{apiKey:secret,source:'https://packages.example.test/v3/index.json'},{fetchImpl,boundary:'a'.repeat(48)});
  assert.equal(result,status===409?'duplicate':'uploaded');
- const upload=fetches[1];
+ const upload=fetches.find(call=>call.options.method==='PUT');
  assert.equal(upload.options.redirect,'manual');
  assert.equal(upload.options.headers['X-NuGet-ApiKey'],secret);
  assert.equal(upload.options.headers['X-NuGet-Protocol-Version'],'4.1.0');
@@ -95,11 +107,32 @@ for(const status of [201,202,409])test(`streamed upload handles HTTP ${status} w
 
 test('unknown upload HTTP response fails closed without echoing response body',async()=>withFixture(async directory=>{
  const secret='fictional-upload-key';
- const file=path.join(directory,'Example.8.5.7.nupkg');fs.writeFileSync(file,'not-a-real-package');
- const fetchImpl=async(_url,options)=>options.method==='GET'
-  ?new Response(JSON.stringify({resources:[{'@id':'https://push.example.test/api/v2/package','@type':'PackagePublish/2.0.0'}]}),{status:200})
+ const file=path.join(directory,'Example.8.5.7.nupkg');writePackage(file);
+ const fetchImpl=async(url,options)=>options.method==='GET'
+  ?String(url).endsWith('/index.json')?serviceIndex():new Response(null,{status:404})
   :new Response('server reflection '+secret,{status:403});
  await assert.rejects(()=>pushPackage(file,{apiKey:secret,source:'https://packages.example.test/v3/index.json'},{fetchImpl}),error=>{
   assert.equal(error.code,'upload-http');assert.equal(error.status,403);assert.equal(String(error).includes(secret),false);return true;
  });
+}));
+
+for(const result of ['different','absent','unknown'])test(`409 must not succeed when exact remote bytes are ${result}`,()=>withFixture(async directory=>{
+ const file=path.join(directory,'Example.8.5.7.nupkg');writePackage(file);let puts=0;
+ const fetchImpl=async(url,options)=>{
+  if(options.method==='PUT'){puts++;for await(const _ of options.body){}return new Response(null,{status:409});}
+  if(String(url).endsWith('/index.json'))return serviceIndex();
+  if(!puts)return new Response(null,{status:404});
+  return result==='different'?new Response('other candidate'):new Response(null,{status:result==='absent'?404:503});
+ };
+ await assert.rejects(()=>pushPackage(file,{apiKey:'fictional-secret',source:'https://packages.example.test/v3/index.json'},{fetchImpl}),/collision|unconfirmed|unknown/);
+ assert.equal(puts,1,'unknown outcome must not cause an upload retry');
+}));
+
+test('exact already-published package is reused without PUT; different package is never uploaded',()=>withFixture(async directory=>{
+ const file=path.join(directory,'Example.8.5.7.nupkg'),bytes=writePackage(file);
+ for(const same of [true,false]){
+  const fetchImpl=async(url,options)=>{assert.equal(options.method,'GET');return String(url).endsWith('/index.json')?serviceIndex():new Response(same?bytes:Buffer.alloc(bytes.length));};
+  const call=()=>pushPackage(file,{apiKey:'fictional-secret',source:'https://packages.example.test/v3/index.json'},{fetchImpl});
+  if(same)assert.equal(await call(),'duplicate');else await assert.rejects(call,/collision/);
+ }
 }));

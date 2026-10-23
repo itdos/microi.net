@@ -12,10 +12,17 @@ if ($isWindowsHost) {
     & ([scriptblock]::Create($manager.Substring($start, $end - $start)))
 }
 if ($ProcessIds -notmatch '^[1-9][0-9]*(,[1-9][0-9]*)*$') { throw 'Invalid process identity selection.' }
+# 同一轮只读取一次进程表和TCP监听表，避免四个PID触发四遍慢CIM扫描。
+# 仅归并观察成本；仍逐PID检查存在性、完整身份、原生CWD和全部监听端口，不隐藏额外端口。
+$selectedProcessIds = @($ProcessIds.Split(',') | ForEach-Object { [int]$_ })
+$processFilter = ($selectedProcessIds | ForEach-Object { "ProcessId=$_" }) -join ' OR '
+if (-not $isWindowsHost) { throw 'Staged runtime process identity currently requires the supported Windows native Full host.' }
+$observedProcesses = @(Get-CimInstance Win32_Process -Filter $processFilter)
+$observedListeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue)
 $rows = @(foreach ($processIdText in $ProcessIds.Split(',')) {
     $processId = [int]$processIdText
     if ($isWindowsHost) {
-        $process = Get-CimInstance Win32_Process -Filter "ProcessId=$processId"
+        $process = $observedProcesses | Where-Object { $_.ProcessId -eq $processId }
         if ($null -eq $process -and $AllowMissing) { continue }
         if ($null -eq $process -or -not $process.CommandLine -or -not $process.ExecutablePath) { throw 'Owned runtime process is unavailable.' }
         [ordered]@{
@@ -23,7 +30,7 @@ $rows = @(foreach ($processIdText in $ProcessIds.Split(',')) {
             exe = $process.ExecutablePath; commandLine = $process.CommandLine
             creationDate = $process.CreationDate.ToUniversalTime().ToString('o')
             cwd = [Microi.ProcessTools.NativeProcessInspector]::GetCurrentDirectory($processId)
-            listeningPorts = @((Get-NetTCPConnection -State Listen -OwningProcess $processId -ErrorAction SilentlyContinue).LocalPort)
+            listeningPorts = @(($observedListeners | Where-Object { $_.OwningProcess -eq $processId }).LocalPort)
         }
     } else { throw 'Staged runtime process identity currently requires the supported Windows native Full host.' }
 })

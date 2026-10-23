@@ -46,7 +46,41 @@ test('official publication validates complete reminder ownership and rejects a m
  assert.throws(()=>validate('app.microi.message-notification.json',JSON.stringify(broken)),/唯一所有权闭包/);
  const missingConfig=structuredClone(message);missingConfig.SysApiEngines=missingConfig.SysApiEngines.filter(e=>e.ApiEngineKey!=='platform-message-notification-config');missingConfig.PackageInfo.ApiEngineCount=missingConfig.SysApiEngines.length;
  assert.throws(()=>validate('app.microi.message-notification.json',JSON.stringify(missingConfig)),/唯一所有权闭包/);
+ // 删除、替名、重复都不能以调整 PackageInfo 计数绕过精确闭包。
+ for(const kind of ['missing','renamed','duplicate']){
+  const partial=structuredClone(message),engine=partial.SysApiEngines.find(e=>e.ApiEngineKey==='platform-chat-maintenance');
+  if(kind==='missing')partial.SysApiEngines=partial.SysApiEngines.filter(e=>e!==engine);
+  if(kind==='renamed')engine.ApiEngineKey='platform-chat-maintenance-unowned';
+  if(kind==='duplicate')partial.SysApiEngines.push(structuredClone(engine));
+  partial.PackageInfo.ApiEngineCount=partial.SysApiEngines.length;
+  assert.throws(()=>validate('app.microi.message-notification.json',JSON.stringify(partial)),/唯一所有权闭包|缺少接口引擎|Key 为空或重复|元数据或策略/);
+ }
+ // 固定入口的可信身份、非匿名权限和宿主准入不可被发布包降级。
+ for(const mutate of [
+  p=>{p.SysApiEngines.find(e=>e.ApiEngineKey==='platform-chat-maintenance').AllowAnonymous=1;},
+  p=>{p.SysApiEngines.find(e=>e.ApiEngineKey==='platform-chat-maintenance').ApiRole='[]';},
+  p=>{p.SysApiEngines.find(e=>e.ApiEngineKey==='platform-chat-maintenance').Id='unowned';},
+  p=>{p.ResourcePolicies.ApiEngines['platform-chat-maintenance'].Ownership='Tenant';},
+  p=>{p.PackageInfo.RequiredPlatformCapabilities=p.PackageInfo.RequiredPlatformCapabilities.filter(v=>v!=='ApiEngine:platform-chat-maintenance@v1.0.0');},
+ ]){const partial=structuredClone(message);mutate(partial);assert.throws(()=>validate('app.microi.message-notification.json',JSON.stringify(partial)),/聊天维护接口|Managed 接口缺少醒目恢复提示/);}
 });
+test('maintenance package rejects missing or pre-8.6.5 hosts in both publication paths',()=>{
+ const source=readFileSync(new URL('official-resource-api.js',import.meta.url),'utf8');
+ const validate=new Function('V8',source.slice(0,source.indexOf('var action ='))+'\nreturn validatePublishResource;')({Param:{}});
+ for(const minimum of [null,'','8.6.3','8.6.4','invalid']) {
+  const broken=structuredClone(message);broken.PackageInfo.ServerMinVersion=minimum;
+  const content=JSON.stringify(broken);
+  assert.throws(()=>validateOfficialPackageInstallContracts('app.microi.message-notification.json',content),/聊天维护最低后端版本/);
+  assert.throws(()=>validate('app.microi.message-notification.json',content),/聊天维护最低后端版本/);
+ }
+ for(const minimum of ['8.6.5','v8.6.5','8.7.0']) {
+  const current=structuredClone(message);current.PackageInfo.ServerMinVersion=minimum;
+  const content=JSON.stringify(current);
+  assert.doesNotThrow(()=>validateOfficialPackageInstallContracts('app.microi.message-notification.json',content));
+  assert.doesNotThrow(()=>validate('app.microi.message-notification.json',content));
+ }
+});
+
 test('reminder configuration has one System Engine entry and retires all legacy SaaS entry points',()=>{
  const table=saas.DiyTables.find(t=>t.Name==='sys_osclients');
  assert(!saas.DiyFields.some(f=>f.TableId===table.Id&&f.Name==='PlatformReminders'));

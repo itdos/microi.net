@@ -28,6 +28,7 @@ namespace Microi.net
         {
             JObject jobjParam = JsonHelper.ToJObject(dynamicParam);
             V8MongoDBParam param = jobjParam.ToObject<V8MongoDBParam>(DiyCommon.GetJsonSerializer());
+            RejectHostStorageCollection(param.TableName);
             return param;
         }
 
@@ -43,6 +44,7 @@ namespace Microi.net
         {
             try
             {
+                using var managedMutation = ManagedStorageAdmissionRuntime.BeginMutation();
                 V8MongoDBParam param = DynamicToV8MongoDBParam(dynamicParam);
                 if (param.OsClient.DosIsNullOrWhiteSpace())
                 {
@@ -106,6 +108,7 @@ namespace Microi.net
         {
             try
             {
+                using var managedMutation = ManagedStorageAdmissionRuntime.BeginMutation();
                 V8MongoDBParam param = DynamicToV8MongoDBParam(dynamicParam);
                 if (param.Id.DosIsNullOrWhiteSpace())
                 {
@@ -165,6 +168,7 @@ namespace Microi.net
         {
             try
             {
+                using var managedMutation = ManagedStorageAdmissionRuntime.BeginMutation();
                 V8MongoDBParam param = DynamicToV8MongoDBParam(dynamicParam);
                 param.OsClient = ResolveV8MongoTenant(param.OsClient);
                 if (param.OsClient.DosIsNullOrWhiteSpace())
@@ -212,6 +216,7 @@ namespace Microi.net
         {
             try
             {
+                using var managedMutation = ManagedStorageAdmissionRuntime.BeginMutation();
                 V8MongoDBParam param = DynamicToV8MongoDBParam(dynamicParam);
                 if (param.Id.DosIsNullOrWhiteSpace())
                 {
@@ -524,6 +529,7 @@ namespace Microi.net
         {
             try
             {
+                using var managedMutation = ManagedStorageAdmissionRuntime.BeginMutation();
                 V8MongoDBParam param = DynamicToV8MongoDBParam(dynamicParam);
                 param.OsClient = ResolveV8MongoTenant(param.OsClient);
                 if (param.OsClient.DosIsNullOrWhiteSpace())

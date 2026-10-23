@@ -9,7 +9,7 @@ outline: [2, 3]
 
 # Microi Agent
 
-Microi Agent 是基于DeepSeek Harness官方桌面源码的吾码AI工作台，提供Windows与macOS下载、版本校验，以及与VS Code、CLI共享的吾码能力。从 1.3.8 起采用官方桌面宿主；下载按钮显示各平台实际已发布的最新版本，不能把源码版本当作渠道版本。
+Microi Agent 是基于DeepSeek Harness官方桌面源码的吾码AI工作台，提供Windows与macOS下载、版本校验，以及与VS Code、CLI共享的吾码能力。从 1.3.8 起采用官方桌面宿主；下载按钮显示各平台已发布的可下载版本；手动安装包与自动更新频道分别记录，不能把源码版本或手动发行当作频道升级。
 
 <MicroiAgentShowcase />
 
@@ -62,7 +62,7 @@ Microi Agent 是基于DeepSeek Harness官方桌面源码的吾码AI工作台，�
 
 ::: tip Windows 1.4.2（2026-10-18）
 
-Windows 软件版本为 **1.4.2**，对应下载资源版本为 **v1.4.3**。顶部按钮继续使用永久 latest 入口，独立读取各平台实际已发布的版本；macOS 最后可用版本为 **1.3.6**；本轮发布前后按最新清单独立核对，本轮不发布新 Mac 包。
+Windows 软件版本为 **1.4.2**，对应下载资源版本为 **v1.4.3**。本次 1.4.2 已进入 Windows latest 频道，顶部下载选择规则见“安装、签名与平台兼容”；macOS 最后可用版本为 **1.3.6**；本轮发布前后按最新清单独立核对，本轮不发布新 Mac 包。
 
 本轮产品源码冻结于 `5593e92117b5cb4bb9f18d15ab9d5d9217ccd3ad`（C11），受保护输入 1132 文件 / SHA-256 `1efaef4c7623f0804d2dea9f946093710f20404baa2ccc8df518118cb2aecd9f`；资格流水、完整包与同包八项原生已取得实际通过原件。真实 D 升级及两个默认快捷方式已分别通过，【Windows 下载渠道已完成发布与双入口完整回读；官网按下述模式 6 流程独立发布】。Mac 新包仍须在 MacBook 独立构建、签名、公证和原生验收。以下 1.4.1 使用说明及历史发行证据继续保留。
 
@@ -189,7 +189,7 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 
 ## 安装、签名与平台兼容
 
-页面顶部的 Windows 与 macOS 按钮使用固定的 latest 入口，每次点击均从官方更新清单取得当前安装包地址。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.microi.net/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.microi.net/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.microi.net/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
+页面顶部的 Windows 按钮优先提供版本记录中较新的已发布不可变安装包；自动更新频道达到同版或更高版本后，按钮改用永久 latest 入口，后续频道升版无需再改官网。手动下载可用不表示自动更新已经推进；未取得发布与完整文件回读证据的候选不加入版本记录。macOS 按钮继续使用独立 latest 入口。旧版归档和当前安装包的 SHA-256 可在下方展开“版本记录”后查看；版本越多会自动分页。更新元数据由 [Windows latest.yml](https://api.microi.net/microi-code/updates/latest/latest.yml)、[macOS latest-mac.yml](https://api.microi.net/microi-code/updates/latest/latest-mac.yml) 和 [版本目录](https://api.microi.net/microi-code/updates/versions.json) 提供。macOS 自动更新使用 ZIP，DMG 用于手动安装。
 
 **本次发行记录（2026-10-18）**：Windows **1.4.2** 对应下载资源 **v1.4.3**；【渠道 Completed；完整 EXE 与清单回读通过；资源提交第 15 版，发行清单 SHA-256 19fc3bbba1b041455070a35b498d8ba514de33fa9de8c80fde619346febbf33d】。Mac 最新渠道 **1.3.6** / 清单 SHA-256 `ac9fab14113ab5ddd48b14c75aab865b867b912c102ad3b7fb96e38eec154a06` 已在发布前后完整回读并保留，不能由 Windows 结果推进。
 
@@ -225,7 +225,7 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 
 | 系统与架构 | 微软签名在线安装器 / 商店版 | 官网完整 EXE |
 | --- | --- | --- |
-| Windows 11 x64、Windows 10 2004 及以上 x64（含 22H2） | 满足包声明的系统条件；需联网，仍受商店可用性、账户、地区和管理员策略约束 | 提供最新版 1.3.6；当前未签名，客户原生安装、启动仍待验收 |
+| Windows 11 x64、Windows 10 2004 及以上 x64（含 22H2） | 满足包声明的系统条件；需联网，仍受商店可用性、账户、地区和管理员策略约束 | 提供本页顶部已发布的 Windows x64 完整安装包；签名状态与原生验收范围以对应发行记录为准 |
 | Windows 10 2004 之前的 x64（含 1809 / 1909） | 不满足当前商店包最低版本，不能用在线安装器绕过 | 当前 Electron / Node 以 Windows 10 为运行基线，但这些旧构建未验收；不承诺兼容，建议先升级系统 |
 | Windows 7 / 8 / 8.1、32 位 Windows（x86） | 不支持当前应用 | 不支持；当前 Electron 已不支持 Windows 7 / 8 / 8.1，包内 Node 和原生组件为 x64 |
 | Windows 11 ARM64 | 系统支持 x64 仿真，但本产品尚未完成 ARM 设备验收；没有 ARM64 原生包 | x64 仿真兼容性待验收；Windows 10 ARM 仅提供 x86 仿真，不能运行当前 x64 包 |

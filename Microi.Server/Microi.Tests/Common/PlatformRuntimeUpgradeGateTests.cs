@@ -876,6 +876,52 @@ public class PlatformRuntimeUpgradeGateTests
     }
 
     [Fact]
+    public void MessageNotificationGate_RejectsIncompleteMaintenanceDelivery()
+    {
+        var validate = GetPrivateStaticMethod("HasPackagedV8FirstApplicationRuntime");
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            FindServerRoot(), "OfficialApplications", "Resource", "app.microi.message-notification.json")));
+        Assert.True(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.message-notification.json", package })));
+
+        foreach (var minimum in new string?[] { null, "", "8.5.2", "8.6.3", "8.6.4", "invalid" })
+        {
+            var broken = (JObject)package.DeepClone();
+            broken["PackageInfo"]!["ServerMinVersion"] = minimum;
+            Assert.False(Assert.IsType<bool>(validate.Invoke(
+                null, new object[] { "app.microi.message-notification.json", broken })));
+        }
+        var newer = (JObject)package.DeepClone();
+        newer["PackageInfo"]!["ServerMinVersion"] = "8.7.0";
+        Assert.True(Assert.IsType<bool>(validate.Invoke(
+            null, new object[] { "app.microi.message-notification.json", newer })));
+
+        // 用实际发布包逐项制造缺件，防止仅校验 Key 存在就接受无法安全运维的包。
+        foreach (var capability in new[]
+        {
+            "ApiEngine:platform-chat-maintenance@v1.0.0",
+            "V8.Method.ManageManagedStorageMaintenance",
+            "V8.Method.RequireManagedStorageMaintenance"
+        })
+        {
+            var broken = (JObject)package.DeepClone();
+            broken["PackageInfo"]!["RequiredPlatformCapabilities"] = new JArray(
+                package["PackageInfo"]!["RequiredPlatformCapabilities"]!.Where(item => item?.ToString() != capability));
+            Assert.False(Assert.IsType<bool>(validate.Invoke(
+                null, new object[] { "app.microi.message-notification.json", broken })));
+        }
+        foreach (var field in new[] { "StopHttp", "AllowAnonymous" })
+        {
+            var broken = (JObject)package.DeepClone();
+            var maintenance = Assert.Single(broken["SysApiEngines"]!.Children<JObject>(),
+                item => item["ApiEngineKey"]?.ToString() == "platform-chat-maintenance");
+            maintenance[field] = 1;
+            Assert.False(Assert.IsType<bool>(validate.Invoke(
+                null, new object[] { "app.microi.message-notification.json", broken })));
+        }
+    }
+
+    [Fact]
     public void LegacyFieldTableNameProjection_WidensBeforeBackfillAndFreshInstallUsesSameCapacity()
     {
         var serverRoot = FindServerRoot();

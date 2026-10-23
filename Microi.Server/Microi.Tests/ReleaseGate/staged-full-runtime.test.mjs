@@ -8,6 +8,18 @@ import os from 'node:os';
 import * as runtime from './staged-full-runtime.mjs';
 import {validateReady,processIdentities} from './staged-full-runtime.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
+
+test('native process sampling batches CIM and TCP reads before inspecting selected PIDs',()=>{
+ // 一次就绪校验会观察四个进程；逐PID查询TCP表会放大原生命令时延，不能靠放宽时限接受。
+ const script=fs.readFileSync(new URL('./read-staged-runtime-identity.ps1',import.meta.url),'utf8');
+ const loop=script.indexOf('$rows = @(');assert.ok(loop>0);
+ const prefix=script.slice(0,loop),body=script.slice(loop);
+ assert.match(prefix,/Get-CimInstance Win32_Process/);
+ assert.match(prefix,/Get-NetTCPConnection -State Listen/);
+ assert.doesNotMatch(body,/Get-CimInstance|Get-NetTCPConnection/);
+ assert.match(body,/OwningProcess -eq \$processId/);
+ assert.match(body,/Owned runtime process is unavailable/);
+});
 test('the exact Full HDFS evidence survives build cleanup and rejects changed or foreign bytes',()=>{
  const results=fs.mkdtempSync(path.join(os.tmpdir(),'microi-hdfs-proof-'));
  const directory=path.join(results,'.net-artifacts');fs.mkdirSync(directory);
@@ -64,26 +76,48 @@ function transportFixture(){
  value.currentSupervisor=structuredClone(value.ready.supervisor);return value;
 }
 const verifyTransport=value=>runtime.validateTransportOnly(value.build,value.ready,value.transport,value.currentSupervisor,value.remaining,value.environment,value.accepted,value.receiptHash);
-
-test('configured native bridge ports retain fresh runtime identity and exact listener ownership',()=>{
- const ports=[63980,63982,63983,63984],value=fixture();
- value.environment.MICROI_TEST_NATIVE_BRIDGE_PORTS=JSON.stringify(ports);
- value.current.find(row=>row.pid===99).listeningPorts=ports;
+test('frozen credential profile supports independent bridge ports in both real exported validators',()=>{
+ const value=transportFixture(),ports={mysql:64160,redis:64162,mongo:64163,scheduleRedis:64164},list=Object.values(ports);
+ value.credentials.nativeBridgePorts=ports;
+ value.ready.supervisor.listeningPorts=list;
+ value.current.find(row=>row.pid===99).listeningPorts=list;
+ value.currentSupervisor.listeningPorts=list;
+ value.transport.retainedBridgePorts=list;
  assert.deepEqual(Object.keys(validate(value)),['MICROI_TEST_TOKEN','MICROI_TEST_CHILD_TOKEN']);
- for(const mutate of [v=>v.current.find(row=>row.pid===99).listeningPorts.pop(),v=>v.current.find(row=>row.pid===99).listeningPorts.push(64000),v=>v.current.find(row=>row.pid===99).parentPid=1]){
-  const invalid=structuredClone(value);mutate(invalid);assert.throws(()=>validate(invalid));
+ assert.equal(runtime.validateTransportOnly(value.build,value.ready,value.transport,value.currentSupervisor,value.remaining,value.environment,value.accepted,value.receiptHash,value.credentials),true);
+});
+test('native bridge profile rejects partial, ambiguous and out-of-range ports',()=>{
+ assert.deepEqual(runtime.nativeBridgePorts(),[63960,63962,63963,63964]);
+ const ports={mysql:64160,redis:64162,mongo:64163,scheduleRedis:64164};
+ assert.deepEqual(runtime.nativeBridgePorts({nativeBridgePorts:ports}),[64160,64162,64163,64164]);
+ for(const configured of [null,[],{}, {...ports,mysql:undefined}, {...ports,mysql:'64160'}, {...ports,mysql:1023},
+  {...ports,mysql:65536},{...ports,mysql:64162},{...ports,mysql:64160.5},{...ports,extra:64165}]){
+  const value=fixture();value.credentials.nativeBridgePorts=configured;
+  assert.throws(()=>validate(value),/bridge profile/i);
  }
 });
-
-test('configured bridge transport keeps the accepted Full barrier and rejects malformed or colliding ports',()=>{
- const ports=[63980,63982,63983,63984],value=transportFixture();
- value.environment.MICROI_TEST_NATIVE_BRIDGE_PORTS=JSON.stringify(ports);
- value.currentSupervisor.listeningPorts=ports;value.transport.retainedBridgePorts=ports;
- assert.equal(verifyTransport(value),true);
- for(const supplied of ['', 'null','{}','[63980]','[63980,63980,63983,63984]','[0,63982,63983,63984]','[65536,63982,63983,63984]','[63980.5,63982,63983,63984]','["63980",63982,63983,63984]','[63970,63982,63983,63984]']){
-  const invalid=transportFixture();invalid.environment.MICROI_TEST_NATIVE_BRIDGE_PORTS=supplied;assert.throws(()=>verifyTransport(invalid));
+test('configured bridge validators retain process, receipt and profile authority checks',()=>{
+ function configured(){const v=transportFixture(),ports={mysql:64160,redis:64162,mongo:64163,scheduleRedis:64164};
+  v.credentials.nativeBridgePorts=ports;v.ready.supervisor.listeningPorts=Object.values(ports);
+  v.current.find(row=>row.pid===99).listeningPorts=Object.values(ports);v.currentSupervisor.listeningPorts=Object.values(ports);
+  v.transport.retainedBridgePorts=Object.values(ports);return v;}
+ const transport=v=>runtime.validateTransportOnly(v.build,v.ready,v.transport,v.currentSupervisor,v.remaining,v.environment,v.accepted,v.receiptHash,v.credentials);
+ for(const change of [v=>v.currentSupervisor.parentPid=1,v=>v.currentSupervisor.creationDate='reused',
+  v=>v.currentSupervisor.cwd=root,v=>v.currentSupervisor.commandLine='foreign',v=>v.currentSupervisor.exe='foreign',
+  v=>v.currentSupervisor.listeningPorts.push(64165),v=>v.transport.retainedBridgePorts=[63960,63962,63963,63964],
+  v=>v.credentials.sourceHead='f'.repeat(40),v=>v.credentials.buildId='old',v=>v.credentials.env.MICROI_TEST_DID='other',
+  v=>v.credentials.credentialsRefreshedAt='2025-01-01T00:00:00Z',v=>v.remaining=[v.ready.processes[0]]]){
+  const value=configured();change(value);assert.throws(()=>transport(value));
  }
- const wrong=structuredClone(value);wrong.transport.retainedBridgePorts=[63960,63962,63963,63964];assert.throws(()=>verifyTransport(wrong));
+ for(const change of [v=>v.current.find(row=>row.pid===99).parentPid=1,v=>v.current.find(row=>row.pid===99).creationDate='reused',
+  v=>v.current.find(row=>row.pid===99).listeningPorts=[63960,63962,63963,63964],v=>v.current[0].cwd=root,
+  v=>v.ready.runtimeManifestSha256='f'.repeat(64)]){const value=configured();change(value);assert.throws(()=>validate(value));}
+});
+test('inherited environment cannot redefine the native bridge scope',()=>{
+ const value=fixture();value.environment.MICROI_TEST_NATIVE_BRIDGE_PORTS='[64160,64162,64163,64164]';
+ assert.deepEqual(Object.keys(validate(value)),['MICROI_TEST_TOKEN','MICROI_TEST_CHILD_TOKEN']);
+ value.current.find(row=>row.pid===99).listeningPorts=[64160,64162,64163,64164];
+ assert.throws(()=>validate(value),/four bridge ports/);
 });
 test('PrepareRelease barrier requires independently exited runtime PIDs and same-owner live native bridges',()=>{
  assert.equal(typeof runtime.validateTransportOnly,'function');assert.equal(verifyTransport(transportFixture()),true);

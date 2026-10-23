@@ -1282,7 +1282,7 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
 });
 
 test('官网发布接口以固定白名单、事务行锁和哈希保护多节点写入', () => {
-  assert.match(officialEngineSource, /Version: v1\.4\.4/);
+  assert.match(officialEngineSource, /Version: v1\.4\.5/);
   assert.match(officialEngineSource, /V8\.Method\.AuthorizeOfficialResourcePublish\(\)/);
   assert.doesNotMatch(officialEngineSource, /Number\(currentUser\.Level/);
   assert.match(officialEngineSource, /function lockPublishRows\(\)/);
@@ -1417,9 +1417,20 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 176);
+  assert.equal(seenKeys.size, 177);
   assert.ok(seenKeys.has('mci-tree-drag-sort'));
-  assert.equal(managedCount, 164);
+  assert.equal(managedCount, 165);
+  // 新增聊天维护只归通知包；数量增加必须同时证明固定身份、路由、非匿名权限及 Managed 策略。
+  const maintenance = publishedEngines.get('platform-chat-maintenance');
+  assert.ok(maintenance);
+  assert.equal(maintenance.packageName, 'app.microi.message-notification.json');
+  assert.deepEqual(maintenance.policy, {Ownership:'Platform', UpgradePolicy:'Managed'});
+  assert.equal(maintenance.engine.Id, '019e29b3-2400-7b91-9801-000000000001');
+  assert.equal(maintenance.engine.Version, 'v1.0.0');
+  assert.equal(maintenance.engine.ApiAddress, '/apiengine/platform-chat-maintenance');
+  assert.equal(maintenance.engine.ApiRole, '["$authenticated"]');
+  assert.equal(maintenance.engine.AllowAnonymous, 0);
+  assert.equal(maintenance.engine.StopHttp, 0);
   // 两个已发布许可管理入口归 SaaS 的 Managed 闭包；精确锁定新增归属和权限，不能仅放宽数量。
   for (const key of ['platform-license-management-state', 'platform-license-server-nodes']) {
     const actual = publishedEngines.get(key);

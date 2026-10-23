@@ -60,15 +60,18 @@ namespace Microi.net
 
                 try
                 {
-                    var userResult = MicroiEngine.FormEngine.GetFormDataAsync("sys_user", new
+                    // 此处是已绑定固定引擎/主租户/普通DiyToken的可信宿主边界。
+                    // FormEngine会对Pwd脱敏，不能把其投影当成真实密码材料，否则会
+                    // 无故退回随机admin密码。只按权威当前用户Id参数化读取，材料不返回V8。
+                    var hostClient = OsClientExtend.GetClient(osClient);
+                    object ownerRow = hostClient.Db.FromSql(@"SELECT Id, Pwd, Phone, Name FROM sys_user
+                        WHERE Id = @ProvisioningOwnerId AND State = 1
+                          AND (IsDeleted IS NULL OR IsDeleted <> 1)")
+                        .AddInParameter("ProvisioningOwnerId", userId)
+                        .First<dynamic>();
+                    if (ownerRow != null)
                     {
-                        Id = userId,
-                        OsClient = osClient,
-                        _SelectFields = new[] { "Id", "Pwd", "Phone", "Name" }
-                    }).GetAwaiter().GetResult();
-                    if (userResult.Code == 1 && userResult.Data != null)
-                    {
-                        var user = JObject.FromObject(userResult.Data);
+                        var user = JObject.FromObject(ownerRow);
                         encryptedPwd = user["Pwd"].Val<string>();
                         if (phone.DosIsNullOrWhiteSpace()) phone = user["Phone"].Val<string>();
                         if (userName.DosIsNullOrWhiteSpace()) userName = user["Name"].Val<string>();

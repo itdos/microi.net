@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet("Quick", "Full", "Panel")]
     [string]$Mode = "Quick",
@@ -104,6 +104,11 @@ if ($Mode -eq "Full") {
     if ($stagedRuntime -and ((Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_READY_FILE) -or (Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_BUILD_FILE))) {
         throw 'Staged Full requires new signal files; previous runtime/build receipts cannot be reused.'
     }
+    # 新 HTTP 门禁仅支持已经具备最终 DLL/进程/凭据身份核验的 staged runtime。
+    # 预检在所有构建/数据库写入前失败，不把缺夹具变成 Skip。
+    $admissionTool = Join-Path $testRoot 'ReleaseGate/fixtures/admission/runtime.mjs'
+    node $admissionTool preflight $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'Full admission fixture preflight failed. See Microi.Tests/README.md: Admission fixture.' }
     if ([string]::IsNullOrWhiteSpace($TestMatrixFile)) {
         throw 'Full requires MICROI_TEST_MATRIX_FILE with the verified MCP dependency versions and isolated fixture coordinates.'
     }
@@ -146,6 +151,24 @@ if ($env:MICROI_DESKTOP_NODE_HOME) {
 $env:PYTHONUTF8 = '1'
 $env:PYTHONIOENCODING = 'utf-8'
 
+function Get-MicroiDesktopTestPath {
+    param([string]$OriginalPath, [string]$NodeHome, [bool]$WindowsHost)
+    $prefixes = @()
+    if (-not [string]::IsNullOrWhiteSpace($NodeHome)) { $prefixes += $NodeHome }
+    if ($WindowsHost) {
+        # Git Bash 的 GNU tar 把 D: 等盘符当作远端主机；原生 Windows 测试使用
+        # 系统 API 返回的 bsdtar 目录，同时保留已核验的 Node 运行时最高优先级。
+        $systemDirectory = [Environment]::GetFolderPath([Environment+SpecialFolder]::System)
+        if ([string]::IsNullOrWhiteSpace($systemDirectory) -or
+            -not [IO.File]::Exists((Join-Path $systemDirectory 'tar.exe'))) {
+            throw 'Windows desktop regression requires the native system tar.exe.'
+        }
+        $prefixes += $systemDirectory
+    }
+    $prefixes += $OriginalPath
+    return $prefixes -join [IO.Path]::PathSeparator
+}
+
 # 创始人工作区中的 Microi Code 桌面应用以自身 package.json 的 Vitest 入口为
 # 单一事实源。公开仓不带该闭源目录，因此只在应用存在时纳入统一门禁；Vitest
 # 默认对零用例和失败用例返回非零，禁止把空的历史 tests/ 目录视作通过。
@@ -178,8 +201,8 @@ if (Test-Path -LiteralPath $desktopPackage) {
             if (-not (Test-Path -LiteralPath $desktopNode)) {
                 throw "MICROI_DESKTOP_NODE_HOME does not contain ${desktopNodeName}: $env:MICROI_DESKTOP_NODE_HOME"
             }
-            $env:Path = $env:MICROI_DESKTOP_NODE_HOME + [IO.Path]::PathSeparator + $originalDesktopTestPath
         }
+        $env:Path = Get-MicroiDesktopTestPath -OriginalPath $originalDesktopTestPath -NodeHome $env:MICROI_DESKTOP_NODE_HOME -WindowsHost ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop')
         # 正式门禁与数据库、浏览器和双 API 同机运行；串行 Vitest worker 保留全部
         # 用例，同时避免 Windows 提交额度紧张时并发 worker 产生伪失败或争用插件目录。
         npm test -- --maxWorkers=1 --no-file-parallelism
@@ -380,16 +403,39 @@ if ($Mode -eq "Full") {
         if ($missingAfterRuntime.Count -gt 0) { throw "Full runtime is missing prerequisites: $($missingAfterRuntime -join ', ')" }
     }
 
+    # 只有同次 verify-ready 成功后才允许准备独占租户；正式入口承担该生命周期。
+    $admissionJson = node $admissionTool prepare $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'Full admission fixture preparation failed; preserve its private receipts before retrying.' }
+    $admissionReady = $admissionJson | ConvertFrom-Json
+    $env:MICROI_ADMISSION_READY_FILE = $admissionReady.MICROI_ADMISSION_READY_FILE
+    $env:MICROI_ADMISSION_ENVIRONMENT_FILE = $admissionReady.MICROI_ADMISSION_ENVIRONMENT_FILE
+
     Write-Host "Running isolated-tenant FormEngine and ApiEngine full-stack tests..."
-    dotnet test $project `
-        -c $Configuration `
-        --no-build `
-        --no-restore `
-        --filter $matrixPlan.fullFilter `
-        --results-directory $ResultsDirectory `
-        --logger "trx;LogFileName=microi-full-stack.trx" `
-        -m:1
-    if ($LASTEXITCODE -ne 0) { throw "Full-stack release gate failed with exit code $LASTEXITCODE." }
+    $fullStackExit = $null
+    $fullStackLaunchError = $null
+    $admissionCleanupExit = $null
+    try {
+        dotnet test $project `
+            -c $Configuration `
+            --no-build `
+            --no-restore `
+            --filter $matrixPlan.fullFilter `
+            --results-directory $ResultsDirectory `
+            --logger "trx;LogFileName=microi-full-stack.trx" `
+            -m:1
+        $fullStackExit = $LASTEXITCODE
+    } catch {
+        $fullStackLaunchError = $_
+    } finally {
+        try {
+            node $admissionTool cleanup $ResultsDirectory
+            $admissionCleanupExit = $LASTEXITCODE
+        } catch { $admissionCleanupExit = 'LaunchFailed' }
+    }
+    # 清理失败不能掩盖原始测试退出码；TRX、私有意图与两个阶段结果均保留。
+    if ($fullStackLaunchError -or $fullStackExit -ne 0 -or $admissionCleanupExit -ne 0) {
+        throw "Full-stack failed: testExit=$fullStackExit; testLaunchFailed=$([bool]$fullStackLaunchError); admissionCleanupExit=$admissionCleanupExit. Preserve TRX and admission/private receipts."
+    }
 
     Write-Host "Validating incident evidence rendering, storage failures and mobile layout..."
     node (Join-Path $testRoot 'FullStack\incident-observability-component.mjs') $ResultsDirectory

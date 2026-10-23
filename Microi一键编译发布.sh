@@ -1693,6 +1693,9 @@ if [ "$PUSH_NUGET" = true ]; then
             fi
             node Microi.Server/tools/release-encryption.mjs packages-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_check_file" || print_fail "首个上传前 NuGet 清单或包字节发生变化；禁止全部上传。"
         fi
+        # 先查完整远端集合，避免推到一半才发现另一个候选已占用同版；未知读取也停止。
+        _nuget_remote_receipt="$MICROI_RELEASE_GATE_DIR/nuget-remote-${VERSION}-${RANDOM}-${RANDOM}.json"
+        node Microi.Server/tools/release-remote-collision.mjs nuget-preflight Microi.Server "$VERSION" "$_nupkg_list_file" "$CONFIG_FILE" "$_nuget_remote_receipt" || print_fail "远端 NuGet 同版本包不同或无法确认；禁止上传本轮包。"
         while IFS= read -r -d '' _nupkg; do
             node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "当前 NuGet 上传前候选源码发生变化；禁止上传。"
             if [ "$HAS_ENCRYPT" = true ]; then
@@ -1880,6 +1883,10 @@ docker_push_plan() {
         fi
     fi
 
+    # 固定版本标签在任何 latest 推送之前先全量核对；不能覆盖另一候选。
+    local collision_receipt="$MICROI_RELEASE_GATE_DIR/${plan_type}-remote-${version}-${RANDOM}-${RANDOM}.json"
+    node Microi.Server/tools/release-remote-collision.mjs docker-baseline "$local_image" "${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}" "$remote_images" "$version" "$collision_receipt" || print_fail "Docker 固定版本标签已被不同候选占用或远端状态未知；禁止推送。"
+
     # 推送每个远程镜像
     IFS=',' read -ra _images <<< "$remote_images"
     for _img_tag in "${_images[@]}"; do
@@ -1897,7 +1904,7 @@ docker_push_plan() {
         local _remote_tag=$(echo "$_img_tag" | cut -d':' -f2)
         docker tag "$local_image" "$full_tag"
         # 断点续发时仅复用已由当前本地镜像取得的同内容仓库摘要。
-        # 本地 RepoDigests 与远端指定标签均一致才跳过；查询失败或版本不同仍正常推送。
+        # 本地 RepoDigests 与远端指定标签均一致才跳过；下方最后复核拒绝状态漂移。
         local _published_repo="${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${_remote_name}"
         local _local_published_digest
         _local_published_digest=$(docker image inspect "$local_image" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
@@ -1907,10 +1914,13 @@ docker_push_plan() {
             _remote_digest=$(docker buildx imagetools inspect "$full_tag" --format '{{.Manifest.Digest}}' 2>/dev/null | tr -d '\r' || true)
         fi
         if [ "$_remote_digest" = "$_local_published_digest" ] && [ -n "$_remote_digest" ]; then
+            node Microi.Server/tools/release-remote-collision.mjs docker-recheck "$collision_receipt" "$full_tag" || print_fail "远端 Docker 标签在验收后变化，已停止发布。"
             print_info "已回读相同 digest，复用远端标签: $full_tag ($_remote_digest)"
             continue
         fi
         print_step "推送: $full_tag"
+        # Registry 没有跨仓库 CAS；每次 push 前缩短检查窗口，但不宣称原子发布。
+        node Microi.Server/tools/release-remote-collision.mjs docker-recheck "$collision_receipt" "$full_tag" || print_fail "远端 Docker 标签在验收后变化，已停止发布。"
         docker push "$full_tag"
     done
 
