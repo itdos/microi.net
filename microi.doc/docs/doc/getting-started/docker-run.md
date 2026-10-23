@@ -1700,7 +1700,14 @@ services:
       - LT_API_KEYS_DB_PATH=/app/db/api_keys.db
       # 仅用于首次向 LibreTranslate 注册密钥；请替换为随机强密钥。
       - LT_BOOTSTRAP_API_KEY=replace-with-a-random-strong-key
-      - LT_WORKERS=1
+      # LibreTranslate 入口使用 LT_THREADS 控制 Gunicorn worker；LT_WORKERS 不生效。
+      - LT_THREADS=1
+      - ARGOS_INTER_THREADS=1
+      - ARGOS_INTRA_THREADS=1
+      - OMP_NUM_THREADS=1
+      - OPENBLAS_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - NUMEXPR_NUM_THREADS=1
       - LT_TIMEOUT=120
     entrypoint: /bin/sh
     command: >

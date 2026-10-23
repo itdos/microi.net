@@ -18,6 +18,25 @@ test('installation summary does not claim a hard-coded password for an imported 
   assert.match(source, /登录帐号与初始密码: 以导入数据库为准/);
 });
 
+test('translation uses the upstream worker setting and bounded native model threads', () => {
+  const template = source.slice(source.indexOf('  microi-translate:'), source.indexOf("echo 'Microi：LibreTranslate 编排文件已生成"));
+  assert.match(template, /LT_THREADS=1/);
+  assert.doesNotMatch(template, /- LT_WORKERS=/);
+  for (const name of ['ARGOS_INTER_THREADS', 'ARGOS_INTRA_THREADS', 'OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'NUMEXPR_NUM_THREADS']) {
+    assert(template.includes(`- ${name}=1`), `${name} must bound inference concurrency`);
+  }
+  assert.match(template, /LT_API_KEYS=true/);
+  assert.match(template, /127\.0\.0\.1:/);
+});
+
+test('OCR also bounds native math threads without exposing the diagnostic port', () => {
+  const template = source.slice(source.indexOf('  microi-install-ocr:'), source.indexOf("echo 'Microi：OCR 编排文件已生成"));
+  for (const name of ['OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'NUMEXPR_NUM_THREADS']) {
+    assert(template.includes(`- ${name}=1`), `${name} must bound inference concurrency`);
+  }
+  assert.match(template, /127\.0\.0\.1:/);
+});
+
 function run(choice, mode) {
   // 执行安装器真实暂停区块；模拟外部命令结果，确保失败时不能继续启动 API。
   const input = ['set -e', 'database_exec_sql() {',

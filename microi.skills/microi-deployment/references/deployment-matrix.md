@@ -41,6 +41,8 @@
 
 恢复库在 API/Worker 启动前必须暂停业务任务与 Quartz 触发器并强回读。MySQL 5.7 的无表 `SELECT` 带 `WHERE` 时显式使用 `FROM DUAL`，兼容 8.0 和空任务表；校验命令非零退出、无标记或仅错误文本包含标记时均停止，区分 SQL 执行失败与状态不一致。中断的新安装先备份编排和数据库，保留原数据目录后恢复，不通过跳过任务暂停门禁续装。
 
+小规格宿主部署翻译与 OCR 时必须实际执行推理并同时检查 SSH/API 响应、线程数和可用内存。LibreTranslate 1.9.6 的容器入口使用 `LT_THREADS` 作为 Gunicorn worker 数，`LT_WORKERS` 不生效；使用 `LT_THREADS=1`、`ARGOS_INTER_THREADS=1`、`ARGOS_INTRA_THREADS=1` 并约束 OMP/OpenBLAS/MKL/NumExpr 原生线程。OCR 同样约束原生数学库线程。容器 Running、模型列表和健康 GET 不能代替首次真实推理验收；这些是附加服务配置，不进入吾码 API 十项启动环境变量。
+
 执行前：
 
 1. 固定目标目录和 compose 文件，解析所有 volume 的绝对宿主路径。

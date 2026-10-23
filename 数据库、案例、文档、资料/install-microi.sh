@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Alibaba Cloud Linux 3 / Anolis、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-10-23 11:44:30
+# 版本：v2026-10-23 12:04:38
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -113,7 +113,7 @@ microi_install_ops() {
 }
 
 
-SCRIPT_VERSION="v2026-10-23 11:44:30"
+SCRIPT_VERSION="v2026-10-23 12:04:38"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -5863,6 +5863,12 @@ services:
     container_name: ${OCR_CONTAINER_NAME}
 ${OCR_COMPOSE_SERVICE_NETWORK}
     init: true
+    # 原生数学库默认线程可能高于小规格宿主可承受并发；只限制模型线程，不改 API 配置。
+    environment:
+      - OMP_NUM_THREADS=1
+      - OPENBLAS_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - NUMEXPR_NUM_THREADS=1
     restart: unless-stopped
     ports:
       - "127.0.0.1:${OCR_PORT}:${OCR_INTERNAL_PORT}"
@@ -6113,7 +6119,15 @@ ${OCR_COMPOSE_SERVICE_NETWORK}
       - LT_LOAD_ONLY=${LIBRETRANSLATE_LANGS_CSV}
       - LT_API_KEYS=true
       - LT_API_KEYS_DB_PATH=/app/db/api_keys.db
-      - LT_WORKERS=1
+      # 上游入口用 LT_THREADS 设置 Gunicorn worker；LT_WORKERS 会被忽略并回落到 4。
+      # HTTP worker 和模型原生计算线程分别限为 1，避免首次推理压垮同机 API/数据库。
+      - LT_THREADS=1
+      - ARGOS_INTER_THREADS=1
+      - ARGOS_INTRA_THREADS=1
+      - OMP_NUM_THREADS=1
+      - OPENBLAS_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - NUMEXPR_NUM_THREADS=1
       - LT_TIMEOUT=120
     ports:
       - "127.0.0.1:${LIBRETRANSLATE_PORT}:${LIBRETRANSLATE_INTERNAL_PORT}"
