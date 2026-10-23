@@ -11,6 +11,23 @@ export const ROOT=path.resolve(HERE,'../../../../..');
 const SETTINGS=['OsClient','OsClientType','OsClientNetwork','OsClientDbType','OsClientDbConn','OsClientRedisHost','OsClientRedisPort','OsClientRedisPwd','OsClientRedisDataBase','OsClientDbMongoConn'];
 const json=bytes=>JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/,''));
 const same=(a,b)=>path.resolve(a).toLowerCase()===path.resolve(b).toLowerCase();
+let commandDiagnosticDirectory;
+let commandDiagnosticSequence=0;
+
+// 记录仅进入已验证ACL的私有目录。stdout可能含刚签发的Token，参数可能含业务秘密，均不保存。
+// 原失败仍原样抛出；有界诊断写入失败也不能覆盖原始命令失败。
+export function describeCommandFailure(result,exe,args,elapsedMs){
+  if(!result.error&&result.status===0)return null;
+  return {schema:1,at:new Date().toISOString(),executable:path.basename(exe),argumentSha256:sha(JSON.stringify(args)),elapsedMs,
+    exitCode:result.status??null,signal:result.signal??null,errorType:result.error?.name??null,nativeErrorCode:result.error?.code??null,
+    stderr:String(result.stderr||'').slice(-32768)};
+}
+function savePrivateFailure(record){
+  if(!commandDiagnosticDirectory)return {privateDiagnosticUnavailable:true};
+  const file=path.join(commandDiagnosticDirectory,`admission-failure-${Date.now()}-${process.pid}-${commandDiagnosticSequence++}.json`);
+  try{regular(file,{missing:true});fs.writeFileSync(file,JSON.stringify(record,null,2)+'\n',{flag:'wx',mode:0o600});return {privateDiagnosticFile:file};}
+  catch(error){return {diagnosticWriteErrorType:error.name,diagnosticWriteErrorCode:error.code??null};}
+}
 
 export function regular(file,{directory=false,missing=false}={}) {
   assert.ok(typeof file==='string'&&path.isAbsolute(file),'Fixture paths must be absolute');
@@ -26,10 +43,15 @@ export function regular(file,{directory=false,missing=false}={}) {
 }
 const read=file=>fs.readFileSync(regular(file));
 function command(exe,args,{timeout=30000,input}={}) {
+  const started=Date.now();
   const result=spawnSync(exe,args,{encoding:'utf8',windowsHide:true,timeout,maxBuffer:1024*1024,input});
   // 子进程错误可能含连接串；仅私有阶段回执可查看，控制台只给固定边界信息。
-  assert.equal(result.error,undefined,'Fixture process could not complete');
-  assert.equal(result.status,0,'Fixture process failed; preserve private intents and inspect before retry');
+  const failure=describeCommandFailure(result,exe,args,Date.now()-started);
+  const diagnostic=failure?savePrivateFailure(failure):null;
+  try{
+    assert.equal(result.error,undefined,'Fixture process could not complete');
+    assert.equal(result.status,0,'Fixture process failed; preserve private intents and inspect before retry');
+  }catch(error){error.fixtureCommandFailure={nativeErrorCode:failure?.nativeErrorCode??null,exitCode:failure?.exitCode??null,...diagnostic};throw error;}
   return result.stdout;
 }
 function privateAcl(python,file) {
@@ -95,7 +117,9 @@ export function requireStaged(env){
     'Full admission HTTP gate requires the staged runtime and MICROI_ADMISSION_PROFILE_FILE; see Microi.Server/Microi.Tests/README.md (Admission fixture). Non-staged Full is not supported.');
 }
 function loadProfile(env){
-  requireStaged(env);const file=regular(env.MICROI_ADMISSION_PROFILE_FILE),value=validateProfile(json(read(file)));regular(value.python);privateAcl(value.python,file);
+  requireStaged(env);const file=regular(env.MICROI_ADMISSION_PROFILE_FILE),value=validateProfile(json(read(file)));regular(value.python);
+  // 先验证父目录再允许私有诊断；不为旧目录更改ACL，也不向未经验证的路径写错误正文。
+  commandDiagnosticDirectory=undefined;privateAcl(value.python,path.dirname(file));commandDiagnosticDirectory=path.dirname(file);privateAcl(value.python,file);
   for(const p of value.bootstrapFiles)privateAcl(value.python,p);
   command(value.python,['-B','-c','import pymysql,redis']);
   const settings=bootstrapSettings(value.bootstrapFiles.map(p=>json(read(p))),env.MICROI_TEST_OSCLIENT);
@@ -155,5 +179,9 @@ export async function cleanupRuntime(results,env=process.env){
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   try{const [action,results]=process.argv.slice(2);assert.ok(['preflight','prepare','cleanup'].includes(action));process.stdout.write(JSON.stringify(action==='preflight'?preflight(results):action==='prepare'?await prepareRuntime(results):await cleanupRuntime(results)));}
-  catch(error){process.stderr.write('Admission fixture stopped: '+(error.message.startsWith('Full admission HTTP')?error.message:'private input/runtime/ownership/stage check failed; preserve private receipts and inspect before retry')+'\n');process.exitCode=1;}
+  catch(error){
+    const diagnostic=error.fixtureCommandFailure||savePrivateFailure({schema:1,at:new Date().toISOString(),errorType:error.name,message:String(error.message).slice(-16384),stage:'admission-'+process.argv[2]});
+    const code=String(diagnostic.nativeErrorCode||('EXIT_'+(diagnostic.exitCode??'UNKNOWN'))).replace(/[^A-Z0-9_]/gi,'').slice(0,32);
+    process.stderr.write('Admission fixture stopped: '+(error.message.startsWith('Full admission HTTP')?error.message:'private input/runtime/ownership/stage check failed; preserve private receipts and inspect before retry')+'; native='+code+(diagnostic.privateDiagnosticFile?'; private diagnostic saved':'')+'\n');process.exitCode=1;
+  }
 }

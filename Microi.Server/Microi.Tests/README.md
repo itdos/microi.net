@@ -1,5 +1,7 @@
 # Microi.Tests
 
+原生 Full 宿主的进程观察器在每轮就绪校验中批量读取一次 CIM 进程表及 TCP 监听表，再逐 PID 校验原有身份、原生 CWD 和全部端口；不放宽 20 秒原生查询、30 秒夹具子命令及原身份断言。准入入口的子命令失败会把有界 stderr、退出码/信号和原生错误码保存到经 ACL 验证的私有 profile 目录 `admission-failure-*.json`，控制台只显示固定分类。stdout、命令参数明文和连接凭据不进入公开日志；私有诊断不得提交 Git 或上传公有证据桶。该诊断不代替重新执行原 Full。
+
 `Microi.Tests` 是吾码后端统一自动化测试入口，合并了原
 `Dos.Common.Tests` 与 `Dos.ORM.Tests`，并在私有源码存在时条件纳入
 `Microi.AI.Tests`、FormEngine、ApiEngine、安全与多租户边界回归。

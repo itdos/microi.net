@@ -8,6 +8,18 @@ import os from 'node:os';
 import * as runtime from './staged-full-runtime.mjs';
 import {validateReady,processIdentities} from './staged-full-runtime.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
+
+test('native process sampling batches CIM and TCP reads before inspecting selected PIDs',()=>{
+ // 一次就绪校验会观察四个进程；逐PID查询TCP表会放大原生命令时延，不能靠放宽时限接受。
+ const script=fs.readFileSync(new URL('./read-staged-runtime-identity.ps1',import.meta.url),'utf8');
+ const loop=script.indexOf('$rows = @(');assert.ok(loop>0);
+ const prefix=script.slice(0,loop),body=script.slice(loop);
+ assert.match(prefix,/Get-CimInstance Win32_Process/);
+ assert.match(prefix,/Get-NetTCPConnection -State Listen/);
+ assert.doesNotMatch(body,/Get-CimInstance|Get-NetTCPConnection/);
+ assert.match(body,/OwningProcess -eq \$processId/);
+ assert.match(body,/Owned runtime process is unavailable/);
+});
 test('the exact Full HDFS evidence survives build cleanup and rejects changed or foreign bytes',()=>{
  const results=fs.mkdtempSync(path.join(os.tmpdir(),'microi-hdfs-proof-'));
  const directory=path.join(results,'.net-artifacts');fs.mkdirSync(directory);

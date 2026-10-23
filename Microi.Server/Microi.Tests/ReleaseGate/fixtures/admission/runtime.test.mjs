@@ -8,6 +8,23 @@ import {requireStaged,validateProfile,mysqlConnection,bootstrapSettings,regular,
 import {configureContext,ACCOUNTS} from './contracts.mjs';
 import {identityPassword,requiredApplication,resourceInstallRequest,REQUIRED_APPLICATION} from './prepare.mjs';
 import {createHash} from 'node:crypto';
+import * as fixtureRuntime from './runtime.mjs';
+
+test('private native failure records retain the exit reason without stdout or argument plaintext',()=>{
+ assert.equal(typeof fixtureRuntime.describeCommandFailure,'function');
+ const value=fixtureRuntime.describeCommandFailure({status:null,signal:'SIGTERM',error:{name:'Error',code:'ETIMEDOUT'},stdout:'never-record-this-token',stderr:'native observation timed out'},'/runtime/node',['private-password'],30001);
+ assert.equal(value.nativeErrorCode,'ETIMEDOUT');assert.equal(value.exitCode,null);assert.equal(value.signal,'SIGTERM');
+ assert.equal(value.executable,'node');assert.match(value.argumentSha256,/^[a-f0-9]{64}$/);
+ assert.equal(value.stderr,'native observation timed out');
+ assert.doesNotMatch(JSON.stringify(value),/never-record-this-token|private-password/);
+});
+
+test('private native failure records are bounded and distinguish exit failure from success',()=>{
+ assert.equal(typeof fixtureRuntime.describeCommandFailure,'function');
+ assert.equal(fixtureRuntime.describeCommandFailure({status:0,stdout:'private-token'},'node',[],1),null);
+ const value=fixtureRuntime.describeCommandFailure({status:1,stderr:'x'.repeat(40000)},'python',[],2);
+ assert.equal(value.exitCode,1);assert.equal(value.nativeErrorCode,null);assert.equal(value.stderr.length,32768);
+});
 
 test('non-staged Full fails before any transport or build and identifies the formal configuration',()=>{
   assert.throws(()=>requireStaged({}),/staged runtime.*MICROI_ADMISSION_PROFILE_FILE/);
