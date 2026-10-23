@@ -43,6 +43,8 @@
 
 小规格宿主部署翻译与 OCR 时必须实际执行推理并同时检查 SSH/API 响应、线程数和可用内存。LibreTranslate 1.9.6 的容器入口使用 `LT_THREADS` 作为 Gunicorn worker 数，`LT_WORKERS` 不生效；使用 `LT_THREADS=1`、`ARGOS_INTER_THREADS=1`、`ARGOS_INTRA_THREADS=1` 并约束 OMP/OpenBLAS/MKL/NumExpr 原生线程。OCR 同样约束原生数学库线程。容器 Running、模型列表和健康 GET 不能代替首次真实推理验收；这些是附加服务配置，不进入吾码 API 十项启动环境变量。
 
+一键新安装在 Docker 可用后、每个模型启动前检查真实内存：物理低于 7680MiB 或可用低于 2048MiB 时，本次安装固定停用 OCR/LibreTranslate，精确停止已有同名安装容器并将 restart 设为 no，回读必须为 stopped；不删除模型或数据库。唯一活动主租户在核心升级完成后设置 OcrEnabled=0、TranslateProvider=None，保留 URL/Key，写后回读成功才刷新 API。空 Provider 会根据保留 URL 自动回退，不代表禁用。内存充足时模型分别限制 1024/768MiB RAM、1536/1280MiB RAM+Swap、0.75CPU，并保留单线程。小规格新建 MySQL buffer pool 上限 384MiB；无 Swap 时在文件系统、磁盘及备份前提满足后尝试 2GiB Swap，不能覆盖既存文件，也不能将 Swap 计入模型物理内存准入。内存保护已触发时禁止继续做 OCR/翻译真实推理验收；改为验收停止状态、租户开关与核心登录，待资源调整后单独启用和实测。
+
 执行前：
 
 1. 固定目标目录和 compose 文件，解析所有 volume 的绝对宿主路径。
