@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Microi.Tests.Common;
 
 namespace Microi.Tests.FullStack;
 
@@ -81,14 +82,45 @@ public sealed class ManagedStorageAdmissionHttpTests
             using var child = Process.Start(start) ?? throw new InvalidOperationException("Could not start owned admission fixture control");
             var input = values == null ? new JObject() : (JObject)values.DeepClone();
             input["action"] = action; input["owner"] = nonce; input["tenant"] = tenant;
-            input["runId"] = runId; input["requestId"] = Guid.NewGuid().ToString("N");
+            var requestId = Guid.NewGuid().ToString("N");
+            input["runId"] = runId; input["requestId"] = requestId;
             await child.StandardInput.WriteAsync(input.ToString(Formatting.None)); child.StandardInput.Close();
-            var stdout = child.StandardOutput.ReadToEndAsync(); var stderr = child.StandardError.ReadToEndAsync();
+            var stdout = BoundedNativeProcessOutput.ReadAsync(child.StandardOutput);
+            var stderr = BoundedNativeProcessOutput.ReadAsync(child.StandardError);
             // helper 每个网络操作有界；取消时仍等原子写入/回读落下结果，不因测试取消杀死未知提交。
             await child.WaitForExitAsync(CancellationToken.None);
-            var raw = await stdout; _ = await stderr;
-            Assert.True(child.ExitCode == 0, "Owned fixture control failed; preserve its private intent/readback receipts (no automatic mutation retry)");
-            var result = JObject.Parse(raw); Assert.Equal(1, result.Value<int>("Code"));
+            var output = await stdout; var errorOutput = await stderr;
+            if (child.ExitCode != 0 || output.Truncated || errorOutput.Truncated)
+            {
+                var receipt = "Unavailable";
+                try
+                {
+                    // 原错误可能发生在 journal 创建之前。只让原冻结 Python/Context 以 CreateNew
+                    // 保存失败输出；该专用动作不构造 NativeStore、不访问数据库、不重发未知写入。
+                    var captureStart = new ProcessStartInfo(start.FileName)
+                    { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
+                    foreach (var argument in start.ArgumentList.Take(start.ArgumentList.Count - 1)) captureStart.ArgumentList.Add(argument);
+                    captureStart.ArgumentList.Add("--record-process-failure");
+                    using var capture = Process.Start(captureStart) ?? throw new InvalidOperationException("Could not start private evidence writer");
+                    var payload = new JObject { ["owner"] = nonce, ["tenant"] = tenant, ["runId"] = runId,
+                        ["requestId"] = requestId, ["action"] = action, ["exitCode"] = child.ExitCode,
+                        ["stdout"] = output.PrivateBody(), ["stderr"] = errorOutput.PrivateBody() };
+                    await capture.StandardInput.WriteAsync(payload.ToString(Formatting.None)); capture.StandardInput.Close();
+                    var captureOut = BoundedNativeProcessOutput.ReadAsync(capture.StandardOutput);
+                    var captureError = BoundedNativeProcessOutput.ReadAsync(capture.StandardError);
+                    await capture.WaitForExitAsync(CancellationToken.None);
+                    var captureResult = await captureOut; _ = await captureError;
+                    var expected = "native-control-failure-" + requestId + ".json";
+                    if (capture.ExitCode == 0 && !captureResult.Truncated)
+                    {
+                        var saved = JObject.Parse(captureResult.Text);
+                        if (saved.Value<int>("Code") == 1 && saved.Value<string>("file") == expected) receipt = expected;
+                    }
+                }
+                catch { /* 证据保存失败不能覆盖或泄露原子操作的原始失败。 */ }
+                Assert.Fail($"Owned fixture control failed: action={action}; exit={child.ExitCode}; {errorOutput.SafeFailureSummary()}; private evidence={receipt}; no automatic mutation retry.");
+            }
+            var result = JObject.Parse(output.Text); Assert.Equal(1, result.Value<int>("Code"));
             Assert.Equal(tenant, result.Value<string>("tenant")); Assert.Equal(nonce, result.Value<string>("owner"));
             return result;
         }

@@ -258,6 +258,13 @@ DLL 指纹与 fresh login，再创建独占 `adm_<32位nonce>` 租户。短前�
 完整原文及 CAS 备份仅保存在本次结果目录 `admission/private`，创建后立即验证实际 ACL。
 `admission-ready.json` 独立绑定原 runtime-ready 的 SHA，不修改既有 ready 协议。
 
+`ManagedStorageAdmissionHttpTests` 的 Native 控制子进程失败时，会继续排空 stdout/stderr，
+每个流最多保留 65,536 个 UTF-16 字符及全文字符数/摘要；截断状态单独记录。
+经同一冻结 Context、源码与 ACL 校验后，以 CreateNew 写入
+`admission/private/native-control-failure-<requestId>.json`，断言只显示可信异常类型、数字错误码和回执名。
+该保存动作不构造 NativeStore、不连接数据库，也不重试原操作；保存失败不能覆盖原错误。
+这些私有正文可能含连接或源码信息，不得提交 Git 或作为公开验收附件。
+
 HTTP 用例实际覆盖普通、分布式锁、Hub 兼容三条路径和在途排空；只在新租户中
 对两个固定 Managed Key 做逐字节 CAS 替换/恢复，并用 HTTP 回读确认 API 节点缓存已恢复。
 测试取消时使用独立有界清理 token；无法确认在途归零时保持维护关闭并保留备份，禁止强制解除。

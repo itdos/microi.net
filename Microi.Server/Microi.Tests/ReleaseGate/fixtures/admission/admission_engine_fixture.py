@@ -406,6 +406,32 @@ def run(request, store, folder):
     return {**summary, 'Code': 1, 'rowsHash': digest(observed), 'mutated': counts is not None and any(counts), **result}
 
 
+def record_process_failure(request, config, context):
+    """仅把失败进程的有界正文存入已验证私有目录；不构造 store、不连接或重试数据库。"""
+    require(set(request) == {'owner', 'tenant', 'runId', 'requestId', 'action', 'exitCode', 'stdout', 'stderr'}, 'Unexpected process evidence fields')
+    require(request['owner'] == config['owner'] and request['tenant'] == config['tenant'], 'Wrong process evidence ownership')
+    for key in ('runId', 'requestId'):
+        require(re.fullmatch('[a-f0-9]{32}', request[key] or '') is not None, 'Invalid process evidence identity')
+    require(request['action'] in ('snapshot', 'status', 'install', 'lock', 'restore'), 'Unsupported failed action')
+    require(type(request['exitCode']) is int and -2147483648 <= request['exitCode'] <= 2147483647, 'Invalid failed exit code')
+    for key in ('stdout', 'stderr'):
+        value = request[key]
+        require(isinstance(value, dict) and set(value) == {'text', 'characters', 'utf16LeSha256', 'truncated'}, 'Invalid bounded process stream')
+        require(isinstance(value['text'], str), 'Missing process stream text')
+        text = value['text'].encode('utf-16-le', errors='strict')
+        units = len(text) // 2
+        require(units <= 65536 and type(value['characters']) is int and units <= value['characters'] <= 2147483647, 'Process stream bound differs')
+        require(type(value['truncated']) is bool and value['truncated'] == (value['characters'] > units), 'Process stream truncation differs')
+        require(re.fullmatch('[a-f0-9]{64}', value['utf16LeSha256'] or '') is not None, 'Missing whole stream hash')
+        if not value['truncated']:
+            require(hashlib.sha256(text).hexdigest() == value['utf16LeSha256'], 'Complete stream hash differs')
+    name = 'native-control-failure-' + request['requestId'] + '.json'
+    # Context.save 同时执行源/上下文/ACL 校验与 CreateNew；权限拒绝不得换路径或改 ACL。
+    context.save(name, {'schema': 'microi.admission.native-process-failure.v1', 'task': config['task'],
+                       'sourceHead': context.data['sourceHead'], 'attempt': context.data['attempt'], **request})
+    return {'Code': 1, 'file': name, 'sqlWrites': 0, 'databaseConnections': 0}
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--context', required=True)
@@ -413,9 +439,15 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--stdio', action='store_true')
     group.add_argument('--verify-owner', action='store_true')
+    group.add_argument('--record-process-failure', action='store_true')
     args = parser.parse_args()
     context = Context(args.context, args.context_sha256)
     config = binding(context.load('admission-fixture.json'), context)
+    if args.record_process_failure:
+        raw = sys.stdin.read(1048577)
+        require(len(raw) <= 1048576, 'Private process evidence exceeds bound')
+        print(json.dumps(record_process_failure(json.loads(raw), config, context)))
+        return
     store = NativeStore(config, context)
     if args.verify_owner:
         rows = store.rows()

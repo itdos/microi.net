@@ -5,6 +5,8 @@ import pathlib
 import tempfile
 import unittest
 import types
+import hashlib
+from unittest import mock
 from test_acl_guard import context_value
 from acl_guard import ROOT
 
@@ -266,6 +268,60 @@ class Tests(unittest.TestCase):
         self.assertIs(original[16], bytes)
         self.assertIs(selected[252], bytes)
         self.assertIs(selected[7], datetime.datetime)
+
+
+class NativeProcessEvidenceTests(unittest.TestCase):
+    def payload(self, text='{"Code":0,"errorType":"OperationalError","errorCode":2013}'):
+        def stream(value):
+            data = value.encode('utf-16-le')
+            return dict(text=value, characters=len(data)//2, utf16LeSha256=hashlib.sha256(data).hexdigest(), truncated=False)
+        return dict(owner=OWNER, tenant=TENANT, runId='b'*32, requestId='c'*32,
+                    action='snapshot', exitCode=1, stdout=stream(''), stderr=stream(text))
+
+    def context(self):
+        result = types.SimpleNamespace(data={'sourceHead':'d'*40, 'attempt':'test-attempt'}, saved={})
+        result.save = lambda name, value: result.saved.setdefault(name, value)
+        return result
+
+    def test_failure_evidence_is_private_and_never_constructs_native_store(self):
+        context = self.context()
+        payload = self.payload('private-secret full stderr')
+        with mock.patch.object(f, 'NativeStore', side_effect=AssertionError('No database construction allowed')):
+            result = f.record_process_failure(payload, dict(owner=OWNER, tenant=TENANT, task=C['task']), context)
+        self.assertEqual(result, dict(Code=1, file='native-control-failure-'+'c'*32+'.json', sqlWrites=0, databaseConnections=0))
+        saved = next(iter(context.saved.values()))
+        self.assertEqual(saved['stderr']['text'], 'private-secret full stderr')
+        self.assertNotIn('private-secret', str(result))
+
+    def test_failure_evidence_rejects_wrong_owner_paths_oversize_or_bad_hash(self):
+        for change in ('owner', 'requestId', 'oversize', 'hash', 'truncation', 'extra'):
+            value = self.payload(); context = self.context()
+            if change == 'owner': value['owner'] = 'x'*32
+            if change == 'requestId': value['requestId'] = '../escape'
+            if change == 'oversize': value = self.payload('x'*65537)
+            if change == 'hash': value['stderr']['utf16LeSha256'] = '0'*64
+            if change == 'truncation': value['stderr']['truncated'] = True
+            if change == 'extra': value['directory'] = 'unowned'
+            with self.subTest(change=change), self.assertRaises(f.BoundaryError):
+                f.record_process_failure(value, dict(owner=OWNER, tenant=TENANT, task=C['task']), context)
+            self.assertFalse(context.saved)
+
+    def test_acl_or_create_new_rejection_is_preserved_without_fallback(self):
+        context = self.context()
+        def denied(*args): raise PermissionError('Original private ACL denial')
+        context.save = denied
+        with self.assertRaisesRegex(PermissionError, 'Original private ACL denial'):
+            f.record_process_failure(self.payload(), dict(owner=OWNER, tenant=TENANT, task=C['task']), context)
+        self.assertFalse(context.saved)
+
+    def test_truncated_body_keeps_whole_output_count_and_hash(self):
+        value = self.payload('x'*65536); context = self.context()
+        value['stderr'].update(characters=70000, truncated=True, utf16LeSha256='a'*64)
+        f.record_process_failure(value, dict(owner=OWNER, tenant=TENANT, task=C['task']), context)
+        saved = next(iter(context.saved.values()))
+        self.assertEqual(len(saved['stderr']['text']), 65536)
+        self.assertEqual(saved['stderr']['characters'], 70000)
+        self.assertTrue(saved['stderr']['truncated'])
 
 
 if __name__ == '__main__':
