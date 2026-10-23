@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-22T10:20:42.568Z",
+  "generatedAt": "2026-10-23T15:59:19.620Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -3241,17 +3241,17 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "1c4f533e55f0ab695e0998026300de6cce481479b93a3619bfb4e642668802a9",
-      "originalLines": 711,
-      "prefixSha256": "dca80d3ddfca36f1c9a6fbd8bb5681de212255e753a0428aea69f9f21546bb5c",
-      "prefixBytes": 15187,
+      "originalSha256": "36659b4191923a4defec0132aff43e647cb7e127c5517a28bb828074dd79a957",
+      "originalLines": 713,
+      "prefixSha256": "c5d7890a69e031a8c9f63dc24982542084bd330d6b90b663b7f9187e597ae176",
+      "prefixBytes": 15123,
       "entryLines": 175,
       "chunks": [
         {
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "e3e6f49e83e80b958184a4d281559fd80aa0a3bb7cbcb0893ecc1821c4b2f001",
+          "sha256": "fefc18da554473ded99a55c3b2e66d698fcc4b37506622dcd2d17bca09c2fcbc",
           "lines": 60,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
@@ -3259,7 +3259,7 @@
           "id": "workspace-conventions-001",
           "ordinal": 1,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "8d8dfff420c0cc768bbeb13d94e9f77f52d5002fc61d93dc82d71b3a17f2eaa0",
+          "sha256": "c3db79fb5f6f00a6ea619f7129f1e81259efe899256a5100f9c84a5b5dca58f4",
           "lines": 12,
           "heading": "Microi吾码工作进度播报规范（强制）"
         },
@@ -3563,8 +3563,8 @@
           "id": "workspace-conventions-039",
           "ordinal": 39,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "ff09cc6c76c9c6d13280f1d0fe45db19775863bca06eae8dadd1c4b2358183d3",
-          "lines": 15,
+          "sha256": "d4b5a2a2aff6e403f15d6b4d91e1d04a8a9c10394a24a4edc6b57f1791a6bc4e",
+          "lines": 17,
           "heading": "本地测试程序与依赖生命周期（强制）"
         }
       ],

@@ -64,6 +64,27 @@ function transportFixture(){
  value.currentSupervisor=structuredClone(value.ready.supervisor);return value;
 }
 const verifyTransport=value=>runtime.validateTransportOnly(value.build,value.ready,value.transport,value.currentSupervisor,value.remaining,value.environment,value.accepted,value.receiptHash);
+
+test('configured native bridge ports retain fresh runtime identity and exact listener ownership',()=>{
+ const ports=[63980,63982,63983,63984],value=fixture();
+ value.environment.MICROI_TEST_NATIVE_BRIDGE_PORTS=JSON.stringify(ports);
+ value.current.find(row=>row.pid===99).listeningPorts=ports;
+ assert.deepEqual(Object.keys(validate(value)),['MICROI_TEST_TOKEN','MICROI_TEST_CHILD_TOKEN']);
+ for(const mutate of [v=>v.current.find(row=>row.pid===99).listeningPorts.pop(),v=>v.current.find(row=>row.pid===99).listeningPorts.push(64000),v=>v.current.find(row=>row.pid===99).parentPid=1]){
+  const invalid=structuredClone(value);mutate(invalid);assert.throws(()=>validate(invalid));
+ }
+});
+
+test('configured bridge transport keeps the accepted Full barrier and rejects malformed or colliding ports',()=>{
+ const ports=[63980,63982,63983,63984],value=transportFixture();
+ value.environment.MICROI_TEST_NATIVE_BRIDGE_PORTS=JSON.stringify(ports);
+ value.currentSupervisor.listeningPorts=ports;value.transport.retainedBridgePorts=ports;
+ assert.equal(verifyTransport(value),true);
+ for(const supplied of ['', 'null','{}','[63980]','[63980,63980,63983,63984]','[0,63982,63983,63984]','[65536,63982,63983,63984]','[63980.5,63982,63983,63984]','["63980",63982,63983,63984]','[63970,63982,63983,63984]']){
+  const invalid=transportFixture();invalid.environment.MICROI_TEST_NATIVE_BRIDGE_PORTS=supplied;assert.throws(()=>verifyTransport(invalid));
+ }
+ const wrong=structuredClone(value);wrong.transport.retainedBridgePorts=[63960,63962,63963,63964];assert.throws(()=>verifyTransport(wrong));
+});
 test('PrepareRelease barrier requires independently exited runtime PIDs and same-owner live native bridges',()=>{
  assert.equal(typeof runtime.validateTransportOnly,'function');assert.equal(verifyTransport(transportFixture()),true);
  for(const change of [v=>v.transport.sourceHead='b'.repeat(40),v=>v.transport.buildId='old',v=>v.transport.attempt='old-attempt',v=>v.transport.ownerPid=1,v=>v.transport.task='other',v=>v.transport.runtimeStopped=false,v=>v.transport.cleanup.pop(),v=>v.transport.cleanup[0].pid=200,v=>v.transport.cleanup[0].stopped=false,v=>v.currentSupervisor.parentPid=1,v=>v.currentSupervisor.creationDate='reused',v=>v.currentSupervisor.cwd=root,v=>v.currentSupervisor.exe=path.join(root,'foreign.exe'),v=>v.currentSupervisor.commandLine='foreign.js',v=>v.currentSupervisor.listeningPorts=[63960],v=>v.remaining=[v.ready.processes[0]],v=>v.accepted.accepted=false,v=>v.receiptHash='0'.repeat(64),v=>v.transport.at='2026-10-16T09:59:00Z']){

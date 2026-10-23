@@ -37,12 +37,24 @@ export function verifyHdfsEvidence(build){
  if(fs.existsSync(live))check(hash(read(live))===digest,'Live and preserved Full HDFS bytes differ.');
  return digest;
 }
+// 这是测试进程配置，不是生产 API 业务开关。候选已冻结的环境声明四个独占端口；
+// 缺省保留历史夹具，显式配置必须完整合法，不能用空值或重复/业务运行端口弱化监听核验。
+export function nativeBridgePorts(environment){
+ const supplied=environment.MICROI_TEST_NATIVE_BRIDGE_PORTS;
+ if(supplied===undefined)return [63960,63962,63963,63964];
+ check(typeof supplied==='string'&&supplied.length>0&&supplied.length<=128,'Native bridge ports require a bounded JSON array.');
+ let ports;try{ports=JSON.parse(supplied);}catch{throw Error('Native bridge ports must be valid JSON.');}
+ check(Array.isArray(ports)&&ports.length===4&&ports.every(port=>Number.isInteger(port)&&port>=1024&&port<=65535)&&new Set(ports).size===4,'Native bridge ports require four distinct valid TCP ports.');
+ const runtimePorts=['MICROI_TEST_API_BASE','MICROI_TEST_PEER_API_BASE','MICROI_TEST_FRONTEND_BASE'].filter(key=>environment[key]).map(key=>Number(new URL(environment[key]).port));
+ check(!ports.some(port=>runtimePorts.includes(port)),'Native bridge ports must not overlap API or frontend ports.');
+ return [...ports].sort((a,b)=>a-b);
+}
 // 回执只记录归属；必须重读存活进程的创建时间、父进程和监听端口，防止 PID 复用冒充原桥接协调器。
 function validateSupervisor(ready,actual,environment){
  const expected=ready.supervisor,profile=path.dirname(path.dirname(environment.MICROI_TEST_RUNTIME_ENVIRONMENT_FILE||''));
  const expectedExe=path.join(environment.MICROI_DESKTOP_NODE_HOME||'',process.platform==='win32'?'node.exe':'node');
  check(expected&&actual&&expected.pid===ready.supervisorPid&&actual.pid===expected.pid&&actual.parentPid===expected.parentPid&&actual.parentPid>0&&actual.creationDate===expected.creationDate&&actual.commandLine===expected.commandLine&&same(actual.cwd,profile)&&same(expected.cwd,profile)&&same(actual.exe,expectedExe)&&same(expected.exe,expectedExe)&&actual.commandLine.includes(path.join(profile,'runtime-coordinator.mjs')),'Native transport supervisor PID, parent, CWD, executable or command line differs.');
- const ports=[63960,63962,63963,63964],ordered=value=>[...(value||[])].sort((a,b)=>a-b);
+ const ports=nativeBridgePorts(environment),ordered=value=>[...(value||[])].sort((a,b)=>a-b);
  check(JSON.stringify(ordered(actual.listeningPorts))===JSON.stringify(ports),'The original native transport supervisor must own exactly the four bridge ports.');
 }
 export function validateReady(build,ready,credentials,current,environment){
@@ -71,7 +83,7 @@ export function validateTransportOnly(build,ready,transport,supervisor,remaining
  check(accepted?.accepted===true&&accepted.sourceHead===build.sourceHead&&accepted.runtimeBuildId===build.buildId&&/^[a-f0-9]{64}$/.test(receiptSha256)&&transport.fullReceiptSha256===receiptSha256&&Number.isFinite(Date.parse(transport.at))&&Date.parse(transport.at)>=Date.parse(accepted.verifiedAt),'Transport-only proof predates or differs from the accepted Full receipt.');
  check(ready.processes?.length===3&&new Set(ready.processes.map(row=>row.pid)).size===3&&Array.isArray(remaining)&&remaining.length===0,'Owned API/Vite PIDs must independently be absent before PrepareRelease.');
  check(transport.cleanup?.length===3&&ready.processes.every(process=>transport.cleanup.filter(row=>row.kind===process.kind&&row.pid===process.pid&&(row.stopped===true||row.alreadyExited===true)).length===1),'Transport-only proof is missing an owned runtime exit.');
- check(JSON.stringify([...(transport.retainedBridgePorts||[])].sort((a,b)=>a-b))===JSON.stringify([63960,63962,63963,63964]),'Transport-only bridge port scope differs.');
+ check(JSON.stringify([...(transport.retainedBridgePorts||[])].sort((a,b)=>a-b))===JSON.stringify(nativeBridgePorts(environment)),'Transport-only bridge port scope differs.');
  validateSupervisor(ready,supervisor,environment);return true;
 }
 export async function waitForTransportOnly(file,failedFile,timeoutMs=60000,pollMs=100){
