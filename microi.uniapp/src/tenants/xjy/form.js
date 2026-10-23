@@ -848,7 +848,7 @@ async function orderProductFilterRows(context, form) {
   const id = context.rowId
   if (!id) return []
   const rows = [], seen = new Set()
-  let native = false, expectedCount
+  let native = false, expectedCount, hasStatistics, statisticsTotal
   for (let page = 1; page <= 10; page += 1) {
     let result
     if (!native) {
@@ -868,6 +868,24 @@ async function orderProductFilterRows(context, form) {
       })
     }
     if (Number(result?.Code) !== 1 || !Array.isArray(result.Data)) throw new Error(result?.Msg || '订单耗材读取失败')
+    if (native) {
+      // 原生查询由菜单 SelectFields 决定明细列，_SelectFields 不保证金额列进入响应。
+      // 沿用同一授权/父外键查询返回的后台合计，不能在小程序重算折扣或另查裸表。
+      const statistics = result.DataAppend?.StatisticsFields
+      const supplied = !!statistics && Object.prototype.hasOwnProperty.call(statistics, 'YouhuiHLXZJ')
+      if (hasStatistics !== undefined && hasStatistics !== supplied) throw new Error('滤芯价格合计返回不一致，请重试')
+      hasStatistics = supplied
+      if (supplied) {
+        const amount = statistics.YouhuiHLXZJ
+        if (amount === null || amount === '' || !['string', 'number'].includes(typeof amount) ||
+          !String(amount).trim() || !Number.isFinite(Number(amount)) || Number(amount) < 0) {
+          throw new Error('后台滤芯价格合计无效，请核对滤芯明细')
+        }
+        const total = Number(Number(amount).toFixed(2))
+        if (statisticsTotal !== undefined && statisticsTotal !== total) throw new Error('滤芯价格合计已变化，请重试')
+        statisticsTotal = total
+      }
+    }
     const count = result.DataCount == null ? undefined : Number(result.DataCount)
     if (count !== undefined) {
       if (!Number.isInteger(count) || count < 0 || count > 1000) throw new Error('耗材明细过多或数量无效，请在平台核对')
@@ -882,7 +900,7 @@ async function orderProductFilterRows(context, form) {
     if (expectedCount !== undefined && rows.length > expectedCount) throw new Error('耗材明细数量不一致，请重试')
     if (result.Data.length < 100 || rows.length === expectedCount) {
       if (expectedCount !== undefined && rows.length !== expectedCount) throw new Error('耗材明细未完整读取，请重试')
-      return rows
+      return hasStatistics ? { rows, statisticsTotal } : rows
     }
   }
   throw new Error('耗材明细超过移动端核对范围，请在平台调整')

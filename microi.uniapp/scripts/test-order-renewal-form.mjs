@@ -569,6 +569,76 @@ test('合同详情进入正式商品时使用真实 SpLvXin 配置，并保留�
   }
 })
 
+test('真实 HTTP 菜单投影不含行金额时读取后台统计合计，首次查看、切换和返回均不误报', async () => {
+  let total = 1930
+  const record = { Id: 'sp-1', HezuoFS: '包年换芯', LvxinSJDJ: 1930, LvxinYJ: 1930, ShebeiSJDJ: 0 }
+  const h = harness({
+    draftRecord: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+    draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+    getFormData: async table => ({ Code: 1, Data: table === 'diy_shangpin'
+      ? { Xianjia: 1580, GenghuanLXJG: 1930 } : { ...record } }),
+    // 与线上 HTTP 返回相同：菜单仅选了型号、名称、级数、周期、单价；行中没有 YouhuiHLXZJ。
+    getTableData: async () => ({ Code: 1, DataCount: 5,
+      DataAppend: { StatisticsFields: { LvxinZJ: total, YouhuiHLXZJ: total } },
+      Data: [500, 60, 60, 150, 150].map((LvxinDJ, i) => ({
+        Id: `f-${i}`, LvxinXH: '滤芯型号', LvxinMC: '滤芯名称', Paixu: i + 1,
+        GenghuanZQ: i === 0 ? 24 : 3, LvxinDJ
+      }))
+    })
+  })
+  const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'View', rowId: 'sp-1', form: {
+    ...record, ShangpinID: 'sku', DingdanID: DRAFT_ID, Shuliang: 1
+  } })
+  await h.hooks.initialize(ctx)
+  assert.equal(h.toasts.length, 0)
+  assert.equal(h.hooks.getBusyMessage(ctx), '')
+  assert.equal(ctx.form.LvxinSJDJ, 1930)
+  await h.hooks.handleFieldChange(ctx, { field: { Name: 'HezuoFS' }, value: '包年换芯' })
+  assert.equal(ctx.form.LvxinSJDJ, 1930)
+  assert.equal(ctx.form.YouhuiFD, 100)
+  // 子表修改后后台已重算合计，返回及提交继续读取后台结果。
+  total = 1210
+  record.LvxinSJDJ = total
+  await h.hooks.refreshDerivedValues(ctx)
+  assert.equal(ctx.form.LvxinSJDJ, 1210)
+  assert.equal(ctx.form.YouhuiFD, 62.69)
+  assert.equal((await h.hooks.beforeSubmit(ctx)).LvxinZJ, 1210)
+  assert.ok(h.reads.every(read => read.params._TableChildAuth.ParentFieldId === FILTER_FIELD_ID))
+  assert.equal(h.toasts.length, 0)
+})
+
+test('后台滤芯统计为零有效，分页总计只用一次，统计缺失、无效、变化或截断均阻止保存', async () => {
+  for (const scenario of ['zero', 'pages', 'missing', 'invalid', 'changed', 'truncated']) {
+    const h = harness({
+      draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+      getFormData: async () => ({ Code: 1, Data: { Xianjia: 1580, GenghuanLXJG: 1930 } }),
+      getTableData: async (table, params) => {
+        const page = params._PageIndex
+        const rows = Array.from({ length: 101 }, (_, i) => ({ Id: `f-${i}`, LvxinDJ: 60, GenghuanZQ: 3 }))
+        return { Code: 1, DataCount: 101,
+          Data: scenario === 'truncated' ? rows.slice(0, 1) : rows.slice((page - 1) * 100, page * 100),
+          DataAppend: { StatisticsFields: scenario === 'missing' ? {} : {
+            YouhuiHLXZJ: scenario === 'zero' ? 0 : scenario === 'invalid' ? null : scenario === 'changed' && page === 2 ? 2000 : 1930
+          } }
+        }
+      }
+    })
+    const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+      ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 2, LvxinSJDJ: 1210
+    } })
+    await h.hooks.handleFieldChange(ctx, { field: { Name: 'HezuoFS' }, value: '包年换芯' })
+    if (scenario === 'zero' || scenario === 'pages') {
+      const expected = scenario === 'zero' ? 0 : 1930
+      assert.equal(ctx.form.LvxinSJDJ, expected)
+      assert.equal(ctx.form.LvxinZJ, expected * 2)
+      assert.equal(h.toasts.length, 0)
+    } else {
+      assert.equal(ctx.form.LvxinSJDJ, 1210)
+      await assert.rejects(h.hooks.beforeSubmit(ctx), /价格|合计|变化|完整/)
+    }
+  }
+})
+
 test('滤芯字段、外键或父级授权不完整时仍拒绝查询，不借用安装位置或相似文案', async () => {
   for (const missing of ['field', 'foreign-key', 'parent']) {
     const h = harness({ draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }) })

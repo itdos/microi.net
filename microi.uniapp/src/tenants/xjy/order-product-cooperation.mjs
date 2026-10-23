@@ -89,18 +89,25 @@ export function normalizedOrderProductPrices(form = {}) {
   return { ...values, ShijiJG: values.ShebeiSJDJ, ...derived }
 }
 
-// 分页和权限由调用方提供；失败、缺列、截断都不能冒充零元或商品参考原价。
-export function orderProductFilterQuote(rows) {
-  let total = 0
+// 正式订单可用同一授权查询的后台统计；草稿仍汇总后台逐行金额，不重算滤芯优惠。
+// 分页和权限由调用方核定；既没有有效统计又缺行金额时，不能冒充零元或商品参考原价。
+export function orderProductFilterQuote(source) {
+  const rows = Array.isArray(source) ? source : source?.rows
+  if (!Array.isArray(rows)) throw new Error('滤芯明细价格不完整，请刷新后重试')
+  const hasStatistics = !Array.isArray(source) && Object.prototype.hasOwnProperty.call(source, 'statisticsTotal')
+  const invalid = value => value == null || !['string', 'number'].includes(typeof value) ||
+    !String(value).trim() || !Number.isFinite(Number(value)) || Number(value) < 0
+  if (hasStatistics && invalid(source.statisticsTotal)) throw new Error('后台滤芯价格合计无效，请核对滤芯明细')
+  let total = hasStatistics ? Math.round(Number(source.statisticsTotal) * 100) : 0
   const fingerprint = rows.map(row => {
     const value = row?.YouhuiHLXZJ
-    if (value === undefined || value === null || value === '' || !Number.isFinite(Number(value)) || Number(value) < 0) {
+    if (!row || typeof row !== 'object' || ((!hasStatistics || Object.prototype.hasOwnProperty.call(row, 'YouhuiHLXZJ')) && invalid(value))) {
       throw new Error('滤芯明细价格不完整，请刷新后重试')
     }
-    total += Math.round(Number(value) * 100)
-    return [row.Id || '', Number(value), row.GenghuanZQ, row.MeinianGHLXSL, row.LvxinDJ, row.YouhuiFD]
+    if (!hasStatistics) total += Math.round(Number(value) * 100)
+    return [row.Id || '', hasStatistics ? null : Number(value), row.GenghuanZQ, row.MeinianGHLXSL, row.LvxinDJ, row.YouhuiFD]
   }).map(value => JSON.stringify(value)).sort().join('|')
-  return { total: total / 100, fingerprint }
+  return { total: total / 100, fingerprint: JSON.stringify([hasStatistics ? 'statistics' : 'rows', total, fingerprint]) }
 }
 
 // 每个表单独享会话。所有异步结果检查记录、合作方式及代次，不能回写已退出/已切换的页面。
