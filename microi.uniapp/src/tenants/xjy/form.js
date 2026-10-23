@@ -907,6 +907,9 @@ async function loadOrderSummaryValues(orderId, context) {
   const id = String(orderId || '').trim()
   if (!id) return orderSummaryValues([], [])
   if (isOrderAdd(context)) {
+    // 列表新增允许先打开完整表单再选客户；未绑定客户时尚不能维护商品，
+    // 也不能调用要求客户归属的草稿明细接口。选定客户后仍走原受控读取与校验。
+    if (!String(context.form.KehuID || '').trim()) return orderSummaryValues([], [])
     const products = await loadDraftSummaryRows(ORDER_PRODUCT_TABLE, id, 1000)
     const positions = products.length ? await loadDraftSummaryRows(INSTALLATION_POSITION_TABLE, id, 5000) : []
     return orderSummaryValues(products, positions)

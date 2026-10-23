@@ -5,6 +5,7 @@ import vm from 'node:vm'
 import * as renewal from '../src/tenants/xjy/order-renewal.mjs'
 import * as summary from '../src/tenants/xjy/order-summary.mjs'
 import * as contract from '../src/tenants/xjy/order-contract.mjs'
+import * as status from '../src/tenants/xjy/order-status.mjs'
 import * as cooperation from '../src/tenants/xjy/order-product-cooperation.mjs'
 
 const DRAFT_ID = '00000000-0000-4000-8000-000000000001'
@@ -27,7 +28,7 @@ function harness({ run, products = [], positions = [], getFormData, draftRows } 
     .replace(/export (?=(?:async )?function|const)/g, '')
   // 只替换 I/O 与与本场景无关的扩展；续签、计价和合同日期使用实际业务模块。
   const hooks = vm.runInNewContext(`${source}; exported`, {
-    ...renewal, ...summary, ...contract, ...cooperation,
+    ...renewal, ...summary, ...contract, ...status, ...cooperation,
     console, setTimeout, clearTimeout,
     uni: { showToast: value => toasts.push(value) },
     getUser: () => ({ Id: 'user-1', Name: '当前人员' }),
@@ -143,6 +144,60 @@ test('普通新增只登记草稿，不误触发续签资料复制', async () =>
   assert.equal(ctx.form.RenewalInitialized, undefined)
   const values = await h.hooks.beforeSubmit(ctx)
   assert.equal(values.XQDingdanBH, '')
+})
+
+test('列表新增未选客户时完整初始化，选客户后才读取受控草稿明细', async () => {
+  let boundCustomer = ''
+  const h = harness({
+    run: async (key, params) => {
+      assert.equal(key, renewal.ORDER_DRAFT_ENGINE)
+      boundCustomer = params.KehuID || boundCustomer
+      return { Code: 1, Data: { Status: 'Active' } }
+    },
+    getFormData: async () => ({ Code: 1, Data: { Id: 'customer-2', KehuMC: '新客户', LianxiR: '联系人' } }),
+    // 对齐后端的客户前置条件，防止宽松的空数组夹具掩盖真实加载错误。
+    draftRows: () => boundCustomer
+      ? { Code: 1, Data: [{ Id: 'product-1', HezuoFS: '租赁' }], DataCount: 1 }
+      : { Code: 0, Msg: '订单草稿尚未确定客户' }
+  })
+  const ctx = h.context()
+  await h.hooks.initialize(ctx)
+  assert.equal(ctx.state.orderInitialized, true)
+  assert.equal(ctx.state.orderDraftReady, true)
+  assert.equal(h.calls.filter(call => call.params.Action === 'Begin').length, 1)
+  assert.equal(h.calls.filter(call => call.params.Action === 'DraftRows').length, 0)
+  assert.equal(h.hooks.getRelatedPresentation(ctx, { Name: 'DingdanSP' }).visible, false)
+  assert.deepEqual(plain(ctx.state.orderSummaryValues), summary.orderSummaryValues([], []))
+
+  await h.hooks.handleFieldSelect(ctx, {
+    field: { Name: 'KehuMC' }, option: { raw: { Id: 'customer-2' } }, value: '新客户'
+  })
+  await h.hooks.refreshDerivedValues(ctx)
+  assert.equal(ctx.form.KehuID, 'customer-2')
+  assert.equal(ctx.form.LianxiR, '联系人')
+  assert.equal(ctx.form.DingdanHZFS, '租赁')
+  assert.notEqual(h.hooks.getRelatedPresentation(ctx, { Name: 'DingdanSP' }).visible, false)
+  assert.ok(h.calls.some(call => call.params.Action === 'DraftRows'))
+  assert.equal(h.reads.length, 0, '草稿明细保持走受控接口')
+})
+
+test('客户详情新增仍读取草稿，真实权限错误继续阻止初始化', async () => {
+  for (const accepted of [true, false]) {
+    const h = harness({ draftRows: () => accepted
+      ? { Code: 1, Data: [], DataCount: 0 }
+      : { Code: 0, Msg: '订单草稿不属于当前账号' } })
+    const ctx = h.context({ defaults: { KehuID: 'customer-1', KehuMC: '已有客户' } })
+    if (accepted) {
+      await h.hooks.initialize(ctx)
+      assert.equal(ctx.form.KehuID, 'customer-1')
+      assert.equal(ctx.state.orderInitialized, true)
+    } else {
+      await assert.rejects(h.hooks.initialize(ctx), /不属于当前账号/)
+      assert.equal(ctx.state.orderSummaryValues, null)
+    }
+    assert.ok(h.calls.some(call => call.params.Action === 'DraftRows'))
+    assert.equal(h.reads.length, 0)
+  }
 })
 
 test('编辑已保存续签合同不重开草稿、不重新复制，待审批日期仍可调整', async () => {
