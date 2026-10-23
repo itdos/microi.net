@@ -20,8 +20,8 @@ const inheritedDefaults = {
 }
 const plain = value => JSON.parse(JSON.stringify(value))
 
-function harness({ run, products = [], positions = [], getFormData, draftRows } = {}) {
-  const calls = [], reads = [], toasts = [], opened = [], writes = []
+function harness({ run, products = [], positions = [], getFormData, getTableData, draftRows, draftRecord } = {}) {
+  const calls = [], reads = [], toasts = [], opened = [], writes = [], contexts = []
   const source = fs.readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')
     .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*/g, '')
     .replace(/export default/g, 'const exported =')
@@ -43,6 +43,11 @@ function harness({ run, products = [], positions = [], getFormData, draftRows } 
       ApiEngine: {
         Run: async (key, params) => {
           calls.push({ key, params: plain(params) })
+          if (key === renewal.ORDER_RENEWAL_ENGINE && params.Action === 'DraftRecord') {
+            if (draftRecord) return draftRecord(params)
+            const ctx = contexts.find(item => item.rowId === params.Id)
+            return { Code: 1, Data: { ...ctx?.form, Id: params.Id } }
+          }
           if (key === renewal.ORDER_RENEWAL_ENGINE && params.Action === 'DraftRows') {
             if (draftRows) return draftRows(params)
             const rows = params.TableName === 'diy_dingdansp' ? products : positions
@@ -61,6 +66,7 @@ function harness({ run, products = [], positions = [], getFormData, draftRows } 
         UptFormData: async (table, values) => { writes.push({ table, values: plain(values) }); return { Code: 1 } },
         GetTableData: async (table, params) => {
           reads.push({ table, params: plain(params) })
+          if (getTableData) return getTableData(table, params)
           return { Code: 1, Data: table === 'diy_dingdansp' ? products : positions }
         }
       }
@@ -71,9 +77,12 @@ function harness({ run, products = [], positions = [], getFormData, draftRows } 
       tableName, mode, rowId, draftRowId: mode === 'Add' ? DRAFT_ID : '',
       menuId: 'order-menu', state: hooks.createState(),
       defaultValues: { ...defaults }, form: { Id: DRAFT_ID, ...defaults, ...form },
-      definition: { fields: [], layoutFields: [], childFields: [], groups: [] }
+      definition: { table: { Id: 'product-table' }, fields: [], layoutFields: [], childFields: [
+        { Id: 'filters-field', Name: 'LvxinMX', Label: '滤芯明细', config: { TableChildTableName: 'diy_dingdansphc' } }
+      ], groups: [] }
     }
     ctx.patchForm = values => Object.assign(ctx.form, values)
+    contexts.push(ctx)
     return ctx
   }
   return { hooks, context, calls, reads, toasts, opened, writes }
@@ -508,7 +517,74 @@ test('正式商品耗材仅在明确原生标志后回退查询，失败/超限�
     } else {
       assert.equal(h.reads.length, 0)
       assert.equal(ctx.form.LvxinSJDJ, 88)
-      assert.match(h.toasts.at(-1).title, /权限|明细过多/)
+      assert.match(h.toasts.at(-1).title, /权限|明细未完整/)
+      await assert.rejects(h.hooks.beforeSubmit(ctx), /权限|明细未完整/)
     }
   }
+})
+
+test('正式订单耗材查询失败不能把1930原价替代1210实际价，保留完整父子授权', async () => {
+  const h = harness({
+    draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+    getTableData: async () => ({ Code: 0, Msg: '耗材读取失败' }),
+    getFormData: async () => ({ Code: 1, Data: { Xianjia: 1580, GenghuanLXJG: 1930 } })
+  })
+  const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+    DingdanID: DRAFT_ID, ShangpinID: 'sku', HezuoFS: '包年换芯', Shuliang: 1, LvxinSJDJ: 1210
+  } })
+  ctx.tableChildAuth = { ParentRowId: 'customer-1' }
+  await h.hooks.handleFieldChange(ctx, { field: { Name: 'HezuoFS' }, value: '包年换芯' })
+  assert.equal(ctx.form.LvxinSJDJ, 1210)
+  assert.equal(h.reads[0].params._TableChildAuth.ParentFieldId, 'filters-field')
+  assert.equal(h.reads[0].params._TableChildAuth.ParentRowId, 'sp-1')
+  assert.equal(h.reads[0].params._TableChildAuth.Parent.ParentRowId, 'customer-1')
+  await assert.rejects(h.hooks.beforeSubmit(ctx), /耗材读取失败/)
+})
+
+test('草稿耗材超过一页时完整累计，分页截断和重复均阻止保存', async () => {
+  for (const broken of ['', 'truncated', 'duplicate']) {
+    const rows = Array.from({ length: 101 }, (_, i) => ({ Id: `f-${i}`, YouhuiHLXZJ: 10 }))
+    const h = harness({
+      draftRows: params => ({ Code: 1, DataCount: 101,
+        Data: broken === 'truncated' ? rows.slice(0, 1) : broken === 'duplicate'
+          ? rows.slice(0, 100) : rows.slice((params._PageIndex - 1) * 100, params._PageIndex * 100) }),
+      getFormData: async () => ({ Code: 1, Data: { GenghuanLXJG: 1930 } })
+    })
+    const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+      ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 1
+    } })
+    await h.hooks.handleFieldChange(ctx, { field: { Name: 'HezuoFS' }, value: '包年换芯' })
+    if (broken) await assert.rejects(h.hooks.beforeSubmit(ctx), /未完整|重复/)
+    else { assert.equal(ctx.form.LvxinSJDJ, 1010); assert.equal(h.hooks.getBusyMessage(ctx), '') }
+  }
+})
+
+test('真实初始化钩子回源服务端报价，耗材返回刷新不会保留旧页面1930', async () => {
+  let unit = 1210, amount = 1210
+  const h = harness({
+    draftRecord: async () => ({ Code: 1, Data: { Id: 'sp-1', HezuoFS: '包年换芯', LvxinSJDJ: unit, LvxinYJ: 1930, ShebeiSJDJ: 0 } }),
+    draftRows: () => ({ Code: 1, Data: [{ Id: 'f-1', YouhuiHLXZJ: amount }], DataCount: 1 })
+  })
+  const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+    ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 1, LvxinSJDJ: 1930, LvxinYJ: 1930
+  } })
+  await h.hooks.initialize(ctx)
+  assert.equal(ctx.form.LvxinSJDJ, 1210)
+  assert.equal(ctx.form.YouhuiFD, 62.69)
+  unit = 1310; amount = 1310
+  await h.hooks.refreshDerivedValues(ctx)
+  assert.equal(ctx.form.LvxinSJDJ, 1310)
+  assert.equal((await h.hooks.beforeSubmit(ctx)).LvxinZJ, 1310)
+})
+
+test('本次收费范围字段切换按后台保留原滤芯实际单价', async () => {
+  const h = harness({ getFormData: async () => ({ Code: 1, Data: { Xianjia: 1580, GenghuanLXJG: 1930 } }),
+    draftRows: () => ({ Code: 1, Data: [{ Id: 'f-1', YouhuiHLXZJ: 1210 }], DataCount: 1 }) })
+  const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+    ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '买断+包年换芯', Shuliang: 1,
+    RenewalSourceSPID: 'old-sp', RenewalChargeMode: 'Service', LvxinSJDJ: 999
+  } })
+  await h.hooks.handleFieldChange(ctx, { field: { Name: 'RenewalChargeMode' }, value: 'Service' })
+  assert.equal(ctx.form.LvxinSJDJ, 999)
+  assert.equal(ctx.form.ShebeiSJDJ, 0)
 })

@@ -45,8 +45,7 @@ import {
   isReusedInstallationPosition,
   renewalDateValues,
   renewalFieldPresentation,
-  renewalPositionSubmitValues,
-  renewalProductPriceValues
+  renewalPositionSubmitValues
 } from './order-renewal.mjs'
 import { proposalCostFieldPresentation } from './proposal-cost-presentation.mjs'
 import {
@@ -62,9 +61,8 @@ import {
 import { followupApprovalDefaultValues } from './followup-approval-defaults.mjs'
 import { leadFollowupDefaultValues } from './lead-followup-defaults.mjs'
 import {
-  calculateOrderProductCooperation,
-  calculateOrderProductPriceBinding,
-  orderProductNumberValue
+  normalizedOrderProductPrices,
+  createOrderProductPricing
 } from './order-product-cooperation.mjs'
 import {
   emptyOrderAmountValues,
@@ -814,73 +812,116 @@ function cooperationOptionKey(field, value) {
   return raw.Key ?? raw.key ?? ''
 }
 
-async function orderProductFilterPrice(context, product) {
-  const orderProductId = context.rowId || context.form.Id
-  if (!context.rowId || !orderProductId) return orderProductNumberValue(product.GenghuanLXJG)
-  const draft = await V8.ApiEngine.Run('xjy-order-renewal', {
-    Action: 'DraftRows', TableName: ORDER_PRODUCT_CONSUMABLE_TABLE,
-    ParentId: orderProductId, DingdanID: context.form.DingdanID, _PageIndex: 1, _PageSize: 100
-  })
-  if (Number(draft?.Code) !== 1) throw new Error(draft?.Msg || '订单耗材读取失败')
-  if (draft.DataAppend?.UseNativeQuery !== true) {
-    if (Number(draft.DataCount) > 100) throw new Error('耗材明细过多，请在平台调整合作方式')
-    return (Array.isArray(draft.Data) ? draft.Data : []).reduce((sum, item) => sum + orderProductNumberValue(item?.YouhuiHLXZJ), 0)
+function orderProductReadScope(context) {
+  return {
+    ...(context.menuId ? { _SysMenuId: context.menuId } : {}),
+    ...(context.tableChildAuth ? { _TableChildAuth: context.tableChildAuth } : {})
   }
-  const result = await V8.FormEngine.GetTableData(ORDER_PRODUCT_CONSUMABLE_TABLE, {
-    _Where: [['DingdanSPID', '=', orderProductId]],
-    _SelectFields: ['YouhuiHLXZJ'],
-    _PageIndex: 1,
-    _PageSize: 1000
+}
+
+function orderProductConsumableField(context) {
+  return (context.definition?.childFields || []).find(field => {
+    const config = field.config || {}
+    return String(config.TableChildTableName || config.TableChild?.TableName || '').toLowerCase() === ORDER_PRODUCT_CONSUMABLE_TABLE ||
+      /滤芯明细|耗材明细/.test([field.Name, field.Label, config.TableChildSysMenuName, config.TableChild?.Title].join(' '))
   })
-  // PC 字段事件查询成功时使用耗材明细合计，失败时才回退商品滤芯价。
-  if (!result || Number(result.Code) !== 1) return orderProductNumberValue(product.GenghuanLXJG)
-  return (Array.isArray(result.Data) ? result.Data : []).reduce(
-    (sum, item) => sum + orderProductNumberValue(item && item.YouhuiHLXZJ),
-    0
-  )
+}
+
+function orderProductConsumableScope(context, id) {
+  const field = orderProductConsumableField(context), tableId = context.definition?.table?.Id
+  if (!field?.Id || !tableId || (!context.menuId && !context.tableChildAuth)) {
+    throw new Error('滤芯明细授权信息不完整，请重新打开表单')
+  }
+  // 沿用页面真实父子授权链；子表菜单无独立读取权限时不能退为裸表查询。
+  return { _TableChildAuth: {
+    ParentFieldId: field.Id, ParentTableId: tableId, ParentSysMenuId: context.menuId || '',
+    ParentRowId: String(id), ParentValue: String(id), ParentFormMode: context.mode || 'View',
+    ...(context.tableChildAuth ? { Parent: context.tableChildAuth } : {})
+  } }
+}
+
+async function orderProductFilterRows(context, form) {
+  const id = context.rowId
+  if (!id) return []
+  const rows = [], seen = new Set()
+  let native = false, expectedCount
+  for (let page = 1; page <= 10; page += 1) {
+    let result
+    if (!native) {
+      result = await V8.ApiEngine.Run('xjy-order-renewal', {
+        Action: 'DraftRows', TableName: ORDER_PRODUCT_CONSUMABLE_TABLE,
+        ParentId: id, DingdanID: form.DingdanID, _PageIndex: page, _PageSize: 100
+      })
+      if (Number(result?.Code) !== 1) throw new Error(result?.Msg || '订单耗材读取失败')
+      native = result.DataAppend?.UseNativeQuery === true
+    }
+    if (native) {
+      result = await V8.FormEngine.GetTableData(ORDER_PRODUCT_CONSUMABLE_TABLE, {
+        ...orderProductConsumableScope(context, id),
+        _Where: [['DingdanSPID', '=', id]],
+        _SelectFields: ['Id', 'YouhuiHLXZJ', 'GenghuanZQ', 'MeinianGHLXSL', 'LvxinDJ', 'YouhuiFD'],
+        _OrderBy: 'Id', _OrderByType: 'ASC', _PageIndex: page, _PageSize: 100
+      })
+    }
+    if (Number(result?.Code) !== 1 || !Array.isArray(result.Data)) throw new Error(result?.Msg || '订单耗材读取失败')
+    const count = result.DataCount == null ? undefined : Number(result.DataCount)
+    if (count !== undefined) {
+      if (!Number.isInteger(count) || count < 0 || count > 1000) throw new Error('耗材明细过多或数量无效，请在平台核对')
+      if (expectedCount !== undefined && expectedCount !== count) throw new Error('耗材明细已变化，请重试')
+      expectedCount = count
+    }
+    for (const row of result.Data) {
+      if (row.Id && seen.has(row.Id)) throw new Error('耗材明细分页重复，请重试')
+      if (row.Id) seen.add(row.Id)
+      rows.push(row)
+    }
+    if (expectedCount !== undefined && rows.length > expectedCount) throw new Error('耗材明细数量不一致，请重试')
+    if (result.Data.length < 100 || rows.length === expectedCount) {
+      if (expectedCount !== undefined && rows.length !== expectedCount) throw new Error('耗材明细未完整读取，请重试')
+      return rows
+    }
+  }
+  throw new Error('耗材明细超过移动端核对范围，请在平台调整')
+}
+
+function orderProductPricing(context) {
+  if (!context.state.orderProductPricing) {
+    context.state.orderProductPricing = createOrderProductPricing({
+      loadFilters: orderProductFilterRows,
+      async loadRecord(ctx) {
+        if (!ctx.rowId) return null
+        let result = await V8.ApiEngine.Run('xjy-order-renewal', {
+          Action: 'DraftRecord', TableName: ORDER_PRODUCT_TABLE, Id: ctx.rowId
+        })
+        if (Number(result?.Code) !== 1) throw new Error(result?.Msg || '订单商品读取失败')
+        if (result.DataAppend?.UseNativeQuery === true) {
+          result = await V8.FormEngine.GetFormData(ORDER_PRODUCT_TABLE, { Id: ctx.rowId, ...orderProductReadScope(ctx) })
+        }
+        if (Number(result?.Code) !== 1 || !result.Data || String(result.Data.Id) !== String(ctx.rowId)) {
+          throw new Error(result?.Msg || '订单商品读取失败，请刷新后重试')
+        }
+        return result.Data
+      },
+      async loadProduct(ctx, form) {
+        if (!form.HezuoFS || !form.ShangpinID) throw new Error('请先选择商品和合作方式')
+        const result = await V8.FormEngine.GetFormData(PRODUCT_TABLE, {
+          Id: form.ShangpinID, _SelectFields: ['Id', 'Yuanjia', 'Xianjia', 'ZulinYJ', 'ZulinXJ', 'GenghuanLXJG']
+        })
+        if (Number(result?.Code) !== 1 || !result.Data) throw new Error(result?.Msg || '商品价格读取失败')
+        return result.Data
+      },
+      notify: title => uni.showToast({ title, icon: 'none' })
+    })
+  }
+  return context.state.orderProductPricing
 }
 
 async function updateOrderProductCooperation(context, payload) {
-  const cooperation = String(payload.value || '')
-  const cooperationKey = cooperationOptionKey(payload.field, cooperation)
-  const productId = context.form.ShangpinID
-  const requestId = Number(context.state.orderProductCooperationRequestId || 0) + 1
-  context.state.orderProductCooperationRequestId = requestId
-
-  // 与 PC 一致先更新隐藏合作方式值，接口异常时也不残留上一方式。
-  context.patchForm({ HezuoFSZ: cooperationKey })
-  if (!cooperation || !productId) return { handled: true }
-
-  try {
-    const productResult = await V8.FormEngine.GetFormData(PRODUCT_TABLE, {
-      Id: productId,
-      _SelectFields: ['Id', 'Yuanjia', 'Xianjia', 'ZulinYJ', 'ZulinXJ', 'GenghuanLXJG']
-    })
-    if (!productResult || Number(productResult.Code) !== 1 || !productResult.Data) {
-      throw new Error(productResult && productResult.Msg || '商品价格读取失败')
-    }
-    const filterActualUnitPrice = await orderProductFilterPrice(context, productResult.Data)
-    // 快速连续切换时只允许最后一次请求更新价格。
-    if (context.state.orderProductCooperationRequestId !== requestId ||
-      String(context.form.HezuoFS || '') !== cooperation) {
-      return { handled: true }
-    }
-    const prices = calculateOrderProductCooperation({
-      cooperation,
-      cooperationKey,
-      form: context.form,
-      product: productResult.Data,
-      filterActualUnitPrice
-    })
-    context.patchForm({ ...prices, ...renewalProductPriceValues({ ...context.form, ...prices }) })
-  } catch (error) {
-    if (context.state.orderProductCooperationRequestId === requestId) {
-      uni.showToast({
-        title: error.message || error.Msg || '合作方式价格联动失败',
-        icon: 'none'
-      })
-    }
-  }
+  const cooperationKey = cooperationOptionKey(payload.field, payload.value)
+  const values = { HezuoFS: String(payload.value || ''), HezuoFSZ: cooperationKey }
+  context.patchForm(values)
+  context.form = { ...context.form, ...values }
+  await orderProductPricing(context).refresh(context, { reset: true, cooperationKey })
   return { handled: true }
 }
 
@@ -1816,7 +1857,7 @@ export function createState() {
     orderSummaryValues: null,
     installationSelectorVisible: false,
     installationSelectorVisibilityRequestId: 0,
-    orderProductCooperationRequestId: 0,
+    orderProductPricing: null,
     installationCodeInitialized: false,
     installationCodeInitializing: false,
     installationCodeField: '',
@@ -1850,7 +1891,8 @@ export async function initialize(context) {
   await initializeInstallationPositionLocation(context)
   // 详情、编辑、新增统一按当前单价和数量展示派生价格，修复历史记录中的不一致值。
   if (isOrderProductForm(context)) {
-    context.patchForm({ ...calculateOrderProductPriceBinding(context.form), ...renewalProductPriceValues(context.form) })
+    context.patchForm(normalizedOrderProductPrices(context.form))
+    if (context.form.ShangpinID) await orderProductPricing(context).refresh(context)
   }
   // zhy：所有入口进入订单新增页时统一初始化，避免各页面分别维护相同逻辑。
   if (isOrderAdd(context) && !context.state.orderInitialized) {
@@ -2011,16 +2053,26 @@ export async function initialize(context) {
 // zhy：客户方案的场所点位数量始终取安装点位子表接口返回的完整总数，空子表显示 0。
 export async function handleRelatedCount(context, payload = {}) {
   if (payload.filtered) return
+  if (isOrderProductForm(context) && payload.field?.Id === orderProductConsumableField(context)?.Id && payload.field?.Id) {
+    await orderProductPricing(context).refresh(context)
+    return
+  }
   const count = Number(payload.count)
   const value = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
 
   // 订单商品的设备数量以安装位置完整总数为唯一事实源。
   if (isOrderProductForm(context) && isOrderProductInstallationChild(payload.field)) {
+    // 数量自动同步也是写入入口，必须先核对价格，不能绕过主表保存的失败保护。
+    if (context.form.ShangpinID) {
+      await orderProductPricing(context).refresh(context)
+      const error = orderProductPricing(context).busy()
+      if (error) throw new Error(error)
+    }
     const field = fieldName(context, 'Shuliang', '设备数量')
     if (Number(context.form[field] || 0) === value) return
     const quantityValues = { [field]: value }
     const nextForm = { ...context.form, ...quantityValues }
-    const priceValues = { ...calculateOrderProductPriceBinding(nextForm), ...renewalProductPriceValues(nextForm) }
+    const priceValues = normalizedOrderProductPrices(nextForm)
     if (context.rowId && context.mode !== 'View') {
       let result = await V8.ApiEngine.Run('xjy-order-renewal', {
         Action: 'DraftSave', TableName: ORDER_PRODUCT_TABLE, Id: context.rowId,
@@ -2039,6 +2091,7 @@ export async function handleRelatedCount(context, payload = {}) {
       ...quantityValues,
       ...priceValues
     })
+    orderProductPricing(context).observe({ ...context, form: { ...nextForm, ...priceValues } })
     return
   }
 
@@ -2738,7 +2791,10 @@ export async function handleFieldChange(context, payload) {
     return { handled: true }
   }
   if (isOrderProductForm(context) && payload?.field?.Name === 'RenewalChargeMode') {
-    context.patchForm(renewalProductPriceValues({ ...context.form, RenewalChargeMode: payload.value }))
+    // 收费范围也会改变设备/滤芯是否收费，必须作废之前的报价请求。
+    context.form = { ...context.form, RenewalChargeMode: payload.value }
+    await orderProductPricing(context).refresh(context, { reset: true, preserveFilter: true,
+      cooperationKey: context.form.HezuoFSZ })
     return { handled: true }
   }
   if (isTerminationForm(context) && payload?.field?.Name === 'DingdanBH' && !payload.value) {
@@ -2765,12 +2821,7 @@ export async function handleFieldChange(context, payload) {
   if (isOrderProductForm(context) && payload) {
     const changedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
     if (['shuliang', 'shebeisjdj', 'lvxinsjdj'].includes(changedFieldName)) {
-      const changedValues = { [payload.field.Name]: payload.value }
-      context.patchForm({
-        ...changedValues,
-        ...calculateOrderProductPriceBinding({ ...context.form, ...changedValues }),
-        ...renewalProductPriceValues({ ...context.form, ...changedValues })
-      })
+      orderProductPricing(context).change(context, payload.field.Name, payload.value)
       return { handled: true }
     }
   }
@@ -2886,8 +2937,8 @@ export async function beforeSubmit(context) {
   if (isOrderProductForm(context)) {
     // 派生字段可能为只读或隐藏，显式随主表单保存，保证落库值与页面联动结果一致。
     return {
-      ...calculateOrderProductPriceBinding(context.form),
-      ...renewalProductPriceValues(context.form),
+      ...await orderProductPricing(context).prepare(context),
+      HezuoFSZ: context.form.HezuoFSZ,
       ...(context.form.RenewalSourceSPID ? {
         RenewalSourceSPID: context.form.RenewalSourceSPID,
         RenewalChargeMode: context.form.RenewalChargeMode
@@ -3079,7 +3130,10 @@ export async function beforeSubmit(context) {
 
 export async function refreshDerivedValues(context) {
   if (isOrderProductForm(context)) {
-    await refreshInstallationSelectorVisibility(context)
+    await Promise.all([
+      refreshInstallationSelectorVisibility(context),
+      context.form.ShangpinID ? orderProductPricing(context).refresh(context) : Promise.resolve()
+    ])
     return {}
   }
   if (isProposalForm(context)) {
@@ -3130,11 +3184,13 @@ export async function afterSubmit(context) {
 }
 
 export function getBusyMessage(context) {
+  if (isOrderProductForm(context)) return context.state.orderProductPricing?.busy() || ''
   if (isOrderAdd(context) && !context.state.orderDraftReady) return '正在初始化订单资料，请稍候'
   return context.state && context.state.locating ? '正在获取位置，请稍候' : ''
 }
 
 export function dispose(context) {
+  if (isOrderProductForm(context)) context.state.orderProductPricing?.dispose()
   if (isOrderForm(context) && context.state.orderDraftLifecycle) {
     context.state.orderDraftDisposed = true
     const id = context.state.orderDraftId || context.draftRowId || context.form.Id
