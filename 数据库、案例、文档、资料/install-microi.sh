@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Alibaba Cloud Linux 3 / Anolis、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-10-23 11:32:36
+# 版本：v2026-10-23 11:44:30
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -113,7 +113,7 @@ microi_install_ops() {
 }
 
 
-SCRIPT_VERSION="v2026-10-23 11:32:36"
+SCRIPT_VERSION="v2026-10-23 11:44:30"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -1510,7 +1510,9 @@ print_generated_install_configuration() {
   echo "${address_title}："
   echo '------------------------------------------------------------------'
   if [ -n "${ACCESS_IP:-}" ] && [ -n "${VUE_PORT:-}" ]; then
-    echo "前端传统界面:  http://${ACCESS_IP}:${VUE_PORT}/?OsClient=${OS_CLIENT:-iTdos}    账号: admin  密码: demo123456"
+    echo "前端传统界面:  http://${ACCESS_IP}:${VUE_PORT}/?OsClient=${OS_CLIENT:-iTdos}"
+    # 导入包可能使用随机初始密码或保留客户原帐号；安装器不重置密码，不输出写死的凭据。
+    echo '登录帐号与初始密码: 以导入数据库为准；官方标准空库请查看登录页提示。'
   fi
   echo "主租户:        OsClient=${OS_CLIENT:-未生成}, ClientName=${OS_CLIENT:-未生成}"
   echo ''
@@ -6731,5 +6733,5 @@ if [ "${OPTIONAL_COMPONENT_FAILURE_COUNT}" -gt 0 ]; then
 else
   echo 'Microi：安装完成！如需管理编排，可进入对应编排目录执行 docker compose 命令。'
 fi
-echo 'Microi：提示：请及时修改默认管理员密码（admin / demo123456）。'
+echo 'Microi：提示：请使用导入数据库中的管理员帐号密码登录；官方标准空库请查看登录页提示，并及时修改初始密码。'
 echo '=================================================================='

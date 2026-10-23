@@ -13,6 +13,11 @@ const bash = process.platform === 'win32'
   ? ['D:/Program Files/Git/bin/bash.exe', 'C:/Program Files/Git/bin/bash.exe'].find(existsSync) : 'bash';
 assert(bash);
 
+test('installation summary does not claim a hard-coded password for an imported database', () => {
+  assert.doesNotMatch(source, /密码[：:]?\s*demo123456|admin\s*\/\s*demo123456/);
+  assert.match(source, /登录帐号与初始密码: 以导入数据库为准/);
+});
+
 function run(choice, mode) {
   // 执行安装器真实暂停区块；模拟外部命令结果，确保失败时不能继续启动 API。
   const input = ['set -e', 'database_exec_sql() {',
