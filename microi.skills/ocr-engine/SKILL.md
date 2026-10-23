@@ -91,6 +91,7 @@ return {
 - OCR 宿主机端口只绑定 `127.0.0.1`；Docker 化 API 与 OCR 同时加入 external bridge 网络 `microi-ocr`，一键安装的内部 endpoint 固定为 `http://microi-install-ocr:8080/ocr`。不得通过公网/LAN 回环调用同机 OCR。
 - `install-microi.sh` 默认尝试安装 OCR，但先部署 API/Web 并通过 liveness、完整 `ServerVersion` 升级链和 readiness。随后必须依次满足“固定镜像拉取并回读为 amd64 → OCR healthy → Upgrade29 的 9 个物理字段数据库回读 → 唯一活动主租户 → 配置写入后回读 → API 重启 readiness”才设置 `OcrEnabled=1`；任一步失败都保持 OCR 能力关闭并记录警告，但不得中断已经可用的核心平台。字段每秒回读一次且最多 15 秒；正常升级应首轮命中，镜像过旧或迁移失败应快速关闭 OCR，禁止无意义等待 5 分钟。不要用安装脚本直接伪造 `diy_field` 元数据绕过 Upgrade29。
 - API/Web 官方浮动 `latest` 必须在 Compose 启动时强制回源拉取，避免旧本机镜像缺少 Upgrade29。核心门禁失败时输出“安装未完成”恢复汇总并保留非零退出码；OCR 字段、服务或配置门禁失败时，成功汇总明确显示“OCR SaaS 未启用”和附加能力警告。两种汇总都不是启用 OCR 的依据。
+- 内存保护优先于默认安装：新安装识别物理内存低于 7680MiB 或模型启动前可用内存低于 2048MiB 时，OCR 和翻译在本次安装始终保持停用，已有同名安装容器精确停止并关闭自动重启，保留卷和数据；核心升级后只对唯一活动主租户设置 `OcrEnabled=0` 并回读，再刷新 API。不要因停止后可用内存增加或存在 Swap 而重新启用，也不要在降级主机继续触发真实 OCR 推理。内存充足时 OCR Compose 默认限制 1024MiB RAM、1536MiB RAM+Swap、0.75CPU，且原生数学库线程为 1。
 - OCR 使用固定不可变版本，不加入只跟踪 API/Web 浮动标签的 Watchtower 自动更新列表；升级镜像时先发布新 tag、匿名回读 digest/架构，再修改 Compose 与安装器。
 - 登录国内镜像源必须从本机发布配置读取凭据并走 `docker login --password-stdin`，不得输出密码。推送成功不是发布验收，必须使用隔离的匿名 Docker config 回读 manifest/digest，必要时再做匿名拉取。
 - 不要在内存不足的共享开发机上直接构建模型镜像。构建前检查物理内存、Docker 占用与同类进程；保留至少 `max(6 GB, 物理内存 20%)`，不足时延后构建而不是停止他人服务。

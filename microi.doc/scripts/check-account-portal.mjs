@@ -5,13 +5,15 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const project = fileURLToPath(new URL('../', import.meta.url));
-export const portalRoutes = ['overview', 'systems', 'create', 'licenses', 'invitations', 'ai', 'account'];
+export const portalRoutes = ['overview', 'systems', 'create', 'licenses', 'invitations', 'star-gift-registration', 'ai', 'account'];
 const sourceFiles = [
   'docs/.vitepress/theme/components/ProfilePage.vue',
   'docs/.vitepress/theme/components/InvitationTree.vue',
   'docs/.vitepress/theme/components/LoginPage.vue',
   'docs/.vitepress/theme/profile-i18n.ts',
-  'docs/.vitepress/theme/styles/mainstream.scss'
+  'docs/.vitepress/theme/styles/mainstream.scss',
+  'docs/.vitepress/theme/components/ProfileStarGiftRecords.vue',
+  'server/api-engines/official-star-gift-records.js'
 ];
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -101,7 +103,7 @@ function main() {
   if (!process.argv.includes('--dist')) {
     fs.mkdirSync(path.dirname(snapshot), { recursive: true });
     fs.writeFileSync(snapshot, JSON.stringify(hashes, null, 2));
-    console.log('个人中心源码检查通过：7 个页面、邀请注册、邀请树、系统授权。');
+    console.log('个人中心源码检查通过：8 个页面、邀请注册、邀请树、系统授权与角色限定活动登记。');
     return;
   }
   assertSourceUnchanged(JSON.parse(fs.readFileSync(snapshot, 'utf8')), hashes);
