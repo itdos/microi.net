@@ -9,7 +9,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useData } from 'vitepress'
 const { isDark } = useData()
-const baseEntry = 'https://file.microi.net/itdos/micro-app/microi-engine-city/index.html?v=1.9.1'
+const baseEntry = 'https://static.itdos.com/itdos/micro-app/microi-engine-city/index.html?v=1.10.1'
 const entryOrigin = new URL(baseEntry).origin
 const entry = ref(baseEntry)
 const host = ref(null), frame = ref(null), activate = ref(false)
