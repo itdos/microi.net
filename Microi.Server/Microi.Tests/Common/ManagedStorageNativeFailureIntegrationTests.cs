@@ -71,4 +71,16 @@ public sealed class ManagedStorageNativeFailureIntegrationTests
         var failed = await Read(new JObject { ["Code"] = 0, ["tenant"] = Tenant, ["owner"] = Owner }.ToString());
         Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => ManagedStorageAdmissionHttpTests.ParseOwnedControlSuccess(failed, Tenant, Owner));
     }
+
+    [Fact]
+    public void StopHttpHostRejectionUsesTheExistingDataContract()
+    {
+        // 直接调用原宿主动作，不启服务或运行 V8；锁定恢复验证实际接收的 Data/Msg 协议。
+        var response = new Microi.net.Api.ApiEngineController().StopHttp();
+        var json = Assert.IsType<Microsoft.AspNetCore.Mvc.JsonResult>(response);
+        var result = Assert.IsType<Dos.Common.DosResult>(json.Value);
+        Assert.Equal(0, result.Code);
+        Assert.Equal("此接口已禁止http调用！", Assert.IsType<string>(result.Data));
+        Assert.Null(result.Msg);
+    }
 }
