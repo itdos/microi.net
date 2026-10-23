@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Alibaba Cloud Linux 3 / Anolis、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-10-11 18:05:28
+# 版本：v2026-10-23 11:32:36
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -113,7 +113,7 @@ microi_install_ops() {
 }
 
 
-SCRIPT_VERSION="v2026-10-11 18:05:28"
+SCRIPT_VERSION="v2026-10-23 11:32:36"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -5382,7 +5382,8 @@ INSTALL_CURRENT_STAGE="步骤6/11 暂停恢复库定时任务"
 case "${DATABASE_CHOICE}" in
   1|2)
     PAUSE_SCHEDULE_SQL="UPDATE diy_schedule_job SET Status='暂停'; UPDATE microi_job_triggers SET TRIGGER_STATE='PAUSED';"
-    PAUSE_SCHEDULE_VERIFY_SQL="SELECT 'MICROI_SCHEDULES_PAUSED' AS Marker WHERE NOT EXISTS (SELECT 1 FROM diy_schedule_job WHERE IFNULL(Status,'')<>'暂停') AND NOT EXISTS (SELECT 1 FROM microi_job_triggers WHERE IFNULL(TRIGGER_STATE,'')<>'PAUSED');"
+    # MySQL 5.7 的无表 SELECT 带 WHERE 时必须显式 FROM DUAL；同时兼容 8.0，空任务表也可校验。
+    PAUSE_SCHEDULE_VERIFY_SQL="SELECT 'MICROI_SCHEDULES_PAUSED' AS Marker FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM diy_schedule_job WHERE IFNULL(Status,'')<>'暂停') AND NOT EXISTS (SELECT 1 FROM microi_job_triggers WHERE IFNULL(TRIGGER_STATE,'')<>'PAUSED');"
     ;;
   3)
     PAUSE_SCHEDULE_SQL="UPDATE [dbo].[diy_schedule_job] SET [Status]=N'暂停'; UPDATE [dbo].[microi_job_triggers] SET [TRIGGER_STATE]=N'PAUSED';"
@@ -5398,8 +5399,13 @@ case "${DATABASE_CHOICE}" in
     ;;
 esac
 database_exec_sql "${PAUSE_SCHEDULE_SQL}"
-PAUSE_SCHEDULE_READBACK=$(database_exec_sql "${PAUSE_SCHEDULE_VERIFY_SQL}" 2>&1 || true)
-if ! printf '%s\n' "${PAUSE_SCHEDULE_READBACK}" | grep -q 'MICROI_SCHEDULES_PAUSED'; then
+# 校验 SQL 执行失败与状态不一致分别诊断；错误文本里出现标记不能冒充成功回执。
+if ! PAUSE_SCHEDULE_READBACK=$(database_exec_sql "${PAUSE_SCHEDULE_VERIFY_SQL}" 2>&1); then
+  echo 'Microi：错误：恢复库的定时任务暂停校验 SQL 执行失败，已在 API/Worker 启动前停止。'
+  printf '%s\n' "${PAUSE_SCHEDULE_READBACK}" >&2
+  exit 1
+fi
+if ! printf '%s\n' "${PAUSE_SCHEDULE_READBACK}" | grep -Eq '^[[:space:]]*MICROI_SCHEDULES_PAUSED[[:space:]]*$'; then
   echo 'Microi：错误：恢复库的定时任务暂停状态回读不一致，已在 API/Worker 启动前停止。'
   exit 1
 fi

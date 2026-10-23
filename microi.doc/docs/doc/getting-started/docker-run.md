@@ -177,6 +177,8 @@ bash install-microi.sh --repair-network
 
 **网络修复不等于续装。** 若失败发生于步骤 9、API 和 `microi-install-app/docker-compose.yml` 还没有创建，`--repair-app` 无法补齐此次安装。保留失败汇总与已有编排，按实际配置恢复后续安装；普通安装入口仍会拒绝覆盖已有 `microi-install-*` 容器，防止重新导入数据库。仅在确认是尚未投入使用的新安装且已有备份时，才按中断安装提示停掉对应编排并重新安装，原数据目录继续保留。
 
+如果 MySQL 5.7 在“暂停恢复库中的定时任务”阶段退出，先区分校验 SQL 执行错误与任务状态不一致。旧脚本的无表 `SELECT … WHERE NOT EXISTS …` 会报 `ERROR 1064`；新版使用兼容 MySQL 5.7/8.0 的 `FROM DUAL`，并独立核对命令退出状态和完整成功标记。下载新版后，仍需按上面的备份与中断安装恢复要求处理，不能跳过暂停门禁或删除原数据目录。
+
 #### 复用已有 MySQL / MinIO
 
 - 选择 MySQL 5.7 或 MySQL 8.0 后，可选择“使用已有 MySQL 服务”，再填写 IP/DNS、端口、`root` 帐号和该帐号的真实密码。IP 直接按 Enter 表示本机服务，容器通过 `host.docker.internal` 的 host-gateway 访问；安装器会实测连接和服务端版本，只接受与所选项一致的 MySQL 5.7.x / 8.0.x，不接受 MariaDB，也不存在“MySQL 5.8”这个版本选项。
