@@ -820,10 +820,14 @@ function orderProductReadScope(context) {
 }
 
 function orderProductConsumableField(context) {
-  return (context.definition?.childFields || []).find(field => {
+  const fields = context.definition?.childFields || []
+  // 标准 TableChild 配置保存目标表 Id；本租户用 SpLvXin + DingdanSPID 标识滤芯关系。
+  // Label 可为空或由菜单名称生成，不能用显示文案判断是否存在授权字段。
+  const configured = fields.find(field => field.Name === 'SpLvXin' &&
+    field.config?.TableChildTableId && field.config?.TableChildFkFieldName === 'DingdanSPID')
+  return configured || fields.find(field => {
     const config = field.config || {}
-    return String(config.TableChildTableName || config.TableChild?.TableName || '').toLowerCase() === ORDER_PRODUCT_CONSUMABLE_TABLE ||
-      /滤芯明细|耗材明细/.test([field.Name, field.Label, config.TableChildSysMenuName, config.TableChild?.Title].join(' '))
+    return String(config.TableChildTableName || config.TableChild?.TableName || '').toLowerCase() === ORDER_PRODUCT_CONSUMABLE_TABLE
   })
 }
 

@@ -11,6 +11,20 @@ import * as cooperation from '../src/tenants/xjy/order-product-cooperation.mjs'
 const DRAFT_ID = '00000000-0000-4000-8000-000000000001'
 const SOURCE_ID = '00000000-0000-4000-8000-000000000002'
 const OTHER_SOURCE_ID = '00000000-0000-4000-8000-000000000003'
+// 当前租户真实配置仅保存子表/菜单 Id，没有 TableChildTableName；Label 为空。
+const FILTER_FIELD_ID = '4a0eaea0-ede9-4657-a5e4-22a5965b12a1'
+const PRODUCT_TABLE_ID = '6e4d13a2-6015-4dc1-8f9e-194e79532bb8'
+function productFilterField() {
+  return {
+    Id: FILTER_FIELD_ID, Name: 'SpLvXin', Label: '', component: 'TableChild',
+    config: {
+      TableChildTableId: 'ae0f4c0d-12d1-4e5b-9fe5-2cbc7c65c8d1',
+      TableChildSysMenuId: 'ae485545-447a-4147-b886-8d48dc9ff101',
+      TableChildSysMenuName: '订单商品滤芯表', TableChildFkFieldName: 'DingdanSPID',
+      TableChild: { PrimaryTableFieldName: 'Id' }
+    }
+  }
+}
 const inheritedDefaults = {
   XinLDD: renewal.ORDER_RENEWAL_TYPE, XQDingdanID: SOURCE_ID, XQDingdanBH: 'OLD-001',
   KehuID: 'customer-1', KehuMC: '原客户', RenewalInitialized: 1, RenewalTermMonths: 12,
@@ -77,9 +91,8 @@ function harness({ run, products = [], positions = [], getFormData, getTableData
       tableName, mode, rowId, draftRowId: mode === 'Add' ? DRAFT_ID : '',
       menuId: 'order-menu', state: hooks.createState(),
       defaultValues: { ...defaults }, form: { Id: DRAFT_ID, ...defaults, ...form },
-      definition: { table: { Id: 'product-table' }, fields: [], layoutFields: [], childFields: [
-        { Id: 'filters-field', Name: 'LvxinMX', Label: '滤芯明细', config: { TableChildTableName: 'diy_dingdansphc' } }
-      ], groups: [] }
+      definition: { table: { Id: PRODUCT_TABLE_ID }, fields: [], layoutFields: [],
+        childFields: [productFilterField()], groups: [] }
     }
     ctx.patchForm = values => Object.assign(ctx.form, values)
     contexts.push(ctx)
@@ -523,6 +536,57 @@ test('正式商品耗材仅在明确原生标志后回退查询，失败/超限�
   }
 })
 
+test('合同详情进入正式商品时使用真实 SpLvXin 配置，并保留无独立商品菜单的嵌套授权', async () => {
+  for (const Label of ['', '订单商品滤芯表']) {
+    const h = harness({
+      draftRecord: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+      draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+      getFormData: async () => ({ Code: 1, Data: {
+        Id: 'sp-1', HezuoFS: '包年换芯', LvxinSJDJ: 1210, LvxinYJ: 1930, ShebeiSJDJ: 0
+      } }),
+      getTableData: async () => ({ Code: 1, Data: [{ Id: 'f-1', YouhuiHLXZJ: 1210 }], DataCount: 1 })
+    })
+    const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'View', rowId: 'sp-1', form: {
+      ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 1,
+      LvxinSJDJ: 1210, LvxinYJ: 1930
+    } })
+    ctx.definition.childFields[0].Label = Label
+    // 合同 -> 商品 -> 滤芯；商品页面可以仅通过上一级 TableChild 授权进入。
+    ctx.menuId = ''
+    ctx.tableChildAuth = { ParentFieldId: 'goods-field', ParentTableId: 'order-table',
+      ParentSysMenuId: 'contract-menu', ParentRowId: DRAFT_ID, ParentValue: DRAFT_ID, ParentFormMode: 'View' }
+    await h.hooks.initialize(ctx)
+    assert.equal(h.toasts.length, 0)
+    assert.equal(h.hooks.getBusyMessage(ctx), '')
+    assert.equal(ctx.form.LvxinSJDJ, 1210)
+    assert.equal(ctx.form.YouhuiFD, 62.69)
+    assert.equal(h.reads.length, 1)
+    assert.deepEqual(h.reads[0].params._TableChildAuth, {
+      ParentFieldId: FILTER_FIELD_ID, ParentTableId: PRODUCT_TABLE_ID, ParentSysMenuId: '',
+      ParentRowId: 'sp-1', ParentValue: 'sp-1', ParentFormMode: 'View', Parent: ctx.tableChildAuth
+    })
+    assert.deepEqual(h.reads[0].params._Where, [['DingdanSPID', '=', 'sp-1']])
+  }
+})
+
+test('滤芯字段、外键或父级授权不完整时仍拒绝查询，不借用安装位置或相似文案', async () => {
+  for (const missing of ['field', 'foreign-key', 'parent']) {
+    const h = harness({ draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }) })
+    const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'View', rowId: 'sp-1', form: {
+      ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 1, LvxinSJDJ: 1210
+    } })
+    if (missing === 'field') ctx.definition.childFields = [{ Id: 'positions-field', Name: 'AnzhuangWZ',
+      Label: '滤芯明细安装位置', config: { TableChildTableId: 'positions-table', TableChildFkFieldName: 'DingdanSPID' } }]
+    if (missing === 'foreign-key') ctx.definition.childFields[0].config.TableChildFkFieldName = 'OtherId'
+    if (missing === 'parent') ctx.menuId = ''
+    await h.hooks.initialize(ctx)
+    assert.equal(h.reads.length, 0)
+    assert.match(h.toasts.at(-1).title, /滤芯明细授权信息不完整/)
+    assert.equal(ctx.form.LvxinSJDJ, 1210)
+    await assert.rejects(h.hooks.beforeSubmit(ctx), /滤芯明细授权信息不完整/)
+  }
+})
+
 test('正式订单耗材查询失败不能把1930原价替代1210实际价，保留完整父子授权', async () => {
   const h = harness({
     draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
@@ -535,7 +599,7 @@ test('正式订单耗材查询失败不能把1930原价替代1210实际价，保
   ctx.tableChildAuth = { ParentRowId: 'customer-1' }
   await h.hooks.handleFieldChange(ctx, { field: { Name: 'HezuoFS' }, value: '包年换芯' })
   assert.equal(ctx.form.LvxinSJDJ, 1210)
-  assert.equal(h.reads[0].params._TableChildAuth.ParentFieldId, 'filters-field')
+  assert.equal(h.reads[0].params._TableChildAuth.ParentFieldId, FILTER_FIELD_ID)
   assert.equal(h.reads[0].params._TableChildAuth.ParentRowId, 'sp-1')
   assert.equal(h.reads[0].params._TableChildAuth.Parent.ParentRowId, 'customer-1')
   await assert.rejects(h.hooks.beforeSubmit(ctx), /耗材读取失败/)
