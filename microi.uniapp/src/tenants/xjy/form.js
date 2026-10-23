@@ -204,7 +204,9 @@ const CUSTOMER_PERSONNEL_LINKS = [
     sourceNames: ['ZhuanshuKF', 'ZhaunshuKF'],
     sourceLabels: ['专属客服'],
     phoneName: 'ZhuanshuKFDH',
-    phoneLabel: '专属客服电话'
+    phoneLabel: '专属客服电话',
+    // 列表按人员 ID 授权，名称与电话不足以建立专属客服的数据关联。
+    idName: 'ZhuanshuKFID'
   },
   {
     sourceNames: ['ShouhouRY'],
@@ -2767,7 +2769,7 @@ export async function handleFieldSelect(context, payload) {
     : payload.option && payload.option.raw && typeof payload.option.raw === 'object'
       ? payload.option.raw
       : {}
-  const phone = personValue(row, PERSON_PHONE_KEYS)
+  const phone = payload.cleared ? '' : personValue(row, PERSON_PHONE_KEYS)
   const personId = selectedPersonId(payload, row)
   const phoneName = fieldName(context, link.phoneName, link.phoneLabel)
   const updates = { [phoneName]: phone }
