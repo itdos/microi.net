@@ -185,7 +185,7 @@ def outcome(current, before, after):
 
 
 def cache_keys(tenant, rows):
-    require(tenant.lower().startswith('stdadmission_'), 'Wrong cache tenant')
+    require(re.fullmatch(r'adm_[a-f0-9]{32}', tenant.lower()), 'Wrong cache tenant')
     aliases = set()
     for key in KEYS:
         row = rows[key]

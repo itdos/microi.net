@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {configureContext,PROTOCOL_PATHS,sha} from './contracts.mjs';
-import {bindPreparation,main as stage} from './prepare.mjs';
+import {bindPreparation,main as stage,REQUIRED_APPLICATION} from './prepare.mjs';
 
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 export const ROOT=path.resolve(HERE,'../../../../..');
@@ -84,7 +84,7 @@ function sourceManifest(){
     const file=path.join(folder,entry.name);assert.ok(!entry.isSymbolicLink(),'MCP source/dependency cannot cross links');
     return entry.isDirectory()?walk(file):[relative(file)];
   });
-  const files=[...PROTOCOL_PATHS,...fs.readdirSync(HERE).filter(n=>/\.(mjs|py)$/.test(n)).map(n=>relative(path.join(HERE,n))),relative(path.join(HERE,'../native-mysql-client.py')),
+  const files=[...PROTOCOL_PATHS,REQUIRED_APPLICATION,...fs.readdirSync(HERE).filter(n=>/\.(mjs|py)$/.test(n)).map(n=>relative(path.join(HERE,n))),relative(path.join(HERE,'../native-mysql-client.py')),
     'microi.mcp/package.json','microi.mcp/package-lock.json','microi.mcp/tsconfig.json',
     ...walk(path.join(ROOT,'microi.mcp/src')),...walk(path.join(ROOT,'microi.mcp/dist')),
     ...walk(path.join(ROOT,'microi.mcp/node_modules/@modelcontextprotocol/sdk/dist/esm'))];
@@ -125,14 +125,14 @@ export async function prepareRuntime(results,env=process.env){
   const privateDirectory=path.join(directory,'private');createPrivate(privateDirectory,p.value.python);
   const runtimeBuildFile=path.join(privateDirectory,'runtime-build.json'),runtimeReadyFile=path.join(privateDirectory,'runtime-ready.json');
   write(runtimeBuildFile,read(env.MICROI_TEST_RUNTIME_BUILD_FILE));write(runtimeReadyFile,read(env.MICROI_TEST_RUNTIME_READY_FILE));
-  const context={schema:1,task:ready.task,owner32,tenant:'StdAdmission_'+owner32,mainTenant:env.MICROI_TEST_OSCLIENT,fixtureOwner:p.value.expectedParentOwner,
+  const context={schema:1,task:ready.task,owner32,tenant:'adm_'+owner32,mainTenant:env.MICROI_TEST_OSCLIENT,fixtureOwner:p.value.expectedParentOwner,
     ...p.settings,privateDirectory,candidateRoot:ROOT,python:p.value.python,bootstrapFiles:p.bootstrapFiles,sourceHashes:pre.sourceHashes,
     mainCredentials:{account:credentials.env.MICROI_TEST_ACCOUNT,password:credentials.env.MICROI_TEST_PASSWORD},sourceHead:build.sourceHead,buildId:build.buildId,attempt:ready.attempt,
     runtimeBuildFile,runtimeBuildSha256:sha(read(runtimeBuildFile)),runtimeReadyFile,runtimeReadySha256:sha(read(runtimeReadyFile)),base:env.MICROI_TEST_API_BASE};
   assert.ok(context.mainCredentials.account&&context.mainCredentials.password);
   configureContext(context);const contextFile=path.join(privateDirectory,'context.json');write(contextFile,context);privateAcl(context.python,contextFile);const contextSha256=sha(read(contextFile));bindPreparation(contextFile,contextSha256);
   const native=(action)=>{verify();const output=command(context.python,['-B',path.join(HERE,'register_fixture.py'),'--context',contextFile,'--context-sha256',contextSha256,action],{timeout:90000});return json(Buffer.from(output));};
-  native('check-parent');verify();await stage(['owner',owner32]);native('preflight');verify();await stage(['tenant',owner32]);native('inspect');native('claim');verify();
+  native('check-parent');verify();await stage(['owner',owner32]);native('preflight');verify();await stage(['tenant',owner32]);native('registration');verify();await stage(['resources',owner32]);native('inspect');native('claim');verify();
   const identity=await stage(['identities',owner32]);const identityRecord=json(read(path.join(privateDirectory,identity.identityFile)));verify();
   const environmentPath=path.join(privateDirectory,'environment.json'),controlScript=path.join(HERE,'admission_engine_fixture.py');
   const controls={MICROI_ADMISSION_CONTROL_PYTHON:context.python,MICROI_ADMISSION_CONTROL_SCRIPT:controlScript,MICROI_ADMISSION_CONTROL_SHA256:sha(read(controlScript)),MICROI_ADMISSION_CONTEXT_FILE:contextFile,MICROI_ADMISSION_CONTEXT_SHA256:contextSha256};

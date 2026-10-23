@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {randomUUID} from 'node:crypto';
 import {DID,MAIN,TENANT,CONTEXT,success,mcpStatus,sha} from './contracts.mjs';
+
+export function failureSummary(route,tenant,body,result) {
+  const safeKeys=new Set(['AccountLength','PwdLength','AccountNoNull','HaveAccount','NoAuth']);
+  return {route,tenant,action:typeof body?.Action==='string'?body.Action:null,code:result?.Code,
+    messageKey:safeKeys.has(result?.Msg)?result.Msg:null,messageSha256:sha(String(result?.Msg||''))};
+}
 
 export function verifySources() {
   assert.ok(CONTEXT,'Admission context must be verified before transport');
@@ -18,12 +25,16 @@ export class HttpSession {
   constructor(tenant,token='') {assert.ok([MAIN,TENANT].includes(tenant));this.tenant=tenant;this.token=token;}
   async post(route,body,{timeout=90000}={}) {
     assert.ok(['api/SysUser/Login','api/SysUserAccessKey/Exchange','apiengine/platform-current-user',
-      'apiengine/platform-sys-user-admin','apiengine/platform-create-tenant'].includes(route));
+      'apiengine/platform-sys-user-admin','apiengine/platform-create-tenant','apiengine/import-microi-store-package'].includes(route));
     const response=await fetch(new URL(route,CONTEXT.base),{method:'POST',redirect:'error',headers:{'content-type':'application/json',osclient:this.tenant,
       osclienttype:'Product',osclientnetwork:'Internal',did:DID,...(this.token?{authorization:this.token}:{})},
       body:JSON.stringify({...body,OsClient:this.tenant}),signal:AbortSignal.timeout(timeout)});
     assert.equal(response.ok,true,'HTTP failed; outcome may be unknown, no automatic retry');
     const result=await response.json();
+    // 只记录固定校验键和错误摘要，不复制请求体、密码、Token或可能含SQL的错误正文。
+    // 这样正式夹具失败后可以精确诊断，不必再次发起未知写入。
+    if(CONTEXT.privateDirectory&&[0,1001,1002].includes(result?.Code))
+      fs.writeFileSync(path.join(CONTEXT.privateDirectory,'http-rejected-'+randomUUID()+'.json'),JSON.stringify(failureSummary(route,this.tenant,body,result),null,2)+'\n',{flag:'wx',mode:0o600});
     const token=response.headers.get('authorization'); if(token)this.token=token;
     return result;
   }

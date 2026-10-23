@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 export let CONTEXT, TASK, OWNER, TENANT, MAIN, MARKER, DID, ACCOUNTS;
 export function configureContext(value) {
   assert.equal(value?.schema,1);assert.match(value.task,/^[A-Za-z0-9][A-Za-z0-9_-]{7,66}$/);
-  assert.match(value.owner32,/^[a-f0-9]{32}$/);assert.equal(value.tenant,'StdAdmission_'+value.owner32);
+  assert.match(value.owner32,/^[a-f0-9]{32}$/);assert.equal(value.tenant,'adm_'+value.owner32);
   assert.match(value.mainTenant,/^[A-Za-z0-9_-]{1,50}$/);assert.notEqual(value.mainTenant.toLowerCase(),value.tenant.toLowerCase());
   assert.match(value.parentDatabase,/^[A-Za-z0-9_]{1,64}$/);
   assert.equal(value.redis.host,'127.0.0.1');assert.ok(Number.isInteger(value.redis.port)&&value.redis.port>=1024&&value.redis.port<=65535);

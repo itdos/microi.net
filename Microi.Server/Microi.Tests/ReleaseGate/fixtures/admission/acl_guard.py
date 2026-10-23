@@ -128,7 +128,7 @@ def validate_context(value):
     require(str(build_id) == value['buildId'] and build_id.version == 4, 'Invalid build identity')
     require(re.fullmatch(r'[a-f0-9]{40}', value.get('sourceHead', '')), 'Missing source HEAD')
     owner = sha((value['buildId'] + '\0' + value['attempt']).encode('utf-8'))[:32]
-    require(value.get('owner32') == owner and value.get('tenant') == 'StdAdmission_' + owner,
+    require(value.get('owner32') == owner and value.get('tenant') == 'adm_' + owner,
             'Owner must derive from this build and attempt')
     require(re.fullmatch(r'[A-Za-z0-9_-]{1,50}', value.get('mainTenant', ''))
             and value['mainTenant'].lower() != value['tenant'].lower(), 'Invalid main tenant')

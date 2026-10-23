@@ -15,7 +15,7 @@ spec = importlib.util.spec_from_file_location('fixture', pathlib.Path(__file__).
 f = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(f)
 OWNER = C['owner32']
-TENANT = 'StdAdmission_' + OWNER
+TENANT = 'adm_' + OWNER
 
 
 def temporary_directory():

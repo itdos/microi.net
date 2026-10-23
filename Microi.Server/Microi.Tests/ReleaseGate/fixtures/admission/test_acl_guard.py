@@ -14,7 +14,7 @@ import acl_guard as g
 def context_value():
     build, attempt = '71e081ce-a30a-44f5-a882-a7abec5627ca', 'attempt-offline-unit'
     owner = g.sha((build + '\0' + attempt).encode())[:32]
-    return dict(schema=1, task='formal-admission-offline-test', owner32=owner, tenant='StdAdmission_' + owner,
+    return dict(schema=1, task='formal-admission-offline-test', owner32=owner, tenant='adm_' + owner,
                 mainTenant='FullMainOffline', parentDatabase='full_main_offline', fixtureOwner='parent-fixture-offline',
                 privateDirectory='/unused/admission/private', candidateRoot=str(g.ROOT), python=sys.executable,
                 mysql=dict(host='127.0.0.1', port=64160, user='offline-user', password='offline-password'),
@@ -50,7 +50,7 @@ class ContextTests(unittest.TestCase):
         second['buildId'] = '4a197fd0-55bb-4680-935b-85c31fe8ac29'
         second['task'] = 'another-formal-run'
         second['owner32'] = g.sha((second['buildId']+'\0'+second['attempt']).encode())[:32]
-        second['tenant'] = 'StdAdmission_' + second['owner32']
+        second['tenant'] = 'adm_' + second['owner32']
         self.assertIs(g.validate_context(first), first)
         self.assertIs(g.validate_context(second), second)
         self.assertNotEqual(first['owner32'], second['owner32'])

@@ -8,7 +8,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.FullStack;
 
-// 只运行在新建的独占 StdAdmission_<32位nonce> 租户。
+// 只运行在新建的独占 adm_<32位nonce> 租户。
 // 真实 HTTP DiyToken -> ApiEngine -> Jint -> Redis/Mongo；没有鉴权/store/锁替身。
 [Collection(BackendReleaseGateCollection.CollectionName)]
 [Trait("Category", "FullStack")]
@@ -49,7 +49,7 @@ public sealed class ManagedStorageAdmissionHttpTests
         var nonce = Required("MICROI_ADMISSION_TEST_OWNER");
         Assert.Matches("^[a-f0-9]{32}$", nonce);
         var tenant = Required("MICROI_ADMISSION_TEST_OSCLIENT");
-        Assert.Equal("stdadmission_" + nonce, tenant.ToLowerInvariant());
+        Assert.Equal("adm_" + nonce, tenant.ToLowerInvariant());
         var endpoint = new Uri(Required("MICROI_TEST_API_BASE")); Assert.True(endpoint.IsLoopback);
         var token = Required("MICROI_ADMISSION_TEST_TOKEN");
         var did = Required("MICROI_ADMISSION_TEST_DID");

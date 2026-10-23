@@ -6,6 +6,8 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {requireStaged,validateProfile,mysqlConnection,bootstrapSettings,regular,createPrivate} from './runtime.mjs';
 import {configureContext,ACCOUNTS} from './contracts.mjs';
+import {identityPassword,requiredApplication,REQUIRED_APPLICATION} from './prepare.mjs';
+import {createHash} from 'node:crypto';
 
 test('non-staged Full fails before any transport or build and identifies the formal configuration',()=>{
   assert.throws(()=>requireStaged({}),/staged runtime.*MICROI_ADMISSION_PROFILE_FILE/);
@@ -29,16 +31,36 @@ test('bootstrap uses actual ten-field tuple and preserves effective Redis databa
   assert.throws(()=>bootstrapSettings([app(),app()],'OtherTenant'));
 });
 test('the per-run contract changes owner and tenant without any fixed historical task identity',()=>{
-  for(const owner32 of ['a'.repeat(32),'b'.repeat(32)])assert.equal(configureContext({schema:1,task:'future-full-run',owner32,tenant:'StdAdmission_'+owner32,mainTenant:'IsolatedMain',parentDatabase:'owned_main',redis:{host:'127.0.0.1',port:63962,database:2},base:'http://127.0.0.1:64171/'}).owner32,owner32);
-  assert.throws(()=>configureContext({schema:1,task:'future-full-run',owner32:'a'.repeat(32),tenant:'StdAdmission_'+'b'.repeat(32)}));
+  for(const owner32 of ['a'.repeat(32),'b'.repeat(32)]){
+    const context=configureContext({schema:1,task:'future-full-run',owner32,tenant:'adm_'+owner32,mainTenant:'IsolatedMain',parentDatabase:'owned_main',redis:{host:'127.0.0.1',port:63962,database:2},base:'http://127.0.0.1:64171/'});
+    assert.equal(context.owner32,owner32);assert.ok(context.tenant.length<=36,'Fixture must fit existing sys_user.TenantId without changing borrowed schema');assert.equal(context.tenant,context.tenant.toLowerCase(),'Fixture database registration must agree with physical lower_case_table_names');
+  }
+  assert.throws(()=>configureContext({schema:1,task:'future-full-run',owner32:'a'.repeat(32),tenant:'adm_'+'b'.repeat(32)}));
 });
 test('real admission accounts fit the unchanged production 2 to 20 character contract',()=>{
   const accounts=[];
   for(const owner32 of ['a'.repeat(32),'b'.repeat(32)]){
-    configureContext({schema:1,task:'future-full-run',owner32,tenant:'StdAdmission_'+owner32,mainTenant:'IsolatedMain',parentDatabase:'owned_main',redis:{host:'127.0.0.1',port:63962,database:2},base:'http://127.0.0.1:64171/'});
+    configureContext({schema:1,task:'future-full-run',owner32,tenant:'adm_'+owner32,mainTenant:'IsolatedMain',parentDatabase:'owned_main',redis:{host:'127.0.0.1',port:63962,database:2},base:'http://127.0.0.1:64171/'});
     for(const account of Object.values(ACCOUNTS)){assert.match(account,/^[a-z0-9]{2,20}$/);accounts.push(account);}
   }
   assert.equal(new Set(accounts).size,4,'Owners and ordinary users remain distinct across attempts');
+});
+test('temporary identity passwords obey the unchanged production maximum and include each required character class',()=>{
+  const values=new Set();
+  for(const kind of ['owner','ordinary'])for(let n=0;n<8;n++){
+    const value=identityPassword(kind);assert.equal(value.length,20);
+    for(const pattern of [/[A-Z]/,/[a-z]/,/[0-9]/,/[!]/])assert.match(value,pattern);
+    assert.ok(!values.has(value));values.add(value);
+  }
+  assert.throws(()=>identityPassword('administrator'));
+});
+test('required chat application is the full preflight-bound official package; missing engines and changed bytes stop before installation',()=>{
+  const bytes=fs.readFileSync(new URL('../../../../OfficialApplications/Resource/app.microi.message-notification.json',import.meta.url));
+  const digest=value=>createHash('sha256').update(value).digest('hex');
+  assert.match(REQUIRED_APPLICATION,/app\.microi\.message-notification\.json$/);
+  const value=requiredApplication(bytes,digest(bytes));assert.ok(value.SysApiEngines.length>2);
+  assert.throws(()=>requiredApplication(Buffer.concat([bytes,Buffer.from(' ')]),digest(bytes)));
+  const missing=Buffer.from(JSON.stringify({...value,SysApiEngines:[]}));assert.throws(()=>requiredApplication(missing,digest(missing)));
 });
 test('ordinary fixture files are accepted and ancestor links are rejected',()=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'admission-path-test-'));

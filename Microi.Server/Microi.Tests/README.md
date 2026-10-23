@@ -229,7 +229,7 @@ JSON 传输，但不会伪造不存在的 DosResult 断言。
 Full 的维护准入门禁由 `run-tests.ps1` 自动调用正式
 `ReleaseGate/fixtures/admission/runtime.mjs`，不依赖某次任务目录的脚本。
 当前支持 staged runtime：最终构建后核验同次双 API、前端、桥进程、源码 HEAD、
-DLL 指纹与 fresh login，再创建独占 `StdAdmission_<32位nonce>` 租户。
+DLL 指纹与 fresh login，再创建独占 `adm_<32位nonce>` 租户。短前缀保留完整归属 nonce，并兼容存量 `sys_user.TenantId` 的36字符边界；临时账号不超过20字符，临时密码采用20字符强随机格式。 新租户先通过独立登记/物理库校验，再经正式应用导入接口安装源码闭包绑定的完整消息通知包；安装后仍必须通过聊天接口、归属和身份校验，禁止用SQL补接口。
 非 staged Full 或缺失 profile 会在重型构建前明确失败；该测试不能 Skip。
 
 在已有可信 staged Full 配置上设置 `MICROI_ADMISSION_PROFILE_FILE` 为绝对路径。

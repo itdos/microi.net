@@ -1,5 +1,5 @@
 import {configureContext} from './contracts.mjs';
-configureContext({schema:1,task:'offline-admission-fixture',owner32:'a'.repeat(32),tenant:'StdAdmission_'+'a'.repeat(32),mainTenant:'OfflineMain',parentDatabase:'offline_main',redis:{host:'127.0.0.1',port:63962,database:1},base:'http://127.0.0.1:64171/'});
+configureContext({schema:1,task:'offline-admission-fixture',owner32:'a'.repeat(32),tenant:'adm_'+'a'.repeat(32),mainTenant:'OfflineMain',parentDatabase:'offline_main',redis:{host:'127.0.0.1',port:63962,database:1},base:'http://127.0.0.1:64171/'});
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {TASK,OWNER,TENANT,MARKER,ACCOUNTS,PROTOCOL_PATHS,sha,id,tenantReturn,ownedUser,currentUser,
@@ -20,8 +20,8 @@ const config=()=>({task:TASK,owner32:OWNER,owner:OWNER,tenant:TENANT,tenantId:ui
 
 test('plan performs no login, filesystem creation or provisioning',async()=>{const result=await main(['plan']);assert.equal(result.executed,false);});
 test('formal ULID and historical GUID allowed; hex-only assumption rejected',()=>{assert.equal(id(uid),uid);id('f'.repeat(32));id('12345678-1234-1234-1234-123456789abc');assert.throws(()=>id('admin'));assert.throws(()=>id('81K7NF6Q6F1YJVZ6FMSR2QK3TN'));});
-test('official tenant return preserves original mixed case',()=>assert.equal(tenantReturn(response()).OsClient,TENANT));
-test('never lowercases a different official tenant response into the target',()=>{const r=response();r.Data.OsClient=TENANT.toLowerCase();assert.throws(()=>tenantReturn(r));});
+test('official tenant return preserves the exact requested spelling',()=>assert.equal(tenantReturn(response()).OsClient,TENANT));
+test('never lowercases a different official tenant response into the target',()=>{const r=response();r.Data.OsClient=TENANT.toUpperCase();assert.throws(()=>tenantReturn(r));});
 test('failed upgrade/return is not a ready fixture',()=>{for(const r of [{Code:0}, {Code:1,Data:{}}, {...response(),Data:{...response().Data,Upgrade:null}}])assert.throws(()=>tenantReturn(r));});
 test('new main owner remains ordinary and fully marked',()=>{ownedUser({...user(),Account:ACCOUNTS.owner},'owner');for(const change of [{Level:9999},{Remark:'foreign'},{Account:'admin'},{State:0}])assert.throws(()=>ownedUser({...user(),...change},'ordinary'));});
 test('identity comes from actual response and cannot be borrowed/mistyped',()=>{currentUser(user(),user());assert.throws(()=>currentUser({...user(),Id:'f'.repeat(32)},user()));assert.throws(()=>currentUser({...user(),_AccessKeySession:true},user()));});
@@ -33,6 +33,6 @@ test('MCP parser rejects narrative and compound content',()=>{assert.throws(()=>
 test('public AccessKey row supports official no-OsClient historical table layout',()=>accessRecord(record(),uid));
 test('AccessKey owner/scope/secret leakage are rejected',()=>{for(const change of [{TargetUserId:'f'.repeat(32)},{OsClient:'foreign'},{Scopes:'["form:write"]'},{SecretHash:'secret'}])assert.throws(()=>accessRecord({...record(),...change},uid));});
 test('exact DB and lower physical variant need independent matching registration',()=>{fixture(config());const c=config();c.database=c.database.toLowerCase();c.registeredDatabase=c.database;fixture(c);});
-test('foreign/mismatched DB, owner and missing source hashes rejected',()=>{for(const change of [{database:'mysql'}, {database:config().database.toLowerCase()}, {owner:'f'.repeat(32)}, {protocolSourceHashes:{}}, {registeredDbConnSha256:''}])assert.throws(()=>fixture({...config(),...change}));});
+test('foreign/mismatched DB, owner and missing source hashes rejected',()=>{for(const change of [{database:'mysql'}, {database:config().database.toUpperCase()}, {owner:'f'.repeat(32)}, {protocolSourceHashes:{}}, {registeredDbConnSha256:''}])assert.throws(()=>fixture({...config(),...change}));});
 test('mutation intent without result is unknown, never an automatic retry',()=>{assert.equal(stageGate(false,false),'New');assert.equal(stageGate(true,true),'ReadbackOnly');assert.throws(()=>stageGate(true,false));});
 test('execution without exact owner binding fails before I/O',async()=>{await assert.rejects(main(['owner','other']));await assert.rejects(main(['arbitrary',OWNER]));});

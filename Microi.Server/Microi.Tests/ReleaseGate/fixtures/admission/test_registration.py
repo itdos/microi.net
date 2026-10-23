@@ -43,14 +43,20 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual(c['returnedDbName'], DB)
 
     def test_case_alias_without_registered_agreement_stops(self):
-        with self.assertRaises(ValueError): self.verify(schemas=[DB.lower()])
+        # 保留混合大小写回归：生成名虽已改小写，登记/物理库不一致仍必须拒绝。
+        mixed_tenant = 'Adm_' + C['owner32']
+        mixed_db = 'microi_' + mixed_tenant
+        self.scope['tenant'] = mixed_tenant
+        row = dict(self.row, OsClient=mixed_tenant, DbConn=self.row['DbConn'].replace(DB, mixed_db))
+        with self.assertRaisesRegex(ValueError, 'Registered/physical casing differs'):
+            self.verify(row, schemas=[mixed_db.lower()])
 
     def test_no_schema_or_two_aliases_stops(self):
         for schemas in ([], [DB, DB.lower()]):
             with self.subTest(schemas=schemas), self.assertRaises(ValueError): self.verify(schemas=schemas)
 
     def test_wrong_tuple_or_owner_stops(self):
-        for change in ({'OsClient': TENANT.lower()}, {'OwnerUserId': 'f'*32}, {'OsClientNetwork': 'Internet'},
+        for change in ({'OsClient': TENANT.upper()}, {'OwnerUserId': 'f'*32}, {'OsClientNetwork': 'Internet'},
                        {'IsEnable': 0}, {'IsDeleted': 1}, {'DbMongoConnection': 'foreign'}):
             with self.subTest(change=tuple(change)), self.assertRaises(ValueError): self.verify(dict(self.row, **change))
 

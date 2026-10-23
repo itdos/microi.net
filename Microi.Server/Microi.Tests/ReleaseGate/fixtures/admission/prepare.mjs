@@ -9,6 +9,15 @@ import {CONTEXT,TASK,OWNER,TENANT,MAIN,MARKER,DID,ACCOUNTS,id,sha,success,tenant
 import {HttpSession,connectMcp,verifySources} from './transport.mjs';
 
 const HERE=path.dirname(fileURLToPath(import.meta.url));
+export const REQUIRED_APPLICATION='Microi.Server/OfficialApplications/Resource/app.microi.message-notification.json';
+export function requiredApplication(bytes,expectedHash) {
+  assert.equal(sha(bytes),expectedHash,'Required application differs from the preflight source closure');
+  const value=JSON.parse(bytes.toString('utf8'));
+  assert.ok(value.PackageInfo&&value.ResourcePolicies?.ApiEngines);
+  for(const key of ['platform-chat-runtime','platform-chat-maintenance'])
+    assert.equal(value.SysApiEngines.filter(x=>x.ApiEngineKey===key).length,1,'Required Managed engine missing/duplicate');
+  return value;
+}
 let contextFile,contextSha256;
 export function bindPreparation(file,digest) {contextFile=file;contextSha256=digest;}
 function acl(args) {
@@ -25,9 +34,15 @@ export function stageGate(intentExists,resultExists) {
 function intent(name,data) {stageGate(exists(name+'.intent.json'),exists(name+'.result.json'));
   assert.ok(!exists(name+'.result.json'),'Stage already has a result; use readback/identities, no repeated mutation');
   save(name+'.intent.json',{task:TASK,owner32:OWNER,at:new Date().toISOString(),...data});}
+export function identityPassword(kind) {
+  assert.ok(['owner','ordinary'].includes(kind));
+  // 生产默认密码接受 6–20 字符。固定四类字符 + 96 位随机量构成精确20字符，
+  // 不为临时身份扩大真实密码上限；密码仍只进入私有文件和正式登录/账号请求。
+  return (kind==='owner'?'Aa9!':'Bb8!')+randomBytes(12).toString('base64url');
+}
 function credentials() {
   if(!exists('credentials.json'))save('credentials.json',{task:TASK,owner32:OWNER,
-    ownerPassword:'A9!'+randomBytes(24).toString('base64url'),ordinaryPassword:'B8!'+randomBytes(24).toString('base64url')});
+    ownerPassword:identityPassword('owner'),ordinaryPassword:identityPassword('ordinary')});
   const value=read('credentials.json');assert.equal(value.task,TASK);assert.equal(value.owner32,OWNER);return value;
 }
 async function mainAdmin() {
@@ -80,6 +95,20 @@ async function childAdmin() {
   const session=new HttpSession(TENANT),user=await session.login('admin',credentials().ownerPassword);
   currentUser(user,{Id:id(user.Id),Account:'admin'},{admin:true});
   return {binding,session,user};
+}
+async function resourcesStage() {
+  // 新空库只保证启动闭包；聊天应用通过正式安装器安装，不能用测试SQL补资源。
+  // 登记校验先独立核实新建库和owner；完整inspect/claim仍在安装后执行且要求聊天接口存在。
+  const binding=fixture(read('registered-tenant.json'));
+  assert.equal(binding.ownerUserId,read('owner.result.json').user.Id);
+  const session=new HttpSession(TENANT),user=await session.login('admin',credentials().ownerPassword);
+  currentUser(user,{Id:id(user.Id),Account:'admin'},{admin:true});
+  const bytes=fs.readFileSync(path.join(CONTEXT.candidateRoot,REQUIRED_APPLICATION));
+  const application=requiredApplication(bytes,CONTEXT.sourceHashes[REQUIRED_APPLICATION]);
+  intent('resources',{tenant:TENANT,ownerUserId:binding.ownerUserId,packagePath:REQUIRED_APPLICATION,packageSha256:sha(bytes)});
+  const response=await session.post('apiengine/import-microi-store-package',{Package:application},{timeout:600000});
+  save('resources.result.json',{task:TASK,owner32:OWNER,tenant:TENANT,packageSha256:sha(bytes),response});
+  success(response);
 }
 async function identitiesStage() {
   const {binding,session,user:admin}=await childAdmin();
@@ -159,12 +188,12 @@ async function removeOrdinaryStage() {
 export async function main(args) {
   const [action,confirmation]=args;
   if(action==='plan'||!action)return {task:TASK,owner32:OWNER,tenant:TENANT,executed:false,
-    stages:['owner','register_fixture.py preflight','tenant','register_fixture.py inspect/claim','identities','revoke','remove-ordinary'],transport:'official-managed-http + dedicated AccessKey MCP'};
+    stages:['owner','register_fixture.py preflight','tenant','register_fixture.py registration','resources','register_fixture.py inspect/claim','identities','revoke','remove-ordinary'],transport:'official-managed-http + dedicated AccessKey MCP'};
   assert.equal(confirmation,OWNER,'Explicit task execution binding required');
-  assert.ok(['owner','tenant','identities','revoke','remove-ordinary'].includes(action));
+  assert.ok(['owner','tenant','resources','identities','revoke','remove-ordinary'].includes(action));
   verifySources();
   acl(['directory']);
-  const result=await ({owner:ownerStage,tenant:tenantStage,identities:identitiesStage,revoke:revokeStage,'remove-ordinary':removeOrdinaryStage}[action])();
+  const result=await ({owner:ownerStage,tenant:tenantStage,resources:resourcesStage,identities:identitiesStage,revoke:revokeStage,'remove-ordinary':removeOrdinaryStage}[action])();
   return {task:TASK,stage:action,completed:true,...result};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {

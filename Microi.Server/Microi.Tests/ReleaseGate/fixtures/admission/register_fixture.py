@@ -149,7 +149,7 @@ class Registry:
             schemas = [item['SCHEMA_NAME'] for item in cur.fetchall()]
         return row, registrations, schemas, main
 
-    def inspect(self):
+    def _inspect(self, require_resources):
         owner_id = self.owner_id()
         formal = self.context.load('tenant.result.json')
         require(formal.get('task') == self.c['task'] and formal.get('owner32') == self.c['owner32']
@@ -166,15 +166,25 @@ class Registry:
         with self.connect(config['database']) as conn, conn.cursor() as cur:
             cur.execute('SELECT DATABASE() AS Name')
             require(cur.fetchone() == {'Name': config['database']}, 'Physical database differs')
-            cur.execute('SELECT ApiEngineKey FROM sys_apiengine WHERE ApiEngineKey IN (%s,%s) AND IsDeleted=0',
-                        ('platform-chat-runtime', 'platform-chat-maintenance'))
-            require(sorted(row['ApiEngineKey'] for row in cur.fetchall()) == ['platform-chat-maintenance', 'platform-chat-runtime'],
-                    'Upgraded fixed Managed resources missing/duplicate')
+            if require_resources:
+                cur.execute('SELECT ApiEngineKey FROM sys_apiengine WHERE ApiEngineKey IN (%s,%s) AND IsDeleted=0',
+                            ('platform-chat-runtime', 'platform-chat-maintenance'))
+                require(sorted(row['ApiEngineKey'] for row in cur.fetchall()) == ['platform-chat-maintenance', 'platform-chat-runtime'],
+                        'Upgraded fixed Managed resources missing/duplicate')
         config['nativeScopeSha256'] = self.context.expected_hash
         config['contextSha256'] = self.context.expected_hash
         config['protocolSourceHashes'] = {relative: sha((ROOT / relative).read_bytes()) for relative in PROTOCOL}
         config['registrationVerifierSha256'] = sha(pathlib.Path(__file__).read_bytes())
         return config
+
+    def registration(self):
+        # 仅把已正式创建并独立回读的登记用于应用安装；不生成claim或ready回执。
+        config = self._inspect(False)
+        self.context.save('registered-tenant.json', config)
+        return config
+
+    def inspect(self):
+        return self._inspect(True)
 
     def preflight(self):
         owner, registrations, schemas, main = self.parent_read()
@@ -218,7 +228,7 @@ class Registry:
 
 
 def main():
-    args = arguments(('check-parent', 'preflight', 'inspect', 'claim'))
+    args = arguments(('check-parent', 'preflight', 'registration', 'inspect', 'claim'))
     context = Context(args.context, args.context_sha256)
     result = getattr(Registry(context), args.action.replace('-', '_'))()
     print(json.dumps({'task': context.data['task'], 'action': args.action, 'tenant': context.data['tenant'],
