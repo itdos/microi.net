@@ -249,5 +249,24 @@ class Tests(unittest.TestCase):
                 f.binding({**config, **change}, CTX)
 
 
+    def test_mysql_single_bit_values_are_canonical_without_loss(self):
+        self.assertEqual(f.decode_mysql_bit(b'\x00'), 0)
+        self.assertEqual(f.decode_mysql_bit(b'\x01'), 1)
+
+    def test_mysql_bit_rejects_text_multi_bit_and_malformed_values(self):
+        for value in (b'', b'\x00\x00', b'\x02', b'0', None, 0):
+            with self.subTest(value=repr(value)):
+                with self.assertRaises(f.BoundaryError):
+                    f.decode_mysql_bit(value)
+
+    def test_mysql_bit_converter_copy_keeps_other_native_types(self):
+        original = {16: bytes, 7: datetime.datetime, 252: bytes}
+        selected = f.native_bit_conversions(original, 16)
+        self.assertEqual(selected[16](b'\x01'), 1)
+        self.assertIs(original[16], bytes)
+        self.assertIs(selected[252], bytes)
+        self.assertIs(selected[7], datetime.datetime)
+
+
 if __name__ == '__main__':
     unittest.main()

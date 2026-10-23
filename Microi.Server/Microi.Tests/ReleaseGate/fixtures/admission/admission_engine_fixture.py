@@ -30,6 +30,19 @@ def require(condition, message):
         raise BoundaryError(message)
 
 
+def decode_mysql_bit(value):
+    # PyMySQL BIT(1) is binary, unlike integer flags. Preserve its exact 0/1 value;
+    # arbitrary binary columns keep the original byte codec and binary CAS.
+    require(isinstance(value, bytes) and len(value) == 1 and value[0] in (0, 1), 'Unsupported native BIT flag')
+    return value[0]
+
+
+def native_bit_conversions(conversions, bit_type):
+    result = dict(conversions)
+    result[bit_type] = decode_mysql_bit
+    return result
+
+
 def encoded(value):
     if isinstance(value, bytes):
         return {'$bytes': base64.b64encode(value).decode('ascii')}
@@ -217,9 +230,11 @@ class NativeStore:
         self.context.verify()
         require(database in (self.config['database'], self.config['parentDatabase']), 'Unregistered database')
         import pymysql
+        from pymysql.constants import FIELD_TYPE
         values = dict(self.scope['mysql'])
         values.update(database=database, connect_timeout=5, read_timeout=15, write_timeout=15,
-                      charset='utf8mb4', autocommit=False, cursorclass=pymysql.cursors.DictCursor)
+                      charset='utf8mb4', autocommit=False, cursorclass=pymysql.cursors.DictCursor,
+                      conv=native_bit_conversions(pymysql.converters.conversions, FIELD_TYPE.BIT))
         return pymysql.connect(**values)
 
     def verify_owner(self):
