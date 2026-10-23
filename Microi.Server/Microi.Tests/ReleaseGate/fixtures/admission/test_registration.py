@@ -130,7 +130,8 @@ class RegistrationTests(unittest.TestCase):
         self.assertTrue(result['parentVerified'])
         self.assertEqual(cur.execute.call_count, 6)
         account_call = cur.execute.call_args_list[3]
-        self.assertEqual(account_call.args[1], ('admissiono'+C['owner32'][:15], C['task']+':'+C['owner32']))
+        self.assertEqual(account_call.args[1], ('admo'+C['owner32'][:15], C['task']+':'+C['owner32']))
+        self.assertLessEqual(len(account_call.args[1][0]), 20)
 
     def test_check_parent_rejects_wrong_or_multiple_parent_marker_and_collisions(self):
         for marker in ([], [{'Id': 1, 'TaskId': 'other'}],

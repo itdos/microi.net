@@ -113,7 +113,7 @@ class Registry:
             main = read_main(cur, self.c)
             infra = infrastructure({}, main, self.context.bootstrap, self.c)
             cur.execute('SELECT Id FROM sys_user WHERE LOWER(Account)=LOWER(%s) OR BINARY Remark=BINARY %s',
-                        ('admissiono' + self.c['owner32'][:15], self.c['task'] + ':' + self.c['owner32']))
+                        ('admo' + self.c['owner32'][:15], self.c['task'] + ':' + self.c['owner32']))
             require(not cur.fetchall(), 'Owner account already exists; no adoption')
             cur.execute('SELECT Id FROM sys_osclients WHERE LOWER(OsClient)=LOWER(%s)', (self.c['tenant'],))
             require(not cur.fetchall(), 'Tenant already exists; no adoption')
@@ -136,7 +136,7 @@ class Registry:
             owners = cur.fetchall()
             require(len(owners) == 1, 'Owner user is missing or ambiguous')
             row = owners[0]
-            require(row['Account'] == 'admissiono' + self.c['owner32'][:15]
+            require(row['Account'] == 'admo' + self.c['owner32'][:15]
                     and row['Name'] == 'Admission ' + self.c['owner32']
                     and row['Remark'] == self.c['task'] + ':' + self.c['owner32'], 'Owned main user differs')
             require(int(row.get('State') or 0) == 1 and int(row.get('Level') or 0) == 0
