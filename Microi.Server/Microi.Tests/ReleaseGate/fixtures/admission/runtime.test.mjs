@@ -6,7 +6,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {requireStaged,validateProfile,mysqlConnection,bootstrapSettings,regular,createPrivate} from './runtime.mjs';
 import {configureContext,ACCOUNTS} from './contracts.mjs';
-import {identityPassword,requiredApplication,REQUIRED_APPLICATION} from './prepare.mjs';
+import {identityPassword,requiredApplication,resourceInstallRequest,REQUIRED_APPLICATION} from './prepare.mjs';
 import {createHash} from 'node:crypto';
 
 test('non-staged Full fails before any transport or build and identifies the formal configuration',()=>{
@@ -59,6 +59,9 @@ test('required chat application is the full preflight-bound official package; mi
   const digest=value=>createHash('sha256').update(value).digest('hex');
   assert.match(REQUIRED_APPLICATION,/app\.microi\.message-notification\.json$/);
   const value=requiredApplication(bytes,digest(bytes));assert.ok(value.SysApiEngines.length>2);
+  const request=resourceInstallRequest(value,'a'.repeat(32));assert.equal(request.TargetApiEngineKey,'import-microi-store-package');assert.equal(request.Param.Package,value);
+  assert.deepEqual(request.Options,{IdempotencyKey:'admission-resources-'+'a'.repeat(32),ConcurrencyKey:'import-microi-store-package',MaxAttempts:1,RetryOnFailure:false});
+  assert.deepEqual(resourceInstallRequest(value,'a'.repeat(32)),request);assert.throws(()=>resourceInstallRequest(value,'unowned'));
   assert.throws(()=>requiredApplication(Buffer.concat([bytes,Buffer.from(' ')]),digest(bytes)));
   const missing=Buffer.from(JSON.stringify({...value,SysApiEngines:[]}));assert.throws(()=>requiredApplication(missing,digest(missing)));
 });

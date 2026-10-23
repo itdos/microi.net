@@ -11,7 +11,7 @@ const response=()=>({Code:1,Data:{OsClient:TENANT,DbName:'microi_'+TENANT,FreeTe
 const wrapped=(value,isError=false)=>({content:[{type:'text',text:JSON.stringify(value)}],isError});
 const grant=()=>accessGrant('2026-10-23T12:00:00.000Z');
 const record=()=>({Id:uid,Name:'Admission '+OWNER,Remark:MARKER,TargetUserId:uid,State:1,
-  Scopes:'["api-engine:run"]',AllowedApiEngineKeys:JSON.stringify(grant().allowedApiEngineKeys)});
+  Scopes:JSON.stringify(grant().scopes),AllowedApiEngineKeys:JSON.stringify(grant().allowedApiEngineKeys)});
 const config=()=>({task:TASK,owner32:OWNER,owner:OWNER,tenant:TENANT,tenantId:uid,ownerUserId:uid,
   returnedDbName:'microi_'+TENANT,database:'microi_'+TENANT,registeredDatabase:'microi_'+TENANT,
   parentDatabase:'offline_main',nativeScopeSha256:'a'.repeat(64),registeredDbConnSha256:'b'.repeat(64),
@@ -31,7 +31,7 @@ test('two-step AccessKey confirmation binds exact canonical grant',()=>{const g=
 test('tampered MCP grant, hash, transport error cannot become confirmation',()=>{const g=grant();for(const r of [wrapped({Blocked:true,NormalizedGrant:{...g,allowedRoutes:['*']},RequiredConfirmationSha256:sha(JSON.stringify(g))},true),wrapped({Blocked:true,NormalizedGrant:g,RequiredConfirmationSha256:'f'.repeat(64)},true),wrapped({Blocked:true,NormalizedGrant:g,RequiredConfirmationSha256:sha(JSON.stringify(g))})])assert.throws(()=>verifyConfirmation(r,g));});
 test('MCP parser rejects narrative and compound content',()=>{assert.throws(()=>mcpJson({content:[{type:'text',text:'Error: denied'}]}));assert.throws(()=>mcpJson({content:[{type:'text',text:'{}'},{type:'text',text:'{}'}]}));});
 test('public AccessKey row supports official no-OsClient historical table layout',()=>accessRecord(record(),uid));
-test('AccessKey owner/scope/secret leakage are rejected',()=>{for(const change of [{TargetUserId:'f'.repeat(32)},{OsClient:'foreign'},{Scopes:'["form:write"]'},{SecretHash:'secret'}])assert.throws(()=>accessRecord({...record(),...change},uid));});
+test('AccessKey owner/scope/secret leakage are rejected',()=>{for(const change of [{TargetUserId:'f'.repeat(32)},{OsClient:'foreign'},{Scopes:'["form:write"]'},{Scopes:'["api-engine:run"]'},{SecretHash:'secret'}])assert.throws(()=>accessRecord({...record(),...change},uid));});
 test('exact DB and lower physical variant need independent matching registration',()=>{fixture(config());const c=config();c.database=c.database.toLowerCase();c.registeredDatabase=c.database;fixture(c);});
 test('foreign/mismatched DB, owner and missing source hashes rejected',()=>{for(const change of [{database:'mysql'}, {database:config().database.toUpperCase()}, {owner:'f'.repeat(32)}, {protocolSourceHashes:{}}, {registeredDbConnSha256:''}])assert.throws(()=>fixture({...config(),...change}));});
 test('mutation intent without result is unknown, never an automatic retry',()=>{assert.equal(stageGate(false,false),'New');assert.equal(stageGate(true,true),'ReadbackOnly');assert.throws(()=>stageGate(true,false));});

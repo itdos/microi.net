@@ -4,6 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomBytes} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {setTimeout as delay} from 'node:timers/promises';
 import {CONTEXT,TASK,OWNER,TENANT,MAIN,MARKER,DID,ACCOUNTS,id,sha,success,tenantReturn,ownedUser,currentUser,
   mcpJson,accessGrant,verifyConfirmation,accessRecord,fixture} from './contracts.mjs';
 import {HttpSession,connectMcp,verifySources} from './transport.mjs';
@@ -17,6 +18,13 @@ export function requiredApplication(bytes,expectedHash) {
   for(const key of ['platform-chat-runtime','platform-chat-maintenance'])
     assert.equal(value.SysApiEngines.filter(x=>x.ApiEngineKey===key).length,1,'Required Managed engine missing/duplicate');
   return value;
+}
+export function resourceInstallRequest(application,owner) {
+  assert.match(owner,/^[a-f0-9]{32}$/);
+  // 含定时任务的完整包必须交给持久队列；稳定请求键和单次尝试禁止未知结果时重放安装。
+  return {Action:'RunApiEngine',TargetApiEngineKey:'import-microi-store-package',Title:'独占验收租户通知应用安装',
+    Param:{Package:application},Options:{IdempotencyKey:'admission-resources-'+owner,
+      ConcurrencyKey:'import-microi-store-package',MaxAttempts:1,RetryOnFailure:false}};
 }
 let contextFile,contextSha256;
 export function bindPreparation(file,digest) {contextFile=file;contextSha256=digest;}
@@ -105,10 +113,15 @@ async function resourcesStage() {
   currentUser(user,{Id:id(user.Id),Account:'admin'},{admin:true});
   const bytes=fs.readFileSync(path.join(CONTEXT.candidateRoot,REQUIRED_APPLICATION));
   const application=requiredApplication(bytes,CONTEXT.sourceHashes[REQUIRED_APPLICATION]);
-  intent('resources',{tenant:TENANT,ownerUserId:binding.ownerUserId,packagePath:REQUIRED_APPLICATION,packageSha256:sha(bytes)});
-  const response=await session.post('apiengine/import-microi-store-package',{Package:application},{timeout:600000});
-  save('resources.result.json',{task:TASK,owner32:OWNER,tenant:TENANT,packageSha256:sha(bytes),response});
-  success(response);
+  const request=resourceInstallRequest(application,OWNER),route='apiengine/platform-background-task';
+  intent('resources',{tenant:TENANT,ownerUserId:binding.ownerUserId,packagePath:REQUIRED_APPLICATION,packageSha256:sha(bytes),idempotencyKey:request.Options.IdempotencyKey});
+  const submitted=await session.post(route,request);save('resources-submit.result.json',{task:TASK,owner32:OWNER,tenant:TENANT,response:submitted});
+  const taskId=id(success(submitted).Id),deadline=Date.now()+600000;let status;
+  do {status=success(await session.post(route,{Action:'Status',Id:taskId}));if(['Succeeded','Failed','Canceled'].includes(status.Status))break;await delay(2000);}while(Date.now()<deadline);
+  const detail=await session.post(route,{Action:'Detail',Id:taskId});
+  save('resources.result.json',{task:TASK,owner32:OWNER,tenant:TENANT,packageSha256:sha(bytes),taskId,status:status.Status,response:detail});
+  assert.equal(status.Status,'Succeeded','Application task did not succeed; inspect the same persisted task, never resubmit');
+  success(success(detail).Result);
 }
 async function identitiesStage() {
   const {binding,session,user:admin}=await childAdmin();
@@ -180,7 +193,7 @@ async function removeOrdinaryStage() {
   const row=await checkUser(session,'ordinary');assert.equal(row.Id,read('ordinary.result.json').user.Id);
   intent('ordinary-delete',{tenant:TENANT,userId:row.Id,account:row.Account,marker:MARKER});
   const result=await session.user({Action:'DelSysUser',Id:row.Id});success(result);
-  const readback=await session.user({Action:'GetSysUserModel',Id:row.Id});
+  const readback=await session.user({Action:'GetSysUserModel',Account:row.Account});
   assert.equal(readback.Code,2,'Owned user removal not confirmed');
   save('ordinary-delete.result.json',{task:TASK,tenant:TENANT,userId:row.Id,removed:true});
 }

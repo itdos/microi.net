@@ -81,7 +81,7 @@ export function mcpStatus(result, tenant) {
   return data;
 }
 export function accessGrant(expiresAt) {
-  return {name:'Admission ' + OWNER,allowedRoutes:['/'],allowedTableNames:['sys_user'],scopes:['api-engine:run'],
+  return {name:'Admission ' + OWNER,allowedRoutes:['/'],allowedTableNames:['sys_user'],scopes:['api-engine:run','page:open'],
     redirectPath:'/',allowedApiEngineKeys:['platform-chat-maintenance','platform-chat-runtime','platform-current-user'],
     allowedDataSourceKeys:[],expiresAt,remark:MARKER};
 }
@@ -97,7 +97,7 @@ export function accessRecord(row,adminId) {
   assert.equal(row.TargetUserId,adminId); if(row.OsClient!==undefined)assert.equal(row.OsClient,TENANT); assert.equal(Number(row.State),1);
   for (const key of ['SecretHash','AccessKey']) assert.ok(!(key in row),'Public access key metadata leaked secret');
   const list = value => Array.isArray(value) ? value : JSON.parse(value);
-  assert.deepEqual(list(row.Scopes),['api-engine:run']);
+  assert.deepEqual([...list(row.Scopes)].sort(),[...accessGrant('').scopes].sort());
   assert.deepEqual([...list(row.AllowedApiEngineKeys)].sort(),[...accessGrant('').allowedApiEngineKeys].sort());
   return row;
 }

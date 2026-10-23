@@ -25,7 +25,7 @@ export class HttpSession {
   constructor(tenant,token='') {assert.ok([MAIN,TENANT].includes(tenant));this.tenant=tenant;this.token=token;}
   async post(route,body,{timeout=90000}={}) {
     assert.ok(['api/SysUser/Login','api/SysUserAccessKey/Exchange','apiengine/platform-current-user',
-      'apiengine/platform-sys-user-admin','apiengine/platform-create-tenant','apiengine/import-microi-store-package'].includes(route));
+      'apiengine/platform-sys-user-admin','apiengine/platform-create-tenant','apiengine/platform-background-task'].includes(route));
     const response=await fetch(new URL(route,CONTEXT.base),{method:'POST',redirect:'error',headers:{'content-type':'application/json',osclient:this.tenant,
       osclienttype:'Product',osclientnetwork:'Internal',did:DID,...(this.token?{authorization:this.token}:{})},
       body:JSON.stringify({...body,OsClient:this.tenant}),signal:AbortSignal.timeout(timeout)});
