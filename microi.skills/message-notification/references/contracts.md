@@ -86,6 +86,23 @@
 
 `ReceiverUserId/ReceiverUserIds` 必填其一，最多 200 个；`Title` 最长 200 字符；`Content` 与序列化后的 `Payload` 各最多 32 KiB；`LinkUrl` 最长 500 字符且只允许站内路径、锚点、HTTP/HTTPS。事件名固定为 `ReceivePlatformNotification`。
 
+## 历史聊天定位维护
+
+`platform-chat-runtime` v1.2.0 保留未迁移租户的旧协议；安装包更新不等于历史定位迁移。旧年度无定位消息跨年重放的限制仍存在，不能用历史分页通过代替幂等验收。
+
+由已授权当前租户超级管理员通过 `microi_run_engine` 调用固定 `platform-chat-maintenance` v1.0.0，禁止临时引擎、原生 SQL 或跨租户写入替代：
+
+1. 核实所有旧写入节点和直接写库者已经退出，新 Core/MongoDB/API 与 Managed 正文已经部署。未满足时不启动维护。
+2. `Begin` 带稳定的 32 位小写十六进制 `OperationId`，保存返回 `Epoch`；关闭本租户整个聊天运行时的新调用（包括读取）。`Drain` 带同一 Epoch，直到真实活动调用归零、`WritersDrained=true`。
+3. `Start` 带 `MaintenanceConfirmed=true` 与 8–100 位字母、数字、下划线或连字符的 `FenceId`；客户端确认只表示维护意图，可信排空由宿主验证。`Step` 每批最多 100 行、8 分区，每批独立稳定 `OperationId`（同 FenceId 格式）及上一迁移 `Revision` 作为 `ExpectedRevision`；未知结果重试同批标识，不能整个扫描重复一个标识。
+4. `Status` 的 `Data.Migration` 必须同时满足 Completed、ScanComplete、零冲突、IndexesReady，FenceEpoch 等于 `Data.Gate.Epoch`；`End` 带同一 Epoch，并由引擎采用刚读取的原生修订号做条件释放。未知响应先 Status 回读。
+
+`V8.Method.ManageManagedStorageMaintenance` / `V8.Method.RequireManagedStorageMaintenance` 只允许可信固定 Key、当前租户、真实超级管理员、非访问密钥会话。准入/活动票据在共享 MongoDB 中保存，不能直接通过 V8 CRUD、反射或禁止 ExecutionContext 流动的 API 绕开。Begin/Drain 的状态不能靠 V8.Param 伪造。
+
+跨分区同 Id 即冲突，无论正文是否相同；原文全部保留。无时区历史时间、非法 Id、目录变化或未知存储结果都不能算完成。只在无迁移状态、同 Epoch 已 Drain 且无活动持有者时允许 AbortUnstarted；已有状态应恢复原操作，不强制回退旧协议。崩溃票据不自动过期；恢复前须有旧写入者确已退出的运维证据，不能清空控制集合。
+
+迁移后历史查询使用权威定位索引与有界原文回查，普通页不 Count；未读计数独立执行。未知未读数保留 null/未知，Hub 不能推送虚假的 0。验收分别记录 VM 行为、真实 MongoDB、真实 HTTP/SignalR、多节点维护及线上部署；单机 Primary/Majority 成功不等于副本集故障切换通过。
+
 ## 验收矩阵
 
 | 场景 | 断言 |
