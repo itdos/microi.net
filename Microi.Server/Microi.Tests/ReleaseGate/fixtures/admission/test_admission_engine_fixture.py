@@ -1,10 +1,14 @@
 import copy
 import datetime
 import importlib.util
+import io
+import json
 import pathlib
 import tempfile
 import unittest
 import types
+import hashlib
+from unittest import mock
 from test_acl_guard import context_value
 from acl_guard import ROOT
 
@@ -266,6 +270,132 @@ class Tests(unittest.TestCase):
         self.assertIs(original[16], bytes)
         self.assertIs(selected[252], bytes)
         self.assertIs(selected[7], datetime.datetime)
+
+
+class NativeProcessEvidenceTests(unittest.TestCase):
+    def payload(self, text='{"Code":0,"errorType":"OperationalError","errorCode":2013}'):
+        def stream(value):
+            data = value.encode('utf-16-le')
+            return dict(text=value, characters=len(data)//2, utf16LeSha256=hashlib.sha256(data).hexdigest(), truncated=False)
+        return dict(owner=OWNER, tenant=TENANT, runId='b'*32, requestId='c'*32,
+                    action='snapshot', exitCode=1, stdout=stream(''), stderr=stream(text))
+
+    def context(self):
+        result = types.SimpleNamespace(data={'sourceHead':'d'*40, 'attempt':'test-attempt'}, saved={})
+        result.save = lambda name, value: result.saved.setdefault(name, value)
+        return result
+
+    def main_context(self):
+        context = types.SimpleNamespace(data=copy.deepcopy(C), expected_hash=CTX.expected_hash)
+        database = 'microi_' + TENANT
+        config = dict(task=C['task'], owner32=OWNER, owner=OWNER, tenant=TENANT,
+                      contextSha256=context.expected_hash, nativeScopeSha256=context.expected_hash,
+                      database=database.lower(), returnedDbName=database, registeredDatabase=database.lower(),
+                      parentDatabase=C['parentDatabase'], tenantId='1'*32, ownerUserId='2'*32,
+                      registeredDbConnSha256='d'*64, mainInfrastructureSha256='e'*64,
+                      tenantInfrastructureSha256='f'*64, effectiveInfrastructureSha256='1'*64,
+                      bootstrapSha256='2'*64, registrationVerifierSha256='3'*64,
+                      redis={key: C['redis'][key] for key in ('host', 'port', 'database')})
+        context.load = mock.Mock(return_value=config)
+        context.save = mock.Mock()
+        return context, config
+
+    def test_main_records_failure_after_context_binding_without_native_store_or_business_action(self):
+        context, config = self.main_context()
+        payload = self.payload('offline-private-evidence-canary')
+        payload['action'] = 'install'
+        context_path = str(ROOT / '.tmp' / 'offline-context-not-read.json')
+        argv = ['admission_engine_fixture.py', '--context', context_path,
+                '--context-sha256', context.expected_hash, '--record-process-failure']
+        output = io.StringIO()
+        # 保留真实参数解析、绑定与落盘分流；只替换私有文件边界，防止测试误触数据库或重发原业务。
+        with mock.patch.object(f.sys, 'argv', argv), \
+                mock.patch.object(f.sys, 'stdin', io.StringIO(json.dumps(payload))), \
+                mock.patch.object(f.sys, 'stdout', output), \
+                mock.patch.object(f, 'Context', return_value=context) as context_type, \
+                mock.patch.object(f, 'NativeStore', side_effect=AssertionError('Unexpected database construction')) as native_store, \
+                mock.patch.object(f, 'run', side_effect=AssertionError('Unexpected business action')) as business_action:
+            f.main()
+        context_type.assert_called_once_with(context_path, context.expected_hash)
+        context.load.assert_called_once_with('admission-fixture.json')
+        native_store.assert_not_called()
+        business_action.assert_not_called()
+        filename = 'native-control-failure-' + payload['requestId'] + '.json'
+        context.save.assert_called_once_with(filename, dict(schema='microi.admission.native-process-failure.v1',
+            task=config['task'], sourceHead=context.data['sourceHead'], attempt=context.data['attempt'], **payload))
+        self.assertEqual(json.loads(output.getvalue()), dict(Code=1, file=filename, sqlWrites=0, databaseConnections=0))
+        self.assertNotIn('offline-private-evidence-canary', output.getvalue())
+
+    def test_main_rejects_unbound_context_or_owner_before_private_write(self):
+        for change, message in (('context_hash', 'Wrong frozen context hash'),
+                                ('config_owner', 'Fixture owner aliases differ'),
+                                ('request_owner', 'Wrong process evidence ownership')):
+            context, config = self.main_context()
+            payload = self.payload()
+            if change == 'context_hash': config['contextSha256'] = 'e'*64
+            if change == 'config_owner': config['owner'] = 'f'*32
+            if change == 'request_owner': payload['owner'] = 'f'*32
+            context_path = str(ROOT / '.tmp' / 'offline-context-not-read.json')
+            argv = ['admission_engine_fixture.py', '--context', context_path,
+                    '--context-sha256', context.expected_hash, '--record-process-failure']
+            input_stream = io.StringIO(json.dumps(payload))
+            output = io.StringIO()
+            with self.subTest(change=change), \
+                    mock.patch.object(f.sys, 'argv', argv), \
+                    mock.patch.object(f.sys, 'stdin', input_stream), \
+                    mock.patch.object(f.sys, 'stdout', output), \
+                    mock.patch.object(f, 'Context', return_value=context) as context_type, \
+                    mock.patch.object(f, 'NativeStore', side_effect=AssertionError('Unexpected database construction')) as native_store, \
+                    mock.patch.object(f, 'run', side_effect=AssertionError('Unexpected business action')) as business_action:
+                with self.assertRaisesRegex(f.BoundaryError, message):
+                    f.main()
+            context_type.assert_called_once_with(context_path, context.expected_hash)
+            context.load.assert_called_once_with('admission-fixture.json')
+            context.save.assert_not_called()
+            native_store.assert_not_called()
+            business_action.assert_not_called()
+            self.assertEqual(output.getvalue(), '')
+            self.assertEqual(input_stream.tell() > 0, change == 'request_owner')
+
+    def test_failure_evidence_is_private_and_never_constructs_native_store(self):
+        context = self.context()
+        payload = self.payload('private-secret full stderr')
+        with mock.patch.object(f, 'NativeStore', side_effect=AssertionError('No database construction allowed')):
+            result = f.record_process_failure(payload, dict(owner=OWNER, tenant=TENANT, task=C['task']), context)
+        self.assertEqual(result, dict(Code=1, file='native-control-failure-'+'c'*32+'.json', sqlWrites=0, databaseConnections=0))
+        saved = next(iter(context.saved.values()))
+        self.assertEqual(saved['stderr']['text'], 'private-secret full stderr')
+        self.assertNotIn('private-secret', str(result))
+
+    def test_failure_evidence_rejects_wrong_owner_paths_oversize_or_bad_hash(self):
+        for change in ('owner', 'requestId', 'oversize', 'hash', 'truncation', 'extra'):
+            value = self.payload(); context = self.context()
+            if change == 'owner': value['owner'] = 'x'*32
+            if change == 'requestId': value['requestId'] = '../escape'
+            if change == 'oversize': value = self.payload('x'*65537)
+            if change == 'hash': value['stderr']['utf16LeSha256'] = '0'*64
+            if change == 'truncation': value['stderr']['truncated'] = True
+            if change == 'extra': value['directory'] = 'unowned'
+            with self.subTest(change=change), self.assertRaises(f.BoundaryError):
+                f.record_process_failure(value, dict(owner=OWNER, tenant=TENANT, task=C['task']), context)
+            self.assertFalse(context.saved)
+
+    def test_acl_or_create_new_rejection_is_preserved_without_fallback(self):
+        context = self.context()
+        def denied(*args): raise PermissionError('Original private ACL denial')
+        context.save = denied
+        with self.assertRaisesRegex(PermissionError, 'Original private ACL denial'):
+            f.record_process_failure(self.payload(), dict(owner=OWNER, tenant=TENANT, task=C['task']), context)
+        self.assertFalse(context.saved)
+
+    def test_truncated_body_keeps_whole_output_count_and_hash(self):
+        value = self.payload('x'*65536); context = self.context()
+        value['stderr'].update(characters=70000, truncated=True, utf16LeSha256='a'*64)
+        f.record_process_failure(value, dict(owner=OWNER, tenant=TENANT, task=C['task']), context)
+        saved = next(iter(context.saved.values()))
+        self.assertEqual(len(saved['stderr']['text']), 65536)
+        self.assertEqual(saved['stderr']['characters'], 70000)
+        self.assertTrue(saved['stderr']['truncated'])
 
 
 if __name__ == '__main__':

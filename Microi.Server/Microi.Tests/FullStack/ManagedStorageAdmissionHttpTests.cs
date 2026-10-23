@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Microi.Tests.Common;
 
 namespace Microi.Tests.FullStack;
 
@@ -58,6 +59,38 @@ public sealed class ManagedStorageAdmissionHttpTests
             // 原始错误输出只留在受限 helper 回执；失败诊断永远不展开解析异常。
         }
         return Message();
+    }
+
+    internal static bool RequiresPrivateFailureEvidence(int exitCode, BoundedNativeProcessOutput stdout, BoundedNativeProcessOutput stderr) =>
+        exitCode != 0 || stdout.Truncated || stderr.Truncated;
+
+    internal static string AcceptPrivateFailureReceipt(int exitCode, BoundedNativeProcessOutput output, string requestId)
+    {
+        if (exitCode != 0 || output.Truncated || !Guid.TryParseExact(requestId, "N", out _)) return "Unavailable";
+        try
+        {
+            var saved = JObject.Parse(output.Text);
+            var expected = "native-control-failure-" + requestId + ".json";
+            return saved.Value<int>("Code") == 1 && saved.Value<string>("file") == expected ? expected : "Unavailable";
+        }
+        catch (JsonException) { return "Unavailable"; }
+        catch (FormatException) { return "Unavailable"; }
+        catch (InvalidCastException) { return "Unavailable"; }
+    }
+
+    internal static string DescribeBoundedControlFailure(int exitCode, BoundedNativeProcessOutput stdout, BoundedNativeProcessOutput stderr, string receipt)
+    {
+        // 回执也只能是本地固定格式；证据 writer 的其它输出永远不进入公共断言。
+        if (!System.Text.RegularExpressions.Regex.IsMatch(receipt, "^native-control-failure-[a-f0-9]{32}\\.json$")) receipt = "Unavailable";
+        return DescribeControlFailure(exitCode, stderr.Truncated ? null : stderr.Text)
+            + $"; private evidence={receipt}; stdoutTruncated={stdout.Truncated}; stderrTruncated={stderr.Truncated}.";
+    }
+
+    internal static JObject ParseOwnedControlSuccess(BoundedNativeProcessOutput output, string tenant, string owner)
+    {
+        var result = JObject.Parse(output.Text); Assert.Equal(1, result.Value<int>("Code"));
+        Assert.Equal(tenant, result.Value<string>("tenant")); Assert.Equal(owner, result.Value<string>("owner"));
+        return result;
     }
 
     [Fact]
@@ -127,16 +160,40 @@ public sealed class ManagedStorageAdmissionHttpTests
             using var child = Process.Start(start) ?? throw new InvalidOperationException("Could not start owned admission fixture control");
             var input = values == null ? new JObject() : (JObject)values.DeepClone();
             input["action"] = action; input["owner"] = nonce; input["tenant"] = tenant;
-            input["runId"] = runId; input["requestId"] = Guid.NewGuid().ToString("N");
+            var requestId = Guid.NewGuid().ToString("N");
+            input["runId"] = runId; input["requestId"] = requestId;
             await child.StandardInput.WriteAsync(input.ToString(Formatting.None)); child.StandardInput.Close();
-            var stdout = child.StandardOutput.ReadToEndAsync(); var stderr = child.StandardError.ReadToEndAsync();
+            var stdout = BoundedNativeProcessOutput.ReadAsync(child.StandardOutput);
+            var stderr = BoundedNativeProcessOutput.ReadAsync(child.StandardError);
             // helper 每个网络操作有界；取消时仍等原子写入/回读落下结果，不因测试取消杀死未知提交。
             await child.WaitForExitAsync(CancellationToken.None);
-            var raw = await stdout; var failure = await stderr;
-            Assert.True(child.ExitCode == 0, DescribeControlFailure(child.ExitCode, failure));
-            var result = JObject.Parse(raw); Assert.Equal(1, result.Value<int>("Code"));
-            Assert.Equal(tenant, result.Value<string>("tenant")); Assert.Equal(nonce, result.Value<string>("owner"));
-            return result;
+            var output = await stdout; var errorOutput = await stderr;
+            if (RequiresPrivateFailureEvidence(child.ExitCode, output, errorOutput))
+            {
+                var receipt = "Unavailable";
+                try
+                {
+                    // 原错误可能发生在 journal 创建之前。只让原冻结 Python/Context 以 CreateNew
+                    // 保存失败输出；该专用动作不构造 NativeStore、不访问数据库、不重发未知写入。
+                    var captureStart = new ProcessStartInfo(start.FileName)
+                    { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
+                    foreach (var argument in start.ArgumentList.Take(start.ArgumentList.Count - 1)) captureStart.ArgumentList.Add(argument);
+                    captureStart.ArgumentList.Add("--record-process-failure");
+                    using var capture = Process.Start(captureStart) ?? throw new InvalidOperationException("Could not start private evidence writer");
+                    var payload = new JObject { ["owner"] = nonce, ["tenant"] = tenant, ["runId"] = runId,
+                        ["requestId"] = requestId, ["action"] = action, ["exitCode"] = child.ExitCode,
+                        ["stdout"] = output.PrivateBody(), ["stderr"] = errorOutput.PrivateBody() };
+                    await capture.StandardInput.WriteAsync(payload.ToString(Formatting.None)); capture.StandardInput.Close();
+                    var captureOut = BoundedNativeProcessOutput.ReadAsync(capture.StandardOutput);
+                    var captureError = BoundedNativeProcessOutput.ReadAsync(capture.StandardError);
+                    await capture.WaitForExitAsync(CancellationToken.None);
+                    var captureResult = await captureOut; _ = await captureError;
+                    receipt = AcceptPrivateFailureReceipt(capture.ExitCode, captureResult, requestId);
+                }
+                catch { /* 证据保存失败不能覆盖或泄露原子操作的原始失败。 */ }
+                Assert.Fail(DescribeBoundedControlFailure(child.ExitCode, output, errorOutput, receipt));
+            }
+            return ParseOwnedControlSuccess(output, tenant, nonce);
         }
         async Task<JObject> Post(string route, JObject body, bool success = true, CancellationToken? cancellation = null)
         {
