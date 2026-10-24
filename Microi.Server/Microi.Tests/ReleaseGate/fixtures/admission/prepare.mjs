@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomBytes} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {setTimeout as delay} from 'node:timers/promises';
+import {waitForResourceTask} from './resource-task-wait.mjs';
 import {CONTEXT,TASK,OWNER,TENANT,MAIN,MARKER,DID,ACCOUNTS,id,sha,success,tenantReturn,ownedUser,currentUser,
   mcpJson,accessGrant,verifyConfirmation,accessRecord,fixture} from './contracts.mjs';
 import {HttpSession,connectMcp,verifySources,TENANT_CREATION_TIMEOUT_MS} from './transport.mjs';
@@ -116,9 +116,11 @@ async function resourcesStage() {
   const request=resourceInstallRequest(application,OWNER),route='apiengine/platform-background-task';
   intent('resources',{tenant:TENANT,ownerUserId:binding.ownerUserId,packagePath:REQUIRED_APPLICATION,packageSha256:sha(bytes),idempotencyKey:request.Options.IdempotencyKey});
   const submitted=await session.post(route,request);save('resources-submit.result.json',{task:TASK,owner32:OWNER,tenant:TENANT,response:submitted});
-  const taskId=id(success(submitted).Id),deadline=Date.now()+600000;let status;
-  do {status=success(await session.post(route,{Action:'Status',Id:taskId}));if(['Succeeded','Failed','Canceled'].includes(status.Status))break;await delay(2000);}while(Date.now()<deadline);
-  const detail=await session.post(route,{Action:'Detail',Id:taskId});
+  const taskId=id(success(submitted).Id);
+  const {status,detail}=await waitForResourceTask(taskId,{
+    readStatus:async selectedId=>success(await session.post(route,{Action:'Status',Id:selectedId})),
+    readDetail:selectedId=>session.post(route,{Action:'Detail',Id:selectedId})
+  });
   save('resources.result.json',{task:TASK,owner32:OWNER,tenant:TENANT,packageSha256:sha(bytes),taskId,status:status.Status,response:detail});
   assert.equal(status.Status,'Succeeded','Application task did not succeed; inspect the same persisted task, never resubmit');
   success(success(detail).Result);
