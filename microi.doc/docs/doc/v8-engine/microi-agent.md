@@ -201,7 +201,7 @@ Microi Agent 的本机开发会话由 DeepSeek Harness 执行；吾码小龙虾�
 
 历史 [Windows 1.3.9 不可变安装包](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.4.0/requests/9e5b8e3d0c468efe0f0777583dd1111654d46d473050af76bf53fc60ea6f7a1a/assets/Microi-Agent-1.3.9-windows-x64-setup.exe)为未签名 EXE，289,552,267 字节，SHA-256：`b6a76a4e72ac889682a6f68ca07cf58e737ad33c0ea2543c66c693aa352baa47`；[发行清单与验收摘要](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.4.0/requests/9e5b8e3d0c468efe0f0777583dd1111654d46d473050af76bf53fc60ea6f7a1a/assets/release-manifest.json)可独立回读。资源归档路径的 `v1.4.0` 是下载资源版本，软件实际版本为 **1.3.9**。完整审计证据保留于内部源码仓库，公开清单不包含凭据或本地路径。
 
-安装后可下载 [一键原生验收工具](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-native-acceptance.zip)，解压并双击 `一键验收.cmd`。它自动回读安装后的全部文件 SHA-256，运行六项真实 NSIS 故障回归，再从完整产品主入口启动两次，检查 Worker 与 Harness 重启；结果 ZIP 位于工具 `result` 目录，失败也会保存证明。工具只导出证明 JSON 和测试截屏，不导出测试 Profile 或凭据。**当前六项 NSIS 夹具已在 Wine 通过，Windows 原生升级与启动仍待验收；自动更新 latest 暂保持 1.3.6，macOS 签名公证版仍为 1.3.6。**
+历史 1.3.7 阶段提供了 [一键原生验收工具](https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.3.8/requests/5bde0d6abbab6cd36fd0c79251a4413c475a90cd1b22cf394890b1027c2af593/assets/Microi-Agent-1.3.7-windows-native-acceptance.zip)，解压并双击 `一键验收.cmd`。它自动回读安装后的全部文件 SHA-256，运行六项真实 NSIS 故障回归，再从完整产品主入口启动两次，检查 Worker 与 Harness 重启；结果 ZIP 位于工具 `result` 目录，失败也会保存证明。工具只导出证明 JSON 和测试截屏，不导出测试 Profile 或凭据。**该阶段的记录为：六项 NSIS 夹具已在 Wine 通过，Windows 原生升级与启动当时仍待验收；当时自动更新 latest 和 macOS 签名公证版均保持 1.3.6。这些历史状态不代表当前下载版本，后续发行结果见本页对应版本记录。**
 
 **Windows 启动恢复说明**：针对 1.3.1 在客户电脑上 IPv4、IPv6 回环 HTTP 连接均超时的问题，新增当前 Harness 私有命名管道恢复，并保留认证、Cookie、WebSocket、工作区和会话。本包未签名；构建、自动回归和 MacBook 上真实 Harness/Electron 验证已通过，**客户 Windows 原生安装与启动仍待确认**。请使用顶部 Windows 按钮下载最新测试包；失败时提供新版 `harness.log`，无需先卸载插件或删除工作区。
 
@@ -1027,7 +1027,7 @@ npm run publish:cli:resume
 
 ### v1.4.2 - (2026-10-18)
 
-> 本条记录 Windows 1.4.2 的产品来源及各层证据。当前为 D 盘待填副本，不表示已发布；下方 1.4.1 及更早记录按当时原件保留，不能替代本轮新群、岗位模型、真实升级和同包原生验收。尚未取得的结论继续保留占位。
+> 本条为 2026-10-18 已归档的 Windows 1.4.2 发行记录：下载资源 v1.4.3 已取得渠道 Completed，完整安装包与发行清单已回读，Windows 原生、官网模式 6 和公开浏览器原件已归档核对。结论仅对应当时的源码、安装包和验收环境，不代表当前频道状态，也不替代后续版本或其它客户设备验收。下方 1.4.1 及更早记录按当时原件保留；macOS 原生验收等未完成项仍分别标明。
 
 - **1. 发送确认与紧凑群聊**：修复岗位缺少模型导致整条用户消息回滚的问题，将消息持久确认与岗位执行状态分开；明确业务拒绝与网络未知分别处理，未知先以原请求标识只读核对。项目、消息、成员与编辑器收紧为紧凑三栏，保留触控、键盘、窄屏与浅深主题。
 - **2. 模型弹窗稳定**：模型目录刷新、空数据、错误与保存结果使用预留区域，不因提示显隐改变窗口高度；已有选项可继续选择，长内容在窗口内滚动。附件预览及同类错误区域一并检查。
