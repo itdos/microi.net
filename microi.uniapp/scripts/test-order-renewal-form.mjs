@@ -5,11 +5,26 @@ import vm from 'node:vm'
 import * as renewal from '../src/tenants/xjy/order-renewal.mjs'
 import * as summary from '../src/tenants/xjy/order-summary.mjs'
 import * as contract from '../src/tenants/xjy/order-contract.mjs'
+import * as status from '../src/tenants/xjy/order-status.mjs'
 import * as cooperation from '../src/tenants/xjy/order-product-cooperation.mjs'
 
 const DRAFT_ID = '00000000-0000-4000-8000-000000000001'
 const SOURCE_ID = '00000000-0000-4000-8000-000000000002'
 const OTHER_SOURCE_ID = '00000000-0000-4000-8000-000000000003'
+// 当前租户真实配置仅保存子表/菜单 Id，没有 TableChildTableName；Label 为空。
+const FILTER_FIELD_ID = '4a0eaea0-ede9-4657-a5e4-22a5965b12a1'
+const PRODUCT_TABLE_ID = '6e4d13a2-6015-4dc1-8f9e-194e79532bb8'
+function productFilterField() {
+  return {
+    Id: FILTER_FIELD_ID, Name: 'SpLvXin', Label: '', component: 'TableChild',
+    config: {
+      TableChildTableId: 'ae0f4c0d-12d1-4e5b-9fe5-2cbc7c65c8d1',
+      TableChildSysMenuId: 'ae485545-447a-4147-b886-8d48dc9ff101',
+      TableChildSysMenuName: '订单商品滤芯表', TableChildFkFieldName: 'DingdanSPID',
+      TableChild: { PrimaryTableFieldName: 'Id' }
+    }
+  }
+}
 const inheritedDefaults = {
   XinLDD: renewal.ORDER_RENEWAL_TYPE, XQDingdanID: SOURCE_ID, XQDingdanBH: 'OLD-001',
   KehuID: 'customer-1', KehuMC: '原客户', RenewalInitialized: 1, RenewalTermMonths: 12,
@@ -19,15 +34,15 @@ const inheritedDefaults = {
 }
 const plain = value => JSON.parse(JSON.stringify(value))
 
-function harness({ run, products = [], positions = [], getFormData, draftRows } = {}) {
-  const calls = [], reads = [], toasts = [], opened = [], writes = []
+function harness({ run, products = [], positions = [], getFormData, getTableData, draftRows, draftRecord } = {}) {
+  const calls = [], reads = [], toasts = [], opened = [], writes = [], contexts = []
   const source = fs.readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')
     .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*/g, '')
     .replace(/export default/g, 'const exported =')
     .replace(/export (?=(?:async )?function|const)/g, '')
   // 只替换 I/O 与与本场景无关的扩展；续签、计价和合同日期使用实际业务模块。
   const hooks = vm.runInNewContext(`${source}; exported`, {
-    ...renewal, ...summary, ...contract, ...cooperation,
+    ...renewal, ...summary, ...contract, ...status, ...cooperation,
     console, setTimeout, clearTimeout,
     uni: { showToast: value => toasts.push(value) },
     getUser: () => ({ Id: 'user-1', Name: '当前人员' }),
@@ -42,6 +57,11 @@ function harness({ run, products = [], positions = [], getFormData, draftRows } 
       ApiEngine: {
         Run: async (key, params) => {
           calls.push({ key, params: plain(params) })
+          if (key === renewal.ORDER_RENEWAL_ENGINE && params.Action === 'DraftRecord') {
+            if (draftRecord) return draftRecord(params)
+            const ctx = contexts.find(item => item.rowId === params.Id)
+            return { Code: 1, Data: { ...ctx?.form, Id: params.Id } }
+          }
           if (key === renewal.ORDER_RENEWAL_ENGINE && params.Action === 'DraftRows') {
             if (draftRows) return draftRows(params)
             const rows = params.TableName === 'diy_dingdansp' ? products : positions
@@ -60,6 +80,7 @@ function harness({ run, products = [], positions = [], getFormData, draftRows } 
         UptFormData: async (table, values) => { writes.push({ table, values: plain(values) }); return { Code: 1 } },
         GetTableData: async (table, params) => {
           reads.push({ table, params: plain(params) })
+          if (getTableData) return getTableData(table, params)
           return { Code: 1, Data: table === 'diy_dingdansp' ? products : positions }
         }
       }
@@ -70,9 +91,11 @@ function harness({ run, products = [], positions = [], getFormData, draftRows } 
       tableName, mode, rowId, draftRowId: mode === 'Add' ? DRAFT_ID : '',
       menuId: 'order-menu', state: hooks.createState(),
       defaultValues: { ...defaults }, form: { Id: DRAFT_ID, ...defaults, ...form },
-      definition: { fields: [], layoutFields: [], childFields: [], groups: [] }
+      definition: { table: { Id: PRODUCT_TABLE_ID }, fields: [], layoutFields: [],
+        childFields: [productFilterField()], groups: [] }
     }
     ctx.patchForm = values => Object.assign(ctx.form, values)
+    contexts.push(ctx)
     return ctx
   }
   return { hooks, context, calls, reads, toasts, opened, writes }
@@ -143,6 +166,60 @@ test('普通新增只登记草稿，不误触发续签资料复制', async () =>
   assert.equal(ctx.form.RenewalInitialized, undefined)
   const values = await h.hooks.beforeSubmit(ctx)
   assert.equal(values.XQDingdanBH, '')
+})
+
+test('列表新增未选客户时完整初始化，选客户后才读取受控草稿明细', async () => {
+  let boundCustomer = ''
+  const h = harness({
+    run: async (key, params) => {
+      assert.equal(key, renewal.ORDER_DRAFT_ENGINE)
+      boundCustomer = params.KehuID || boundCustomer
+      return { Code: 1, Data: { Status: 'Active' } }
+    },
+    getFormData: async () => ({ Code: 1, Data: { Id: 'customer-2', KehuMC: '新客户', LianxiR: '联系人' } }),
+    // 对齐后端的客户前置条件，防止宽松的空数组夹具掩盖真实加载错误。
+    draftRows: () => boundCustomer
+      ? { Code: 1, Data: [{ Id: 'product-1', HezuoFS: '租赁' }], DataCount: 1 }
+      : { Code: 0, Msg: '订单草稿尚未确定客户' }
+  })
+  const ctx = h.context()
+  await h.hooks.initialize(ctx)
+  assert.equal(ctx.state.orderInitialized, true)
+  assert.equal(ctx.state.orderDraftReady, true)
+  assert.equal(h.calls.filter(call => call.params.Action === 'Begin').length, 1)
+  assert.equal(h.calls.filter(call => call.params.Action === 'DraftRows').length, 0)
+  assert.equal(h.hooks.getRelatedPresentation(ctx, { Name: 'DingdanSP' }).visible, false)
+  assert.deepEqual(plain(ctx.state.orderSummaryValues), summary.orderSummaryValues([], []))
+
+  await h.hooks.handleFieldSelect(ctx, {
+    field: { Name: 'KehuMC' }, option: { raw: { Id: 'customer-2' } }, value: '新客户'
+  })
+  await h.hooks.refreshDerivedValues(ctx)
+  assert.equal(ctx.form.KehuID, 'customer-2')
+  assert.equal(ctx.form.LianxiR, '联系人')
+  assert.equal(ctx.form.DingdanHZFS, '租赁')
+  assert.notEqual(h.hooks.getRelatedPresentation(ctx, { Name: 'DingdanSP' }).visible, false)
+  assert.ok(h.calls.some(call => call.params.Action === 'DraftRows'))
+  assert.equal(h.reads.length, 0, '草稿明细保持走受控接口')
+})
+
+test('客户详情新增仍读取草稿，真实权限错误继续阻止初始化', async () => {
+  for (const accepted of [true, false]) {
+    const h = harness({ draftRows: () => accepted
+      ? { Code: 1, Data: [], DataCount: 0 }
+      : { Code: 0, Msg: '订单草稿不属于当前账号' } })
+    const ctx = h.context({ defaults: { KehuID: 'customer-1', KehuMC: '已有客户' } })
+    if (accepted) {
+      await h.hooks.initialize(ctx)
+      assert.equal(ctx.form.KehuID, 'customer-1')
+      assert.equal(ctx.state.orderInitialized, true)
+    } else {
+      await assert.rejects(h.hooks.initialize(ctx), /不属于当前账号/)
+      assert.equal(ctx.state.orderSummaryValues, null)
+    }
+    assert.ok(h.calls.some(call => call.params.Action === 'DraftRows'))
+    assert.equal(h.reads.length, 0)
+  }
 })
 
 test('编辑已保存续签合同不重开草稿、不重新复制，待审批日期仍可调整', async () => {
@@ -453,7 +530,195 @@ test('正式商品耗材仅在明确原生标志后回退查询，失败/超限�
     } else {
       assert.equal(h.reads.length, 0)
       assert.equal(ctx.form.LvxinSJDJ, 88)
-      assert.match(h.toasts.at(-1).title, /权限|明细过多/)
+      assert.match(h.toasts.at(-1).title, /权限|明细未完整/)
+      await assert.rejects(h.hooks.beforeSubmit(ctx), /权限|明细未完整/)
     }
   }
+})
+
+test('合同详情进入正式商品时使用真实 SpLvXin 配置，并保留无独立商品菜单的嵌套授权', async () => {
+  for (const Label of ['', '订单商品滤芯表']) {
+    const h = harness({
+      draftRecord: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+      draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+      getFormData: async () => ({ Code: 1, Data: {
+        Id: 'sp-1', HezuoFS: '包年换芯', LvxinSJDJ: 1210, LvxinYJ: 1930, ShebeiSJDJ: 0
+      } }),
+      getTableData: async () => ({ Code: 1, Data: [{ Id: 'f-1', YouhuiHLXZJ: 1210 }], DataCount: 1 })
+    })
+    const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'View', rowId: 'sp-1', form: {
+      ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 1,
+      LvxinSJDJ: 1210, LvxinYJ: 1930
+    } })
+    ctx.definition.childFields[0].Label = Label
+    // 合同 -> 商品 -> 滤芯；商品页面可以仅通过上一级 TableChild 授权进入。
+    ctx.menuId = ''
+    ctx.tableChildAuth = { ParentFieldId: 'goods-field', ParentTableId: 'order-table',
+      ParentSysMenuId: 'contract-menu', ParentRowId: DRAFT_ID, ParentValue: DRAFT_ID, ParentFormMode: 'View' }
+    await h.hooks.initialize(ctx)
+    assert.equal(h.toasts.length, 0)
+    assert.equal(h.hooks.getBusyMessage(ctx), '')
+    assert.equal(ctx.form.LvxinSJDJ, 1210)
+    assert.equal(ctx.form.YouhuiFD, 62.69)
+    assert.equal(h.reads.length, 1)
+    assert.deepEqual(h.reads[0].params._TableChildAuth, {
+      ParentFieldId: FILTER_FIELD_ID, ParentTableId: PRODUCT_TABLE_ID, ParentSysMenuId: '',
+      ParentRowId: 'sp-1', ParentValue: 'sp-1', ParentFormMode: 'View', Parent: ctx.tableChildAuth
+    })
+    assert.deepEqual(h.reads[0].params._Where, [['DingdanSPID', '=', 'sp-1']])
+  }
+})
+
+test('真实 HTTP 菜单投影不含行金额时读取后台统计合计，首次查看、切换和返回均不误报', async () => {
+  let total = 1930
+  const record = { Id: 'sp-1', HezuoFS: '包年换芯', LvxinSJDJ: 1930, LvxinYJ: 1930, ShebeiSJDJ: 0 }
+  const h = harness({
+    draftRecord: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+    draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+    getFormData: async table => ({ Code: 1, Data: table === 'diy_shangpin'
+      ? { Xianjia: 1580, GenghuanLXJG: 1930 } : { ...record } }),
+    // 与线上 HTTP 返回相同：菜单仅选了型号、名称、级数、周期、单价；行中没有 YouhuiHLXZJ。
+    getTableData: async () => ({ Code: 1, DataCount: 5,
+      DataAppend: { StatisticsFields: { LvxinZJ: total, YouhuiHLXZJ: total } },
+      Data: [500, 60, 60, 150, 150].map((LvxinDJ, i) => ({
+        Id: `f-${i}`, LvxinXH: '滤芯型号', LvxinMC: '滤芯名称', Paixu: i + 1,
+        GenghuanZQ: i === 0 ? 24 : 3, LvxinDJ
+      }))
+    })
+  })
+  const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'View', rowId: 'sp-1', form: {
+    ...record, ShangpinID: 'sku', DingdanID: DRAFT_ID, Shuliang: 1
+  } })
+  await h.hooks.initialize(ctx)
+  assert.equal(h.toasts.length, 0)
+  assert.equal(h.hooks.getBusyMessage(ctx), '')
+  assert.equal(ctx.form.LvxinSJDJ, 1930)
+  await h.hooks.handleFieldChange(ctx, { field: { Name: 'HezuoFS' }, value: '包年换芯' })
+  assert.equal(ctx.form.LvxinSJDJ, 1930)
+  assert.equal(ctx.form.YouhuiFD, 100)
+  // 子表修改后后台已重算合计，返回及提交继续读取后台结果。
+  total = 1210
+  record.LvxinSJDJ = total
+  await h.hooks.refreshDerivedValues(ctx)
+  assert.equal(ctx.form.LvxinSJDJ, 1210)
+  assert.equal(ctx.form.YouhuiFD, 62.69)
+  assert.equal((await h.hooks.beforeSubmit(ctx)).LvxinZJ, 1210)
+  assert.ok(h.reads.every(read => read.params._TableChildAuth.ParentFieldId === FILTER_FIELD_ID))
+  assert.equal(h.toasts.length, 0)
+})
+
+test('后台滤芯统计为零有效，分页总计只用一次，统计缺失、无效、变化或截断均阻止保存', async () => {
+  for (const scenario of ['zero', 'pages', 'missing', 'invalid', 'changed', 'truncated']) {
+    const h = harness({
+      draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+      getFormData: async () => ({ Code: 1, Data: { Xianjia: 1580, GenghuanLXJG: 1930 } }),
+      getTableData: async (table, params) => {
+        const page = params._PageIndex
+        const rows = Array.from({ length: 101 }, (_, i) => ({ Id: `f-${i}`, LvxinDJ: 60, GenghuanZQ: 3 }))
+        return { Code: 1, DataCount: 101,
+          Data: scenario === 'truncated' ? rows.slice(0, 1) : rows.slice((page - 1) * 100, page * 100),
+          DataAppend: { StatisticsFields: scenario === 'missing' ? {} : {
+            YouhuiHLXZJ: scenario === 'zero' ? 0 : scenario === 'invalid' ? null : scenario === 'changed' && page === 2 ? 2000 : 1930
+          } }
+        }
+      }
+    })
+    const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+      ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 2, LvxinSJDJ: 1210
+    } })
+    await h.hooks.handleFieldChange(ctx, { field: { Name: 'HezuoFS' }, value: '包年换芯' })
+    if (scenario === 'zero' || scenario === 'pages') {
+      const expected = scenario === 'zero' ? 0 : 1930
+      assert.equal(ctx.form.LvxinSJDJ, expected)
+      assert.equal(ctx.form.LvxinZJ, expected * 2)
+      assert.equal(h.toasts.length, 0)
+    } else {
+      assert.equal(ctx.form.LvxinSJDJ, 1210)
+      await assert.rejects(h.hooks.beforeSubmit(ctx), /价格|合计|变化|完整/)
+    }
+  }
+})
+
+test('滤芯字段、外键或父级授权不完整时仍拒绝查询，不借用安装位置或相似文案', async () => {
+  for (const missing of ['field', 'foreign-key', 'parent']) {
+    const h = harness({ draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }) })
+    const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'View', rowId: 'sp-1', form: {
+      ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 1, LvxinSJDJ: 1210
+    } })
+    if (missing === 'field') ctx.definition.childFields = [{ Id: 'positions-field', Name: 'AnzhuangWZ',
+      Label: '滤芯明细安装位置', config: { TableChildTableId: 'positions-table', TableChildFkFieldName: 'DingdanSPID' } }]
+    if (missing === 'foreign-key') ctx.definition.childFields[0].config.TableChildFkFieldName = 'OtherId'
+    if (missing === 'parent') ctx.menuId = ''
+    await h.hooks.initialize(ctx)
+    assert.equal(h.reads.length, 0)
+    assert.match(h.toasts.at(-1).title, /滤芯明细授权信息不完整/)
+    assert.equal(ctx.form.LvxinSJDJ, 1210)
+    await assert.rejects(h.hooks.beforeSubmit(ctx), /滤芯明细授权信息不完整/)
+  }
+})
+
+test('正式订单耗材查询失败不能把1930原价替代1210实际价，保留完整父子授权', async () => {
+  const h = harness({
+    draftRows: () => ({ Code: 1, DataAppend: { UseNativeQuery: true } }),
+    getTableData: async () => ({ Code: 0, Msg: '耗材读取失败' }),
+    getFormData: async () => ({ Code: 1, Data: { Xianjia: 1580, GenghuanLXJG: 1930 } })
+  })
+  const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+    DingdanID: DRAFT_ID, ShangpinID: 'sku', HezuoFS: '包年换芯', Shuliang: 1, LvxinSJDJ: 1210
+  } })
+  ctx.tableChildAuth = { ParentRowId: 'customer-1' }
+  await h.hooks.handleFieldChange(ctx, { field: { Name: 'HezuoFS' }, value: '包年换芯' })
+  assert.equal(ctx.form.LvxinSJDJ, 1210)
+  assert.equal(h.reads[0].params._TableChildAuth.ParentFieldId, FILTER_FIELD_ID)
+  assert.equal(h.reads[0].params._TableChildAuth.ParentRowId, 'sp-1')
+  assert.equal(h.reads[0].params._TableChildAuth.Parent.ParentRowId, 'customer-1')
+  await assert.rejects(h.hooks.beforeSubmit(ctx), /耗材读取失败/)
+})
+
+test('草稿耗材超过一页时完整累计，分页截断和重复均阻止保存', async () => {
+  for (const broken of ['', 'truncated', 'duplicate']) {
+    const rows = Array.from({ length: 101 }, (_, i) => ({ Id: `f-${i}`, YouhuiHLXZJ: 10 }))
+    const h = harness({
+      draftRows: params => ({ Code: 1, DataCount: 101,
+        Data: broken === 'truncated' ? rows.slice(0, 1) : broken === 'duplicate'
+          ? rows.slice(0, 100) : rows.slice((params._PageIndex - 1) * 100, params._PageIndex * 100) }),
+      getFormData: async () => ({ Code: 1, Data: { GenghuanLXJG: 1930 } })
+    })
+    const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+      ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 1
+    } })
+    await h.hooks.handleFieldChange(ctx, { field: { Name: 'HezuoFS' }, value: '包年换芯' })
+    if (broken) await assert.rejects(h.hooks.beforeSubmit(ctx), /未完整|重复/)
+    else { assert.equal(ctx.form.LvxinSJDJ, 1010); assert.equal(h.hooks.getBusyMessage(ctx), '') }
+  }
+})
+
+test('真实初始化钩子回源服务端报价，耗材返回刷新不会保留旧页面1930', async () => {
+  let unit = 1210, amount = 1210
+  const h = harness({
+    draftRecord: async () => ({ Code: 1, Data: { Id: 'sp-1', HezuoFS: '包年换芯', LvxinSJDJ: unit, LvxinYJ: 1930, ShebeiSJDJ: 0 } }),
+    draftRows: () => ({ Code: 1, Data: [{ Id: 'f-1', YouhuiHLXZJ: amount }], DataCount: 1 })
+  })
+  const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+    ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '包年换芯', Shuliang: 1, LvxinSJDJ: 1930, LvxinYJ: 1930
+  } })
+  await h.hooks.initialize(ctx)
+  assert.equal(ctx.form.LvxinSJDJ, 1210)
+  assert.equal(ctx.form.YouhuiFD, 62.69)
+  unit = 1310; amount = 1310
+  await h.hooks.refreshDerivedValues(ctx)
+  assert.equal(ctx.form.LvxinSJDJ, 1310)
+  assert.equal((await h.hooks.beforeSubmit(ctx)).LvxinZJ, 1310)
+})
+
+test('本次收费范围字段切换按后台保留原滤芯实际单价', async () => {
+  const h = harness({ getFormData: async () => ({ Code: 1, Data: { Xianjia: 1580, GenghuanLXJG: 1930 } }),
+    draftRows: () => ({ Code: 1, Data: [{ Id: 'f-1', YouhuiHLXZJ: 1210 }], DataCount: 1 }) })
+  const ctx = h.context({ tableName: 'Diy_DingdanSP', mode: 'Edit', rowId: 'sp-1', form: {
+    ShangpinID: 'sku', DingdanID: DRAFT_ID, HezuoFS: '买断+包年换芯', Shuliang: 1,
+    RenewalSourceSPID: 'old-sp', RenewalChargeMode: 'Service', LvxinSJDJ: 999
+  } })
+  await h.hooks.handleFieldChange(ctx, { field: { Name: 'RenewalChargeMode' }, value: 'Service' })
+  assert.equal(ctx.form.LvxinSJDJ, 999)
+  assert.equal(ctx.form.ShebeiSJDJ, 0)
 })
