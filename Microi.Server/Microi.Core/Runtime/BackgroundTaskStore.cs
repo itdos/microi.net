@@ -41,6 +41,12 @@ namespace Microi.net
         private const int InfrastructureContentionRetryLimit = 3;
         internal const int TenantScanBatchSize = 4;
         private const int TenantScanCommandTimeoutSeconds = 2;
+        private const int ClaimedPayloadCommandTimeoutSeconds = 30;
+        // Keep queue scans bounded even when a task embeds a multi-megabyte
+        // application package. Execution data is read only after the CAS claim,
+        // on its worker slot rather than on the shared dispatcher.
+        private const string CandidateProjection = @"Id,OsClient,ApiEngineKey,Status,StartTime,
+RuntimeOsClientType,RuntimeOsClientNetwork,FencingToken,AttemptCount,MaxAttempts,ExecutionCount";
         private static readonly TimeSpan SchemaReadyCacheDuration = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan TenantMaintenanceInterval = TimeSpan.FromSeconds(30);
         private const string InfrastructureContentionRetryPrefix =
@@ -638,7 +644,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=1
                     runtimeNetwork);
         }
 
-        private static BackgroundTaskRecord TryReadCandidate(
+        internal static BackgroundTaskRecord TryReadCandidate(
             OsClientSecret client,
             string osClient,
             DateTime now,
@@ -660,7 +666,7 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=1
             var requiredPredicate = requiredApiEngineKey.DosIsNullOrWhiteSpace()
                 ? ""
                 : " AND ApiEngineKey=@requiredApiEngineKey";
-            var candidateSql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
+            var candidateSql = FirstSql(client, $@"SELECT {CandidateProjection} FROM {TableName}
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND CancelRequested=0
   AND {RuntimeScopePredicate}
   {excludedPredicate}
@@ -743,6 +749,31 @@ WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
             return candidate;
         }
 
+        internal static BackgroundTaskRecord ReadClaimedPayload(BackgroundTaskRecord claim)
+        {
+            return ReadClaimedPayload(GetRequiredClient(claim.OsClient), claim, DateTime.Now);
+        }
+
+        internal static BackgroundTaskRecord ReadClaimedPayload(
+            OsClientSecret client, BackgroundTaskRecord claim, DateTime now)
+        {
+            var sql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
+WHERE Id=@id AND OsClient=@tenant AND Status='Running'
+  AND LeaseOwner=@owner AND FencingToken=@fence AND LeaseExpiresAt>@now
+  AND (IsDeleted=0 OR IsDeleted IS NULL) AND CancelRequested=0
+  AND {RuntimeScopePredicate}");
+            var command = FromSql(client, sql)
+                .AddInParameter("id", claim.Id)
+                .AddInParameter("tenant", claim.OsClient)
+                .AddInParameter("owner", claim.LeaseOwner)
+                .AddInParameter("fence", claim.FencingToken)
+                .AddInParameter("now", DbTime(now))
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork());
+            command.SetCommandTimeout(ClaimedPayloadCommandTimeoutSeconds);
+            return Hydrate(command.ToFirst<BackgroundTaskRecord>());
+        }
+
         private static bool IsTenantMaintenanceDue(string osClient, DateTime utcNow)
         {
             var key = RuntimeCoordinateKey(osClient);
@@ -805,21 +836,34 @@ WHERE Id=@p0 AND OsClient=@p1")
             string leaseOwner,
             long fencingToken)
         {
+            return IsLeaseCurrentCore(osClient, taskId, leaseOwner, fencingToken, 0);
+        }
+
+        internal static bool IsClaimedPayloadLeaseCurrent(BackgroundTaskRecord claim)
+        {
+            return IsLeaseCurrentCore(claim.OsClient, claim.Id, claim.LeaseOwner,
+                claim.FencingToken, TenantScanCommandTimeoutSeconds);
+        }
+
+        private static bool IsLeaseCurrentCore(
+            string osClient, string taskId, string leaseOwner, long fencingToken, int commandTimeoutSeconds)
+        {
             try
             {
                 var client = GetClient(osClient);
                 if (client?.Db == null
                     || taskId.DosIsNullOrWhiteSpace()
                     || leaseOwner.DosIsNullOrWhiteSpace()) return false;
-                return FromSql(client, $@"SELECT COUNT(1) FROM {TableName}
+                var command = FromSql(client, $@"SELECT COUNT(1) FROM {TableName}
 WHERE Id=@p0 AND OsClient=@p1 AND Status='Running' AND CancelRequested=0
   AND LeaseOwner=@p2 AND FencingToken=@p3 AND LeaseExpiresAt>@p4")
                     .AddInParameter("p0", taskId)
                     .AddInParameter("p1", osClient)
                     .AddInParameter("p2", leaseOwner)
                     .AddInParameter("p3", fencingToken)
-                    .AddInParameter("p4", DbTime(DateTime.Now))
-                    .ToScalar<int>() == 1;
+                    .AddInParameter("p4", DbTime(DateTime.Now));
+                if (commandTimeoutSeconds > 0) command.SetCommandTimeout(commandTimeoutSeconds);
+                return command.ToScalar<int>() == 1;
             }
             catch
             {

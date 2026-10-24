@@ -90,6 +90,7 @@ return { Code: 1, Data: { IdempotencyKey: idempotencyKey } };
 - 先证明任务真的在执行：读 `Scheduler.IsStarted`、`Scheduler.NumberOfJobsExecuted` 和 `Acquisition.LastAcquisitionError`，参考 `microi.doc/docs/doc/system-engine/job.md` 的“任务不执行”。`diy_schedule_job.Status=正常`、`diy_schedule_job.NextTime` 和“插件启动成功”都不能证明触发成功；列表/详情页的 `LastTime/NextTime` 来自运行时，直接查表看到的是库内快照。
 - 领取错误含 `Key 'IDX_microi_job_T_NFT_ST' doesn't exist` 时，是 Quartz 3.19 MySQL 方言依赖 `USE INDEX (IDX_{tablePrefix}T_NFT_ST)` 与 `IDX_{tablePrefix}T_NFT_ST_MISFIRE`，而触发器表缺少这两个索引（常见于历史租户库仍是旧 `QRTZ_` 前缀索引名）。平台调度器初始化会按前缀幂等补齐；人工抢修可直接执行文档中的两条 `CREATE INDEX`，索引名大小写不敏感，补完后无需重建任务或 Cron。
 - 失败记录错误分类、重试次数和 `NextRetryTime`，采用有上限退避；永久错误进入人工处理。
+- 大应用包安装返回 Id 后长期 `Pending/AttemptCount=0`，先回读原任务和 `WorkerClaimFailed` 持久栈。旧版完整 `ParamJson` 共用 2 秒候选扫描时限，数据库慢读可能触发驱动超时处理中的空引用；不得凭异常文案归因业务脚本或重复提交。新版候选仅含领取必需字段，完整参数在已领取的执行槽中以任务 Id、租户、owner/fence 和有效租约约束读取，独立上限 30 秒，读后再验租约；读取失败不执行正文，仅释放本次仍拥有的租约。验收覆盖大参数慢读、读失败、读取期间租约变化和原任务成功终态；需要更新后端，MCP/CLI 升级不能代替。
 - 外部调用设置超时；无法确认对方是否成功时用业务幂等号查询，不盲目重发。
 - SQL Server 业务库可用但商城保存任务时报证书链不受信任时，核对调度节点主数据库连接串和实际后端版本。Dos.ORM 的 `System.Data.SqlClient` 与 Quartz 的 `Microsoft.Data.SqlClient` 缺省加密策略不同；插件仅为缺少 `Encrypt` 的旧串显式保留 ORM 的可选加密语义，普通注册和延迟初始化共用此策略。显式 `Encrypt/TrustServerCertificate` 必须保留，不能全局添加信任证书或吞掉任务保存失败。正式环境优先受信任证书；自签名测试环境仅由管理员显式配置。更新后端或连接配置后重启调度节点，再重装并回读 Quartz 任务及触发器，不能以元数据存在代替。
 - 服务停机先停止接单，再在有限宽限期排空或持久化；重启扫描未完成任务。

@@ -1075,6 +1075,22 @@ namespace Microi.net
 
         private static async Task ProcessClaimedAsync(BackgroundTaskRecord item, CancellationToken stoppingToken)
         {
+            var claim = item;
+            item = BackgroundTaskClaimPayload.Prepare(
+                claim,
+                () => BackgroundTaskStore.ReadClaimedPayload(claim),
+                () => BackgroundTaskStore.IsClaimedPayloadLeaseCurrent(claim),
+                () =>
+                {
+                    if (BackgroundTaskStore.ReleaseToPending(
+                            claim, "读取任务参数未完成，等待安全重试", 5))
+                        SignalWorkerIfPending(claim);
+                },
+                error => LogFailure(claim.OsClient, "ClaimedPayloadReadFailed",
+                    "后台任务参数读取未完成", error, claim.Id),
+                stoppingToken);
+            if (item == null) return;
+
             string executionOsClient;
             try
             {
