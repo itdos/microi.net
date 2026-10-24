@@ -4,6 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {snapshotCandidate,changedCandidate} from './release-candidate.mjs';
 import {assertCompositionArtifacts} from './release-composition.mjs';
+import {verifyPlatformReleaseEvidence} from '../Microi.Tests/ReleaseGate/release-test-matrix.mjs';
 
 export async function artifactFiles(directory,type){
  const files={};
@@ -19,7 +20,8 @@ export async function artifactFiles(directory,type){
  return files;
 }
 export function verifyArtifact(receipt,candidate,files,type='api',policy='Full'){
- if(policy!=='Full'||receipt.schema!==1||receipt.gate!=='Full'||!receipt.candidate?.files)throw Error('Release Full acceptance policy/provenance mismatch: rebuild with the release script');
+ if(!['Full','PlatformRelease'].includes(policy)||receipt.schema!==1||receipt.gate!==policy||!receipt.candidate?.files)throw Error('Release Full/PlatformRelease acceptance policy/provenance mismatch: rebuild with the release script');
+ if(policy==='PlatformRelease'&&(receipt.testEvidence?.scope!==policy||!path.isAbsolute(receipt.testEvidence?.file||'')||!/^[a-f0-9]{64}$/.test(receipt.testEvidence?.sha256||'')))throw Error('PlatformRelease original test evidence is missing');
  const changed=changedCandidate(receipt.candidate,candidate);
  if(changed.length)throw Error(`Prebuilt artifact is from different source: ${changed.slice(0,10).join(', ')}`);
  if(JSON.stringify(receipt.files)!==JSON.stringify(files))throw Error('Prebuilt artifact changed after acceptance: rebuild, do not re-sign stale files');
@@ -35,11 +37,13 @@ export function verifySmokeReceipt(smoke, files){
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [mode,type,manifest,receiptFile]=process.argv.slice(2);
  const policy=process.env.MICROI_RELEASE_TEST_POLICY||'Full';
- if(policy!=='Full')throw Error('Release artifacts require the Full test policy');
+ if(!['Full','PlatformRelease'].includes(policy))throw Error('Release artifacts require the Full or PlatformRelease test policy');
  if(!['capture','verify'].includes(mode)||!['api','client'].includes(type)||!manifest||!receiptFile)throw Error('Usage: release-artifact.mjs capture|verify api|client <tested-source-manifest> <receipt>');
  const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
  const candidate=JSON.parse(await fs.readFile(manifest,'utf8'));
- const changed=changedCandidate(candidate,await snapshotCandidate());
+ // 新范围必须携带可独立重读的原始 TRX/Node 证据；单独设置环境变量不能授权发布。
+ const testEvidence=policy==='PlatformRelease'?await verifyPlatformReleaseEvidence(process.env.MICROI_RELEASE_TEST_RECEIPT,manifest):null;
+ const changed=changedCandidate(candidate,await snapshotCandidate(undefined,undefined,{testPolicy:policy}));
  if(changed.length)throw Error(`Source changed after Full acceptance:\n${changed.slice(0,40).join('\n')}`);
  const directory=path.join(root,type==='api'?'Microi.Server/Microi.net.Api/bin/Release':'Microi.Client/bin/Release');
  const files=await artifactFiles(directory,type);
@@ -49,7 +53,11 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   const smoke=type==='api'?JSON.parse(await fs.readFile(path.join(path.dirname(receiptFile),'api-smoke.json'),'utf8')):null;
   if(type==='api')verifySmokeReceipt(smoke,files);
   await fs.mkdir(path.dirname(path.resolve(receiptFile)),{recursive:true});
-  await fs.writeFile(receiptFile,JSON.stringify({schema:1,gate:policy,testsExecuted:policy==='Full',smoke,capturedAt:new Date().toISOString(),candidate,files}));
- }else verifyArtifact(JSON.parse(await fs.readFile(receiptFile,'utf8')),candidate,files,type,policy);
+  await fs.writeFile(receiptFile,JSON.stringify({schema:1,gate:policy,testsExecuted:true,...(testEvidence?{testEvidence}:{}),smoke,capturedAt:new Date().toISOString(),candidate,files}));
+ }else {
+  const receipt=JSON.parse(await fs.readFile(receiptFile,'utf8'));
+  verifyArtifact(receipt,candidate,files,type,policy);
+  if(testEvidence&&JSON.stringify(receipt.testEvidence)!==JSON.stringify(testEvidence))throw Error('PlatformRelease test evidence changed after artifact capture');
+ }
  console.log(`${type} artifact ${mode}: ${Object.keys(files).length} files bound to candidate; test policy=${policy}`);
 }

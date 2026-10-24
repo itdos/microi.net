@@ -24,6 +24,21 @@ async function smokeFixture(t){
  return {root,api,marker,config};
 }
 
+test('PlatformRelease excludes exactly Agent and Code products while freezing platform sources and root HEAD',async t=>{
+ const f=await smokeFixture(t);
+ execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','--quiet','-m','fixture'],{cwd:f.root});
+ const platform='Microi.Client/src/platform.js';await mkdir(path.dirname(path.join(f.root,platform)),{recursive:true});await writeFile(path.join(f.root,platform),'before');
+ const snapshot=()=>snapshotCandidate(f.root,['.','Microi.Agent'],{testPolicy:'PlatformRelease'});
+ const before=await snapshot();assert.equal(before.scope,'PlatformRelease');assert.match(before.sourceHead,/^[a-f0-9]{40}$/);
+ for(const product of ['Microi.Agent','Microi.Code']){await mkdir(path.join(f.root,product),{recursive:true});await writeFile(path.join(f.root,product,'source.js'),'independent');}
+ assert.deepEqual(changedCandidate(before,await snapshot()),[]);
+ await writeFile(path.join(f.root,'Microi.Agent/source.js'),'changed');await rm(path.join(f.root,'Microi.Code'),{recursive:true});
+ assert.deepEqual(changedCandidate(before,await snapshot()),[]);
+ await writeFile(path.join(f.root,platform),'after');assert.deepEqual(changedCandidate(before,await snapshot()),[platform]);
+ assert.ok(changedCandidate(before,{...before,scope:'pc-api-docker-with-mobile-sdk-contracts'}).includes('<candidate-scope>'));
+ assert.ok(changedCandidate(before,{...before,sourceHead:'b'.repeat(40)}).includes('<candidate-head>'));
+});
+
 test('ignored local smoke marker and exact selected configuration are frozen without disclosing secrets',async t=>{
  const f=await smokeFixture(t),before=await snapshotCandidate(f.root,['.']);
  assert.match(before.files[`${f.api}/.microi-local`],/^[a-f0-9]{64}$/);

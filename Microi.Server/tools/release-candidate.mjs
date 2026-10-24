@@ -77,12 +77,18 @@ async function snapshotLocalSmokeInputs(root){
 }
 
 export async function snapshotCandidate(root=workspace,repos=repositories,options={}){
+ const policy=options.testPolicy??'Full';
+ if(!['Full','PlatformRelease'].includes(policy))throw Error('Unknown candidate test policy');
+ const independentProduct=name=>/^(?:Microi\.Agent|Microi\.Code)(?:\/|$)/i.test(name.replaceAll('\\','/'));
  const files={};
  for(const repository of repos){
+  // Agent/Code 有独立发行入口；平台发行不要求这些仓库存在，也不冻结它们的变更。
+  if(policy==='PlatformRelease'&&independentProduct(repository))continue;
   const cwd=path.resolve(root,repository);
   const names=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','-z'],{cwd,encoding:'utf8',maxBuffer:32*1024*1024}).split('\0').filter(Boolean);
   for(const name of [...new Set(names)].sort()){
    const key=path.posix.join(repository.replaceAll('\\','/'),name.replaceAll('\\','/'));
+   if(policy==='PlatformRelease'&&independentProduct(key))continue;
    const buildRecipe=/\/bin\/Release\/(?:Dockerfile|default\.conf)$/.test(key);
    if((generated.test(key)&&!buildRecipe)||independentMobileSource(key)||independentDesktopSource(key)||documentationOnly(key))continue;
    try{
@@ -97,7 +103,7 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
  }
  // 所有发布候选都绑定完整测试输入，历史 SmokeOnly 环境不能缩小源码指纹。
  Object.assign(files,await snapshotStandardInputs(root));
- Object.assign(files,await snapshotDesktopInputs(root));
+ if(policy==='Full')Object.assign(files,await snapshotDesktopInputs(root));
  Object.assign(files,await snapshotLocalSmokeInputs(root));
  // Implicit composition belongs only to this actual workspace; explicit foreign contracts still fail.
  const compositionOptions={...options,environment:options.environment??(path.resolve(root)===workspace?process.env:{})};
@@ -108,11 +114,13 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
    files[key]=value;
   }
  }
- return {scope:'pc-api-docker-with-mobile-sdk-contracts',files,...(privateInputs?{composition:privateInputs.composition}:{})};
+ return {scope:policy==='PlatformRelease'?'PlatformRelease':'pc-api-docker-with-mobile-sdk-contracts',...(policy==='PlatformRelease'?{sourceHead:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim()}:{}),files,...(privateInputs?{composition:privateInputs.composition}:{})};
 }
 
 export function changedCandidate(before,after){
  const changed=[...new Set([...Object.keys(before.files),...Object.keys(after.files)])].filter(name=>before.files[name]!==after.files[name]);
+ if(before.scope!==after.scope)changed.push('<candidate-scope>');
+ if(before.sourceHead!==after.sourceHead)changed.push('<candidate-head>');
  if(JSON.stringify(before.composition??null)!==JSON.stringify(after.composition??null))changed.push('<private-build-composition>');
  return changed.sort();
 }
@@ -120,7 +128,7 @@ export function changedCandidate(before,after){
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [mode,manifest]=process.argv.slice(2);
  if(!['capture','verify'].includes(mode)||!manifest)throw new Error('Usage: release-candidate.mjs capture|verify <manifest>');
- const current=await snapshotCandidate();
+ const current=await snapshotCandidate(undefined,undefined,{testPolicy:process.env.MICROI_RELEASE_TEST_POLICY||'Full'});
  if(mode==='capture'){
   await mkdir(path.dirname(path.resolve(manifest)),{recursive:true});
   await writeFile(manifest,JSON.stringify({...current,capturedAt:new Date().toISOString()},null,2));

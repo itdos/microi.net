@@ -150,7 +150,9 @@ FormEngine、ApiEngine、安全与多租户边界测试。
 .\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Quick
 ```
 
-准备发布 API 前，必须对**隔离测试租户和专用测试表**运行 Full 门禁：
+普通吾码 PC/API 完整发布使用 `PlatformRelease`：平台 Node/C# 自动化、Release 编译、闭源 DLL 加密、最终产物冒烟、Docker 推送及远端不可变摘要回读。以 30 分钟为可度量发布预算并记录分阶段耗时；超时如实记未达标，不能用跳过断言或未完成阶段冒充成功。该入口不运行 Microi Code/Agent 测试，不新建租户、不安装聊天应用。
+
+只有明确选择 Full 深度测试时，才对**隔离测试租户和专用测试表**运行下列独立入口；它不属于普通发布前置条件：
 
 ```powershell
 $env:MICROI_TEST_API_BASE = "http://127.0.0.1:1052/"
@@ -171,7 +173,7 @@ $env:MICROI_TEST_ALLOW_WRITES = "YES"
 .\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Full
 ```
 
-Full 会依次执行：
+Full（显式深度测试）会依次执行：
 
 1. Release 恢复与编译、全部 Quick 单元/组件回归。
 2. FormEngine 单条、批量、按条件新增/查询/计数/修改/删除的真实 HTTP 闭环。
@@ -181,11 +183,11 @@ Full 会依次执行：
 6. 在独立浏览器 Context 中使用真实账号密码登录，验证通知中心按钮和后台任务完成；官方 iTdos 发布源应隐藏给自身安装应用的按钮。
 7. NuGet 易受攻击包和弃用包审计。
 
-一键编译发布脚本在后端发布、前端构建和“仅推送镜像”模式均强制执行 Full：缺少环境、凭据、零用例、失败、取消、跳过或待办均停止发布。取得发布锁后先准备本次版本并冻结候选，测试服务必须加载该候选；健康服务可复用，已登记的隔离环境可由 Full 新构建启动。测试通过才停止本次所选服务并发布，续发同一候选不重复升版。文档专用选项 6 不触发后端业务测试。AI 发布话术还应要求在 VS Code 扩展发布之前先运行同一门禁，话术不能替代脚本检查。 Full 中先用实际在线 MCP 源码完成 TypeScript 编译、生产依赖裁剪和自包含运行包检查，避免仅通过脚本运行测试后，直到后端发布才发现类型或打包错误。
+一键编译发布脚本在后端发布、前端构建和“仅推送镜像”模式使用 PlatformRelease；所选项缺少必需输入、零用例、失败、取消、跳过或待办均停止发布。取得所选产品发布锁后准备本次版本并冻结候选，复用已验证构建产物，续发同一候选不重复升版。显式 Full 的真实依赖、租户维护和浏览器深度测试单独运行，不能自动加入普通发布；Microi Code/Agent 与 VS Code 扩展使用独立产品入口。文档专用选项 6 不触发后端业务测试。实际进入后端镜像的 MCP 运行包仍须通过 TypeScript 编译、生产依赖裁剪和自包含包检查。
 
 macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Docker 与端口探针优先使用 `timeout` / `gtimeout`，系统未安装时自动使用仓库内的 Node 时限工具，避免将正常 Docker 误判为启动超时。该模式只构建和推送官网镜像，不发布 DLL 或 NuGet；后端发布仍须通过原有加密和冒烟门禁。
 
-搜索标签的真实浏览器验收默认覆盖 1366px 和 1920px 常规桌面。只有测试进程显式设置 `MICROI_TEST_BROWSER_4K=1` 时才追加 3840px；所选宽度冻结进 Full 回执，所有所选用例均须通过且不得跳过。该变量仅控制测试，不是生产 API 配置。正式发布和同版本 Docker 热修复都拒绝历史 `--skip-tests` / `SmokeOnly` 路径，最终产物冒烟仍是 Full 之后的独立必需检查。
+搜索标签的真实浏览器验收默认覆盖 1366px 和 1920px 常规桌面。只有测试进程显式设置 `MICROI_TEST_BROWSER_4K=1` 时才追加 3840px；所选宽度冻结进显式 Full 或浏览器专项回执，所有所选用例均须通过且不得跳过。该变量仅控制测试，不是生产 API 配置。正式发布和同版本 Docker 热修复都拒绝历史 `--skip-tests` / `SmokeOnly` 路径，最终产物冒烟仍是 PlatformRelease 编译与平台自动化之后的独立必需检查。
 
 后端 DLL 加密在 macOS/Linux 使用原生绝对路径；仅 Git Bash、MSYS 或 Cygwin 转换 Windows 路径，优先使用 `cygpath`，避免把 `/Users`、`/usr` 误识别为盘符。路径修复应先在隔离构建副本上验证五个 DLL 的实际加密和指纹，然后重新执行一键脚本的 Full、加密及最终产物冒烟。
 
@@ -203,7 +205,7 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 后台发行需要静态组合私有原生规则时，不能依赖根公开仓的文件清单覆盖被忽略的应用源码。发布进程设置 `MICROI_RELEASE_COMPOSITION_FILE` 指向工作区内的受控 JSON 契约，格式为 `schema:1`，包含 `properties`、`files`、`directories`、`artifacts`。`properties` 必须固定 `CustomAfterMicrosoftCommonTargets`、`PrivateRulesProject`、`ApprovedRulesBootstrapSource`、`MicroiCoreProject` 四个文件路径，并与同一发布进程传给 MSBuild 的实际环境属性一致；这些文件必须同时进入 `files` 或 `directories`。
 
-`files` 列出项目、组合 targets、静态审批代码等文件；`directories` 列出应用自己的规则源码目录。契约原始正文和这些输入逐文件加入 Full 候选，新增、删除或修改均触发重新验收；禁止越界路径和符号链接，`bin/obj/dist` 等生成目录不作为源码。`artifacts` 使用 `{ "path":"publish/ApprovedRules.dll", "sha256":"<后台审批的实际DLL哈希>" }` 描述获批制品，最终 API 发布目录必须逐项匹配，缺失或不同均阻止捕获和推送。普通无私有组合的发布和 PC 制品沿用既有门禁。这些变量只供构建，不是生产 API 设置，也不授予 V8/MCP/HTTP 任意加载代码的权限。
+`files` 列出项目、组合 targets、静态审批代码等文件；`directories` 列出应用自己的规则源码目录。契约原始正文和这些输入逐文件加入发布候选，新增、删除或修改均触发重新验收；禁止越界路径和符号链接，`bin/obj/dist` 等生成目录不作为源码。`artifacts` 使用 `{ "path":"publish/ApprovedRules.dll", "sha256":"<后台审批的实际DLL哈希>" }` 描述获批制品，最终 API 发布目录必须逐项匹配，缺失或不同均阻止捕获和推送。普通无私有组合的发布和 PC 制品沿用既有门禁。这些变量只供构建，不是生产 API 设置，也不授予 V8/MCP/HTTP 任意加载代码的权限。
 
 发行组合的进程环境只绑定工具所在的工作区。临时测试仓库或其它源码根须显式传递自己的环境，不能继承另一发行任务的私有路径；显式配置错误仍立即失败。
 
@@ -217,7 +219,7 @@ Oracle AWS 扩展的实际程序集还引用 SQS，尽管其 NuGet 清单只列�
 
 System.Drawing.Common 的 .NET 10 支持程序集还引用 System.Formats.Nrbf；该文件不在 ASP.NET Core 共享框架内，Dos.Common 显式交付同版本官方 NuGet 包，并由上述回归验证引用与文件。Windows GDI 的运行平台限制不变；Linux 图像处理继续使用 SkiaSharp。依赖可解析不等于在 Linux 执行 Windows 绘图 API。
 
-共享源码持续变化时，可将完整候选源码及依赖保存到独立发布目录，在那里运行同一 Full 和一键发布脚本。专用测试服务使用独立端口，并通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口，默认仍为 61501、61500。进程管理器继续检查 PID、命令行和工作区归属；原工作区服务不受影响。这两个变量仅用于发布脚本，不是生产 API 配置。
+共享源码持续变化时，可将完整候选源码及依赖保存到独立发布目录，在那里运行同一 PlatformRelease 和一键发布脚本。专用测试服务使用独立端口，并通过发布脚本变量 `MICROI_RELEASE_BACKEND_PORT`、`MICROI_RELEASE_FRONTEND_PORT` 指定收尾端口，默认仍为 61501、61500。进程管理器继续检查 PID、命令行和工作区归属；原工作区服务不受影响。这两个变量仅用于发布脚本，不是生产 API 配置。
 
 
 Windows Git Bash 的 MSYS PID 与 Windows 原生 PID 不同。一键发布先用真实 `ps` 的 `WINPID` 映射登记 API、PC、官网或 Agent 发布锁，退出时用同一个原生 PID 和令牌释放。映射缺失、重复或进程已退出均停止发布；不借用其它存活进程。旧 API 热修复归属检查以 UTF-8 读取中文入口，并核对实际工作区路径，不仅依赖锁中的标签。
@@ -227,7 +229,7 @@ Windows Git Bash 的 MSYS PID 与 Windows 原生 PID 不同。一键发布先用
 通过真实 PowerShell、Git Bash 回归及完整 Full，不能通过忽略错误文字来放行。
 API、PC 框架、官网和 Microi Agent 各自使用 `.tmp/microi-process-state/` 下的 `api-release.lock`、`pc-release.lock`、`website-release.lock`、`agent-release.lock`，可以同时发布；同类发布互斥。合并发布只取得所选产品的锁，部分取得失败会撤回本次已取得的锁。API 服务启动前执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`，PC 使用 `assert pc`，或通过进程管理器 `AssertServiceStart -ReleaseScope api|pc|all` 检查。Windows 发布准备按相同范围清理：API 处理后端及 Release DLL，PC 处理 Vite，官网不停止二者。
 
-PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与依赖审计统一使用本次结果目录的 `.net-artifacts`，并行发布使用独立结果目录、测试服务/端口及隔离租户。官网的全部源码、主题、测试和依赖由官网发布验收，不影响 PC/API 的候选一致性；共享 SDK、Skills、MCP 与发布工具仍受候选保护。共享版本和跨产品改动应先准备并冻结，再并行发布。资源排队按实际并行阶段预算之和与系统余量判断，不再因无关产品占用一个全局窗口而等待。 macOS/Linux 的进程管理器同时识别项目 `bin/` 和当前工作区 `.tmp/microi-release-gate/日期-时间-PID/.net-artifacts/bin/Microi.net.Api/debug|release/` 下的规范 API apphost；后者仍要求 API 项目 CWD 精确一致，其它工作区、任意输出目录、路径越界或无法回读身份均拒绝停止。
+PC/API 普通发布使用 PlatformRelease，Full 保留为显式深度测试；两者的 .NET restore、build、test 与依赖审计使用本次结果目录的 `.net-artifacts`，并行发布使用独立结果目录和本轮所需服务/端口，普通发布不创建租户。官网的全部源码、主题、测试和依赖由官网发布验收，不影响 PC/API 的候选一致性；共享 SDK、Skills、MCP 与发布工具仍受候选保护。共享版本和跨产品改动应先准备并冻结，再并行发布。资源排队按实际并行阶段预算之和与系统余量判断，不再因无关产品占用一个全局窗口而等待。 macOS/Linux 的进程管理器同时识别项目 `bin/` 和当前工作区 `.tmp/microi-release-gate/日期-时间-PID/.net-artifacts/bin/Microi.net.Api/debug|release/` 下的规范 API apphost；后者仍要求 API 项目 CWD 精确一致，其它工作区、任意输出目录、路径越界或无法回读身份均拒绝停止。
 
 旧 `platform-release.lock` 或 `release.lock` 仅在 PID 的真实命令入口和共享状态目录证明属于 API 热修复或 Agent 时缩小阻塞范围；未知归属继续保守保护。原进程和唯一令牌释放自身锁，不能删除其它正在运行的发布锁。
 
@@ -235,7 +237,7 @@ PC/API 继续保留完整 Full 门禁；Full 的 .NET restore、build、test 与
 
 主、子租户必须在同一维护控制面的有效租户目录中；必要时用 `MICROI_TEST_CONTROL_API_BASE`、`MICROI_TEST_CHILD_API_BASE` 指定各自入口。详细变量和测试边界见源码 `Microi.Server/Microi.Tests/README.md`，报告应区分本地候选与已部署远端的结果。
 
-这里的主、子租户是预先登记的隔离 Full 测试租户。官方应用发布与升级仅验收 `https://api.microi.net` 的主租户 `iTdos`（`microi_itdos`）；线上子租户的安装版本、升级成功与否不属于平台发布完成条件，不因正式发布批量升级线上子租户。通过 AI 提示词或直接运行 `Microi一键编译发布.sh` 均遵守这一边界；普通用户只在自身授权范围执行，脚本不会授予官方母版写入或客户自动部署权限。
+这里的主、子租户仅用于显式 Full 深度测试，普通 PlatformRelease 不创建租户或安装聊天应用。官方应用发布与升级仅验收 `https://api.microi.net` 的主租户 `iTdos`（`microi_itdos`）；线上子租户的安装版本、升级成功与否不属于平台发布完成条件，不因正式发布批量升级线上子租户。通过 AI 提示词或直接运行 `Microi一键编译发布.sh` 均遵守这一边界；普通用户只在自身授权范围执行，脚本不会授予官方母版写入或客户自动部署权限。
 
 测试表至少包含一个可写短文本字段（默认 `Name`，其它名称可通过
 `MICROI_TEST_NAME_FIELD` 指定）。`MICROI_TEST_ALLOW_WRITES=YES` 是强制保护，

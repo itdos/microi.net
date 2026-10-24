@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-23T18:37:10.792Z",
+  "generatedAt": "2026-10-24T17:31:17.401Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,7 +763,7 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "5f525ce40bc074b4e6d0e19909e4420f8d76247b5dc0c8bca2ac7ef801b267c5",
+      "originalSha256": "763e3d4b236d769af299e74313b24ce052ae4738fa576c5b403df9c6fa3de027",
       "originalLines": 711,
       "prefixSha256": "4b609f39cb11459d3cace78e0da3f848b963b2ec2ff9c5fa07b35f3f1114ea96",
       "prefixBytes": 6016,
@@ -821,7 +821,7 @@
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "dee4ef7027b49b46a92f4b2bbd88d82997f9c992351e5d599ba6d38a03267258",
+          "sha256": "a4d82dd8b2c5c3244b450bc5cf5e0fc58c9f32acd5947dfc8c02b926cc34294a",
           "lines": 149,
           "heading": "自动化测试必须覆盖的坑"
         },
@@ -3241,7 +3241,7 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "4d8d06f972f07a2ef9a97e3e27d09c9ed5ea1f3f17fda02c225210f8ee8d6b6a",
+      "originalSha256": "616f00189e10d3a1ed67155eb0143cde50c76e1c3ad53d54a0cbe01eb551a859",
       "originalLines": 713,
       "prefixSha256": "c5d7890a69e031a8c9f63dc24982542084bd330d6b90b663b7f9187e597ae176",
       "prefixBytes": 15123,
@@ -3251,7 +3251,7 @@
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "fefc18da554473ded99a55c3b2e66d698fcc4b37506622dcd2d17bca09c2fcbc",
+          "sha256": "6bf10fb8c24bf754a85cc1b77c6db1f5366e611d9c787c43066f7d6c27659e58",
           "lines": 60,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
@@ -3323,7 +3323,7 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/references/progressive-04-工作区与平台专项保障.md",
-          "sha256": "da44c7edb8923a1c4a7a5da87bfe1e6ec87323096ed2b71a2b27abf4a46d188e",
+          "sha256": "9056add84ccdd3ee8d75883aa9b19bd271bc4fc179de1b4c142b8c5f3531e6e2",
           "lines": 44,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },
@@ -3451,7 +3451,7 @@
           "id": "workspace-conventions-025",
           "ordinal": 25,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "4cf40c4ca771f7e04b80279646323a816378b98669f562ff8f4c647d5bf837ca",
+          "sha256": "8a7a3437fbd43fa31d038d8f8c583e6145d4b68dce42faa290f142b5ff390a0b",
           "lines": 32,
           "heading": "多 AI 对话共享本地服务与发布互斥（强制）"
         },

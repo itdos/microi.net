@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {createMatrixPlan, validateMatrixResults,validateStagedStorageProof,verifyMatrixDesktopInputs} from './release-test-matrix.mjs';
+import {createMatrixPlan, validateMatrixResults,validateStagedStorageProof,verifyMatrixDesktopInputs,validatePlatformReleaseSummary,readPlatformReleaseTests} from './release-test-matrix.mjs';
+import {roots as nodeRoots,discoverTests,regressionLogFile} from '../run-node-regressions.mjs';
 import {snapshotDesktopInputs} from '../../tools/release-desktop-inputs.mjs';
 import {createHash} from 'node:crypto';
 import {preserveHdfsEvidence} from './staged-full-runtime.mjs';
@@ -39,6 +40,39 @@ const geometry=()=>({stats:{expected:2,unexpected:0,skipped:0,flaky:0},caseTitle
 const outcomes=()=>({quick:suite(['OfflineSqlServerCompiler']),full:suite(fullNames),geometry:geometry()});
 const storage=()=>({schemaVersion:1,sourceHead:'a'.repeat(40),observedAt:'2026-10-16T09:01:00.000Z',passed:true,actualProvider:'Aliyun',apiProbe:{passed:true,currentApiAndHdfsPlugin:true,uploadRoute:'api/HDFS/upload',objectsVerified:4,buildId:'synthetic-parser-fixture',apiDllSha256:'d'.repeat(64),hdfsDllSha256:'e'.repeat(64)},objectProbe:{passed:true,objects:['FullMain_123','FullChild_123'].flatMap(tenant=>['Public','Private'].map(scope=>({tenant,scope,key:tenant.toLowerCase()+'/full/run/'+scope,sha256:'b'.repeat(64),bytes:32,apiUpload:200,apiReadGet:200,authenticatedGet:200,anonymousGet:scope==='Public'?200:403,currentDomainGet:200}))),cleanup:['FullMain_123','FullChild_123'].flatMap(tenant=>['Public','Private'].map(scope=>({scope,key:tenant.toLowerCase()+'/full/run/'+scope,signedHeadAfterCleanup:404})))}});
 const frozen=()=>({...createMatrixPlan(matrix(),environment()),sourceHead:'a'.repeat(40)});
+
+test('PlatformRelease is a separate zero-skip scope and does not claim FullStack or desktop acceptance',()=>{
+ const groups=nodeRoots.map(root=>({root,tests:2,pass:2,fail:0,cancelled:0,skipped:0,todo:0}));
+ const receipt={schemaVersion:1,scope:'PlatformRelease',filter:'Category!=FullStack',dotnet:{tests:1,passed:1,failed:0,skipped:0},node:{groups:groups.length,tests:groups.length*2,passed:groups.length*2,failed:0,skipped:0}};
+ const result=validatePlatformReleaseSummary(receipt,suite(['component']),groups);
+ assert.equal(result.scope,'PlatformRelease');assert.equal(result.dotnetPassed,1);assert.ok(result.notExecuted.includes('FullStack'));assert.ok(result.notExecuted.includes('CodeDesktop'));
+ for(const mutate of [r=>{r.scope='Full'},r=>{r.filter='Category=FullStack'},r=>{r.dotnet.passed=0},r=>{r.node.skipped=1},r=>{r.node.groups=0}]){const value=structuredClone(receipt);mutate(value);assert.throws(()=>validatePlatformReleaseSummary(value,suite(['component']),groups));}
+ assert.throws(()=>validatePlatformReleaseSummary(receipt,suite([]),groups));
+ assert.throws(()=>validatePlatformReleaseSummary(receipt,suite(['component']),groups.slice(1)));
+ assert.throws(()=>validatePlatformReleaseSummary(receipt,suite(['component']),groups.map((row,index)=>index?row:{...row,skipped:1})));
+});
+
+test('PlatformRelease rereads raw TRX and each Node TAP and rejects hashes, omitted files and forged counts',async()=>{
+ const workspace=fileURLToPath(new URL('../../../',import.meta.url)),directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-platform-parser-'));
+ const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+ try{
+  // 仅验证解析器的合成夹具；正式回执由实际 dotnet/node 进程生成，测试不发布任何制品。
+  const trxFile=path.join(directory,'microi-platform.trx'),reportFile=path.join(directory,'node-regressions.json'),receiptFile=path.join(directory,'platform-release-tests.json');
+  const xml='<TestRun xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010"><Results><UnitTestResult testName="parser fixture" outcome="Passed"/></Results><ResultSummary outcome="Completed"><Counters total="1" passed="1" executed="1" failed="0" notExecuted="0"/></ResultSummary></TestRun>';
+  fs.writeFileSync(trxFile,xml);
+  const groups=nodeRoots.map(root=>({root,files:discoverTests(path.join(workspace,root)).map(file=>path.relative(workspace,file)),tests:2,pass:2,fail:0,cancelled:0,skipped:0,todo:0}));
+  const tap='# tests 2\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
+  for(const row of groups)fs.writeFileSync(regressionLogFile(directory,row.root),tap);
+  fs.writeFileSync(reportFile,JSON.stringify(groups));
+  const receipt={schemaVersion:1,scope:'PlatformRelease',filter:'Category!=FullStack',dotnet:{trxFile,trxSha256:sha(xml),tests:1,passed:1,failed:0,skipped:0},node:{reportFile,reportSha256:sha(fs.readFileSync(reportFile)),groups:groups.length,tests:groups.length*2,passed:groups.length*2,failed:0,skipped:0}};
+  const save=()=>fs.writeFileSync(receiptFile,'\uFEFF'+JSON.stringify(receipt));save();
+  const actual=await readPlatformReleaseTests(receiptFile);assert.equal(actual.node.tapReceipts.length,nodeRoots.length);
+  fs.appendFileSync(trxFile,' ');await assert.rejects(readPlatformReleaseTests(receiptFile),/TRX/);fs.writeFileSync(trxFile,xml);
+  fs.writeFileSync(regressionLogFile(directory,groups[0].root),tap.replace('# skipped 0','# skipped 1'));await assert.rejects(readPlatformReleaseTests(receiptFile),/skipped/);fs.writeFileSync(regressionLogFile(directory,groups[0].root),tap);
+  receipt.dotnet.passed=2;save();await assert.rejects(readPlatformReleaseTests(receiptFile),/计数/u);receipt.dotnet.passed=1;
+  groups[0].files.pop();fs.writeFileSync(reportFile,JSON.stringify(groups));receipt.node.reportSha256=sha(fs.readFileSync(reportFile));save();await assert.rejects(readPlatformReleaseTests(receiptFile),/发现清单/u);
+ }finally{fs.rmSync(directory,{recursive:true});}
+});
 
 test('Desktop candidate matrix binds the actual Full snapshot and rejects unknown metadata or source drift',async()=>{
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-desktop-matrix-'));

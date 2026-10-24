@@ -6,6 +6,8 @@ import {fileURLToPath} from 'node:url';
 import {verifyHdfsEvidence} from './staged-full-runtime.mjs';
 import {releaseBrowserWidths} from './release-browser-viewports.mjs';
 import {snapshotDesktopInputs} from '../../tools/release-desktop-inputs.mjs';
+import {snapshotCandidate,changedCandidate} from '../../tools/release-candidate.mjs';
+import {roots as nodeRoots,discoverTests,assertTestSummary,regressionLogFile} from '../run-node-regressions.mjs';
 
 const check=(condition,message)=>{if(!condition)throw Error(message);};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -103,18 +105,83 @@ export function validateStagedStorageProof(build,plan,storage,outcomesFile){
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const head=()=>execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim();
 const write=(file,value)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify(value,null,2)+'\n');};
-function authoritativeTrx(suite,expectedFile){
- check(path.resolve(suite.trxFile)===path.resolve(expectedFile)&&hash(readFile(suite.trxFile))===suite.trxSha256,'TRX 位置或字节指纹不属于本轮结果目录');
+function readAuthoritativeTrx(trxFile){
  const reader=path.join(path.dirname(fileURLToPath(import.meta.url)),'read-release-matrix-trx.ps1');
  let text;
- try{text=execFileSync('pwsh',['-NoProfile','-File',reader,'-TrxFile',suite.trxFile],{encoding:'utf8',windowsHide:true,timeout:20000});}
- catch(error){if(error.code!=='ENOENT'||process.platform!=='win32')throw error;text=execFileSync('powershell.exe',['-NoProfile','-File',reader,'-TrxFile',suite.trxFile],{encoding:'utf8',windowsHide:true,timeout:20000});}
- const actual=JSON.parse(text.replace(/^\uFEFF/,'')),canonical=value=>JSON.stringify(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)));
+ try{text=execFileSync('pwsh',['-NoProfile','-File',reader,'-TrxFile',trxFile],{encoding:'utf8',windowsHide:true,timeout:20000});}
+ catch(error){if(error.code!=='ENOENT'||process.platform!=='win32')throw error;text=execFileSync('powershell.exe',['-NoProfile','-File',reader,'-TrxFile',trxFile],{encoding:'utf8',windowsHide:true,timeout:20000});}
+ return JSON.parse(text.replace(/^\uFEFF/,''));
+}
+function authoritativeTrx(suite,expectedFile){
+ check(path.resolve(suite.trxFile)===path.resolve(expectedFile)&&hash(readFile(suite.trxFile))===suite.trxSha256,'TRX 位置或字节指纹不属于本轮结果目录');
+ const actual=readAuthoritativeTrx(suite.trxFile),canonical=value=>JSON.stringify(Object.entries(value).sort(([a],[b])=>a.localeCompare(b)));
  check(actual.trxSha256===suite.trxSha256&&actual.summaryOutcome===suite.summaryOutcome&&canonical(actual.counters)===canonical(suite.counters)&&JSON.stringify(actual.tests)===JSON.stringify(suite.tests),'矩阵 JSON 明细与权威 TRX 不一致');
+}
+
+// 常规平台发行与完整业务 Full 是不同验收范围。这里没有租户创建、应用安装或
+// 桌面应用测试，也不把未执行的真实数据库/浏览器/存储标为通过。
+export const platformReleaseFilter='Category!=FullStack';
+const platformExcluded=['FullStack','NewTenantAdmission','ChatInstallation','CodeDesktop','AgentVsix'];
+export function validatePlatformReleaseSummary(receipt,dotnet,groups){
+ check(receipt?.schemaVersion===1&&receipt.scope==='PlatformRelease'&&receipt.filter===platformReleaseFilter,'PlatformRelease scope/filter 无效');
+ const names=verifySuite(dotnet,'PlatformRelease');
+ check(Array.isArray(groups)&&groups.length===nodeRoots.length,'PlatformRelease Node 责任范围缺失');
+ const total=groups.reduce((sum,row)=>sum+row.tests,0);
+ check(groups.every((row,index)=>row.root===nodeRoots[index]&&Number.isSafeInteger(row.tests)&&row.tests>0&&row.tests===row.pass&&['fail','cancelled','skipped','todo'].every(key=>row[key]===0)),'PlatformRelease Node 存在缺失、失败或跳过');
+ check(receipt.dotnet?.tests===names.length&&receipt.dotnet.passed===names.length&&receipt.dotnet.failed===0&&receipt.dotnet.skipped===0,'PlatformRelease .NET 回执计数与 TRX 不一致');
+ check(receipt.node?.groups===groups.length&&receipt.node.tests===total&&receipt.node.passed===total&&receipt.node.failed===0&&receipt.node.skipped===0,'PlatformRelease Node 回执计数不一致');
+ return {scope:'PlatformRelease',filter:platformReleaseFilter,dotnetPassed:names.length,nodePassed:total,nodeGroups:groups.length,notExecuted:[...platformExcluded]};
+}
+async function verifyPlatformPlan(plan){
+ check(plan?.schemaVersion===1&&plan.scope==='PlatformRelease'&&plan.filter===platformReleaseFilter&&plan.sourceHead===head(),'PlatformRelease 冻结范围或候选 HEAD 漂移');
+ const bytes=readFile(plan.candidateManifest?.file);
+ check(hash(bytes)===plan.candidateManifest.sha256,'PlatformRelease 候选清单字节漂移');
+ const candidate=JSON.parse(bytes);
+ check(candidate.scope==='PlatformRelease'&&candidate.sourceHead===plan.sourceHead&&changedCandidate(candidate,await snapshotCandidate(undefined,undefined,{testPolicy:'PlatformRelease'})).length===0,'PlatformRelease 候选源码漂移');
+}
+export async function readPlatformReleaseTests(receiptFile){
+ const receiptBytes=readFile(receiptFile),receipt=JSON.parse(receiptBytes.toString('utf8').replace(/^\uFEFF/,'')),directory=path.dirname(receiptFile);
+ const trxFile=path.join(directory,'microi-platform.trx');
+ check(path.resolve(receipt.dotnet?.trxFile||'')===trxFile&&hash(readFile(trxFile))===receipt.dotnet.trxSha256,'PlatformRelease 原始 TRX 位置或哈希无效');
+ // 复用禁用 DTD/外部实体的原始 TRX 读取器，JSON 汇总不能替代真实测试结果。
+ const dotnet=readAuthoritativeTrx(trxFile);
+ const reportFile=path.join(directory,'node-regressions.json'),reportBytes=readFile(reportFile);
+ check(path.resolve(receipt.node?.reportFile||'')===reportFile&&hash(reportBytes)===receipt.node.reportSha256,'PlatformRelease 原始 Node 报告位置或哈希无效');
+ const groups=JSON.parse(reportBytes),tapReceipts=[];
+ check(Array.isArray(groups)&&groups.length===nodeRoots.length,'PlatformRelease Node 责任范围缺失');
+ for(const [index,row] of groups.entries()){
+  check(row.root===nodeRoots[index],'PlatformRelease Node 责任范围或顺序漂移');
+  const actualFiles=discoverTests(path.join(root,row.root)).map(file=>path.relative(root,file));
+  check(actualFiles.length>0&&JSON.stringify(actualFiles)===JSON.stringify(row.files),'PlatformRelease Node 文件发现清单漂移');
+  const tapFile=regressionLogFile(directory,row.root),tapBytes=readFile(tapFile),counts=assertTestSummary(tapBytes.toString('utf8'));
+  check(Object.entries(counts).every(([key,value])=>row[key]===value),'PlatformRelease Node TAP 与报告计数不一致');
+  tapReceipts.push({file:tapFile,sha256:hash(tapBytes)});
+ }
+ return {...validatePlatformReleaseSummary(receipt,dotnet,groups),testReceipt:{file:receiptFile,sha256:hash(receiptBytes)},
+  dotnet:{file:trxFile,sha256:hash(readFile(trxFile))},node:{file:reportFile,sha256:hash(reportBytes),tapReceipts}};
+}
+async function platformEvidence(plan,receiptFile){
+ await verifyPlatformPlan(plan);
+ return {schemaVersion:1,accepted:true,sourceHead:plan.sourceHead,candidateManifest:plan.candidateManifest,...await readPlatformReleaseTests(receiptFile)};
+}
+// 制品捕获/推送前再次验证同一范围和原始测试证据，拒绝把 Full 与 PlatformRelease 回执互换。
+export async function verifyPlatformReleaseEvidence(resultFile,candidateFile){
+ const bytes=readFile(resultFile),result=JSON.parse(bytes),planBytes=readFile(result.planReceipt?.file);
+ check(result.scope==='PlatformRelease'&&result.accepted===true&&hash(planBytes)===result.planReceipt.sha256,'PlatformRelease 验收回执或冻结计划无效');
+ check(path.resolve(result.candidateManifest?.file||'')===path.resolve(candidateFile)&&hash(readFile(candidateFile))===result.candidateManifest.sha256,'PlatformRelease 制品与测试候选不一致');
+ const actual=await platformEvidence(JSON.parse(planBytes),result.testReceipt?.file);
+ for(const [key,value] of Object.entries(actual))check(JSON.stringify(value)===JSON.stringify(result[key]),'PlatformRelease 验收回执与原始证据不一致：'+key);
+ return {scope:'PlatformRelease',file:resultFile,sha256:hash(bytes)};
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [mode,file,receipt,...extra]=process.argv.slice(2);
- if(mode==='freeze'){
+ if(mode==='freeze-platform'){
+  const bytes=readFile(file),plan={schemaVersion:1,scope:'PlatformRelease',filter:platformReleaseFilter,sourceHead:head(),candidateManifest:{file,sha256:hash(bytes)},frozenAt:new Date().toISOString()};
+  await verifyPlatformPlan(plan);write(receipt,plan);console.log('PlatformRelease candidate frozen; FullStack and desktop applications are not selected.');
+ }else if(mode==='verify-platform'){
+  const planBytes=readFile(file),result=await platformEvidence(JSON.parse(planBytes),receipt);
+  write(extra[0],{...result,planReceipt:{file,sha256:hash(planBytes)},verifiedAt:new Date().toISOString()});console.log('PlatformRelease raw TRX and platform Node evidence verified.');
+ }else if(mode==='freeze'){
   const bytes=readFile(file),plan={...createMatrixPlan(JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/,'')),process.env),matrixFile:file,matrixSha256:hash(bytes),sourceHead:head()};
   await verifyMatrixDesktopInputs(plan.matrix,root);
   write(receipt,plan);console.log(JSON.stringify({fullFilter:plan.fullFilter,requiredEnvironment:plan.requiredEnvironment}));
@@ -131,5 +198,5 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   if(process.env.MICROI_TEST_RUNTIME_BUILD_FILE)validateStagedStorageProof(JSON.parse(readFile(process.env.MICROI_TEST_RUNTIME_BUILD_FILE)),plan,storage,receipt);
   const result=validateMatrixResults(plan,outcomes,storage);
   write(extra[0],{...result,storageReceipt:{file:storageFile,sha256:hash(storageBytes)},verifiedAt:new Date().toISOString()});console.log('Selected Full dependency matrix passed; unselected providers are NotApplicable.');
- }else throw Error('Usage: release-test-matrix.mjs freeze <matrix> <receipt> | verify <receipt> <outcomes> <result>');
+ }else throw Error('Usage: release-test-matrix.mjs freeze <matrix> <receipt> | verify <receipt> <outcomes> <result> | freeze-platform <candidate> <plan> | verify-platform <plan> <tests> <result>');
 }

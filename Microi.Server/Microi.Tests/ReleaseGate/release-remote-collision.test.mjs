@@ -91,16 +91,17 @@ test('formal shell runs whole-set preflight before first NuGet and Docker baseli
  const script=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
  const nuget=script.indexOf('release-remote-collision.mjs nuget-preflight'),loop=script.indexOf('while IFS= read -r -d');assert.ok(nuget>0&&nuget<loop);
  const docker=script.slice(script.indexOf('docker_push_plan() {'));assert.ok(docker.indexOf('docker-baseline')<docker.indexOf('for _img_tag'));
- assert.match(docker,/docker-recheck[^\n]+\|\| print_fail[^\n]+\n\s*docker push/);
+ assert.match(docker,/docker-recheck[^\n]+\|\| print_fail[^\n]+\n\s*run_release_command docker push/);
 });
 test('two same-version formal preflights create independent proof files and preserve both originals',()=>fixture(root=>{
  const script=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
  const lines=script.split('\n').filter(line=>line.includes('_nuget_remote_receipt=')||line.includes('release-remote-collision.mjs nuget-preflight')).join('\n');
+ const budget=script.slice(script.indexOf('# 从交互选项完成开始计时'),script.indexOf('# Windows (Git Bash) 下'));
  assert.equal(lines.split('\n').length,2);
  const git=process.platform==='win32'?spawnSync('git',['--exec-path'],{encoding:'utf8'}):null;
  const bash=git?path.resolve(git.stdout.trim(),'../../..','bin/bash.exe'):'bash';
  const quote=value=>"'"+value.replaceAll('\\','/').replaceAll("'","'\\''")+"'";
- const result=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:root,encoding:'utf8',input:`set -e\nMICROI_RELEASE_GATE_DIR="$PWD"; VERSION=8.6.4; _nupkg_list_file=fixture; CONFIG_FILE=fixture\nprint_fail(){ exit 17; }\nnode(){ ${quote(process.execPath)} -e 'require("fs").writeFileSync(process.argv[1],"fresh remote proof",{flag:"wx"})' "\${@: -1}"; }\n${lines}\n${lines}\n`});
+ const result=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:root,encoding:'utf8',input:`set -e\nMICROI_RELEASE_GATE_DIR="$PWD"; VERSION=8.6.4; _nupkg_list_file=fixture; CONFIG_FILE=fixture\nprint_fail(){ exit 17; }\n${budget}\nnode(){ ${quote(process.execPath)} -e 'require("fs").writeFileSync(process.argv[1],"fresh remote proof",{flag:"wx"})' "\${@: -1}"; }\n${lines}\n${lines}\n`});
  assert.ifError(result.error);assert.equal(result.status,0,result.stderr);
  const files=fs.readdirSync(root);assert.equal(files.length,2);assert.ok(files.every(file=>/^nuget-remote-8\.6\.4-\d+-\d+\.json$/.test(file)));
  assert.ok(files.every(file=>fs.readFileSync(path.join(root,file),'utf8')==='fresh remote proof'));

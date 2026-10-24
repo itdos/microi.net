@@ -30,7 +30,7 @@ if($errors.Count){throw 'Runner parse errors'}
 $block=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.TryStatementAst] -and $n.Finally -and $n.Finally.Extent.Text.Contains('Remove-MicroiOwnedTestArtifacts')},$true))
 if($block.Count -ne 1){throw 'Full build must have one real cleanup finally'}
 $text=$block[0].Body.Extent.Text
-$start=$text.IndexOf('if ($Mode -eq ''Full'')')
+$start=$text.IndexOf('if ($Mode -eq ''Full'' -or $Mode -eq ''PlatformRelease'')')
 $end=$text.IndexOf('Write-Host "Restoring Microi.Tests')
 if($start -lt 0 -or $end -lt $start){throw 'Actual output isolation block not found'}
 $isolation=$text.Substring($start,$end-$start)

@@ -7,10 +7,12 @@ import test from 'node:test';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const source=fs.readFileSync(path.join(root,'Microi一键编译发布.sh'),'utf8');
-const begin=source.indexOf('# 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行完整业务回归。');
+const begin=source.indexOf('# 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行平台自动化回归。');
 const end=source.indexOf('# 发布只清理所选范围的开发服务',begin);
-assert.ok(begin>0&&end>begin,'The release script must contain the actual full-test gate');
+assert.ok(begin>0&&end>begin,'The release script must contain the actual scoped test gate');
 const gate=source.slice(begin,end);
+const policy=source.slice(source.indexOf('MICROI_FULL_ONLY=false'),source.indexOf('# Windows (Git Bash) 下'));
+const budgetFunctions=source.slice(source.indexOf('# 从交互选项完成开始计时'),source.indexOf('# Windows (Git Bash) 下'));
 const gitExec=process.platform==='win32'?execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim():'';
 const bash=process.platform==='win32'?path.resolve(gitExec,'../../..','bin/bash.exe'):'bash';
 
@@ -40,6 +42,7 @@ for(const scenario of [
   const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:directory,encoding:'utf8',env:{...process.env,DOC_EXPECTED_USER:username,DOC_EXPECTED_PASSWORD:password},input:`
 print_info(){ :; }; print_step(){ :; }; print_success(){ :; }
 print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
+${budgetFunctions}
 node(){ if [ "$2" = probe ]; then return 0; fi; command node "$@"; }
 DOCKER_REGION=hangzhou; DOCKER_NAMESPACE=your-namespace; DOCKER_USERNAME=your-username; DOCKER_PASSWORD=your-password
 ${reader}
@@ -170,30 +173,31 @@ printf 'GATE_DIR=%s\\n' "$MICROI_RELEASE_GATE_DIR"
    'local receipt="$MICROI_RELEASE_GATE_DIR/'
   ])assert.ok(source.includes(marker),marker);
   assert.ok(gate.includes('-ResultsDirectory "$_full_test_results"'));
-  for(const file of ['release-test-matrix.json','release-test-matrix-outcomes.json','release-test-matrix-result.json'])
-   assert.ok(gate.includes('"$_full_test_results/'+file+'"'),'Full matrix evidence must use the same isolated result directory');
+  for(const file of ['release-test-matrix.json','release-test-matrix-outcomes.json','release-test-matrix-result.json','platform-release-plan.json','platform-release-tests.json','platform-release-result.json'])
+   assert.ok(gate.includes('"$_full_test_results/'+file+'"'),'Each selected scope must use the same isolated result directory');
  }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
 
-test('same-version Docker hotfix keeps full gates and excludes version and remote-resource publication',()=>{
+test('same-version Docker hotfix keeps scoped gates and excludes version and remote-resource publication',()=>{
  assert.match(source,/if \[ "\$\{1:-\}" = "--docker-only-hotfix" \]/);
  const hotfix=source.slice(source.indexOf('if [ "$MICROI_DOCKER_ONLY_HOTFIX" = true ]'),source.indexOf('if [ "$MICROI_DOCKER_ONLY_HOTFIX" = true ]')+750);
  for(const marker of ['VERSION="$CURRENT_VERSION"','BUMP_VERSION=false','PUSH_NUGET=false']) assert.ok(hotfix.includes(marker),marker);
  assert.match(source,/if \[ "\$PUBLISH_BACKEND" = true \] && \[ "\$MICROI_DOCKER_ONLY_HOTFIX" != true \]; then[\s\S]*?refresh-resources\.mjs --publish/);
- assert.match(gate,/-Mode Full -Configuration Release/);
+ assert.match(gate,/-Mode "\$MICROI_RELEASE_TEST_POLICY" -Configuration Release/);
  assert.doesNotMatch(gate,/MICROI_DOCKER_ONLY_HOTFIX/);
- assert.ok(gate.includes('-SolutionPath "$SLN_FILE"'),'Full gate must use the detected solution in an isolated checkout');
+ assert.ok(gate.includes('-SolutionPath "$SLN_FILE"'),'The gate must use the detected solution in an isolated checkout');
 });
 
 test('direct release refuses the retired skip-tests flag before preparation or publication',()=>{
- const policy=source.slice(source.indexOf('MICROI_FULL_ONLY=false'),source.indexOf('# Windows (Git Bash) 下'));
  for(const args of ['--docker-only-hotfix --skip-tests','--full-only --skip-tests','--skip-tests']){
   const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',input:`set -- ${args}\n${policy}\nprintf 'PREPARATION_REACHED\\n'\n`});
   assert.ifError(result.error);assert.notEqual(result.status,0,args);
   assert.equal(result.stdout.includes('PREPARATION_REACHED'),false,args);
  }
- const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',env:{...process.env,MICROI_RELEASE_TEST_POLICY:'SmokeOnly',MICROI_RELEASE_SKIP_TESTS:'true'},input:`set -- --docker-only-hotfix\n${policy}\nprintf '%s' "$MICROI_RELEASE_TEST_POLICY"\n`});
- assert.equal(result.status,0,result.stderr);assert.equal(result.stdout,'Full');
+ for(const [args,expected] of [['','PlatformRelease'],['--docker-only-hotfix','PlatformRelease'],['--full-only','Full']]){
+  const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',env:{...process.env,MICROI_RELEASE_TEST_POLICY:'SmokeOnly',MICROI_RELEASE_SKIP_TESTS:'true'},input:`set -- ${args}\n${policy}\nprintf '%s' "$MICROI_RELEASE_TEST_POLICY"\n`});
+  assert.equal(result.status,0,result.stderr);assert.equal(result.stdout,expected);
+ }
 });
 
 test('isolated release targets its own service ports and retains shared defaults',()=>{
@@ -217,9 +221,9 @@ prepare_release_workspace
 });
 
 for(const scenario of [
- {name:'failed full tests prevent platform publication',backend:true,client:false,exit:19,passed:false,called:true},
- {name:'successful full tests allow platform publication',backend:true,client:false,exit:0,passed:true,called:true},
- {name:'frontend publication also requires full tests',backend:false,client:true,exit:19,passed:false,called:true},
+ {name:'failed platform tests prevent platform publication',backend:true,client:false,exit:19,passed:false,called:true},
+ {name:'successful platform tests allow platform publication',backend:true,client:false,exit:0,passed:true,called:true},
+ {name:'frontend publication also requires platform tests',backend:false,client:true,exit:19,passed:false,called:true},
  {name:'prebuilt Docker push cannot bypass failed tests',backend:false,client:false,docker:true,exit:19,passed:false,called:true},
  {name:'documentation-only work avoids the backend gate',backend:false,client:false,exit:19,passed:true,called:false},
  {name:'Full-only mode enforces every test before ending without publication',fullOnly:true,backend:false,client:false,exit:0,passed:false,exitStatus:0,called:true},
@@ -229,9 +233,12 @@ for(const scenario of [
 print_phase(){ :; }
 print_success(){ :; }
 print_fail(){ exit 1; }
+is_windows_shell(){ return 1; }
 pwsh(){ printf 'TEST_ARGUMENTS=%s\\n' "$*"; return ${scenario.exit}; }
 node(){ printf 'CANDIDATE_ARGUMENTS=%s\\n' "$*"; return 0; }
 unset MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT MICROI_TEST_SQLSERVER_EXEMPTION_SHA256
+set -- ${scenario.fullOnly?'--full-only':''}
+${policy}
 PUBLISH_BACKEND=${scenario.backend}
 MICROI_FULL_ONLY=${scenario.fullOnly||false}
 BUILD_CLIENT=${scenario.client}
@@ -243,16 +250,22 @@ printf 'PUBLICATION_REACHED\\n'
  assert.equal(result.status,scenario.exitStatus??(scenario.passed?0:1),result.stderr);
  assert.equal(result.stdout.includes('PUBLICATION_REACHED'),scenario.passed);
  assert.equal(result.stdout.includes('TEST_ARGUMENTS='),scenario.called);
- if(scenario.called)assert.match(result.stdout,/-Mode Full -Configuration Release/);
+ if(scenario.called){
+  assert.ok(result.stdout.includes(`-Mode ${scenario.fullOnly?'Full':'PlatformRelease'} -Configuration Release`),result.stdout);
+  if(scenario.exit===0)assert.ok(result.stdout.includes(`release-test-matrix.mjs ${scenario.fullOnly?'verify ':'verify-platform '}`),result.stdout);
+ }
 });
 
 for(const [receipt,sha]of [['/fixture/explicit receipt.json','a'.repeat(64)],['/fixture/explicit receipt.json',''],['','a'.repeat(64)]])
-test('retired SQL Server skip exemption cannot start Full or publication '+Boolean(receipt)+'/'+Boolean(sha),()=>{
+test('retired SQL Server skip exemption cannot start platform tests or publication '+Boolean(receipt)+'/'+Boolean(sha),()=>{
  const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',env:{...process.env,
   MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:receipt,MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:sha},input:`
 print_phase(){ :; }; print_success(){ :; }; print_fail(){ exit 1; }
+is_windows_shell(){ return 1; }
 pwsh(){ printf 'TEST_ARGUMENTS=%s\\n' "$*"; return 0; }
 node(){ return 0; }
+set --
+${policy}
 PUBLISH_BACKEND=true; MICROI_FULL_ONLY=false; BUILD_CLIENT=false; PLATFORM_DOCKER_SELECTED=false
 ${gate}
 printf 'PUBLICATION_REACHED\\n'
@@ -262,13 +275,16 @@ printf 'PUBLICATION_REACHED\\n'
  assert.equal(result.stdout.includes('TEST_ARGUMENTS='),false);
 });
 
-test('matrix readback rejection prevents publication after a successful Full process',()=>{
+for(const fullOnly of [false,true])test(`matrix readback rejection blocks the successful ${fullOnly?'Full':'PlatformRelease'} test process`,()=>{
  const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',input:`
 print_phase(){ :; }; print_success(){ :; }; print_fail(){ exit 1; }
+is_windows_shell(){ return 1; }
 pwsh(){ return 0; }
 node(){ case "$1" in *release-test-matrix.mjs) return 23;; *) return 0;; esac; }
 unset MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT MICROI_TEST_SQLSERVER_EXEMPTION_SHA256
-PUBLISH_BACKEND=true; MICROI_FULL_ONLY=false; BUILD_CLIENT=false; PLATFORM_DOCKER_SELECTED=false
+set -- ${fullOnly?'--full-only':''}
+${policy}
+PUBLISH_BACKEND=true; BUILD_CLIENT=false; PLATFORM_DOCKER_SELECTED=false
 ${gate}
 printf 'PUBLICATION_REACHED\\n'
 `});
@@ -276,7 +292,7 @@ printf 'PUBLICATION_REACHED\\n'
  assert.equal(result.stdout.includes('PUBLICATION_REACHED'),false);
 });
 
-test('prebuilt artifacts require Full source provenance and are rechecked before every push',()=>{
+test('prebuilt artifacts require matching source and test scope provenance and are rechecked before every push',()=>{
  assert.match(source,/PLATFORM_DOCKER_SELECTED=true/);
  const start=source.indexOf('docker_push_plan() {'),end=source.indexOf('if [ ${#SELECTED_API_PLANS',start);
  const push=source.slice(start,end);
@@ -302,8 +318,11 @@ for(const mode of ['capture','verify'])test(`candidate ${mode} failure prevents 
 print_phase(){ :; }
 print_success(){ :; }
 print_fail(){ exit 1; }
+is_windows_shell(){ return 1; }
 pwsh(){ return 0; }
 node(){ [ "$2" != "${mode}" ]; }
+set --
+${policy}
 PUBLISH_BACKEND=true
 BUILD_CLIENT=false
 ${gate}
@@ -317,12 +336,12 @@ test('publication refuses resource merge drift and preserves the independent Pan
  assert.match(source,/find Microi\.Server[^\n]*-not -path "\*\/Microi\.Panel\/\*"/);
 });
 
-test('selected versions are frozen before Full and every publication still waits for successful Full',()=>{
+test('selected versions are frozen before scoped tests and every publication waits for success',()=>{
  const version=source.indexOf('# ─── 阶段（条件）: 更新版本号'),capture=source.indexOf('release-candidate.mjs capture');
- assert.ok(version>0&&version<begin&&begin<capture,'Full must test the selected release version, not the preceding version');
+ assert.ok(version>0&&version<begin&&begin<capture,'The selected scope must test the selected release version, not the preceding version');
  assert.ok(source.indexOf('# 前端资源预检必须发生')<version,'Resource preflight must still precede version preparation');
  for(const marker of ['refresh-resources.mjs --publish','secure-nuget-push.mjs push']){
-   const offset=source.indexOf(marker);assert.ok(offset>end,`${marker} must follow the full-test gate`);
+   const offset=source.indexOf(marker);assert.ok(offset>end,`${marker} must follow the selected test gate`);
  }
  assert.equal(source.match(/print_step "更新 Directory\.Build\.props/g)?.length,1,'Selected version preparation must not execute twice');
 });
@@ -339,4 +358,62 @@ test('real schedule stores belong to Full and their settings fail fast before bu
   assert.match(fixture,/\[Trait\("Category", "FullStack"\)\]/);
   assert.doesNotMatch(fixture,/Assert\.Skip\(/);
  }
+});
+
+for(const mode of ['PlatformRelease','Expired','Full'])test(`actual shell budget integration: ${mode}`,()=>{
+ const directory=fs.mkdtempSync(path.join(root,'.tmp','release-budget-shell-'));
+ const quote=value=>"'"+value.replaceAll('\\','/').replaceAll("'","'\\''")+"'";
+ const start=source.indexOf('START_TIME=$(date +%s)',source.indexOf('# 开始执行')),finish=source.indexOf('# 按所选产品取得锁',start);
+ const phaseStart=source.indexOf('print_phase() {'),phaseEnd=source.indexOf('print_step() {',phaseStart);
+ assert.ok(start>0&&finish>start&&phaseStart>0&&phaseEnd>phaseStart);
+ const now=Math.floor(Date.now()/1000),initial=mode==='PlatformRelease'?now:now-1801;
+ const marker=path.join(directory,'executed.txt');
+ try{
+  // 回放真实初始化、阶段与命令包装器；只用本地短 Node 子进程，不调用编译器或 Docker。
+  const result=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:root,encoding:'utf8',timeout:20000,input:`
+set -e
+print_info(){ :; }; is_windows_shell(){ return 1; }
+fixture_now=${initial}
+date(){ if [ "$1" = +%s ]; then printf '%s' "$fixture_now"; else command date "$@"; fi; }
+${budgetFunctions}
+MICROI_RELEASE_GATE_DIR=${quote(directory)}
+MICROI_RELEASE_BUDGET_TOOL=${quote(path.join(root,'Microi.Server/tools/release-budget.mjs'))}
+MICROI_FULL_ONLY=${mode==='Full'?'true':'false'}
+${source.slice(start,finish)}
+${source.slice(phaseStart,phaseEnd)}
+original_start="$START_TIME"; original_deadline="$MICROI_RELEASE_DEADLINE"
+fixture_now=${now}
+${mode==='Expired'?`
+set +e
+( run_release_command ${quote(process.execPath)} -e ${quote('require("fs").writeFileSync(process.argv[1],"unexpected")')} ${quote(marker)} )
+command_exit=$?
+( check_release_budget ); check_exit=$?
+set -e
+[ "$command_exit" = 124 ] && [ "$check_exit" = 124 ]
+printf 'EXPIRED_BEFORE_EXECUTION\\n'
+`:`
+for stage in tests build docker; do
+  print_phase "$stage"
+  [ "$START_TIME" = "$original_start" ] && [ "$MICROI_RELEASE_DEADLINE" = "$original_deadline" ]
+  run_release_command ${quote(process.execPath)} -e ${quote('require("fs").appendFileSync(process.argv[1],process.argv[2]+String.fromCharCode(10))')} ${quote(marker)} "$stage"
+done
+if [ "$MICROI_FULL_ONLY" = true ]; then [ -z "$MICROI_RELEASE_DEADLINE" ]; else [ "$MICROI_RELEASE_DEADLINE" = "$((START_TIME + 1800))" ]; fi
+printf 'BUDGET_SCOPE_VALID\\n'
+`}
+`});
+  assert.ifError(result.error);assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+  if(mode==='Expired'){
+   assert.match(result.stdout,/EXPIRED_BEFORE_EXECUTION/);assert.equal(fs.existsSync(marker),false);
+  }else{
+   assert.match(result.stdout,/BUDGET_SCOPE_VALID/);assert.equal(fs.readFileSync(marker,'utf8'),'tests\nbuild\ndocker\n');
+   const timing=fs.readdirSync(directory).filter(name=>name.startsWith('release-timing-'));
+   if(mode==='Full')assert.deepEqual(timing,[]);
+   else{
+    assert.equal(timing.length,1);
+    const rows=fs.readFileSync(path.join(directory,timing[0]),'utf8').trim().split('\n').map(JSON.parse);
+    assert.deepEqual(rows.map(row=>row.phase),['tests','build']);
+    assert.ok(rows.every(row=>row.startedEpochSeconds===initial&&row.deadlineEpochSeconds===initial+1800&&row.scope==='PlatformRelease'));
+   }
+  }
+ }finally{fs.rmSync(directory,{recursive:true});}
 });

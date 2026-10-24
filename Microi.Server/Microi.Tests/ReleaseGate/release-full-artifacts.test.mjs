@@ -7,7 +7,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const source=fs.readFileSync(fileURLToPath(new URL('../run-tests.ps1',import.meta.url)),'utf8');
-const start=source.indexOf("if ($Mode -eq 'Full') {",source.indexOf('# Full 的 restore/build/test/list package'));
+const start=source.indexOf("if ($Mode -eq 'Full' -or $Mode -eq 'PlatformRelease') {",source.indexOf('# Full 的 restore/build/test/list package'));
 const end=source.indexOf('Write-Host "Restoring Microi.Tests',start);
 assert.ok(start>0&&end>start,'actual Full SDK output isolation block must exist');
 const isolation=source.slice(start,end);

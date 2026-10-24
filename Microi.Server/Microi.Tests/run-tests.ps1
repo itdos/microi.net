@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidateSet("Quick", "Full", "Panel")]
+    [ValidateSet("Quick", "PlatformRelease", "Full", "Panel")]
     [string]$Mode = "Quick",
 
     [string]$Configuration = "Release",
@@ -54,6 +54,16 @@ if ([string]::IsNullOrWhiteSpace($ResultsDirectory)) {
     $ResultsDirectory = Join-Path $testRoot "TestResults"
 }
 $ResultsDirectory = [IO.Path]::GetFullPath($ResultsDirectory)
+$testStartedAt = [DateTimeOffset]::UtcNow
+$testTrxName = if ($Mode -eq 'PlatformRelease') { 'microi-platform.trx' } else { 'microi-quick.trx' }
+if ($Mode -eq 'PlatformRelease') {
+    # 平台发布使用独立范围和新回执，不能把历史 Quick/Full 结果冒充本轮执行。
+    foreach ($name in @($testTrxName, 'node-regressions.json', 'platform-release-plan.json', 'platform-release-tests.json', 'platform-release-result.json')) {
+        if (Test-Path -LiteralPath (Join-Path $ResultsDirectory $name)) {
+            throw "PlatformRelease requires fresh result files: $name"
+        }
+    }
+}
 
 if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') {
     $os = Get-CimInstance Win32_OperatingSystem
@@ -135,6 +145,15 @@ if ($Mode -eq "Full") {
 }
 
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
+if ($Mode -eq 'PlatformRelease') {
+    if ([string]::IsNullOrWhiteSpace($env:MICROI_RELEASE_CANDIDATE)) {
+        throw 'PlatformRelease requires the current MICROI_RELEASE_CANDIDATE manifest.'
+    }
+    $platformMatrixTool = Join-Path $testRoot 'ReleaseGate/release-test-matrix.mjs'
+    $platformPlanFile = Join-Path $ResultsDirectory 'platform-release-plan.json'
+    node $platformMatrixTool freeze-platform $env:MICROI_RELEASE_CANDIDATE $platformPlanFile
+    if ($LASTEXITCODE -ne 0) { throw 'PlatformRelease candidate binding failed before regression execution.' }
+}
 
 # 测试夹具包含真实 node:sqlite 与中文 SQLite 输入。统一使用任务已验证的
 # Node 运行时及 Python UTF-8，防止 Windows PATH/代码页导致假失败；这些变量
@@ -173,6 +192,7 @@ function Get-MicroiDesktopTestPath {
 # 单一事实源。公开仓不带该闭源目录，因此只在应用存在时纳入统一门禁；Vitest
 # 默认对零用例和失败用例返回非零，禁止把空的历史 tests/ 目录视作通过。
 $workspaceRoot = Split-Path -Parent $serverRoot
+if ($Mode -ne 'PlatformRelease') {
 $desktopRoot = Join-Path $workspaceRoot 'Microi.Agent/apps/microi-code'
 # 平台插件的制品边界直接验收真实 ZIP，避免只测工作树清单而漏掉已打包的私有资料。
 # 公开工作区没有内部插件仓时不引入其依赖；完整创始人工作区必须执行，失败停止 Full。
@@ -213,9 +233,10 @@ if (Test-Path -LiteralPath $desktopPackage) {
         Pop-Location
     }
 }
+}
 
-# 创始人桌面子门禁先失败即停，避免已知桌面问题在平台回归结束后才暴露。
-# 所有平台 Node、.NET、双 API 和真实浏览器检查仍在同一次完整 Full 中执行。
+# PlatformRelease 只覆盖平台本身；Code/Agent 的独立产品检查仍保留在原 Quick/Full 入口。
+# 双 API、新租户安装及跨产品浏览器验收仅属于显式 Full，不作为平台发布的先决条件。
 # 自动发现平台统一入口、平台内置应用包和 PC 端的 node:test 回归；新增测试不依赖手工清单。
 node (Join-Path $testRoot 'run-node-regressions.mjs') $ResultsDirectory
 if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with exit code $LASTEXITCODE." }
@@ -285,7 +306,7 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 node --test $fileCabinetOfficeTest
 if ($LASTEXITCODE -ne 0) { throw "File-cabinet Office regression tests failed with exit code $LASTEXITCODE." }
 
-# Full 的 restore/build/test/list package 全部继承同一 SDK 输出目录。
+# Full 的 restore/build/test/list package 及 PlatformRelease 组件回归继承独占 SDK 输出目录。
 # API 与 PC 可并行 Full，不写对方或长期开发服务的 bin/obj；只修改本 PowerShell 子进程环境。
 $ownedArtifactTarget = $null
 $ownedArtifactLink = $null
@@ -295,12 +316,12 @@ $previousUseArtifactsOutput = $env:UseArtifactsOutput
 $artifactGateFailed = $false
 . (Join-Path $serverRoot 'tools/Microi.TestArtifactCleanup.ps1')
 try {
-if ($Mode -eq 'Full') {
+if ($Mode -eq 'Full' -or $Mode -eq 'PlatformRelease') {
     $artifactTarget = [IO.Path]::GetFullPath((Join-Path $ResultsDirectory '.net-artifacts'))
     $workspaceRoot = [IO.Path]::GetFullPath((Split-Path -Parent $serverRoot))
     $linkRoot = [IO.Path]::GetFullPath((Join-Path $workspaceRoot '.tmp'))
     if (-not $linkRoot.StartsWith($workspaceRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Full artifact link directory escaped the workspace.'
+        throw "$Mode artifact link directory escaped the workspace."
     }
     if (-not (Test-Path -LiteralPath $artifactTarget)) {
         New-Item -ItemType Directory -Path $artifactTarget -ErrorAction Stop | Out-Null
@@ -328,11 +349,11 @@ if ($Mode -eq 'Full') {
     $existingTarget = @($linkItem.Target) | Select-Object -First 1
     if ($linkItem.LinkType -ne $linkType -or [string]::IsNullOrWhiteSpace($existingTarget) -or
         [IO.Path]::GetFullPath($existingTarget) -ne $artifactTarget) {
-        throw "Full artifact link collision: $artifactLink"
+        throw "$Mode artifact link collision: $artifactLink"
     }
     $env:ArtifactsPath = $artifactLink
     $env:UseArtifactsOutput = 'true'
-    Write-Host "Isolated Full build artifacts: $artifactTarget (workspace link: $artifactLink)"
+    Write-Host "Isolated $Mode build artifacts: $artifactTarget (workspace link: $artifactLink)"
 }
 
 Write-Host "Restoring Microi.Tests with one restore worker..."
@@ -356,10 +377,10 @@ dotnet test $project `
     --no-restore `
     --filter "Category!=FullStack" `
     --results-directory $ResultsDirectory `
-    --logger "trx;LogFileName=microi-quick.trx" `
+    --logger "trx;LogFileName=$testTrxName" `
     --collect "XPlat Code Coverage" `
     -m:1
-if ($LASTEXITCODE -ne 0) { throw "Quick regression tests failed with exit code $LASTEXITCODE." }
+if ($LASTEXITCODE -ne 0) { throw "$Mode component regression tests failed with exit code $LASTEXITCODE." }
 
 if ($Mode -eq "Full") {
     Write-Host "Building the complete backend solution..."
@@ -512,7 +533,7 @@ if ($Mode -eq "Full") {
     if ($LASTEXITCODE -ne 0) { throw "NuGet deprecation audit failed with exit code $LASTEXITCODE." }
 }
 
-foreach ($name in @("microi-quick.trx") + $(if ($Mode -eq "Full") { @("microi-full-stack.trx") } else { @() })) {
+foreach ($name in $(if ($Mode -eq 'PlatformRelease') { @() } elseif ($Mode -eq 'Full') { @($testTrxName, 'microi-full-stack.trx') } else { @($testTrxName) })) {
     [xml]$report = Get-Content -LiteralPath (Join-Path $ResultsDirectory $name) -Raw
     $counters = $report.TestRun.ResultSummary.Counters
     if ([int]$counters.total -le 0 -or [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0 -or [int]$counters.passed -ne [int]$counters.total) {
@@ -531,8 +552,6 @@ if ($Mode -eq 'Full') {
         if ($LASTEXITCODE -ne 0) { throw 'Owned runtimes did not exit or the same-attempt native bridges are unavailable before PrepareRelease.' }
     }
 }
-Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory"
-
 } catch {
     $artifactGateFailed = $true
     throw
@@ -553,3 +572,39 @@ Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory"
         if (-not $artifactGateFailed) { throw $cleanupError }
     }
 }
+
+if ($Mode -eq 'PlatformRelease') {
+    # 使用统一安全 XML 读取器核对真实用例及原字节哈希；产物清理失败时不会到达此处。
+    $platformTrx = & (Join-Path $testRoot 'ReleaseGate/read-release-matrix-trx.ps1') -TrxFile (Join-Path $ResultsDirectory $testTrxName) | ConvertFrom-Json
+    $counters = $platformTrx.counters
+    if ($platformTrx.summaryOutcome -notin @('Completed', 'Passed') -or
+        [int]$counters.total -le 0 -or [int]$counters.passed -ne [int]$counters.total -or
+        [int]$counters.failed -ne 0 -or [int]$counters.notExecuted -ne 0 -or
+        @($platformTrx.tests).Count -ne [int]$counters.total -or
+        @($platformTrx.tests | Where-Object { $_.outcome -cne 'Passed' }).Count -ne 0) {
+        throw 'PlatformRelease requires complete, non-empty passing TRX cases without failures or skips.'
+    }
+    $nodeReportFile = Join-Path $ResultsDirectory 'node-regressions.json'
+    $nodeGroups = @(Get-Content -LiteralPath $nodeReportFile -Raw | ConvertFrom-Json)
+    if ($nodeGroups.Count -eq 0) { throw 'PlatformRelease requires discovered platform Node regression evidence.' }
+    foreach ($group in $nodeGroups) {
+        if (@($group.files).Count -le 0 -or [int]$group.tests -le 0 -or [int]$group.pass -ne [int]$group.tests -or
+            [int]$group.fail -ne 0 -or [int]$group.cancelled -ne 0 -or [int]$group.skipped -ne 0 -or [int]$group.todo -ne 0) {
+            throw 'PlatformRelease Node regressions must have non-empty passing results without failures, cancellations or skips.'
+        }
+    }
+    $nodeTests = [int](($nodeGroups | Measure-Object -Property tests -Sum).Sum)
+    $completedAt = [DateTimeOffset]::UtcNow
+    $receipt = [ordered]@{
+        schemaVersion = 1; scope = 'PlatformRelease'; status = 'Passed'; filter = 'Category!=FullStack'
+        startedAt = $testStartedAt.ToString('o'); completedAt = $completedAt.ToString('o')
+        elapsedSeconds = [Math]::Round(($completedAt - $testStartedAt).TotalSeconds, 3)
+        dotnet = [ordered]@{ trxFile = $platformTrx.trxFile; trxSha256 = $platformTrx.trxSha256; tests = [int]$counters.total; passed = [int]$counters.passed; failed = 0; skipped = 0 }
+        node = [ordered]@{ reportFile = $nodeReportFile; reportSha256 = (Get-FileHash -LiteralPath $nodeReportFile -Algorithm SHA256).Hash.ToLowerInvariant(); groups = $nodeGroups.Count; tests = $nodeTests; passed = $nodeTests; failed = 0; skipped = 0 }
+        excludedScopes = @('CodeAgentDesktopAndVSIX', 'NewTenantAdmission', 'FullStackDependencyMatrix', 'NotificationChatInstallationAndBrowser')
+    }
+    $receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $ResultsDirectory 'platform-release-tests.json') -Encoding UTF8
+    node $platformMatrixTool verify-platform $platformPlanFile (Join-Path $ResultsDirectory 'platform-release-tests.json') (Join-Path $ResultsDirectory 'platform-release-result.json')
+    if ($LASTEXITCODE -ne 0) { throw 'PlatformRelease matrix rejected source drift or inconsistent real test evidence.' }
+}
+Write-Host "Microi.Tests $Mode gate passed. Results: $ResultsDirectory"

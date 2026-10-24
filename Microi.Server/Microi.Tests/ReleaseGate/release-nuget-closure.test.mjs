@@ -13,6 +13,7 @@ const source = fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编�
 const start = source.indexOf('if [ "$PUSH_NUGET" = true ] || {'), end = source.indexOf('# --- DLL 加密', start);
 assert.ok(start > 0 && end > start);
 const packBlock = source.slice(start, end);
+const budgetFunctions = source.slice(source.indexOf('# 从交互选项完成开始计时'), source.indexOf('# Windows (Git Bash) 下'));
 const names = ['Microi.NPOI.Core', 'Microi.NPOI.OpenXml4Net', 'Microi.NPOI.OpenXmlFormats', 'Microi.NPOI.OOXML', 'Microi.NPOI', 'Microi.Office'];
 const hash = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const quote = value => "'" + value.replaceAll('\\', '/').replaceAll("'", "'\\''") + "'";
@@ -57,7 +58,7 @@ test('actual SDK reproduces missing NPOI packages and Debug references; producti
         run(root, [...build, inheritance]);
         const dlls = f.projects.slice(0, 4).map((project, i) => path.join(path.dirname(project), 'bin/Release/net10.0', names[i] + '.dll'));
         const before = dlls.map(hash);
-        const packed = spawnSync(bash, ['--noprofile', '--norc', '-s'], { cwd: root, encoding: 'utf8', input: `set -o pipefail\nprint_divider(){ :; }; print_step(){ :; }; print_success(){ :; }; print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }\nPUSH_NUGET=true; HAS_ENCRYPT=false; DEPLOY_MODE=4; _MICROI_NET_PROJECT=absent; SLN_FILE=Microi.Server/Fixture.sln; VERSION=8.5.10; _BUILD_EXTRA_ARGS='-p:PackOnly=true'; RED=''; NC='';\n${packBlock}` });
+        const packed = spawnSync(bash, ['--noprofile', '--norc', '-s'], { cwd: root, encoding: 'utf8', input: `set -o pipefail\nprint_divider(){ :; }; print_step(){ :; }; print_success(){ :; }; print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }\n${budgetFunctions}\nPUSH_NUGET=true; HAS_ENCRYPT=false; DEPLOY_MODE=4; _MICROI_NET_PROJECT=absent; SLN_FILE=Microi.Server/Fixture.sln; VERSION=8.5.10; _BUILD_EXTRA_ARGS='-p:PackOnly=true'; RED=''; NC='';\n${packBlock}` });
         assert.ifError(packed.error); assert.equal(packed.status, 0, packed.stdout + packed.stderr);
         assert.deepEqual(dlls.map(hash), before, 'Pack 未重新编译 Release DLL');
         assert.equal(f.pending().length, 6);
