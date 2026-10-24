@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import {CONTEXT,TASK,OWNER,TENANT,MAIN,MARKER,DID,ACCOUNTS,id,sha,success,tenantReturn,ownedUser,currentUser,
   mcpJson,accessGrant,verifyConfirmation,accessRecord,fixture} from './contracts.mjs';
-import {HttpSession,connectMcp,verifySources} from './transport.mjs';
+import {HttpSession,connectMcp,verifySources,TENANT_CREATION_TIMEOUT_MS} from './transport.mjs';
 
 const HERE=path.dirname(fileURLToPath(import.meta.url));
 export const REQUIRED_APPLICATION='Microi.Server/OfficialApplications/Resource/app.microi.message-notification.json';
@@ -92,7 +92,7 @@ async function tenantStage() {
   // 正式 MCP ExecuteApiEngine 要额外开发权。这里按 root/parent 授权复用相同 Managed
   // HTTP 业务入口，让普通 owner 保持普通权限；不创建临时引擎、不伪造 CurrentUser。
   const result=await session.post('apiengine/platform-create-tenant',{
-    TenantKey:TENANT,SystemName:'Admission '+OWNER},{timeout:600000});
+    TenantKey:TENANT,SystemName:'Admission '+OWNER},{timeout:TENANT_CREATION_TIMEOUT_MS});
   // Code!=1 仍保存真实回执；timeout/断线只留下 intent，必须独立盘点后恢复。
   save('tenant.result.json',{task:TASK,owner32:OWNER,ownerUserId:owner.Id,response:result});
   tenantReturn(result);
