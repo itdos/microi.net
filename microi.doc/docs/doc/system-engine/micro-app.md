@@ -1115,6 +1115,23 @@ AI 应用工作台“发布应用商城”
 
 `mci_app_stream_gate_transition` 和发布门禁相关列/索引由应用商城责任包维护。更新目标租户的应用商城责任包，通过已有“升级租户数据库”入口核验责任包安装，安装完成后回读物理表、列及唯一索引，再重新盘点源码、版本和发布基线。不要执行已退役 Upgrade25，也不要手动 reset 锁、fence、Storage 或 active/committed 指针。`dry-run` 不应切换运行版本；“旧运行版本未切换”还可能来自资产校验失败或真实 CAS 漂移，应按原始错误和回读结果分别处理。
 
+### 历史安装应用持续产生对象存储下载
+
+历史安装应用可能保持 `PublishState=LegacyUnverified` 和协议 2，同时已经具有可用的稳定入口。旧版后台别名巡检每 30 秒扫描候选，会重复下载版本目录与稳定入口中的完整文件校验哈希；模型、音视频等大文件较多时，即使没有用户打开应用，也可能产生大量服务端 OSS 公网流量。CDN 访问统计不能覆盖这类直接读取对象存储的费用，应结合存储访问日志中的 SDK、对象路径和周期核对。
+
+包含持久检查点修复的后端，在受保护的 `mci_ai_app_version.BuildLog` 中记录独立的 `InstalledAliasReconciliation/1` 检查点。权威摘要绑定当前租户、应用、版本、运行服务和完整公开文件清单，排除检查点自身；元数据发生变化时，下次巡检立即重新校验。它保留 `LegacyUnverified`、协议 2 以及原有 V3 指针，不把历史别名校验记成一次正式 V3 发布。
+
+| 当前结果 | 下次完整文件校验 |
+|---|---|
+| 第一次成功 | 5 分钟后 |
+| 第二次连续稳定成功 | 30 分钟后 |
+| 第三次及以后连续稳定成功 | 24 小时后 |
+| 校验或复制失败 | 依次退避 5、10、20、40、60 分钟，之后保持 60 分钟 |
+
+发生修复复制会重新累计稳定次数。每轮昂贵读取前先持久化 `Verifying`，使进程重启后仍遵守退避；数据库无法保存检查点时不开始全量下载。未知或不合法的非空 `BuildLog` 不接管、不覆盖。租约、主库完整回读和条件写入继续约束并发发布；检查点只更新所属版本的 `BuildLog`，不改变版本号或 `UpdateTime`。
+
+排查时查看后台巡检回执的 `VerifiedCheckpointSkipped`、`RetryBackoffSkipped` 与 `NextCheckAtUtc`，并在等待窗口内确认同一文件的重复 GET 减少。正式验收仍需覆盖全部实际运行节点，核对后端已部署该修复、元数据变更后重新校验及失败后的恢复。源码修改、测试通过或镜像上传均不能单独证明线上流量已经下降。
+
 ### PublicPublishPath 没有租户前缀
 
 先检查 `sys_microiservice.StorageMode`。`microi-platform-service` 等受信任平台启动包使用 `StorageMode=db、MsUrl=db` 从目标租户数据库内联产物运行，安装器可将 `PublicPublishPath` 保存为 `micro-app/{AppKey}/{Version}`；该值没有租户前缀不等于缺文件。不要直接补前缀或切换为 file。普通 file 应用应核对 `AssetsJson/AssetManifestJson` 内每项 `HdfsPath/FilePathName`、当前租户 `FileServer` 与实际对象，按正常重新安装或发布流程修复；单改商城展示字段不能证明运行入口恢复。
