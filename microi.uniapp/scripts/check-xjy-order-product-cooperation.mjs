@@ -66,12 +66,12 @@ assert.deepEqual(calculateOrderProductPriceBinding({
   ShebeiYHFD: 0,
   Zongjia: 0,
   YouhuiFD: 0,
-  LvxinZJ: 300.38
+  LvxinZJ: 300.39
 })
 
 const formSource = fs.readFileSync(new URL('../src/tenants/xjy/form.js', import.meta.url), 'utf8')
 assert.match(formSource, /\['shuliang', 'shebeisjdj', 'lvxinsjdj'\]/)
-assert.match(formSource, /calculateOrderProductPriceBinding\(context\.form\)/)
+assert.match(formSource, /normalizedOrderProductPrices\(context\.form\)/)
 assert.match(formSource, /\.\.\.priceValues,\s*_InvokeType: 'Client'/)
 
 console.log('xjy order product cooperation checks passed')

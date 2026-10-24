@@ -518,11 +518,11 @@ export default {
         ])
         if (requestId !== this.loadRequestId) return
         this.typeCounts = summary.typeCounts
+        this.stateCounts = states
         let periods = summary.periodCounts
         if (!Object.keys(periods).length) periods = await loadTaskPeriodCounts(filters)
         if (requestId !== this.loadRequestId) return
         this.periodCounts = periods
-        this.stateCounts = states
       } catch (error) {}
     },
     stateCount(item) {
