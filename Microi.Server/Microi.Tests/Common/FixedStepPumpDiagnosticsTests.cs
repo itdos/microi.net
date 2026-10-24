@@ -132,9 +132,13 @@ public sealed class FixedStepPumpDiagnosticsTests
         using var stop = new CancellationTokenSource(); var run = c.RunAsync(stop.Token);
         try
         {
-            for (var i = 0; i < 100 && Snapshot(c, "tenant")["Rooms"]![0]!.Value<long>("Dispatches") == 0; i++)
+            // Dispatches 在排队时递增；等待异步结果写回后，才能验证停止不会抹掉已有失败记录。
+            for (var i = 0; i < 100 && Snapshot(c, "tenant")["Rooms"]![0]!.Value<DateTime?>("LastCompletedUtc") == null; i++)
                 await Task.Delay(5, TestContext.Current.CancellationToken);
-            Assert.Equal("Running", Snapshot(c, "tenant").Value<string>("LoopState"));
+            var beforeStop = Snapshot(c, "tenant");
+            Assert.Equal("Running", beforeStop.Value<string>("LoopState"));
+            Assert.NotNull(beforeStop["Rooms"]![0]!.Value<DateTime?>("LastCompletedUtc"));
+            Assert.Equal("LoginRequired", beforeStop["Rooms"]![0]!.Value<string>("LastErrorCode"));
             stop.Cancel(); await run;
             Assert.Equal("Stopped", Snapshot(c, "tenant").Value<string>("LoopState"));
             Assert.Equal("LoginRequired", Snapshot(c, "tenant")["Rooms"]![0]!.Value<string>("LastErrorCode"));
