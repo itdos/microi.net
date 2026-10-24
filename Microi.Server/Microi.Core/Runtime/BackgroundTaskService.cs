@@ -1206,6 +1206,8 @@ namespace Microi.net
                 CacheProjection(item);
                 QueueNotification(item);
                 var renewal = RenewLoopAsync(active, laneLease, concurrencyLease, stoppingToken);
+                // 阶段只供异常诊断，必须在实际调用前切换；不据此恢复、重试或改变任务结果。
+                var executionStage = BackgroundTaskExecutionStage.ExecutionPreparation;
                 try
                 {
                     var param = ParseObject(item.ParamJson);
@@ -1262,6 +1264,7 @@ namespace Microi.net
                         item.Total
                     });
 
+                    executionStage = BackgroundTaskExecutionStage.NativeWorkerExecution;
                     dynamic rawResult;
                     if (string.Equals(item.ApiEngineKey, DiyLangBackgroundTaskService.WorkerApiEngineKey,
                             StringComparison.OrdinalIgnoreCase))
@@ -1315,15 +1318,19 @@ namespace Microi.net
                     }
                     else
                     {
+                        executionStage = BackgroundTaskExecutionStage.ApiEngineExecution;
                         rawResult = await MicroiEngine.BackgroundTaskApiEngine
                             .RunBackgroundAsync(param, trustedUser, cancellation.Token)
                             .ConfigureAwait(false);
                     }
+                    executionStage = BackgroundTaskExecutionStage.ResultProjection;
                     var result = SafeToJObject(rawResult);
                     var continuation = GetContinuation(result);
                     if (continuation != null && IsTrue(continuation["HasMore"]))
                     {
+                        executionStage = BackgroundTaskExecutionStage.ContinuationProgress;
                         ApplyContinuationProgress(item.Id, continuation);
+                        executionStage = BackgroundTaskExecutionStage.ContinuationPreparation;
                         var nextParam = (JObject)param.DeepClone();
                         nextParam.Remove("_CurrentUser");
                         nextParam.Remove("_BackgroundTask");
@@ -1350,6 +1357,7 @@ namespace Microi.net
                         var requestedDelay = ParseInt(continuation["NextDelaySeconds"], 0);
                         // 业务调用及其事务已经完成；先停续租，再确认释放两层 Redis 租约。
                         // 任何确认失败仍使用原来的保护延迟，不降低领取和 fencing 条件。
+                        executionStage = BackgroundTaskExecutionStage.ContinuationLeaseRelease;
                         var leasesReleased = requestedDelay <= 0
                             && await TryReleaseContinuationLeasesAsync(
                                 renewal, () => active.RenewalCancellation.Cancel(),
@@ -1357,6 +1365,7 @@ namespace Microi.net
                                 () => concurrencyLease == null ? Task.FromResult(true)
                                     : concurrencyLease.ReleaseConfirmedAsync(TimeSpan.FromMilliseconds(500)))
                                 .ConfigureAwait(false);
+                        executionStage = BackgroundTaskExecutionStage.ContinuationPersist;
                         BackgroundTaskStore.RequeueChunk(
                             item,
                             nextParam,
@@ -1370,6 +1379,7 @@ namespace Microi.net
                         var succeeded = result["Code"]?.ToString() == "1";
                         if (!succeeded && item.RetryOnFailure == 1)
                         {
+                            executionStage = BackgroundTaskExecutionStage.BusinessFailurePersist;
                             BackgroundTaskStore.RetryOrFail(
                                 item,
                                 new InvalidOperationException(result["Msg"]?.ToString() ?? "接口引擎返回失败。"),
@@ -1377,6 +1387,7 @@ namespace Microi.net
                         }
                         else
                         {
+                            executionStage = BackgroundTaskExecutionStage.TerminalPersist;
                             BackgroundTaskStore.Complete(
                                 item,
                                 succeeded ? "Succeeded" : "Failed",
@@ -1409,6 +1420,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
+                    BackgroundTaskFailureDiagnostics.TryReport(item, executionOsClient, executionStage, ex);
                     BackgroundTaskStore.RetryOrFail(item, ex, stoppingToken.IsCancellationRequested);
                 }
                 finally

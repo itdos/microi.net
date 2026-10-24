@@ -149,6 +149,10 @@ return { Code: 1, Data: { JobRunId: runId } };
 
 新版执行器的候选扫描只读领取所需的小字段。原子领取成功后，在独立执行槽中按任务 Id、租户、租约持有者和 fencing token 读取完整参数，使用单独的 30 秒读取上限，并在读取后再次核验有效租约。读取失败或租约变化时不执行任务正文，仅尝试释放本次持有的租约以供安全重试。此能力需要更新后端；安装成功仍以原任务的 `Succeeded` 终态和资源回读为准。
 
+已领取的后台任务执行失败时，先按原任务 Id 回读真实状态，再查系统日志 `Source=BackgroundTask`、`Action=ExecutionFailed`。脱敏诊断用 `Stage` 区分接口引擎执行（`ApiEngineExecution`，也包括执行前的权威引擎读取）、分片进度写入（`ContinuationProgress`）、分片重新入队（`ContinuationPersist`）和终态写入（`TerminalPersist`）；后者表示 `Complete` 本身失败，不能据此认定业务脚本失败。结合 `OwnerOsClient/ExecutionOsClient`、运行环境、`TaskId/Fence` 关联原任务；安全异常链最多 4 个节点，保留类型、`HResult`、可读取的提供商 `Number/SqlState/SocketErrorCode` 及每节点最多 4 个 CLR 方法名，不包含源码路径、行号或实参。
+
+此诊断不记录异常消息正文、SQL、参数或连接串。`MessageSha256` 仅用于关联相同消息前缀：最多取前 65,536 个 UTF-16 字符后编码为 UTF-8 计算摘要，并同时记录 `MessageLength/MessageHashChars/MessageHashTruncated`；不能把截断摘要当作完整消息或根因证据。诊断走既有 `QueueSystemLog`，接受入队不等于已经持久化，必须实际查询到日志才算取得诊断证据；日志拒绝或异常不改变原任务的重试、事务、租约和失败结果，也不能触发重复提交。
+
 SQL Server 的通知中心若把中文状态显示为 `????`，应先区分状态显示与任务本身的失败原因。
 旧版后台持久化把中文直接拼入 SQL 字符串；数据库使用 Latin1 等非中文代码页时，即使目标列是
 `nvarchar`，中文也可能在写入前变成问号。新版后端统一参数化写入状态、消息和错误文本，需更新
