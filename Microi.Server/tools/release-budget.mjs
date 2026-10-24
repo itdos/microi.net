@@ -2,7 +2,7 @@ import {spawn,execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import fs from 'node:fs';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {pathToFileURL,fileURLToPath} from 'node:url';
 
 const execute=promisify(execFile),windows=process.platform==='win32';
 const delay=milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds));
@@ -39,7 +39,8 @@ export function runReleaseBudget(deadline,command,args=[]){
  return new Promise(resolve=>{
   let child,finished=false,expired=false,timer,identity;
   const finish=code=>{if(finished)return;finished=true;clearTimeout(timer);resolve(code);};
-  try{child=spawn(command,args,{stdio:'inherit',windowsHide:true,detached:!windows});}catch{finish(127);return;}
+  // Windows 独立 Node 子树隔离控制台；不能直接 detached 启动 pwsh，否则可能退出 0 却未执行命令。
+  try{child=spawn(windows?process.execPath:command,windows?[fileURLToPath(import.meta.url),'windows-child',command,...args]:args,{stdio:'inherit',windowsHide:true,detached:true});}catch{finish(127);return;}
   child.once('error',()=>finish(127));
   child.once('close',code=>{if(!expired)finish(epoch()>deadline?124:(code??1));});
   // 创建事件之后立即捕获身份，快速命令已退出时无需终止任何进程。
@@ -69,7 +70,14 @@ export function recordReleasePhase(file,started,phase,exitCode,finished=epoch())
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const [mode,...args]=process.argv.slice(2);
  try{
-  if(mode==='run')process.exitCode=await runReleaseBudget(Number(args[0]),args[1],args.slice(2));
+  if(mode==='windows-child'&&windows&&args[0]){
+   // 真实命令继承独立子树的标准流，保留原退出码；外层仍按该 Node 的 PID/启动时间清理整树。
+   process.exitCode=await new Promise(resolve=>{
+    const child=spawn(args[0],args.slice(1),{stdio:'inherit',windowsHide:true});
+    child.once('error',()=>resolve(127));child.once('close',code=>resolve(code??1));
+   });
+  }
+  else if(mode==='run')process.exitCode=await runReleaseBudget(Number(args[0]),args[1],args.slice(2));
   else if(mode==='record'){recordReleasePhase(args[0],Number(args[1]),args[2],Number(args[3]));process.exitCode=0;}
   else throw Error('Usage');
  }catch{process.stderr.write('Usage: release-budget.mjs run <deadlineEpochSeconds> <command> [...args] | record <absolute-jsonl> <startedEpochSeconds> <phase> <exitCode>\n');process.exitCode=2;}
