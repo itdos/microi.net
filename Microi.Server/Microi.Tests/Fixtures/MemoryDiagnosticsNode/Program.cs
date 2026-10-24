@@ -11,6 +11,17 @@ using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
 
 // 隔离测试宿主：只使用测试租户和指定的本机测试数据库。
+// 真实子进程探针只读本机容量，不启动API、连接数据库或分配大块内存。
+if (args.FirstOrDefault() == "process-memory-capacity")
+{
+    var capacity = ProcessMemoryCapacity.Detect();
+    Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+    {
+        capacity.TotalBytes, capacity.Source,
+        GcAvailableBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes
+    }));
+    return;
+}
 if (args.FirstOrDefault() == "incident-acceptance") { await IncidentDurabilityAcceptance.Run(Path.GetFullPath(args[1])); return; }
 if (args.FirstOrDefault() == "incident-repository") { IncidentDurabilityFixture.RepositoryRegression(); return; }
 if (args.FirstOrDefault() == "incident")
