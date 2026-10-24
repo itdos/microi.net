@@ -250,11 +250,13 @@ for(const mode of ['success','after-scan-byte-drift','after-scan-added-package',
   fs.writeFileSync(path.join(f.root,'.gitignore'),'/evidence.json\n/pending.nul\n/.tmp/\n'+candidateRepos.slice(1).map(repo=>'/'+repo+'/').join('\n')+'\n');
   const candidate=path.join(f.root,'.tmp/verified-candidate.json'),probe=path.join(f.root,'candidate-source.txt');
   fs.writeFileSync(probe,'accepted source');
-  const environment={...process.env};
-  for(const key of ['MICROI_RELEASE_COMPOSITION_FILE','CustomAfterMicrosoftCommonTargets','PrivateRulesProject','ApprovedRulesBootstrapSource','MicroiCoreProject'])delete environment[key];
+  // 此处验证既有 Full NuGet 制品；临时空仓不得继承外层正式 PlatformRelease 的候选与私有配置。
+  const environment={...process.env,MICROI_RELEASE_TEST_POLICY:'Full'};
+  for(const key of ['MICROI_RELEASE_CANDIDATE','MICROI_RELEASE_TEST_RECEIPT','MICROI_RELEASE_SMOKE_CONFIG','MICROI_RELEASE_COMPOSITION_FILE','CustomAfterMicrosoftCommonTargets','PrivateRulesProject','ApprovedRulesBootstrapSource','MicroiCoreProject'])delete environment[key];
   execFileSync(process.execPath,[path.join(f.server,'tools/release-candidate.mjs'),'capture',candidate],{cwd:f.root,env:environment});
   if(mode==='candidate-rejected')fs.appendFileSync(probe,' changed before first upload');
   const source=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
+  const budgetFunctions=source.slice(source.indexOf('# 从交互选项完成开始计时'),source.indexOf('# Windows (Git Bash) 下'));
   const begin=source.indexOf('# ─── 阶段（条件）: NuGet 推送'),end=source.indexOf('# ─── 阶段（条件）: 推送 Docker 镜像',begin);
   assert.ok(begin>0&&end>begin);
   const quote=value=>"'"+value.replaceAll('\\','/').replaceAll("'","'\\''")+"'";
@@ -264,6 +266,7 @@ for(const mode of ['success','after-scan-byte-drift','after-scan-added-package',
   const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:f.root,env:environment,encoding:'utf8',input:`
 print_phase(){ :; }; print_step(){ :; }; print_success(){ :; }; print_warning(){ :; }
 print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
+${budgetFunctions}
 PUSH_NUGET=true; HAS_ENCRYPT=true; DLL_ENCRYPTED=true; NUPKG_REPLACED=true
 VERSION=8.5.2; PUBLISH_DIR=${quote(f.directory)}; MICROI_ENCRYPTION_RECEIPT=${quote(f.file)}
 MICROI_RELEASE_GATE_DIR="$PWD/.tmp/microi-release-gate"
