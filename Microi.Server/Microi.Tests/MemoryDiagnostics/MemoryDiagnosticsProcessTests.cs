@@ -19,6 +19,47 @@ public sealed class MemoryDiagnosticsProcessTests
         Assert.Contains("\"Passed\":", output, StringComparison.Ordinal);
     }
 
+    public static bool IsWindowsPhysicalMemoryProbe => OperatingSystem.IsWindows();
+
+    [Fact(Skip = "Requires Windows native physical memory", SkipUnless = nameof(IsWindowsPhysicalMemoryProbe))]
+    public async Task ProcessMemoryCapacity_UsesWindowsPhysicalMemoryDespiteGcHeapHardLimit()
+    {
+        // 独立CIM读回OS可见物理容量，不用被测provider或GC堆预算充当期望值。
+        var start = new ProcessStartInfo("powershell.exe")
+        {
+            UseShellExecute = false, CreateNoWindow = true,
+            RedirectStandardOutput = true, RedirectStandardError = true
+        };
+        foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-Command",
+                     "[Console]::Write(([uint64](Get-CimInstance Win32_OperatingSystem).TotalVisibleMemorySize * 1024).ToString([Globalization.CultureInfo]::InvariantCulture))" })
+            start.ArgumentList.Add(arg);
+        using var physical = Process.Start(start) ?? throw new InvalidOperationException("Windows physical memory probe failed to start.");
+        var stdout = physical.StandardOutput.ReadToEndAsync();
+        var stderr = physical.StandardError.ReadToEndAsync();
+        try
+        {
+            await physical.WaitForExitAsync(TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            if (!physical.HasExited) await StopCapacityProbeAsync(physical);
+        }
+        var physicalText = await stdout;
+        await stderr;
+        Assert.True(physical.ExitCode == 0, "Windows physical memory probe failed.");
+        Assert.True(long.TryParse(physicalText, System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var physicalBytes), "Windows physical capacity is not an integer.");
+        Assert.True(physicalBytes >= 128L * 1024 * 1024, "Windows physical capacity is unavailable.");
+
+        var output = await RunFixtureAsync(TimeSpan.FromSeconds(30), "process-memory-capacity");
+        using var state = JsonDocument.Parse(output);
+        Assert.Equal(256L * 1024 * 1024, state.RootElement.GetProperty("GcAvailableBytes").GetInt64());
+        Assert.Equal("WindowsGlobalMemoryStatusEx", state.RootElement.GetProperty("Source").GetString());
+        Assert.Equal(physicalBytes, state.RootElement.GetProperty("TotalBytes").GetInt64());
+        Assert.True(physicalBytes > state.RootElement.GetProperty("GcAvailableBytes").GetInt64());
+    }
+
     [Fact]
     public async Task ObservationBenchmark_KeepsAllScriptResultsCorrect()
     {
@@ -175,13 +216,32 @@ public sealed class MemoryDiagnosticsProcessTests
         Assert.True(File.Exists(Fixture), $"内存诊断隔离夹具未构建：{Fixture}");
         var start = new ProcessStartInfo("dotnet") { UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardOutput = true, RedirectStandardError = true };
+        // 只有此容量探针使用小GC堆；正式Full/API及其它夹具原预算不变。
+        if (args.FirstOrDefault() == "process-memory-capacity")
+        {
+            start.Environment["DOTNET_GCHeapHardLimit"] = "0x10000000";
+            start.Environment["COMPlus_GCHeapHardLimit"] = "0x10000000";
+        }
         start.ArgumentList.Add(Fixture);
         foreach (var arg in args) start.ArgumentList.Add(arg);
         using var process = Process.Start(start) ?? throw new InvalidOperationException("无法启动内存诊断隔离夹具。");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        try { await process.WaitForExitAsync().WaitAsync(timeout); }
-        catch (TimeoutException) { await StopAsync(process); throw; }
+        var capacityProbe = args.FirstOrDefault() == "process-memory-capacity";
+        try
+        {
+            if (capacityProbe)
+                await process.WaitForExitAsync(TestContext.Current.CancellationToken)
+                    .WaitAsync(timeout, TestContext.Current.CancellationToken);
+            else
+                await process.WaitForExitAsync().WaitAsync(timeout);
+        }
+        catch (Exception probeFailure) when (probeFailure is TimeoutException || (capacityProbe && probeFailure is OperationCanceledException))
+        {
+            if (capacityProbe) await StopCapacityProbeAsync(process);
+            else await StopAsync(process);
+            throw;
+        }
         var output = await stdout;
         var error = await stderr;
         Assert.True(process.ExitCode == 0, $"隔离夹具退出码 {process.ExitCode}。输出：{output[^Math.Min(output.Length, 3000)..]} 错误：{error[^Math.Min(error.Length, 3000)..]}");
@@ -194,6 +254,14 @@ public sealed class MemoryDiagnosticsProcessTests
         while (!File.Exists(path) && DateTime.UtcNow < deadline && !process.HasExited)
             await Task.Delay(100);
         Assert.True(File.Exists(path), $"隔离夹具没有就绪：{path}，退出码：{(process.HasExited ? process.ExitCode : -1)}");
+    }
+
+    private static async Task StopCapacityProbeAsync(Process process)
+    {
+        // 只接收本测试刚创建的probe；cleanup不复用已取消的TestContext token。
+        try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
+        catch (InvalidOperationException) { /* 子进程可能恰好自行退出。 */ }
+        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     private static async Task StopAsync(Process process)
