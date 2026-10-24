@@ -147,6 +147,8 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 服务器暂未部署修复且普通应用产物很小时，可把 `StorageMode=db` 与内联 `ContentBase64` 作为短期恢复手段；必须明确记录为临时方案。修复部署后重新流式发布到公有 HDFS，并恢复 `StorageMode=file`。只有上一条满足严格资源策略的受信任平台启动应用允许长期保留小型数据库产物；禁止借此把普通或大体积 JS/CSS 长期放进数据库 JSON。
 - 子租户发布时，源码、版本资产、回读验签、页面与缓存全部绑定当前 Token 的 `OsClient`；禁止回退到主租户或宿主服务器默认租户。切换前必须由当前 API 节点通过该子租户 HDFS 配置读回每个版本文件并校验大小/SHA-256。
 - CDN 同一不可变对象返回 200 而 API 稳定入口返回 404 时，先检查 API 读取到的当前租户 `FileServer`（含公有桶路径）和已提交 `ReleasePrefix`，不能把默认域名回退当作恢复。配置读取必须将 dynamic 数据显式转为 object/JObject，再调用扩展方法；缺失或无效配置失败关闭。
+- CDN 刷新先验证当前租户可信 `FileServer` 与已校验路径组成的绝对 HTTP(S) 地址，拒绝 UserInfo、Query、Fragment。只有主机名精确匹配 `static.itdos.com`（不区分大小写）才走官方阿里云刷新并强制 HTTPS，刷新资产与入口的 Authority（主机、端口）必须一致；其它合法 HTTP/HTTPS 域名或 IP 不适用官方刷新，不读取其凭据或提交刷新任务。
+- 私有 HTTP/IP 部署在对象投影通过后仍提示“固定入口缺少 HTTPS 公有文件域名”时，应升级 API 的刷新目标分类逻辑，不要求客户为此修改业务源码或伪造 HTTPS 地址。不适用刷新不等于已执行 purge，也不能跳过对象大小/SHA-256 回读、租户隔离与原 RequestId/finalize 门禁；原任务完成和页面实际可用继续分别验收。
 - 首次 CDN 投影的目标尚不存在时，只有提供商验证的明确 `NoSuchKey` 才允许从已校验版本补写。MinIO/S3 必须实际签名 GET 返回 HTTP 404，并完整读取不超过 8 KiB 的合法 S3 XML；精确 Code 与可选 Key/BucketName 均校验通过。OSS 只接受实际 SDK 服务异常的精确 ErrorCode。HDFS 通过 `DataAppend.StorageReadErrorCode=NoSuchKey` 传递语义，MinIO/S3 同时提供 `StorageReadHttpStatusCode=404`；发布器不得按 Msg、路径或桶名中的词推断。普通代理 404、缺桶、拒绝访问、未知错误及不完整读取仍失败关闭。
 - 旧 API 丢失错误码或仍按诊断文字分类时需升级全部 API 节点。恢复 `RepairRequired / ProjectionPending` 前回读原任务，再保留首次 finalize 的 RequestId、版本、清单哈希与原前置条件重放；禁止手工改状态、删除版本或新建同版本发布。验收必须含 Completed、投影完成、服务/页面登记、稳定/版本入口和资产哈希及真实交互。
 - `microi-platform-service` 等受信任 DatabaseOnly 平台包以 `sys_microiservice.StorageMode=db / MsUrl=db` 和内联已验签字节为运行事实。安装后的 `PublicPublishPath=micro-app/{AppKey}/{Version}` 可以没有租户前缀；不能仅凭该字段补前缀或强改为 file。普通 file 应用则核对每项 HdfsPath/FilePathName、当前租户 FileServer 与真实对象。

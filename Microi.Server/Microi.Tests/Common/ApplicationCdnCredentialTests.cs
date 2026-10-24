@@ -9,6 +9,73 @@ namespace Microi.Tests.Common;
 
 public class ApplicationCdnCredentialTests
 {
+    private static (Uri Target, bool Required, string Error) RefreshTarget(string url)
+    {
+        var method = typeof(V8McpLogic).GetMethod("ResolveApplicationCdnRefreshTarget",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return ((Uri, bool, string))method.Invoke(null, new object[] { url })!;
+    }
+
+    [Theory]
+    [InlineData("http://192.0.2.20:9000/public/tenant/micro-app/planner/index.html")]
+    [InlineData("http://[::1]:9000/public/tenant/micro-app/planner/index.html")]
+    [InlineData("http://storage.internal:9000/public/tenant/micro-app/planner/index.html")]
+    [InlineData("https://storage.example/public/tenant/micro-app/planner/index.html")]
+    [InlineData("https://static.itdos.com.example/public/tenant/micro-app/planner/index.html")]
+    public void NonOfficialStorageDoesNotRequireAliyunPurge(string url)
+    {
+        var result = RefreshTarget(url);
+        Assert.Null(result.Error);
+        Assert.False(result.Required);
+        Assert.Equal(new Uri(url), result.Target);
+    }
+
+    [Theory]
+    [InlineData("https://static.itdos.com/tenant/micro-app/planner/index.html")]
+    [InlineData("https://STATIC.ITDOS.COM/tenant/micro-app/planner/index.html")]
+    public void OfficialCdnStillRequiresAuthenticatedRefresh(string url)
+    {
+        var result = RefreshTarget(url);
+        Assert.Null(result.Error);
+        Assert.True(result.Required);
+    }
+
+    [Theory]
+    [InlineData("http://static.itdos.com/tenant/micro-app/planner/index.html")]
+    [InlineData("https://user:secret@static.itdos.com/tenant/index.html")]
+    [InlineData("http://user:secret@192.0.2.20/public/tenant/index.html")]
+    [InlineData("https://static.itdos.com/tenant/index.html?credential=unsafe")]
+    [InlineData("http://storage.internal/public/tenant/index.html#fragment")]
+    [InlineData("ftp://storage.internal/public/tenant/index.html")]
+    [InlineData("/tenant/micro-app/planner/index.html")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void InvalidOrDowngradedCdnTargetFailsClosed(string url)
+    {
+        var result = RefreshTarget(url);
+        Assert.NotNull(result.Error);
+        Assert.DoesNotContain("secret", result.Error);
+        Assert.DoesNotContain("unsafe", result.Error);
+    }
+
+    [Theory]
+    [InlineData("https://static.itdos.com/tenant/micro-app/planner/assets/main.js", true)]
+    [InlineData("http://static.itdos.com/tenant/micro-app/planner/assets/main.js", false)]
+    [InlineData("https://other.example/tenant/micro-app/planner/assets/main.js", false)]
+    [InlineData("https://static.itdos.com.example/tenant/micro-app/planner/assets/main.js", false)]
+    [InlineData("https://static.itdos.com:444/tenant/micro-app/planner/assets/main.js", false)]
+    [InlineData("https://user:secret@static.itdos.com/tenant/micro-app/planner/assets/main.js", false)]
+    [InlineData("https://static.itdos.com/tenant/micro-app/planner/assets/main.js?credential=unsafe", false)]
+    public void RefreshAssetsCannotChangeTrustedAuthorityOrTransport(string url, bool expected)
+    {
+        var method = typeof(V8McpLogic).GetMethod("IsApplicationCdnRefreshAssetUrl",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        Assert.Equal(expected, method.Invoke(null, new object[] { url,
+            new Uri("https://static.itdos.com/tenant/micro-app/planner/index.html") }));
+    }
+
     private static bool IsMissingPublicObject(DosResult result)
     {
         var method = typeof(V8McpLogic).GetMethod("IsApplicationCdnMissingPublicObject",
