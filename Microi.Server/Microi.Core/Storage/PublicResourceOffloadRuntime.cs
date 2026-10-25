@@ -345,6 +345,9 @@ return 1";
                     throw new InvalidOperationException("ReplicaExistenceUnknown");
             }
             // 大文件不进入 V8/JSON/byte[]；独占临时文件在成功、失败和取消路径均关闭并回收。
+            var scratch = new DriveInfo(Path.GetTempPath());
+            if (asset.Value<long>("Size") > scratch.AvailableFreeSpace - 64L * 1024 * 1024)
+                throw new InvalidOperationException("ReplicaScratchSpaceInsufficient");
             var temporary = Path.Combine(Path.GetTempPath(), "microi-public-replica-" + Guid.NewGuid().ToString("N"));
             try
             {
@@ -528,7 +531,7 @@ return 1";
             "CurrentPublicVersionRequired", "CommittedRuntimeRequired", "CommittedRuntimeManifestMismatch",
             "VerifiedDayThresholdRequired", "PublicSourceChangedDuringCopy", "BackupStorageCapabilityMissing",
             "BackupPublicReadNotConfirmed", "ExistingReplicaMismatch", "ReplicaExistenceUnknown", "SourceReadOrSizeMismatch",
-            "SourceHashMismatch", "SourceSizeLimitExceeded", "BackupWriteNotConfirmed", "BackupReadbackMismatch",
+            "SourceHashMismatch", "SourceSizeLimitExceeded", "ReplicaScratchSpaceInsufficient", "BackupWriteNotConfirmed", "BackupReadbackMismatch",
             "InvalidBackupPublicUrl", "BackupAnonymousReadFailed", "BackupContentTypeMismatch", "BackupCorsNotConfirmed",
             "BackupAnonymousHashMismatch", "BackupRangeNotConfirmed", "CompleteDayRequired", "CloudReadActionDenied",
             "CloudReadCredentialsIncomplete", "CloudReadCredentialsMissing", "CloudReportReadFailed", "CloudReportTooLarge", "CloudReportRejected"
