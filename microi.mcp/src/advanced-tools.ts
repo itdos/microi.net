@@ -51,7 +51,7 @@ type ManifestRelationContract = {
 const WF_MARKER_BEGIN = '/* MICROI_WF_LINE_CONDITION_JSON';
 const WF_MARKER_END = 'MICROI_WF_LINE_CONDITION_JSON */';
 
-const jsonRecordSchema = z.record(z.unknown());
+const jsonRecordSchema = z.record(z.string(), z.unknown());
 
 function textResult(text: string, isError = false): ToolResult {
   return { content: [{ type: 'text', text }], isError };
