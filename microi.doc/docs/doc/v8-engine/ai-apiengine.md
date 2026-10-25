@@ -180,7 +180,7 @@ node --max-old-space-size=512 --import tsx --test --test-concurrency=1 src/manif
 
 产物记录任务/工具源码哈希、实际返回模型、输入输出哈希、完成态、首文本/总耗时、供应商 usage、逐项正确性和全部失败。用量缺失记未知，缓存/推理用量只抄录供应商返回值，未核验价格时不计算费用。模拟服务只用于运行器回归测试，必须标为 `harness-test`，不能充当 `real-provider` 成绩。
 
-2026-10-26 首次按协议 1.0.0 执行 6 次真实调用，0 次通过：5 次流未完整、1 次截断，6 次均未通过 JSON 校验；供应商报告合计 4,693 Token。随后诊断发现默认思考文本与上游结束帧兼容问题。原失败记录保留在[公开运行方法与脱敏结果](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/ai-quality)，没有改写旧成绩。
+2026-10-26 首次按协议 1.0.0 执行 6 次真实调用，0 次通过：5 次流未完整、1 次截断，6 次均未通过 JSON 校验；供应商报告合计 4,693 Token。随后诊断发现默认思考文本与上游结束帧兼容问题。原失败记录保留在[公开运行方法与脱敏结果](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/ai-quality)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/ai-quality)），没有改写旧成绩。
 
 在两个官方 API 均观察到 8.7.1 后，按协议 1.1.0 固定参数执行新一轮 6 次：六次流和 JSON 均完整，计划验收共 4/6；无上下文组 1/3、固定平台上下文组 3/3。供应商输入 1,750、输出 329、总计 2,079 Token，与六条新增账本和累计用量增量一致。两项未通过分别涉及无上下文组的身份/租户边界和提交计划；未执行模型计划，不是实际业务越权或事务事故。固定上下文组总用量为 1,089，无上下文组为 990，不能据此声称节省 Token。该批改变了思考设置，新旧批次不能用于推导效率提升倍数；单轮三任务也不代表稳定成功率或完整系统交付率。
 
