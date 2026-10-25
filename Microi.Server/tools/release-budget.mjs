@@ -31,7 +31,7 @@ async function stopPosixGroup(pid){
  throw Error('Owned process group did not exit');
 }
 
-// 所有阶段传入同一个绝对 deadline；阶段切换不重置预算，也不能把超时写成成功。
+// 显式单操作硬超时保留原行为；普通平台发布只调用下方 runReleaseTarget，不因总耗时杀进程。
 export function runReleaseBudget(deadline,command,args=[]){
  if(!validEpoch(deadline)||!command)throw Error('Invalid release deadline or command');
  const remaining=deadline*1000-Date.now();
@@ -53,7 +53,23 @@ export function runReleaseBudget(deadline,command,args=[]){
  });
 }
 
-// 小型 JSONL 时序回执只包含阶段与时间。追加必须沿用同一次启动/截止时间。
+// 30 分钟是整个发布的耗时目标。到点只告警，不给正在执行或后续命令制造 124。
+// 不创建 detached 子树，使普通取消继续沿宿主进程组传播；命令自身超时/失败仍原样返回。
+export function runReleaseTarget(target,command,args=[]){
+ if(!validEpoch(target)||!command)throw Error('Invalid release target or command');
+ return new Promise(resolve=>{
+  let child,finished=false,timer;
+  const finish=code=>{if(finished)return;finished=true;clearTimeout(timer);resolve(code);};
+  const warn=()=>process.stderr.write('PlatformRelease exceeded the 30-minute elapsed-time target; continuing release and recording the overrun.\n');
+  const remaining=target*1000-Date.now();
+  if(remaining<=0)warn();else timer=setTimeout(warn,Math.min(remaining,2147483647));
+  try{child=spawn(command,args,{stdio:'inherit',windowsHide:true});}catch{finish(127);return;}
+  child.once('error',()=>finish(127));
+  child.once('close',(code,signal)=>finish(code??(signal==='SIGINT'?130:signal==='SIGTERM'?143:1)));
+ });
+}
+
+// 小型 JSONL 时序回执沿用同一次开始/目标时间；发布成功与耗时达标分别记录。
 export function recordReleasePhase(file,started,phase,exitCode,finished=epoch()){
  if(!path.isAbsolute(file)||!validEpoch(started)||!validEpoch(finished)||finished<started||!Number.isInteger(exitCode)||exitCode<0||exitCode>255||typeof phase!=='string'||!phase.length||phase.length>160||/[\r\n\u0000-\u001f]/.test(phase))throw Error('Invalid release phase record');
  let previous=null;
@@ -63,7 +79,8 @@ export function recordReleasePhase(file,started,phase,exitCode,finished=epoch())
   if(previous.scope!=='PlatformRelease'||previous.startedEpochSeconds!==started||previous.deadlineEpochSeconds!==started+1800||previous.finishedEpochSeconds>finished)throw Error('Release budget record belongs to another run');
  }
  const phaseStarted=previous?.finishedEpochSeconds??started;
- const record={schemaVersion:1,scope:'PlatformRelease',startedEpochSeconds:started,deadlineEpochSeconds:started+1800,phase,phaseStartedEpochSeconds:phaseStarted,finishedEpochSeconds:finished,elapsedSeconds:finished-phaseStarted,totalElapsedSeconds:finished-started,exitCode,withinBudget:finished<=started+1800};
+ // deadlineEpochSeconds 保留兼容旧读者；新字段明确这是告警目标而不是强制终止时间。
+ const record={schemaVersion:1,scope:'PlatformRelease',budgetPolicy:'advisory',startedEpochSeconds:started,deadlineEpochSeconds:started+1800,targetEpochSeconds:started+1800,phase,phaseStartedEpochSeconds:phaseStarted,finishedEpochSeconds:finished,elapsedSeconds:finished-phaseStarted,totalElapsedSeconds:finished-started,exitCode,withinBudget:finished<=started+1800,targetExceeded:finished>started+1800};
  fs.appendFileSync(file,JSON.stringify(record)+'\n');return record;
 }
 
@@ -78,7 +95,8 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
    });
   }
   else if(mode==='run')process.exitCode=await runReleaseBudget(Number(args[0]),args[1],args.slice(2));
+  else if(mode==='run-target')process.exitCode=await runReleaseTarget(Number(args[0]),args[1],args.slice(2));
   else if(mode==='record'){recordReleasePhase(args[0],Number(args[1]),args[2],Number(args[3]));process.exitCode=0;}
   else throw Error('Usage');
- }catch{process.stderr.write('Usage: release-budget.mjs run <deadlineEpochSeconds> <command> [...args] | record <absolute-jsonl> <startedEpochSeconds> <phase> <exitCode>\n');process.exitCode=2;}
+ }catch{process.stderr.write('Usage: release-budget.mjs run-target <targetEpochSeconds> <command> [...args] | run <deadlineEpochSeconds> <command> [...args] | record <absolute-jsonl> <startedEpochSeconds> <phase> <exitCode>\n');process.exitCode=2;}
 }

@@ -147,31 +147,23 @@ if [ "$MICROI_FULL_ONLY" = true ]; then
     export MICROI_RELEASE_TEST_POLICY=Full
 fi
 
-# 从交互选项完成开始计时，所有重任务共用同一个 30 分钟截止时间。
+# 从交互选项完成开始计时，所有重任务共用同一个 30 分钟目标；超过目标仍继续发布。
+# 保留 DEADLINE 变量名兼容时序回执，但它仅用于衡量耗时，不能中止命令或改写真实退出码。
 MICROI_RELEASE_DEADLINE=""
 MICROI_RELEASE_PHASE=""
 MICROI_RELEASE_BUDGET_TOOL=""
-MICROI_RELEASE_BUDGET_FAILURE_FILE=""
+MICROI_RELEASE_TARGET_WARNED=false
 check_release_budget() {
-    if [ -n "$MICROI_RELEASE_BUDGET_FAILURE_FILE" ] && [ -f "$MICROI_RELEASE_BUDGET_FAILURE_FILE" ]; then
-        local _budget_failure
-        _budget_failure=$(cat "$MICROI_RELEASE_BUDGET_FAILURE_FILE")
-        case "$_budget_failure" in 124|125) exit "$_budget_failure" ;; esac
+    if [ -n "$MICROI_RELEASE_DEADLINE" ] && [ "$(date +%s)" -gt "$MICROI_RELEASE_DEADLINE" ] && [ "$MICROI_RELEASE_TARGET_WARNED" != true ]; then
+        echo "平台发布已超过 30 分钟耗时目标，记录未达标并继续发布；真实错误和单项超时仍会阻止失败步骤。" >&2
+        MICROI_RELEASE_TARGET_WARNED=true
     fi
-    if [ -n "$MICROI_RELEASE_DEADLINE" ] && [ "$(date +%s)" -ge "$MICROI_RELEASE_DEADLINE" ]; then
-        echo "平台发布已达到 30 分钟总时限；停止后续操作，请查看阶段耗时回执。" >&2
-        exit 124
-    fi
+    return 0
 }
 run_release_command() {
     if [ -n "$MICROI_RELEASE_DEADLINE" ]; then
         check_release_budget
-        local _command_exit=0
-        node "$MICROI_RELEASE_BUDGET_TOOL" run "$MICROI_RELEASE_DEADLINE" "$@" || _command_exit=$?
-        if { [ "$_command_exit" -eq 124 ] || [ "$_command_exit" -eq 125 ]; } && [ ! -f "$MICROI_RELEASE_BUDGET_FAILURE_FILE" ]; then
-            printf '%s' "$_command_exit" > "$MICROI_RELEASE_BUDGET_FAILURE_FILE"
-        fi
-        return "$_command_exit"
+        node "$MICROI_RELEASE_BUDGET_TOOL" run-target "$MICROI_RELEASE_DEADLINE" "$@"
     else
         "$@"
     fi
@@ -319,12 +311,7 @@ finish_windows_session() {
     fi
     release_workspace_lock
     if [ -n "$MICROI_RELEASE_DEADLINE" ]; then
-        if [ "$(date +%s)" -ge "$MICROI_RELEASE_DEADLINE" ] && [ "$_exit_code" -eq 0 ]; then _exit_code=124; fi
-        if [ -f "$MICROI_RELEASE_BUDGET_FAILURE_FILE" ]; then
-            local _budget_failure
-            _budget_failure=$(cat "$MICROI_RELEASE_BUDGET_FAILURE_FILE")
-            case "$_budget_failure" in 124|125) _exit_code="$_budget_failure" ;; esac
-        fi
+        check_release_budget
         node "$MICROI_RELEASE_BUDGET_TOOL" record "$MICROI_RELEASE_TIMING_FILE" "$START_TIME" "${MICROI_RELEASE_PHASE:-结束}" "$_exit_code" || { [ "$_exit_code" -ne 0 ] || _exit_code=1; }
     fi
     if is_windows_shell && [ "$MICROI_SKIP_EXIT_PAUSE" != true ] && [ -t 0 ]; then
@@ -1100,9 +1087,8 @@ START_TIME=$(date +%s)
 if [ "$MICROI_FULL_ONLY" != true ]; then
     MICROI_RELEASE_DEADLINE=$((START_TIME + 1800))
     MICROI_RELEASE_TIMING_FILE="$MICROI_RELEASE_GATE_DIR/release-timing-${START_TIME}-$$.jsonl"
-    MICROI_RELEASE_BUDGET_FAILURE_FILE="$MICROI_RELEASE_GATE_DIR/release-budget-failure-${START_TIME}-$$.txt"
     if is_windows_shell; then MICROI_RELEASE_TIMING_FILE=$(cygpath -m "$MICROI_RELEASE_TIMING_FILE"); fi
-    print_info "普通发布总预算 30 分钟；阶段耗时记录: $MICROI_RELEASE_TIMING_FILE"
+    print_info "普通发布耗时目标 30 分钟；超过后告警并继续，阶段耗时记录: $MICROI_RELEASE_TIMING_FILE"
 fi
 
 # 按所选产品取得锁；Full 构建使用本次结果目录隔离，服务保持运行供业务回归。
@@ -2001,7 +1987,7 @@ docker_push_plan() {
         run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-recheck "$collision_receipt" "$full_tag" || print_fail "远端 Docker 标签在验收后变化，已停止发布。"
         run_release_command docker push "$full_tag"
         # 新推送与断点复用都须读回实际标签；本地 RepoDigest 与远端相同才落成功回执。
-        # 复用本轮绝对截止时间，不能把发布后校验移出 30 分钟预算或吞掉失败。
+        # 发布后校验计入同一耗时目标；超过 30 分钟仍执行校验，真实失败不能报告成功。
         run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-confirm "$collision_receipt" "$full_tag" "$_published_receipt" || print_fail "Docker 已推送，但远端摘要尚未确认；本标签不能报告发布完成，请查看回执后再重试。"
     done
 

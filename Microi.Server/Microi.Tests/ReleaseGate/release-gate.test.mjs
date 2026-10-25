@@ -361,19 +361,22 @@ test('real schedule stores belong to Full and their settings fail fast before bu
  }
 });
 
-for(const mode of ['PlatformRelease','Expired','Full'])test(`actual shell budget integration: ${mode}`,()=>{
+for(const mode of ['PlatformRelease','OverTarget','OverTargetFailure','OverTargetTimeout','OverTargetCancel','Full'])test(`actual shell elapsed-time target integration: ${mode}`,()=>{
  const directory=fs.mkdtempSync(path.join(root,'.tmp','release-budget-shell-'));
  const quote=value=>"'"+value.replaceAll('\\','/').replaceAll("'","'\\''")+"'";
  const start=source.indexOf('START_TIME=$(date +%s)',source.indexOf('# 开始执行')),finish=source.indexOf('# 按所选产品取得锁',start);
  const phaseStart=source.indexOf('print_phase() {'),phaseEnd=source.indexOf('print_step() {',phaseStart);
- assert.ok(start>0&&finish>start&&phaseStart>0&&phaseEnd>phaseStart);
- const now=Math.floor(Date.now()/1000),initial=mode==='PlatformRelease'?now:now-1801;
+ const exitStart=source.indexOf('finish_windows_session() {'),exitEnd=source.indexOf('if [[ "$OSTYPE"',exitStart);
+ assert.ok(start>0&&finish>start&&phaseStart>0&&phaseEnd>phaseStart&&exitStart>0&&exitEnd>exitStart);
+ const now=Math.floor(Date.now()/1000),late=mode.startsWith('OverTarget'),initial=late?now-1801:now;
+ const expected=mode==='OverTargetFailure'?7:mode==='OverTargetTimeout'?124:mode==='OverTargetCancel'?130:0;
  const marker=path.join(directory,'executed.txt');
  try{
-  // 回放真实初始化、阶段与命令包装器；只用本地短 Node 子进程，不调用编译器或 Docker。
+  // 回放真实初始化、阶段、命令包装器及退出回执；超过目标的成功与真实失败不能混为一谈。
   const result=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:root,encoding:'utf8',timeout:20000,input:`
 set -e
 print_info(){ :; }; is_windows_shell(){ return 1; }
+stop_active_client_build(){ :; }; cleanup_release_scratch(){ :; }; release_workspace_lock(){ :; }
 fixture_now=${initial}
 date(){ if [ "$1" = +%s ]; then printf '%s' "$fixture_now"; else command date "$@"; fi; }
 ${budgetFunctions}
@@ -382,39 +385,31 @@ MICROI_RELEASE_BUDGET_TOOL=${quote(path.join(root,'Microi.Server/tools/release-b
 MICROI_FULL_ONLY=${mode==='Full'?'true':'false'}
 ${source.slice(start,finish)}
 ${source.slice(phaseStart,phaseEnd)}
+${source.slice(exitStart,exitEnd)}
+trap finish_windows_session EXIT
 original_start="$START_TIME"; original_deadline="$MICROI_RELEASE_DEADLINE"
 fixture_now=${now}
-${mode==='Expired'?`
-set +e
-( run_release_command ${quote(process.execPath)} -e ${quote('require("fs").writeFileSync(process.argv[1],"unexpected")')} ${quote(marker)} )
-command_exit=$?
-( check_release_budget ); check_exit=$?
-set -e
-[ "$command_exit" = 124 ] && [ "$check_exit" = 124 ]
-printf 'EXPIRED_BEFORE_EXECUTION\\n'
-`:`
 for stage in tests build docker; do
   print_phase "$stage"
   [ "$START_TIME" = "$original_start" ] && [ "$MICROI_RELEASE_DEADLINE" = "$original_deadline" ]
-  run_release_command ${quote(process.execPath)} -e ${quote('require("fs").appendFileSync(process.argv[1],process.argv[2]+String.fromCharCode(10))')} ${quote(marker)} "$stage"
+  run_release_command ${quote(process.execPath)} -e ${quote('require("fs").appendFileSync(process.argv[1],process.argv[2]+String.fromCharCode(10));if(process.argv[2]==="build")process.exit(Number(process.argv[3]))')} ${quote(marker)} "$stage" ${expected}
 done
 if [ "$MICROI_FULL_ONLY" = true ]; then [ -z "$MICROI_RELEASE_DEADLINE" ]; else [ "$MICROI_RELEASE_DEADLINE" = "$((START_TIME + 1800))" ]; fi
-printf 'BUDGET_SCOPE_VALID\\n'
-`}
+printf 'TARGET_SCOPE_VALID\\n'
 `});
-  assert.ifError(result.error);assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
-  if(mode==='Expired'){
-   assert.match(result.stdout,/EXPIRED_BEFORE_EXECUTION/);assert.equal(fs.existsSync(marker),false);
-  }else{
-   assert.match(result.stdout,/BUDGET_SCOPE_VALID/);assert.equal(fs.readFileSync(marker,'utf8'),'tests\nbuild\ndocker\n');
-   const timing=fs.readdirSync(directory).filter(name=>name.startsWith('release-timing-'));
-   if(mode==='Full')assert.deepEqual(timing,[]);
-   else{
-    assert.equal(timing.length,1);
-    const rows=fs.readFileSync(path.join(directory,timing[0]),'utf8').trim().split('\n').map(JSON.parse);
-    assert.deepEqual(rows.map(row=>row.phase),['tests','build']);
-    assert.ok(rows.every(row=>row.startedEpochSeconds===initial&&row.deadlineEpochSeconds===initial+1800&&row.scope==='PlatformRelease'));
-   }
+  assert.ifError(result.error);assert.equal(result.status,expected,result.stdout+'\n'+result.stderr);
+  assert.equal(fs.readFileSync(marker,'utf8'),expected===0?'tests\nbuild\ndocker\n':'tests\nbuild\n');
+  if(expected===0)assert.match(result.stdout,/TARGET_SCOPE_VALID/);
+  if(late)assert.match(result.stderr,/超过 30 分钟耗时目标|exceeded the 30-minute/);
+  const timing=fs.readdirSync(directory).filter(name=>name.startsWith('release-timing-'));
+  if(mode==='Full')assert.deepEqual(timing,[]);
+  else{
+   assert.equal(timing.length,1);
+   const rows=fs.readFileSync(path.join(directory,timing[0]),'utf8').trim().split('\n').map(JSON.parse);
+   assert.deepEqual(rows.map(row=>row.phase),expected===0?['tests','build','docker']:['tests','build']);
+   assert.ok(rows.every(row=>row.startedEpochSeconds===initial&&row.targetEpochSeconds===initial+1800&&row.deadlineEpochSeconds===initial+1800&&row.scope==='PlatformRelease'&&row.budgetPolicy==='advisory'));
+   assert.equal(rows.at(-1).exitCode,expected);
+   assert.equal(rows.at(-1).targetExceeded,late);assert.equal(rows.at(-1).withinBudget,!late);
   }
  }finally{fs.rmSync(directory,{recursive:true});}
 });
