@@ -3,7 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const JUNCHI_PASSWORD = process.env.PW_JUNCHI_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || "";
@@ -24,13 +26,14 @@ test.use({
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
-function tenantUrl(osClient, apiBase = "") {
+function tenantUrl(osClient, apiBase = API_BASE) {
+    expect(osClient, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
     const query = new URLSearchParams({ OsClient: osClient });
     if (apiBase) query.set("ApiBase", apiBase);
     return `${FRONTEND}/?${query.toString()}`;
 }
 
-async function login(page, { osClient, password, apiBase = "" }) {
+async function login(page, { osClient, password, apiBase = API_BASE }) {
     await page.goto(tenantUrl(osClient, apiBase), { waitUntil: "domcontentloaded" });
     const account = page.locator([
         'input[placeholder*="用户名"]',
@@ -302,7 +305,7 @@ test("表单呈现契约：HTML 分组说明、页脚与必填统计由同一 Di
 test("本地接口引擎：通用关键词搜索在亮色与暗色主题下保持清晰等宽", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/api-engine");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/api-engine");
     const keywordInput = page.locator(".diy-table .keyword-search .keyword-input:visible").first();
     await expect(keywordInput).toBeVisible({ timeout: 45_000 });
 
@@ -331,7 +334,7 @@ test("本地接口引擎：通用关键词搜索在亮色与暗色主题下保�
 test("本地接口引擎表单：字段说明以紧凑灰字直显，不再使用信息图标", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/api-engine");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/api-engine");
     const firstRow = page.locator(".el-table__body-wrapper tbody tr").first();
     await expect(firstRow).toBeVisible({ timeout: 45_000 });
     await firstRow.dblclick();
@@ -372,7 +375,7 @@ test("本地接口引擎表单：字段说明以紧凑灰字直显，不再使�
 
 test("本地员工表单：日期与普通文本输入等高", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/diy-employee");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/diy-employee");
     const firstRow = page.locator(".el-table__body-wrapper tbody tr").first();
     await expect(firstRow).toBeVisible({ timeout: 45_000 });
     await firstRow.dblclick();
@@ -396,7 +399,7 @@ test("本地员工表单：日期与普通文本输入等高", async ({ page }) 
 test("记录工作台：合并头部、表格弹层同构、跨模块通用、移动适配与页签去重", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/system-config");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/system-config");
 
     await expect(page.locator(".module-form-workbench")).toBeVisible({ timeout: 45_000 });
     await expect.poll(() => page.url(), { timeout: 30_000 }).toMatch(/#\/system-config\?[^#]*RecordId=[^&#]+/);
@@ -537,7 +540,7 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
 
     const systemRecordId = await page.evaluate(() => new URLSearchParams(location.hash.split("?")[1] || "").get("RecordId"));
     expect(systemRecordId).toBeTruthy();
-    await page.goto(`${tenantUrl("iTdos")}#/system-config?RecordId=${encodeURIComponent(systemRecordId)}&ViewMode=Table`, {
+    await page.goto(`${tenantUrl(OS_CLIENT)}#/system-config?RecordId=${encodeURIComponent(systemRecordId)}&ViewMode=Table`, {
         waitUntil: "domcontentloaded"
     });
     await expect(page.locator(".module-form-workbench")).toHaveCount(0, { timeout: 45_000 });
@@ -563,7 +566,7 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
     await expect(modernForm).toBeHidden({ timeout: 15_000 });
 
     const apiRecordId = "01M0E5HKF6E2XQ32P8X1QMH4X5";
-    await page.goto(`${tenantUrl("iTdos")}#/api-engine?RecordId=${apiRecordId}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${tenantUrl(OS_CLIENT)}#/api-engine?RecordId=${apiRecordId}`, { waitUntil: "domcontentloaded" });
     const apiWorkbench = page.locator(".module-form-workbench:visible").last();
     await expect(apiWorkbench).toBeVisible({ timeout: 45_000 });
     await expect(apiWorkbench.locator(".diy-form-embedded-workbench")).toBeVisible({ timeout: 45_000 });
@@ -638,7 +641,7 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
     await expect.poll(() => page.evaluate(() => document.body.classList.contains("diy-form-print-mode"))).toBe(false);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(`${tenantUrl("iTdos")}#/system-config?RecordId=${encodeURIComponent(systemRecordId)}`, {
+    await page.goto(`${tenantUrl(OS_CLIENT)}#/system-config?RecordId=${encodeURIComponent(systemRecordId)}`, {
         waitUntil: "domcontentloaded"
     });
     const mobileWorkbench = page.locator(".module-form-workbench:visible").last();
@@ -674,7 +677,7 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
 test("联系人弹层：单分组满宽、紧凑记录工具、原地切换与通用打印", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/contact");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/contact");
 
     const table = page.locator(".el-table__body-wrapper").first();
     const firstRow = table.locator("tbody tr").first();
@@ -769,7 +772,7 @@ test("系统设置：安全与服务接入统一弹层、紧凑卡片与平台�
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     const runtimeDiagnostics = collectMicroAppDiagnostics(page);
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/system-config");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/system-config");
     await expect(page.locator(".module-form-workbench")).toBeVisible({ timeout: 45_000 });
 
     const entry = page.getByRole("button", { name: /安全与服务接入|Security.*Service Access/i }).first();
@@ -914,7 +917,7 @@ test("本地员工详情：通用搜索工具栏与日期、单选对齐", async
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, "#/diy-employee");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/diy-employee");
     const firstRow = page.locator(".el-table__body-wrapper tbody tr").first();
     await expect(firstRow).toBeVisible({ timeout: 45_000 });
     await firstRow.dblclick();
@@ -1003,7 +1006,7 @@ test("本地表单设计器：开关双击只打开开关专项配置", async ({
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await openTenantRoute(
         page,
-        { osClient: "iTdos", password: LOCAL_PASSWORD },
+        { osClient: OS_CLIENT, password: LOCAL_PASSWORD },
         "#/diy/diy-design/c8570fa6-c10f-4014-8cb4-4b046e7ba69c?PageType="
     );
 
@@ -1062,7 +1065,7 @@ test("指定表单设计器：单行文本、Tabs276 与 FileUpload20 拖动后�
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await openTenantRoute(
         page,
-        { osClient: "iTdos", password: LOCAL_PASSWORD },
+        { osClient: OS_CLIENT, password: LOCAL_PASSWORD },
         "#/diy/diy-design/4232ebac-abb7-4981-b0de-a8bdad5dc53a?PageType="
     );
 
@@ -1251,7 +1254,7 @@ test("指定表单设计器：Autocomplete43 值变更事件保存后刷新仍�
     const initialResultPromise = page
         .waitForResponse(isTargetFieldListResponse, { timeout: 45_000 })
         .then((response) => response.json());
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, routeHash);
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, routeHash);
     const initialResult = await initialResultPromise;
     const initialField = initialResult.Data.find((item) => item.Name === "Autocomplete43");
     expect(initialField, "Autocomplete43 initial backend readback").toBeTruthy();
@@ -1301,7 +1304,7 @@ test("历史 Button 物理 V8Code：列表、字数与编辑器均完整回读",
         }, { timeout: 45_000 })
         .then((response) => response.json());
 
-    await openTenantRoute(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, routeHash);
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, routeHash);
     const fieldListResult = await fieldListPromise;
     expect(Number(fieldListResult.Code), fieldListResult.Msg || "GetDiyFieldList failed").toBe(1);
     const buttonField = fieldListResult.Data.find((field) => field.Name === "BtnDisplayPwd");
@@ -1341,7 +1344,7 @@ test("平台通用 Dialog：代码编辑器具备统一标题、圆角与拖动�
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await openTenantRoute(
         page,
-        { osClient: "iTdos", password: LOCAL_PASSWORD },
+        { osClient: OS_CLIENT, password: LOCAL_PASSWORD },
         "#/diy/diy-design/4232ebac-abb7-4981-b0de-a8bdad5dc53a?PageType="
     );
     await chooseDesignerField(page, "Autocomplete43");
@@ -1398,7 +1401,7 @@ test("指定表单设计器：复制字段发送完整且字符串化的新增�
     });
     await openTenantRoute(
         page,
-        { osClient: "iTdos", password: LOCAL_PASSWORD },
+        { osClient: OS_CLIENT, password: LOCAL_PASSWORD },
         "#/diy/diy-design/4232ebac-abb7-4981-b0de-a8bdad5dc53a?PageType="
     );
 

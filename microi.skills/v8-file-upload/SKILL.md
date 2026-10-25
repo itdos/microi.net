@@ -98,6 +98,14 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 使用 i_app_cdn_backfill 的 RepairCommittedCdnAliases 前，必须读取[完整绑定、范围与并发边界](references/cdn-alias-repair.md)。保持默认 DryRun、原始字节哈希与 Base64 摘要分离，并独立回读实际 CDN 字节。
 
+### 历史安装应用的持久别名检查点
+
+- `LegacyUnverified`、协议 2 的已安装微服务可能由后台补齐稳定入口。旧版每 30 秒扫描并反复全读版本与别名对象，会产生与浏览器/CDN 访问无关的 SDK 存储出流量；先按访问日志核对调用方、对象路径及周期，不能仅用 CDN 用量解释 OSS 公网账单。
+- 后端使用受保护 `mci_ai_app_version.BuildLog` 的独立两键对象 `{Contract:'InstalledAliasReconciliation/1',Checkpoint:{...}}`；检查点字段为 `AuthorityHash/Status/Attempt/StablePasses/UpdatedAtUtc/NextCheckAtUtc`，状态仅 `Verifying/Retrying/Verified`。未知非空日志或非法结构拒绝接管，禁止人工清空日志或伪造 `Verified` 来节流。
+- `AuthorityHash` 绑定规范化租户及完整权威应用、版本、服务、公开文件清单；只排除检查点自身，保留版本 `UpdateTime` 发现同版本重装。元数据变更使检查点立即失效，下一轮恢复全量校验。写入只条件更新所属版本的 `BuildLog`，不改 `UpdateTime`、`LegacyUnverified`、协议号、active/committed 指针或 V3 成功状态。
+- 初次成功后等待 5 分钟，第二次稳定成功后等待 30 分钟，第三次及以后每日复核；发生修复复制重新累计稳定次数。失败按 5/10/20/40/60 分钟退避并封顶。先持久化 `Verifying` 再读对象，硬重启仍遵守等待；保存失败不开始昂贵读取。全程持有共享发布租约，结果按主库完整权威和日志独立回读确认，响应未知不能盲重做。
+- 只读验收结合 `VerifiedCheckpointSkipped/RetryBackoffSkipped/NextCheckAtUtc` 与对象存储访问日志，覆盖等待内零重复读取、元数据变更、失败恢复和多个节点。需确认实际 API 节点已部署修复；文档、单测、镜像上传不等于生产节流生效，也不把检查点成功当成正式 V3 发布回执。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=v8-file-upload-000 sha256=9402f7173710e8d110392f184119154a50187138ab7d698fce0b73b5f12123e2 -->
 ## 核心 API

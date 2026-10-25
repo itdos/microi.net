@@ -10,6 +10,7 @@ import {snapshotDesktopInputs} from '../../tools/release-desktop-inputs.mjs';
 import {createHash} from 'node:crypto';
 import {preserveHdfsEvidence} from './staged-full-runtime.mjs';
 import os from 'node:os';
+import {platformFrontendScope} from './platform-all-tests.mjs';
 
 test('post-cleanup storage verification accepts Git Bash mixed separators and rejects another results directory',()=>{
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-matrix-proof-'));
@@ -67,6 +68,15 @@ test('PlatformRelease rereads raw TRX and each Node TAP and rejects hashes, omit
   const receipt={schemaVersion:1,scope:'PlatformRelease',filter:'Category!=FullStack',dotnet:{trxFile,trxSha256:sha(xml),tests:1,passed:1,failed:0,skipped:0},node:{reportFile,reportSha256:sha(fs.readFileSync(reportFile)),groups:groups.length,tests:groups.length*2,passed:groups.length*2,failed:0,skipped:0}};
   const save=()=>fs.writeFileSync(receiptFile,'\uFEFF'+JSON.stringify(receipt));save();
   const actual=await readPlatformReleaseTests(receiptFile);assert.equal(actual.node.tapReceipts.length,nodeRoots.length);
+  const selected=platformFrontendScope(path.join(workspace,'Microi.Client/tests'));
+  const browserReport={config:{rootDir:path.join(workspace,'Microi.Client/tests')},stats:{expected:selected.files.length,unexpected:0,skipped:0,flaky:0},suites:selected.files.map(file=>({file,specs:[{file,title:'general parser fixture',line:1,column:1,ok:true,tests:[{status:'expected',results:[{status:'passed'}]}]}]}))};
+  const browserFile=path.join(directory,'platform-frontend-browser.json'),listFile=path.join(directory,'platform-frontend-browser-list.json');
+  for(const file of [browserFile,listFile])fs.writeFileSync(file,JSON.stringify(browserReport));
+  receipt.platformFrontendTests=true;receipt.browser={tests:selected.files.length,passed:selected.files.length,failed:0,skipped:0,files:selected.files.length,reportFile:browserFile,reportSha256:sha(fs.readFileSync(browserFile)),listFile,listSha256:sha(fs.readFileSync(listFile)),excluded:selected.excluded};save();
+  const regular=await readPlatformReleaseTests(receiptFile);assert.equal(regular.platformFrontendTests,true);assert.equal(regular.browser.scope,'PlatformFrontendTests');assert.equal(regular.browser.excluded.length,selected.excluded.length);
+  fs.appendFileSync(listFile,' ');await assert.rejects(readPlatformReleaseTests(receiptFile),/inventory/);fs.writeFileSync(listFile,JSON.stringify(browserReport));
+  receipt.browser.excluded=[];save();await assert.rejects(readPlatformReleaseTests(receiptFile),/exclusion scope/);
+  delete receipt.browser;delete receipt.platformFrontendTests;save();
   fs.appendFileSync(trxFile,' ');await assert.rejects(readPlatformReleaseTests(receiptFile),/TRX/);fs.writeFileSync(trxFile,xml);
   fs.writeFileSync(regressionLogFile(directory,groups[0].root),tap.replace('# skipped 0','# skipped 1'));await assert.rejects(readPlatformReleaseTests(receiptFile),/skipped/);fs.writeFileSync(regressionLogFile(directory,groups[0].root),tap);
   receipt.dotnet.passed=2;save();await assert.rejects(readPlatformReleaseTests(receiptFile),/计数/u);receipt.dotnet.passed=1;
@@ -90,6 +100,27 @@ test('Desktop candidate matrix binds the actual Full snapshot and rejects unknow
   fs.writeFileSync(path.join(desktop,'package.json'),'{"version":"changed"}');
   await assert.rejects(verifyMatrixDesktopInputs(input,directory),/Desktop Full/u);
  }finally{fs.rmSync(directory,{recursive:true,force:true});}
+});
+
+test('all-platform dependency freeze ignores inherited Desktop snapshots while preserving actual database and fixture validation',()=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-platform-dependencies-'));
+ const tool=fileURLToPath(new URL('./release-test-matrix.mjs',import.meta.url));
+ const input=path.join(directory,'matrix.json'),receipt=path.join(directory,'platform.json');
+ const env={...process.env,...environment(),MICROI_UPGRADE_SQLSERVER_TEST_CONN:'',MICROI_TEST_MONGO_LEGACY:'',MICROI_TEST_MONGO_LEGACY_VERSION:''};
+ try{
+  const value=matrix();
+  value.candidateInputs={desktop:{fileCount:1,filesSha256:'obsolete-desktop-hash',formalCandidateModule:'removed-desktop-repository.mjs'}};
+  fs.writeFileSync(input,JSON.stringify(value));
+  const result=spawnSync(process.execPath,[tool,'freeze',input,receipt,'--platform-only'],{env,encoding:'utf8',windowsHide:true});
+  assert.ifError(result.error);assert.equal(result.status,0,result.stderr);
+  const plan=JSON.parse(fs.readFileSync(receipt));assert.equal(plan.scope,'PlatformDependencies');
+  assert.equal(plan.matrix.candidateInputs,undefined);assert.ok(plan.requiredEnvironment.includes('MICROI_TEST_TOKEN'));
+  const full=spawnSync(process.execPath,[tool,'freeze',input,path.join(directory,'full.json')],{env,encoding:'utf8',windowsHide:true});
+  assert.notEqual(full.status,0);assert.equal(fs.existsSync(path.join(directory,'full.json')),false);
+  delete value.dependencies.mongo;fs.writeFileSync(input,JSON.stringify(value));
+  const invalid=spawnSync(process.execPath,[tool,'freeze',input,path.join(directory,'invalid.json'),'--platform-only'],{env,encoding:'utf8',windowsHide:true});
+  assert.notEqual(invalid.status,0);assert.equal(fs.existsSync(path.join(directory,'invalid.json')),false);
+ }finally{fs.rmSync(directory,{recursive:true});}
 });
 
 test('常规桌面足以验收，显式4K选择冻结并要求额外用例',()=>{

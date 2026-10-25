@@ -2,13 +2,17 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const FRONTEND = 'http://localhost:61500';
-const API_BASE = 'https://localhost:61501';
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || 'http://localhost:61500';
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || 'https://localhost:61501';
 const PASSWORD = process.env.PW_LOCAL_PASSWORD || '';
 const OUTPUT = path.resolve(process.cwd(), '../.tmp/screenshots/webos-four-issues-2026-08-30');
 const MENU_ROUTE = '**/apiengine/platform-sys-menu**';
 
-const tenantUrl = () => `${FRONTEND}/?OsClient=iTdos&ApiBase=${encodeURIComponent(API_BASE)}`;
+const tenantUrl = () => {
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`;
+};
 
 async function login(page) {
     await page.goto(tenantUrl(), { waitUntil: 'domcontentloaded' });

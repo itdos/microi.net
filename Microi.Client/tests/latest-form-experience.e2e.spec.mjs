@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const XJY_PASSWORD = process.env.PW_XJY_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || "";
@@ -16,13 +18,14 @@ test.use({
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
-function tenantUrl(osClient, apiBase = "") {
+function tenantUrl(osClient, apiBase = API_BASE) {
+    expect(osClient, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
     const query = new URLSearchParams({ OsClient: osClient });
     if (apiBase) query.set("ApiBase", apiBase);
     return `${FRONTEND}/?${query.toString()}`;
 }
 
-async function login(page, { osClient, password, apiBase = "" }, captureStates = false) {
+async function login(page, { osClient, password, apiBase = API_BASE }, captureStates = false) {
     await page.goto(tenantUrl(osClient, apiBase), { waitUntil: "domcontentloaded" });
     const account = page.locator([
         'input[placeholder*="用户名"]',
@@ -85,7 +88,7 @@ async function openTenantRoute(page, tenant, hash) {
 test("登录完成态保持到工作台接管，退出确认统一为大圆角弹窗", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    const states = await login(page, { osClient: "iTdos", password: LOCAL_PASSWORD }, true);
+    const states = await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, true);
     const busyIndex = states.findIndex((text) => text.includes("正在安全接入"));
     expect(busyIndex, JSON.stringify(states)).toBeGreaterThanOrEqual(0);
     expect(states.slice(busyIndex + 1), JSON.stringify(states)).not.toContain("登录");
@@ -124,7 +127,7 @@ test("表单设计器切到 left 后主区域宽度保持稳定", async ({ page 
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await openTenantRoute(
         page,
-        { osClient: "iTdos", password: LOCAL_PASSWORD },
+        { osClient: OS_CLIENT, password: LOCAL_PASSWORD },
         "#/diy/diy-design/cf389aef-72cc-4980-9c5b-143123561ac0?PageType="
     );
     const designerForm = page.locator(".itdos-diy-form").first();

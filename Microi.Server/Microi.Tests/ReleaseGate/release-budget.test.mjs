@@ -5,7 +5,37 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {runReleaseBudget,recordReleasePhase} from '../../tools/release-budget.mjs';
+import {runReleaseBudget,runReleaseTarget,recordReleasePhase} from '../../tools/release-budget.mjs';
+
+test('platform elapsed-time target permits expired starts and preserves failures, timeouts and cancellation',async()=>{
+ const target=Date.now()/1000-1;
+ for(const expected of [0,7,124,130])assert.equal(await runReleaseTarget(target,process.execPath,['-e',`process.exit(${expected})`]),expected);
+ assert.equal(await runReleaseTarget(target,'microi-no-such-target-command'),127);
+ assert.notEqual(await runReleaseTarget(target,process.execPath,['-e',"process.kill(process.pid,'SIGTERM')"]),0);
+});
+
+test('platform command crossing its target finishes actual work instead of terminating the tree',async()=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-target-')),receipt=path.join(directory,'finished.txt');
+ try{
+  const source='setTimeout(()=>{require("node:fs").writeFileSync(process.argv[1],"FINISHED");process.exit(Number(process.argv[2]));},350)';
+  for(const expected of [0,9]){
+   if(fs.existsSync(receipt))fs.unlinkSync(receipt);
+   assert.equal(await runReleaseTarget(Date.now()/1000+0.15,process.execPath,['-e',source,receipt,String(expected)]),expected);
+   assert.equal(fs.readFileSync(receipt,'utf8'),'FINISHED');
+  }
+ }finally{fs.rmSync(directory,{recursive:true});}
+});
+
+test('platform target executes Windows PowerShell after the target and keeps its actual failure',async()=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-target-shell-')),script=path.join(directory,'probe.ps1'),receipt=path.join(directory,'executed.txt');
+ try{
+  fs.writeFileSync(script,'param([string]$Receipt)\n[IO.File]::WriteAllText($Receipt,"EXECUTED")\nexit 7\n');
+  const windows=process.platform==='win32';
+  const args=windows?['-NoProfile','-NonInteractive','-File',script,'-Receipt',receipt]:['-e','require("node:fs").writeFileSync(process.argv[1],"EXECUTED");process.exit(7)',receipt];
+  assert.equal(await runReleaseTarget(Date.now()/1000-1,windows?'pwsh.exe':process.execPath,args),7);
+  assert.equal(fs.readFileSync(receipt,'utf8'),'EXECUTED');
+ }finally{fs.rmSync(directory,{recursive:true});}
+});
 
 test('release deadline preserves exits, rejects expired launch and never resets between phases',async()=>{
  const deadline=Date.now()/1000+10;
@@ -32,11 +62,12 @@ test('budget expiry terminates its actual child tree and preserves an unrelated 
  }
 });
 
-test('phase receipts retain actual exit and total deadline without claiming late success',()=>{
+test('phase receipts distinguish successful publication from elapsed-time target compliance',()=>{
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-budget-record-')),file=path.join(directory,'phases.jsonl');
  try{
-  const first=recordReleasePhase(file,100,'test',0,120),last=recordReleasePhase(file,100,'finish',124,1901);
-  assert.equal(first.elapsedSeconds,20);assert.equal(last.elapsedSeconds,1781);assert.equal(last.totalElapsedSeconds,1801);assert.equal(last.withinBudget,false);assert.equal(last.exitCode,124);
+  const first=recordReleasePhase(file,100,'test',0,120),last=recordReleasePhase(file,100,'finish',0,1901);
+  assert.equal(first.elapsedSeconds,20);assert.equal(last.elapsedSeconds,1781);assert.equal(last.totalElapsedSeconds,1801);assert.equal(last.withinBudget,false);assert.equal(last.exitCode,0);
+  assert.equal(last.budgetPolicy,'advisory');assert.equal(last.targetExceeded,true);assert.equal(last.targetEpochSeconds,1900);
   assert.equal(fs.readFileSync(file,'utf8').trim().split('\n').length,2);
   assert.throws(()=>recordReleasePhase(file,101,'other',0,1902),/another run/);
   assert.throws(()=>recordReleasePhase(file,100,'finish',0,150),/another run/);

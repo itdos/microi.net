@@ -150,7 +150,7 @@ FormEngine、ApiEngine、安全与多租户边界测试。
 .\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Quick
 ```
 
-普通吾码 PC/API 完整发布使用 `PlatformRelease`：平台 Node/C# 自动化、Release 编译、闭源 DLL 加密、最终产物冒烟、Docker 推送及远端不可变摘要回读。以 30 分钟为可度量发布预算并记录分阶段耗时；超时如实记未达标，不能用跳过断言或未完成阶段冒充成功。该入口不运行 Microi Code/Agent 测试，不新建租户、不安装聊天应用。
+吾码完整正式发布默认执行 `Microi一键编译发布.sh --platform-release`（菜单默认完整选项）：版本号按原规则 +1 一次，发布 NuGet、API Docker、PC Docker 和官方网站文档/Docker。完整入口通过 `PlatformRelease + PlatformFrontendTests` 执行常规 Microi.Tests（平台单元/组件，不自动追加 Full 专项）、吾码前端全部通用 Node/Playwright 测试、真实接口检查与最终加密产物启动/运行冒烟。真实付费 AI、鸿地/JUNCHI、XJY 等指定客户数据专项和 SQL Server 等独立提供商专项默认不纳入，不再逐次询问；只有用户另行明确要求专项时才执行，回执逐项列为“不适用/未执行”，不能冒充通过。常规门禁通过后完成 Release 编译、闭源 DLL 加密、最终产物冒烟与各渠道回读。默认从 `.microi-local` 选择项目配置并复用已有 MySQL、Redis、MongoDB、MinIO/OSS，使用本机程序验证，不另建 Docker 测试依赖或临时官网运行容器；既有测试授权保护仍有效，缺前置条件不能静默跳过。整体以 30 分钟为耗时目标，超出时记录瓶颈并继续推进至成功，真实错误、取消及单操作超时仍保留。不混入 Microi Code/Agent 独立产品测试，不新建租户、不安装聊天应用。源码拉取、合并、冲突解决和提交推送按需补齐；仅明确要求局部发布时才缩小渠道。
 
 只有明确选择 Full 深度测试时，才对**隔离测试租户和专用测试表**运行下列独立入口；它不属于普通发布前置条件：
 

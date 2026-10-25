@@ -1,5 +1,5 @@
 # 质量优先的上下文与增量开发
-<!-- microi-progressive:chunk id=microi-system-delivery-008 sha256=beffc0924e9b36dca7a57da12a4cecb65ab05e938cb776c295c7fc5d7f736553 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-008 sha256=0e9e14b98ac7ab7ca0bf1c4ef97bad2bf061d0c01b170325ddbaf961a02a0de4 -->
 
 本规范用于降低重复读取和重复传输，不降低软件质量。准确性、权限、业务完整性和验收优先于 token、耗时和回复长度。摘要只用于发现目标，不能成为未经核实的写入依据。
 

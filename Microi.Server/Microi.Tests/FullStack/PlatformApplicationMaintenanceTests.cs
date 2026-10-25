@@ -8,31 +8,76 @@ namespace Microi.Tests.FullStack;
 [Trait("Suite", "PlatformApplicationMaintenance")]
 public sealed class PlatformApplicationMaintenanceTests
 {
+    private static readonly string[] ExistingDependencyIds = ["app.microi.store", "app.microi.saas-engine"];
+
     [Fact]
     public async Task MainTenant_CanMaintainSelectedChildPlatformApplications()
     {
         using var client = Client("MICROI_TEST_TOKEN", "MICROI_TEST_CONTROL_API_BASE");
+        using var childClient = Client("MICROI_TEST_CHILD_TOKEN", "MICROI_TEST_CHILD_API_BASE");
         var tenant = Required("MICROI_TEST_OSCLIENT");
+        var childTenant = Required("MICROI_TEST_CHILD_OSCLIENT");
+        await RequireExistingDependencies(client, tenant);
+        await RequireExistingDependencies(childClient, childTenant);
         if (!string.Equals(tenant, "iTdos", StringComparison.OrdinalIgnoreCase))
         {
             await RunTwice(client, tenant, "bulk-import-microi-store-packages",
-                new JsonObject { ["ApplicationType"] = "Platform", ["StoreApiBase"] = "https://api.microi.net", ["StoreOsClient"] = "iTdos" });
+                DependencyParameters());
         }
         await RunTwice(client, Required("MICROI_TEST_OSCLIENT"), "bulk-update-child-tenant-platform-apps",
-            new JsonObject { ["TargetOsClients"] = new JsonArray(Required("MICROI_TEST_CHILD_OSCLIENT")) });
+            new JsonObject { ["TargetOsClients"] = new JsonArray(childTenant), ["MaintenanceScope"] = "StartupDependencies" });
     }
 
     [Fact]
-    public async Task ChildTenant_CanInstallUpdateAllPlatformApplicationsAndRepeatWithoutWork()
+    public async Task ChildTenant_CanMaintainSelectedExistingPlatformDependenciesAndRepeatWithoutWork()
     {
         using var client = Client("MICROI_TEST_CHILD_TOKEN", "MICROI_TEST_CHILD_API_BASE");
-        await RunTwice(client, Required("MICROI_TEST_CHILD_OSCLIENT"), "bulk-import-microi-store-packages",
-            new JsonObject { ["ApplicationType"] = "Platform", ["StoreApiBase"] = "https://api.microi.net", ["StoreOsClient"] = "iTdos" });
+        var tenant = Required("MICROI_TEST_CHILD_OSCLIENT");
+        await RequireExistingDependencies(client, tenant);
+        await RunTwice(client, tenant, "bulk-import-microi-store-packages", DependencyParameters());
+    }
+
+    private static JsonArray DependencyIds() => new(ExistingDependencyIds.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());
+
+    private static JsonObject DependencyParameters() => new()
+    {
+        ["ApplicationType"] = "Platform", ["StoreApiBase"] = "https://api.microi.net", ["StoreOsClient"] = "iTdos",
+        ["RequiredAppIds"] = DependencyIds()
+    };
+
+    private static async Task RequireExistingDependencies(HttpClient client, string tenant)
+    {
+        var result = await Post(client, new JsonObject
+        {
+            ["OsClient"] = tenant, ["FormEngineKey"] = "sys_microistoreversion",
+            ["_Where"] = new JsonArray(new JsonArray("AppId", "In", DependencyIds())),
+            ["_SelectFields"] = new JsonArray("AppId", "AppVersionInstall", "PackageVersion", "AppVersion", "InstallStatus", "IsDeleted", "UpdateTime"),
+            ["_OrderBy"] = "UpdateTime", ["_OrderByType"] = "DESC", ["_PageSize"] = 1000
+        }, "api/FormEngine/GetTableData");
+        var rows = Assert.IsType<JsonArray>(result["Data"]);
+        foreach (var appId in ExistingDependencyIds)
+        {
+            var row = rows.FirstOrDefault(item => string.Equals(item?["AppId"]?.ToString(), appId, StringComparison.OrdinalIgnoreCase));
+            Assert.NotNull(row);
+            Assert.DoesNotContain(row!["IsDeleted"]?.ToString()?.ToLowerInvariant() ?? "", new[] { "1", "true", "yes" });
+            Assert.Contains(row["InstallStatus"]?.ToString()?.ToLowerInvariant() ?? "",
+                new[] { "", "installed", "success", "succeeded", "已安装", "outdated", "可更新", "更新" });
+            Assert.True(new[] { "AppVersionInstall", "PackageVersion", "AppVersion" }.Any(key => !string.IsNullOrWhiteSpace(row[key]?.ToString())),
+                $"Existing authorized fixture must already have {appId}; release tests must not install missing applications.");
+        }
     }
 
     private static async Task RunTwice(HttpClient client, string tenant, string engine, JsonObject parameters)
     {
         Assert.Equal("YES", Required("MICROI_TEST_ALLOW_WRITES"));
+        Assert.Equal("YES", Required("MICROI_TEST_ALLOW_APPLICATION_MAINTENANCE"));
+        if (engine == "bulk-import-microi-store-packages")
+            Assert.Equal(ExistingDependencyIds, parameters["RequiredAppIds"]!.AsArray().Select(item => item!.ToString()));
+        else
+        {
+            Assert.Equal("bulk-update-child-tenant-platform-apps", engine);
+            Assert.Equal("StartupDependencies", parameters["MaintenanceScope"]?.ToString());
+        }
         var prefix = $"release-maintenance-{Guid.NewGuid():N}";
         for (var iteration = 0; iteration < 2; iteration++)
         {
@@ -73,19 +118,27 @@ public sealed class PlatformApplicationMaintenanceTests
                 Assert.Equal(1, data?["TargetCount"]?.GetValue<int>());
                 Assert.Equal(1, data?["SucceededCount"]?.GetValue<int>());
                 Assert.Equal(0, data?["FailedCount"]?.GetValue<int>());
+                var child = Assert.Single(Assert.IsType<JsonArray>(data?["Results"]));
+                var childDetail = await Post(client, new JsonObject { ["OsClient"] = tenant, ["Action"] = "Detail", ["Id"] = child!["TaskId"]!.ToString() });
+                RequireNoInstallation(childDetail, iteration);
             }
-            if (iteration == 1 && engine == "bulk-import-microi-store-packages")
-            {
-                var result = detail["Data"]?["Result"];
-                var data = result?["Data"] ?? result;
-                Assert.NotNull(data?["Planned"]);
-                Assert.Equal(0, data!["Planned"]!.GetValue<int>());
-            }
+            else RequireNoInstallation(detail, iteration);
         }
+    }
+
+    private static void RequireNoInstallation(JsonObject detail, int iteration)
+    {
+        var result = detail["Data"]?["Result"];
+        var data = result?["Data"] ?? result;
+        Assert.Equal(0, data?["Installed"]?.GetValue<int>());
+        if (iteration == 1) Assert.Equal(0, data?["Planned"]?.GetValue<int>());
     }
 
     private static HttpClient Client(string tokenVariable, string endpointVariable)
     {
+        // Connection configuration is not permission to maintain an existing fixture.
+        Assert.Equal("YES", Required("MICROI_TEST_ALLOW_WRITES"));
+        Assert.Equal("YES", Required("MICROI_TEST_ALLOW_APPLICATION_MAINTENANCE"));
         var endpoint = Environment.GetEnvironmentVariable(endpointVariable)?.Trim();
         var client = new HttpClient { BaseAddress = new Uri((string.IsNullOrWhiteSpace(endpoint) ? Required("MICROI_TEST_API_BASE") : endpoint).TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(45) };
         client.DefaultRequestHeaders.TryAddWithoutValidation("authorization", Required(tokenVariable));
@@ -96,9 +149,9 @@ public sealed class PlatformApplicationMaintenanceTests
     private static string Required(string key) => Environment.GetEnvironmentVariable(key)?.Trim() is { Length: > 0 } value
         ? value : throw new Xunit.Sdk.XunitException($"Full release gate requires {key}.");
 
-    private static async Task<JsonObject> Post(HttpClient client, JsonObject request)
+    private static async Task<JsonObject> Post(HttpClient client, JsonObject request, string endpoint = "apiengine/platform-background-task")
     {
-        using var response = await client.PostAsJsonAsync("apiengine/platform-background-task", request, TestContext.Current.CancellationToken);
+        using var response = await client.PostAsJsonAsync(endpoint, request, TestContext.Current.CancellationToken);
         if (response.Headers.TryGetValues("authorization", out var tokens))
         {
             client.DefaultRequestHeaders.Remove("authorization");

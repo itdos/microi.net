@@ -20,9 +20,8 @@ const independentMobileSource=name=>/^microi\.uniapp\//i.test(name)
 // 桌面安装包走独立渠道，但 Full 执行的桌面源码由专属快照纳入本候选；
 // 未执行的 upstream 检出仍独立，pretest 产物由精确规则排除以免误判漂移。
 const independentDesktopSource=name=>/^(?:Microi\.Agent\/(?:apps\/microi-code|upstream\/dsh-desktop)|Microi\.Code\/apps\/microi-code)\//i.test(name);
-// 官网源码、测试、依赖和正文均由独立官网发布验收，不进入 PC/API 镜像。
-// 共享 SDK、Skills、MCP 与平台发布工具继续进入 PC/API Full 候选。
-const documentationOnly=name=>/^microi\.doc\//i.test(name)
+// 官网单独发布时保持独立；本轮同时发布官网则必须将其源码、依赖和正文绑定到同一候选。
+const documentationOnly=(name,includeDocumentation)=>!includeDocumentation&&/^microi\.doc\//i.test(name)
  // 定时商店巡检只追加内部交接日志；不进入 PC/API、VSIX 或 CLI 运行制品。
  // 仅此精确日志路径豁免；Skills、MCP、测试、发布脚本与运行知识仍受门禁保护。
  ||name==='Microi.Agent/维护交接与更新记录.md';
@@ -78,6 +77,8 @@ async function snapshotLocalSmokeInputs(root){
 
 export async function snapshotCandidate(root=workspace,repos=repositories,options={}){
  const policy=options.testPolicy??'Full';
+ // 只读取当前发行工作区的范围；隔离测试仓库不得继承宿主的发布选择。
+ const includeDocumentation=options.includeDocumentation??(path.resolve(root)===workspace&&process.env.MICROI_RELEASE_INCLUDE_DOCUMENTATION==='true');
  if(!['Full','PlatformRelease'].includes(policy))throw Error('Unknown candidate test policy');
  const independentProduct=name=>/^(?:Microi\.Agent|Microi\.Code)(?:\/|$)/i.test(name.replaceAll('\\','/'));
  const files={};
@@ -90,7 +91,7 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
    const key=path.posix.join(repository.replaceAll('\\','/'),name.replaceAll('\\','/'));
    if(policy==='PlatformRelease'&&independentProduct(key))continue;
    const buildRecipe=/\/bin\/Release\/(?:Dockerfile|default\.conf)$/.test(key);
-   if((generated.test(key)&&!buildRecipe)||independentMobileSource(key)||independentDesktopSource(key)||documentationOnly(key))continue;
+   if((generated.test(key)&&!buildRecipe)||independentMobileSource(key)||independentDesktopSource(key)||documentationOnly(key,includeDocumentation))continue;
    try{
     const sourcePath=path.resolve(cwd,name),stat=await lstat(sourcePath);
     // Git 会把目录联接作为未跟踪输入列出；先验证路径类型，避免读目录抢先抛错而跳过私有契约边界。
@@ -114,13 +115,14 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
    files[key]=value;
   }
  }
- return {scope:policy==='PlatformRelease'?'PlatformRelease':'pc-api-docker-with-mobile-sdk-contracts',...(policy==='PlatformRelease'?{sourceHead:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim()}:{}),files,...(privateInputs?{composition:privateInputs.composition}:{})};
+ return {scope:policy==='PlatformRelease'?'PlatformRelease':'pc-api-docker-with-mobile-sdk-contracts',...(includeDocumentation?{documentationIncluded:true}:{}),...(policy==='PlatformRelease'?{sourceHead:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim()}:{}),files,...(privateInputs?{composition:privateInputs.composition}:{})};
 }
 
 export function changedCandidate(before,after){
  const changed=[...new Set([...Object.keys(before.files),...Object.keys(after.files)])].filter(name=>before.files[name]!==after.files[name]);
  if(before.scope!==after.scope)changed.push('<candidate-scope>');
  if(before.sourceHead!==after.sourceHead)changed.push('<candidate-head>');
+ if(Boolean(before.documentationIncluded)!==Boolean(after.documentationIncluded))changed.push('<documentation-scope>');
  if(JSON.stringify(before.composition??null)!==JSON.stringify(after.composition??null))changed.push('<private-build-composition>');
  return changed.sort();
 }

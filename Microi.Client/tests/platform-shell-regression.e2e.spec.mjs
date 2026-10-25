@@ -2,10 +2,11 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || "";
-const API_BASE = process.env.PW_API_BASE || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
 const MARKETPLACE_DIST = process.env.PW_MARKETPLACE_DIST || "";
 const MARKETPLACE_RUNTIME_ID = process.env.PW_MARKETPLACE_RUNTIME_ID || "01KX7M4M9F1KTKBT7YNTP4VH17";
 const SCREENSHOT_DIR = path.resolve(
@@ -22,8 +23,9 @@ test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
 function tenantUrl(hash = "") {
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
     const apiBase = API_BASE ? `&ApiBase=${encodeURIComponent(API_BASE)}` : "";
-    return `${FRONTEND}/?OsClient=iTdos${apiBase}${hash}`;
+    return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}${apiBase}${hash}`;
 }
 
 async function login(page) {

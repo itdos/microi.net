@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
-const frontend = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const frontend = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const password = process.env.PW_LOCAL_PASSWORD || "";
 const flowId = process.env.PW_WORKFLOW_DESIGN_ID || "";
 const artifactDir = path.resolve(process.cwd(), "../.tmp/workflow-acceptance");
@@ -16,7 +18,8 @@ test("approval workflow designer renders distinct node positions after real admi
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
     await mkdir(artifactDir, { recursive: true });
-    await page.goto(`${frontend}/?OsClient=iTdos#/login`, { waitUntil: "domcontentloaded" });
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    await page.goto(`${frontend}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}#/login`, { waitUntil: "domcontentloaded" });
     const account = page.locator(
         'input[placeholder*="用户名"], input[placeholder*="账号"], input[placeholder*="帐号"], input[placeholder*="user name" i]'
     ).first();

@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || "";
 
@@ -12,7 +14,8 @@ test.use({
 test.setTimeout(120_000);
 
 function tenantUrl(hash = "") {
-    const query = new URLSearchParams({ OsClient: "iTdos" });
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    const query = new URLSearchParams({ OsClient: OS_CLIENT, ApiBase: API_BASE });
     return `${FRONTEND}/?${query.toString()}${hash}`;
 }
 

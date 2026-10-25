@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const JUNCHI_PASSWORD = process.env.PW_JUNCHI_PASSWORD || "";
 const ANDERSON_PASSWORD = process.env.PW_ANDERSON_PASSWORD || "";
@@ -21,13 +23,14 @@ test.use({
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
-function tenantUrl(osClient, apiBase = "", hash = "") {
+function tenantUrl(osClient, apiBase = API_BASE, hash = "") {
+    expect(osClient, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
     const query = new URLSearchParams({ OsClient: osClient });
     if (apiBase) query.set("ApiBase", apiBase);
     return `${FRONTEND}/?${query.toString()}${hash}`;
 }
 
-async function login(page, { osClient, password, apiBase = "", account = "admin" }) {
+async function login(page, { osClient, password, apiBase = API_BASE, account = "admin" }) {
     await page.goto(tenantUrl(osClient, apiBase), { waitUntil: "domcontentloaded" });
     const accountInput = page.locator([
         'input[placeholder*="用户名"]',
@@ -184,8 +187,8 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
         }
     });
 
-    await login(page, { osClient: "iTdos", password: LOCAL_PASSWORD });
-    await page.goto(tenantUrl("iTdos", "", "#/system/role"), { waitUntil: "domcontentloaded" });
+    await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD });
+    await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/role"), { waitUntil: "domcontentloaded" });
     const rolePage = page.locator(".left-right-page").first();
     await expect(rolePage).toBeVisible({ timeout: 45_000 });
     await expect(rolePage.locator(".left-tree-card")).toBeVisible();
@@ -343,7 +346,7 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
     await aiPolicyDialog.getByRole("button", { name: /^(?:Close|关闭)$/i }).first().click();
     await expect(aiPolicyDialog).toBeHidden({ timeout: 15_000 });
 
-    await page.goto(tenantUrl("iTdos", "", "#/system/dept"), { waitUntil: "domcontentloaded" });
+    await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/dept"), { waitUntil: "domcontentloaded" });
     const deptPage = page.locator(".left-right-page").first();
     await expect(deptPage).toBeVisible({ timeout: 45_000 });
     await expect(deptPage.locator(".left-tree-card")).toBeVisible();
@@ -363,8 +366,8 @@ test("移动端表单保留即时字段搜索，并在浮动更多中提供刷�
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await page.setViewportSize({ width: 390, height: 844 });
-    await login(page, { osClient: "iTdos", password: LOCAL_PASSWORD });
-    await page.goto(tenantUrl("iTdos", "", "#/system/role"), { waitUntil: "domcontentloaded" });
+    await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD });
+    await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/role"), { waitUntil: "domcontentloaded" });
 
     const rolePage = page.locator(".left-right-page").first();
     await expect(rolePage).toBeVisible({ timeout: 45_000 });
@@ -419,9 +422,9 @@ test("角色和部门低代码表单完成事务新增、修改、删除", async
     let roleCreated = false;
     let deptCreated = false;
 
-    await login(page, { osClient: "iTdos", password: LOCAL_PASSWORD });
+    await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD });
     try {
-        await page.goto(tenantUrl("iTdos", "", "#/system/role"), { waitUntil: "domcontentloaded" });
+        await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/role"), { waitUntil: "domcontentloaded" });
         const rolePage = page.locator(".left-right-page").first();
         await expect(rolePage).toBeVisible({ timeout: 45_000 });
         await expect(rolePage.locator(".right-table-col .el-table")).toBeVisible({ timeout: 30_000 });
@@ -483,7 +486,7 @@ test("角色和部门低代码表单完成事务新增、修改、删除", async
         roleCreated = true;
         await closeFormIfOpen(dialog);
 
-        await page.goto(tenantUrl("iTdos", "", "#/system/role"), { waitUntil: "domcontentloaded" });
+        await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/role"), { waitUntil: "domcontentloaded" });
         let row = await filterRightTable(page, roleName);
         const roleLimitResponse = page.waitForResponse((response) => {
             if (endpointName(response.url()) !== "GetTableData") return false;
@@ -522,11 +525,11 @@ test("角色和部门低代码表单完成事务新增、修改、删除", async
         const updateRoleResult = await (await updateRoleResponse).json();
         expect(Number(updateRoleResult.Code), updateRoleResult.Msg || "update role failed").toBe(1);
         await closeFormIfOpen(dialog);
-        await page.goto(tenantUrl("iTdos", "", "#/system/role"), { waitUntil: "domcontentloaded" });
+        await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/role"), { waitUntil: "domcontentloaded" });
         await deleteFilteredRow(page, roleNameUpdated);
         roleCreated = false;
 
-        await page.goto(tenantUrl("iTdos", "", "#/system/dept"), { waitUntil: "domcontentloaded" });
+        await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/dept"), { waitUntil: "domcontentloaded" });
         const deptPage = page.locator(".left-right-page").first();
         await expect(deptPage).toBeVisible({ timeout: 45_000 });
         await expect(deptPage.locator(".right-table-col .el-table")).toBeVisible({ timeout: 30_000 });
@@ -546,7 +549,7 @@ test("角色和部门低代码表单完成事务新增、修改、删除", async
         deptCreated = true;
         await closeFormIfOpen(dialog);
 
-        await page.goto(tenantUrl("iTdos", "", "#/system/dept"), { waitUntil: "domcontentloaded" });
+        await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/dept"), { waitUntil: "domcontentloaded" });
         row = await filterRightTable(page, deptName);
         await openRowAction(page, row, /^(?:Edit|编辑)$/i);
         dialog = page.locator(".diy-form-container.el-dialog:visible, .diy-form-container.el-drawer:visible").last();
@@ -560,18 +563,18 @@ test("角色和部门低代码表单完成事务新增、修改、删除", async
         const updateDeptResult = await (await updateDeptResponse).json();
         expect(Number(updateDeptResult.Code), updateDeptResult.Msg || "update department failed").toBe(1);
         await closeFormIfOpen(dialog);
-        await page.goto(tenantUrl("iTdos", "", "#/system/dept"), { waitUntil: "domcontentloaded" });
+        await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/dept"), { waitUntil: "domcontentloaded" });
         await deleteFilteredRow(page, deptNameUpdated);
         deptCreated = false;
     } finally {
         if (roleCreated) {
-            await page.goto(tenantUrl("iTdos", "", "#/system/role"), { waitUntil: "domcontentloaded" }).catch(() => {});
+            await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/role"), { waitUntil: "domcontentloaded" }).catch(() => {});
             await deleteFilteredRow(page, roleNameUpdated).catch(async () => {
                 await deleteFilteredRow(page, roleName).catch(() => {});
             });
         }
         if (deptCreated) {
-            await page.goto(tenantUrl("iTdos", "", "#/system/dept"), { waitUntil: "domcontentloaded" }).catch(() => {});
+            await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/dept"), { waitUntil: "domcontentloaded" }).catch(() => {});
             await deleteFilteredRow(page, deptNameUpdated).catch(async () => {
                 await deleteFilteredRow(page, deptName).catch(() => {});
             });
@@ -582,8 +585,8 @@ test("角色和部门低代码表单完成事务新增、修改、删除", async
 test("接口引擎默认关闭 V8 运行限制并在打开后显示限制项", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await login(page, { osClient: "iTdos", password: LOCAL_PASSWORD });
-    await page.goto(tenantUrl("iTdos", "", "#/api-engine"), { waitUntil: "domcontentloaded" });
+    await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD });
+    await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/api-engine"), { waitUntil: "domcontentloaded" });
     const addButton = page.getByRole("button", { name: /^(?:新增(?:记录)?|Add)$/i }).first();
     await expect(addButton).toBeVisible({ timeout: 45_000 });
     await addButton.click();
@@ -643,7 +646,7 @@ test("500 级接口引擎专员可见菜单但服务端拒绝 sys_apiengine 控�
         "需要先把专用测试帐号临时分配给 500 级接口引擎专员角色");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await login(page, {
-        osClient: "iTdos",
+        osClient: OS_CLIENT,
         account: "anderson",
         password: ANDERSON_PASSWORD
     });
@@ -670,8 +673,8 @@ test("500 级接口引擎专员可见菜单但服务端拒绝 sys_apiengine 控�
 test("全量测试表单的二维码字段按 DataAppend.Code 生成可下载 PNG", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await login(page, { osClient: "iTdos", password: LOCAL_PASSWORD });
-    await page.goto(tenantUrl("iTdos", "", "#/mci-full-test"), { waitUntil: "domcontentloaded" });
+    await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD });
+    await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/mci-full-test"), { waitUntil: "domcontentloaded" });
     const addButton = page.getByRole("button", { name: /^(?:新增(?:记录)?|Add)$/i }).first();
     await expect(addButton).toBeVisible({ timeout: 45_000 });
     await addButton.click();

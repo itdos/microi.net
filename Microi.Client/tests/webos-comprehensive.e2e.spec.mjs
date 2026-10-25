@@ -2,13 +2,17 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const FRONTEND = 'http://localhost:61500';
-const API_BASE = 'https://localhost:61501';
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || 'http://localhost:61500';
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || 'https://localhost:61501';
 const PASSWORD = process.env.PW_LOCAL_PASSWORD || '';
 const OUTPUT = path.resolve(process.cwd(), '../.tmp/screenshots/webos-after');
 let pendingPreferenceRestore = null;
 
-const tenantUrl = () => `${FRONTEND}/?OsClient=iTdos&ApiBase=${encodeURIComponent(API_BASE)}`;
+const tenantUrl = () => {
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`;
+};
 
 async function login(page) {
     await page.goto(tenantUrl(), { waitUntil: 'domcontentloaded' });
@@ -231,7 +235,7 @@ test('WebOS macOS/Windows 全流程、主题、低视口与截图回归', async 
     const runtime = await page.evaluate(() => window.__MICROI_RUNTIME_ENDPOINT__);
     expect(runtime?.protocol).toBe('microi.runtime-endpoint.v1');
     expect(runtime?.apiBase).toBe(API_BASE);
-    expect(runtime?.osClient).toBe('iTdos');
+    expect(runtime?.osClient).toBe(OS_CLIENT);
     expect(runtime?.webBase).toBe(FRONTEND);
     expect(runtime?.source?.apiBase).toBe('url-query');
     expect(runtime?.source?.osClient).toBe('url-query');

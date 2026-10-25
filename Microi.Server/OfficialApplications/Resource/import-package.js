@@ -10,12 +10,13 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.0.15
+ * Version: v3.1.0
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
  * - SQL Server 唯一索引先同步声明列，再按真实可空键生成过滤条件；原子修复历史缺失过滤并严格回读，保留非空唯一约束和业务数据。
  * - 随包数据的查重、父记录与元数据读写共享安装事务；保留已有租户配置值，任何真实查询或写入失败均回滚本片。
+ * - 每片重读商城权限与不可变指针后复用有界已验包缓存，命中仍校验 SHA-256 和字节数，避免整包重复下载。
  */
 
 /* EMPTY_SHARED_TABLE_PREREQUISITE_V1
@@ -1059,7 +1060,7 @@ try {
     return { Code: 0, Msg: credentialError.message || String(credentialError) };
 }
 
-// MARKETPLACE_SOURCE_READ_RETRY_V2：后台分片每次都要从商城源重新读取权威包。
+// MARKETPLACE_SOURCE_READ_RETRY_V2：后台分片每次都要从商城源重新读取权威权限与包指针。
 // 代理切换、连接复用或上游瞬时超时时，V8.Http 可能短暂返回空字符串；直接
 // JSON.parse 会让整个大型应用从外层任务重试。这里只对固定的只读商城请求做
 // 有界重试，绝不重试安装写入，也不接受空响应或非成功业务结果。
@@ -1142,8 +1143,34 @@ var loadMarketplacePackage = function (storeModel, label) {
     var expectedSize = parseInt(storeModel.PackageSize || 0, 10) || 0;
     if (!downloadUrl || !/^https?:\/\//i.test(downloadUrl)
         || !/^[a-f0-9]{64}$/.test(expectedSha)
-        || expectedSize < 1 || expectedSize > 256 * 1024 * 1024) {
+        || expectedSize < 1 || Number(storeModel.PackageSize) !== expectedSize || expectedSize > 256 * 1024 * 1024) {
         throw new Error((label || '应用包') + '的 HDFS 指针缺少安全下载地址、SHA-256 或合法字节数');
+    }
+    // MARKETPLACE_VERIFIED_PACKAGE_CACHE_V1：每片仍先向当前来源重新鉴权并取得
+    // 精确快照/可信指针。缓存不授权读取，不保存签名 URL、来源凭据或安装参数。
+    // 每租户仅一个固定槽，最多 64 MiB 原文、96 MiB 序列化值，15 分钟不续期；
+    // 并发不同包只会互相淘汰，不按应用/版本无限增加 Redis 键或放宽分片预算。
+    var cacheBinding = String(V8.EncryptHelper.Sha256Hex(JSON.stringify([
+        String(V8.OsClient || ''), storeApiBase, storeOsClient,
+        String(storeModel.Id || ''), String(storeModel.StoreVersionId || ''),
+        String(storeModel.PackageHdfsPath || ''), String(storeModel.PackageStorageMode || ''),
+        String(storeModel.IsPublic), expectedSha, expectedSize
+    ]))).toLowerCase();
+    var cacheKey = 'Microi:' + String(V8.OsClient || '') + ':Marketplace:VerifiedBody:Import:V1';
+    var cacheable = expectedSize <= 64 * 1024 * 1024 && !!V8.Cache;
+    if (cacheable) {
+        try {
+            var rawCache = V8.Cache.Get(cacheKey);
+            if (rawCache && String(rawCache).length <= 96 * 1024 * 1024) {
+                var cached = JSON.parse(String(rawCache));
+                if (cached.Binding === cacheBinding && typeof cached.Content === 'string'
+                    && Number(System.Text.Encoding.UTF8.GetByteCount(cached.Content)) === expectedSize
+                    && String(V8.EncryptHelper.Sha256Hex(cached.Content)).toLowerCase() === expectedSha) {
+                    debugLog.marketplace_package_read = { Source: 'VerifiedCache', NetworkBytes: 0, Bytes: expectedSize };
+                    return cached.Content;
+                }
+            }
+        } catch (cacheReadError) { /* 缓存非权威；故障继续完整下载校验。 */ }
     }
     var response = V8.Http.GetResponse({
         Url: downloadUrl,
@@ -1165,6 +1192,17 @@ var loadMarketplacePackage = function (storeModel, label) {
     if (actualSize != expectedSize || actualSha != expectedSha) {
         throw new Error((label || '应用包') + '下载校验失败：size=' + actualSize + '/' + expectedSize
             + '，sha256=' + actualSha + '/' + expectedSha);
+    }
+    debugLog.marketplace_package_read = {
+        Source: cacheable ? 'VerifiedDownload' : 'VerifiedDownloadUncached', NetworkBytes: actualSize, Bytes: actualSize
+    };
+    if (cacheable) {
+        try {
+            var cacheValue = JSON.stringify({ Binding: cacheBinding, Content: content });
+            if (Number(System.Text.Encoding.UTF8.GetByteCount(cacheValue)) <= 96 * 1024 * 1024) {
+                V8.Cache.Set(cacheKey, cacheValue, 900);
+            }
+        } catch (cacheWriteError) { /* 缓存故障不影响已验包；下片仍重新鉴权。 */ }
     }
     return content;
 };

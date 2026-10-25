@@ -20,9 +20,6 @@
     "RequiredPlatformCapabilities": [
       "ApiEngine:mci_ai_data_assistant@v1.1.8",
       "ApiEngine:platform-ai-account@v1.1.0",
-      "ApiEngine:platform-ai-runtime@v1.0.0",
-      "ApiEngine:platform-ai-runtime@v1.1.0",
-      "ApiEngine:platform-ai-runtime@v1.1.1",
       "ApiEngine:platform-ai-custom-hook@v1.0.0",
       "V8.Method.ManageAiPlatform",
       "V8.Method.RequireManagedProtocolContext",

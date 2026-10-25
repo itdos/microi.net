@@ -78,7 +78,11 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 | 公开应用 | HDFS 公有桶，`PackageStorageMode=HdfsPublic` | 来源 FileServer/CDN 公有地址；下载后仍校验大小与 SHA-256。 |
 | 私有应用 | HDFS 私有桶，`PackageStorageMode=HdfsPrivate` | 由来源后端验证登录身份后签发短期地址；Token 和签名地址不落浏览器配置或日志。 |
 
-数据库只保留 `PackageId`、`PackageHdfsPath`、`PackageSha256`、`PackageSize`、内容类型、格式版本和校验时间。发布器先上传 UTF-8 JSON，再从 HDFS 回读并核对字节数和 SHA-256，全部一致后才更新商城指针并清空内联正文；安装器会独立下载和校验，不能只相信数据库或 Redis。历史版本继续以不可变 `StoreVersionId` 精确安装，快照保存同一组指针，不会静默换成当前版本。
+数据库只保留 `PackageId`、`PackageHdfsPath`、`PackageSha256`、`PackageSize`、内容类型、格式版本和校验时间。发布器先上传 UTF-8 JSON，再从 HDFS 回读并核对字节数和 SHA-256，全部一致后才更新商城指针并清空内联正文；安装器首次下载与后续缓存命中均核对实际正文大小和 SHA-256，不能只相信数据库或 Redis。历史版本继续以不可变 `StoreVersionId` 精确安装，快照保存同一组指针，不会静默换成当前版本。
+
+详情摘要和安装分片复用经过校验的包正文，减少同一大包的重复下载。每个租户的详情与导入各使用一个固定缓存槽，原文最多 64 MiB、序列化值最多 96 MiB，15 分钟过期且命中不续期；更换版本只替换原槽，不按历史版本无限积累。安装每片仍向当前来源回读权限、版本快照与指针，撤权或指针变化不会因缓存命中而绕过检查。缓存绑定来源、租户、对象路径、快照、大小与摘要，不保存签名地址或凭据；失效、故障或超限时重新下载并完整校验。
+
+详情接口的 `DataAppend.PackageContentRead` 与安装诊断的 `marketplace_package_read` 区分 `VerifiedDownload`、`VerifiedCache` 和 `VerifiedDownloadUncached`，`NetworkBytes` 只计算本次下载包正文的字节数，不代表整个请求或云账单流量。应在相同包的连续读取中核对第二次为 `VerifiedCache` 且下载字节为零；跨节点缓存不可用、并发不同包相互淘汰、超过上限或过期仍可能下载。正式发布源不运行安装器，源码回读与单元测试不能替代目标租户的安装验收。
 
 制包时，全局 v3 运行对象不能通过租户私有 HDFS 代理跨目录读取。发布器从应用当前
 `CommittedPublishVersionId` 精确核对所属应用的 Completed 版本、运行清单哈希与请求指纹，

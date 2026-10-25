@@ -10,10 +10,11 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: get-microi-store-model
- * Version: v1.4.0
+ * Version: v1.4.2
  * Function:
  * - 按公开/私有权限读取不可变应用包，并为私有源码/编译 ZIP 生成不落库的临时下载地址。
  * - 可选在服务端校验并解析安装包，仅向详情页返回资源数量与安全摘要，不暴露包正文或私有签名地址。
+ * - 在当前权限与指针回读后复用有界已验包缓存，命中仍核验 SHA-256 和字节数，避免详情预览重复下载。
  */
 
 function text(value) { return value === null || value === undefined ? "" : String(value); }
@@ -69,6 +70,8 @@ function acceptsHdfsPointer() {
   return trim(V8.Param.PackagePointerMode).toLowerCase() === 'hdfsv1'
     || flag(V8.Param.AcceptHdfsPackagePointer, false);
 }
+var packageContentRead = { Source: 'NotRequested', NetworkBytes: 0, CacheHits: 0 };
+var requestPackageBodies = {};
 function loadPackageBodyFromPointer(row, downloadUrl) {
   // MARKETPLACE_LEGACY_IMPORTER_HDFS_BRIDGE_V1：v2.2.x 及更早导入器只识别
   // AppPakcet。为避免“更新器无法更新自己”的引导死锁，商城源仅在该次旧协议
@@ -77,9 +80,41 @@ function loadPackageBodyFromPointer(row, downloadUrl) {
   var expectedSize = Number(row && row.PackageSize || 0);
   if (!/^https?:\/\//i.test(downloadUrl)
     || !/^[a-f0-9]{64}$/.test(expectedSha)
-    || expectedSize < 1
+    || expectedSize < 1 || expectedSize !== Math.floor(expectedSize)
     || expectedSize > 256 * 1024 * 1024) {
     throw new Error('旧版安装兼容桥缺少安全下载地址、SHA-256 或合法字节数。');
+  }
+  // MARKETPLACE_VERIFIED_PACKAGE_CACHE_V1：调用前仍读取当前商城权限与精确快照。
+  // 每租户仅一个固定槽，最多 64 MiB 原文、96 MiB 序列化值、15 分钟不续期。
+  // 不缓存签名 URL/凭据；绑定来自已授权行的指针，命中再次核验原文大小与 SHA。
+  var cacheBinding = trim(V8.EncryptHelper.Sha256Hex(JSON.stringify([
+    text(V8.OsClient), text(row.Id), text(row.StoreVersionId), text(row.PackageHdfsPath),
+    text(row.PackageStorageMode), text(row.IsPublic), expectedSha, expectedSize
+  ]))).toLowerCase();
+  var cacheKey = 'Microi:' + text(V8.OsClient) + ':Marketplace:VerifiedBody:Model:V1';
+  var cacheable = expectedSize <= 64 * 1024 * 1024 && !!V8.Cache;
+  function verified(value) {
+    return typeof value === 'string'
+      && Number(System.Text.Encoding.UTF8.GetByteCount(value)) === expectedSize
+      && trim(V8.EncryptHelper.Sha256Hex(value)).toLowerCase() === expectedSha;
+  }
+  if (requestPackageBodies[cacheBinding]) {
+    packageContentRead.Source = 'RequestReuse';
+    return requestPackageBodies[cacheBinding];
+  }
+  if (cacheable) {
+    try {
+      var rawCache = V8.Cache.Get(cacheKey);
+      if (rawCache && String(rawCache).length <= 96 * 1024 * 1024) {
+        var cached = JSON.parse(String(rawCache));
+        if (cached.Binding === cacheBinding && verified(cached.Content)) {
+          packageContentRead.Source = 'VerifiedCache';
+          packageContentRead.CacheHits++;
+          requestPackageBodies[cacheBinding] = cached.Content;
+          return cached.Content;
+        }
+      }
+    } catch (cacheReadError) { /* 缓存非权威；故障继续完整下载校验。 */ }
   }
   var response = V8.Http.GetResponse({
     Url: downloadUrl,
@@ -101,6 +136,17 @@ function loadPackageBodyFromPointer(row, downloadUrl) {
   if (actualSize !== expectedSize || actualSha !== expectedSha) {
     throw new Error('旧版安装兼容桥下载校验失败：size=' + actualSize + '/' + expectedSize
       + '，sha256=' + actualSha + '/' + expectedSha);
+  }
+  packageContentRead.Source = cacheable ? 'VerifiedDownload' : 'VerifiedDownloadUncached';
+  packageContentRead.NetworkBytes += actualSize;
+  requestPackageBodies[cacheBinding] = content;
+  if (cacheable) {
+    try {
+      var cacheValue = JSON.stringify({ Binding: cacheBinding, Content: content });
+      if (Number(System.Text.Encoding.UTF8.GetByteCount(cacheValue)) <= 96 * 1024 * 1024) {
+        V8.Cache.Set(cacheKey, cacheValue, 900);
+      }
+    } catch (cacheWriteError) { /* 不因缓存失效改变已验证包的读取结果。 */ }
   }
   return content;
 }
@@ -562,7 +608,8 @@ return {
     ChangeLogCount: changeLogs.Count,
     ChangeLogs: changeLogs.Rows,
     ApplicationAssetDownloadUrls: applicationAssetDownloadUrls,
-    PackageSummary: packageSummary
+    PackageSummary: packageSummary,
+    PackageContentRead: packageContentRead
   },
   Msg: "成功"
 };

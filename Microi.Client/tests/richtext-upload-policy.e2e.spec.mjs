@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
-const API_BASE = process.env.PW_API_BASE || "https://localhost:61501";
-const OS_CLIENT = "iTdos";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || "";
 const TABLE_ID = "4232ebac-abb7-4981-b0de-a8bdad5dc53a";
@@ -22,9 +22,10 @@ test.describe.configure({ mode: "serial" });
 test.setTimeout(300_000);
 
 function tenantUrl(hash = "") {
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
     // 显式绑定本次验收的后端，便于共享 61501 被其它任务占用时使用隔离实例，
     // 同时避免浏览器 localStorage 中旧 ApiBase 污染测试结果。
-    return `${FRONTEND}/?OsClient=iTdos&ApiBase=${encodeURIComponent(API_BASE)}${hash}`;
+    return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}${hash}`;
 }
 
 async function login(page) {

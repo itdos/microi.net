@@ -39,6 +39,20 @@ test('PlatformRelease excludes exactly Agent and Code products while freezing pl
  assert.ok(changedCandidate(before,{...before,sourceHead:'b'.repeat(40)}).includes('<candidate-head>'));
 });
 
+test('complete platform candidate binds website sources and rejects changing the selected website scope',async t=>{
+ const f=await smokeFixture(t);
+ execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','--quiet','-m','fixture'],{cwd:f.root});
+ const files=['microi.doc/docs/doc/guide.md','microi.doc/package.json','microi.doc/pnpm-lock.yaml'];
+ for(const name of files){await mkdir(path.dirname(path.join(f.root,name)),{recursive:true});await writeFile(path.join(f.root,name),'before');}
+ const snapshot=includeDocumentation=>snapshotCandidate(f.root,['.'],{testPolicy:'PlatformRelease',includeDocumentation});
+ const before=await snapshot(true),local=await snapshot(false);
+ assert.equal(before.documentationIncluded,true);for(const name of files)assert.match(before.files[name],/^[a-f0-9]{64}$/);
+ assert.ok(changedCandidate(before,local).includes('<documentation-scope>'));
+ for(const name of files)await writeFile(path.join(f.root,name),'after');
+ assert.deepEqual(changedCandidate(before,await snapshot(true)),files.sort());
+ assert.deepEqual(changedCandidate(local,await snapshot(false)),[],'Explicit partial platform release keeps the independent website scope');
+});
+
 test('ignored local smoke marker and exact selected configuration are frozen without disclosing secrets',async t=>{
  const f=await smokeFixture(t),before=await snapshotCandidate(f.root,['.']);
  assert.match(before.files[`${f.api}/.microi-local`],/^[a-f0-9]{64}$/);

@@ -1,9 +1,11 @@
 import { expect, test } from "@playwright/test";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || "";
 const PASSWORD = process.env.PW_TEST_PASSWORD || "";
-const TENANT_URL = `${FRONTEND}/?OsClient=iTdos`;
+const TENANT_URL = `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`;
 
 test.use({
     viewport: { width: 1600, height: 1000 },
@@ -13,6 +15,7 @@ test.use({
 test.setTimeout(180_000);
 
 async function login(page) {
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
     await page.goto(TENANT_URL, { waitUntil: "domcontentloaded" });
     const account = page.locator([
         'input[placeholder*="用户名"]',

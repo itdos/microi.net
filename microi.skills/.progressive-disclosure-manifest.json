@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-25T04:48:39.945Z",
+  "generatedAt": "2026-10-25T06:15:34.689Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -534,8 +534,8 @@
       ]
     },
     "microi-mobile-app-quality": {
-      "originalSha256": "64b7711929b8a7610fe0b528302e576a31839297ac7b3b798b62f5788d04c33a",
-      "originalLines": 562,
+      "originalSha256": "1ff50c437e189d1d4aa40e53e716c0356f13cd24c054d4ea7ce2e0227f8c3452",
+      "originalLines": 563,
       "prefixSha256": "a176be940d146b3651c3940757c256cb845941e102102b7adcd35c1f737f8c12",
       "prefixBytes": 1562,
       "entryLines": 204,
@@ -720,8 +720,8 @@
           "id": "microi-mobile-app-quality-022",
           "ordinal": 22,
           "destination": "microi-mobile-app-quality/references/mobile-first-delivery.md",
-          "sha256": "748fc4a802457bab760ae24281c3bb27cb70841fe72b61b86f088439236867aa",
-          "lines": 68,
+          "sha256": "33bf185e007fab2c8316f090b1f608143deca2e3ff4b010e7577c7f88d751008",
+          "lines": 69,
           "heading": "开发前固定事实源和首版范围"
         }
       ],
@@ -763,11 +763,11 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "763e3d4b236d769af299e74313b24ce052ae4738fa576c5b403df9c6fa3de027",
-      "originalLines": 711,
-      "prefixSha256": "4b609f39cb11459d3cace78e0da3f848b963b2ec2ff9c5fa07b35f3f1114ea96",
-      "prefixBytes": 6016,
-      "entryLines": 116,
+      "originalSha256": "fadf59f3736794dcccbd3849d31199f7774e93475b3ff8a575128b8caae0a645",
+      "originalLines": 716,
+      "prefixSha256": "917edc92d67281476106fc3322c9cf763098ec0f1c18a79bb23f61507241f508",
+      "prefixBytes": 6528,
+      "entryLines": 117,
       "chunks": [
         {
           "id": "microi-system-delivery-000",
@@ -789,7 +789,7 @@
           "id": "microi-system-delivery-002",
           "ordinal": 3,
           "destination": "microi-system-delivery/references/progressive-03-安全与跨端验收.md",
-          "sha256": "b4cd10b169b54235314d170c8e74f17bf6bcb5f658d0d4d2e10c73dc8aa37ef7",
+          "sha256": "1cf73c1365e3f8245b2069f5f2e24bcbfdc7f6e67c0f13524998b16f7bbf029b",
           "lines": 52,
           "heading": "平台安全与存量兼容验收（强制）"
         },
@@ -797,7 +797,7 @@
           "id": "microi-system-delivery-003",
           "ordinal": 5,
           "destination": "microi-system-delivery/references/progressive-03-安全与跨端验收.md",
-          "sha256": "479ccdb65450c7741b052a30d8e4a11917bc19d80bf9b4ac89ea00092b4aaa73",
+          "sha256": "8e2891f2a149d6828b653b9f0735ea39a4df5ba60178c79f0e5b0065ce72ee84",
           "lines": 13,
           "heading": "前端交付检查清单"
         },
@@ -821,8 +821,8 @@
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "a4d82dd8b2c5c3244b450bc5cf5e0fc58c9f32acd5947dfc8c02b926cc34294a",
-          "lines": 149,
+          "sha256": "4980374a6dd1a9af6c5061bc04f350a06e2f0774b0af2f1a85415d3cf28191f2",
+          "lines": 153,
           "heading": "自动化测试必须覆盖的坑"
         },
         {
@@ -837,7 +837,7 @@
           "id": "microi-system-delivery-008",
           "ordinal": 8,
           "destination": "microi-system-delivery/references/context-quality.md",
-          "sha256": "beffc0924e9b36dca7a57da12a4cecb65ab05e938cb776c295c7fc5d7f736553",
+          "sha256": "0e9e14b98ac7ab7ca0bf1c4ef97bad2bf061d0c01b170325ddbaf961a02a0de4",
           "lines": 54,
           "heading": "质量优先的上下文与增量开发"
         }
@@ -2259,11 +2259,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "1a30b83deafaeaab0b0639c7155d92b647f715b0cb18c66c75036df34e3add52",
-      "originalLines": 683,
-      "prefixSha256": "0b5f03c40107295faaff1291c80ad2b60fec35ffdd480048f29bcd9c7275e32b",
-      "prefixBytes": 18007,
-      "entryLines": 262,
+      "originalSha256": "b85e129836a43fe001c56b154644f82d3477dc16f51d6344dd86c6f76e2d0a2d",
+      "originalLines": 691,
+      "prefixSha256": "5b42e3b11954bc1de401574a135c2fee80ef12201bdbaa0271377fb06843baf4",
+      "prefixBytes": 19947,
+      "entryLines": 270,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -3241,17 +3241,17 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "616f00189e10d3a1ed67155eb0143cde50c76e1c3ad53d54a0cbe01eb551a859",
-      "originalLines": 713,
-      "prefixSha256": "c5d7890a69e031a8c9f63dc24982542084bd330d6b90b663b7f9187e597ae176",
-      "prefixBytes": 15123,
-      "entryLines": 175,
+      "originalSha256": "836ed32a4e4ebc3c1bb3ef2c20d7c18c2a176b2985aa3f2e50448c63d9327eba",
+      "originalLines": 722,
+      "prefixSha256": "5c89ddf8bc79c0f59de1027d5622b146eb46cf192bd6ce4a30c321faacac791f",
+      "prefixBytes": 17268,
+      "entryLines": 183,
       "chunks": [
         {
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "6bf10fb8c24bf754a85cc1b77c6db1f5366e611d9c787c43066f7d6c27659e58",
+          "sha256": "200a4f0de556b3002f1ee858dfc501c52ffa9cb526753c8a863f0f386499b127",
           "lines": 60,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
@@ -3563,8 +3563,8 @@
           "id": "workspace-conventions-039",
           "ordinal": 39,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "709deb0b4a17de0548c17f7cb44f923543dd75a7927f15b4afe2da9fb597efd8",
-          "lines": 17,
+          "sha256": "4a24e3f7bd0244debb6efa82ea164265ab5841ccf97372af67ca16e0211bfe9c",
+          "lines": 18,
           "heading": "本地测试程序与依赖生命周期（强制）"
         }
       ],

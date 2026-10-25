@@ -243,7 +243,7 @@ for(const mode of ['success','after-scan-byte-drift','after-scan-added-package',
   const cli=fileURLToPath(new URL('../../tools/release-encryption.mjs',import.meta.url));
   const tool=path.join(f.server,'tools/release-encryption.mjs');fs.mkdirSync(path.dirname(tool),{recursive:true});fs.copyFileSync(cli,tool);
   // 真实候选工具的直接依赖须完整复制，不能让隔离 shell 场景在进入发布门禁前因缺模块退出。
-  for(const name of ['release-candidate.mjs','release-composition.mjs','release-standard-inputs.mjs','release-desktop-inputs.mjs','release-nuget-closure.mjs'])
+  for(const name of ['release-candidate.mjs','release-composition.mjs','release-standard-inputs.mjs','release-desktop-inputs.mjs','release-nuget-closure.mjs','release-scratch.mjs'])
    fs.copyFileSync(fileURLToPath(new URL('../../tools/'+name,import.meta.url)),path.join(f.server,'tools',name));
   const candidateRepos=['.','Microi.Server/Microi.net','Microi.Server/Microi.AI','Microi.Server/Microi.MCP','Microi.Agent','Microi.Client/src/views/webos','Microi.Server/Microi.WorkFlow','Microi.Server/Microi.Vision'];
   for(const repo of candidateRepos){const cwd=path.resolve(f.root,repo);fs.mkdirSync(cwd,{recursive:true});execFileSync('git',['init','--quiet'],{cwd});}

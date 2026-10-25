@@ -2,14 +2,18 @@ import { expect, test } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
 const password = process.env.PW_TEST_PASSWORD;
 const output = path.resolve(process.env.PW_SCREENSHOT_DIR || '../.tmp/navigation-home-20260930');
 test.use({ viewport: { width: 1920, height: 1080 }, ignoreHTTPSErrors: true, channel: 'msedge', locale: 'zh-CN', actionTimeout:30000 });
 test.setTimeout(240000);
 
 async function login(page) {
+  expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
   if (!password) throw new Error('A protected local test credential is required.');
-  await page.goto('http://localhost:61500/?OsClient=iTdos');
+  await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`);
   await page.locator('input[placeholder*="账号"],input[placeholder*="帐号"],input[placeholder*="用户名"],input[placeholder*="user name" i],input[placeholder*="username" i]').first().fill('admin',{timeout:45000});
   await page.locator('input[type="password"]').first().fill(password);
   const privacy=page.locator('.privacy-policy-wrapper .el-checkbox');

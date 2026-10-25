@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {createReleaseScratch,cleanupReleaseScratch} from './release-scratch.mjs';
 
 export const projects=['Microi.net','Microi.AI','Microi.MCP','Microi.WorkFlow','Microi.Vision'];
 const hash=(bytes,algorithm='sha256')=>createHash(algorithm).update(bytes).digest('hex');
@@ -198,22 +198,30 @@ export function verifyPendingPackageUpload(directory,file,version,packageFile){
  assert.ok(expected,`Unverified NuGet package cannot be uploaded: ${packageFile}`);
  assertPackageBytes(expected);return expected;
 }
-export function verifyImage(directory,file,image){
- const model=verifyFinal(directory,file),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'microi-encrypted-image-'));let container;
+export function verifyImage(directory,file,image,{runDocker=(args,options)=>execFileSync('docker',args,options)}={}){
+ const model=verifyFinal(directory,file),python=findPython();
+ assert.ok(python,'Python 3.8+ is required for static Docker image verification');
+ const temporary=createReleaseScratch(path.dirname(path.resolve(file)));let failure,proof;
  try{
-  const imageId=execFileSync('docker',['image','inspect',image,'--format','{{.Id}}'],{encoding:'utf8'}).trim();
-  // Never start this container or expose ports; only inspect the exact immutable image.
-  container=execFileSync('docker',['create','--network','none','--entrypoint','/bin/true',imageId],{encoding:'utf8'}).trim();
-  assert.match(container,/^[a-f0-9]{64}$/);
+  const imageId=runDocker(['image','inspect',image,'--format','{{.Id}}'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+  assert.match(imageId,/^sha256:[a-f0-9]{64}$/,'Invalid immutable Docker image ID');
+  const archive=path.join(temporary,'image.tar');
+  runDocker(['image','save','--output',archive,imageId],{stdio:['ignore','pipe','pipe']});
+  const inspected=JSON.parse(execFileSync(python,[fileURLToPath(new URL('./inspect-docker-image-dlls.py',import.meta.url)),archive,imageId,JSON.stringify(Object.keys(model.encrypted))],{encoding:'utf8',stdio:['ignore','pipe','pipe']}));
+  assert.equal(inspected.imageId,imageId);
   for(const name of Object.keys(model.encrypted)){
-   const target=path.join(temporary,name);execFileSync('docker',['cp',`${container}:/app/${name}`,target],{stdio:['ignore','pipe','pipe']});
-   assert.deepEqual(describe(fs.readFileSync(target)),model.encrypted[name],`Docker contains an unencrypted or stale DLL: ${name}`);
+   assert.deepEqual(inspected.dlls[name],model.encrypted[name],`Docker contains an unencrypted or stale DLL: ${name}`);
   }
-  model.image={image,imageId,verifiedAt:new Date().toISOString(),dlls:model.encrypted};save(file,model);return model;
+  assert.deepEqual(verifyFinal(directory,file).encrypted,model.encrypted,'Encrypted receipt changed during Docker verification');
+  proof={image,imageId,verifiedAt:new Date().toISOString(),dlls:model.encrypted};
+ }catch(error){failure=error;throw error;
  }finally{
-  if(container)execFileSync('docker',['rm',container],{stdio:['ignore','pipe','pipe']});
-  fs.rmSync(temporary,{recursive:true,force:true});
+  try{cleanupReleaseScratch(temporary);}catch(error){
+   if(!failure)throw error;
+   console.error(`Image scratch cleanup failed after verification failure: ${error.message}`);
+  }
  }
+ model.image=proof;save(file,model);return model;
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

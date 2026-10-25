@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || "admin";
 const PASSWORD = process.env.PW_TEST_PASSWORD || "";
 const SCREENSHOT_DIR = path.resolve(
@@ -23,7 +25,8 @@ test.describe.configure({ mode: "serial" });
 test.setTimeout(240_000);
 
 function tenantUrl(route = "") {
-    return `${FRONTEND}/?OsClient=iTdos${route ? `#${route}` : ""}`;
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}${route ? `#${route}` : ""}`;
 }
 
 function unwrapDosResult(value) {
