@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import manifest, { policyFields } from '../PlatformService/file-resource-manifest.mjs';
 import { configureFileResourceCandidate, fileResourceCandidateNames } from './configure-file-resource-candidate.mjs';
@@ -27,7 +28,7 @@ test('canonical monitoring source retains the complete catalog through the stand
   }
   assert.deepEqual(source.ResourcePolicies.ApiEngines['mci-file-resource-manager'],
     pkg.ResourcePolicies.ApiEngines['mci-file-resource-manager']);
-  execFileSync(process.execPath, [new URL('./configure-system-observability-package.mjs', import.meta.url).pathname.replace(/^\/(?:([A-Za-z]):)/, '$1:'), '--verify-only'],
+  execFileSync(process.execPath, [fileURLToPath(new URL('./configure-system-observability-package.mjs', import.meta.url)), '--verify-only'],
     { windowsHide: true, stdio: 'pipe' });
 });
 

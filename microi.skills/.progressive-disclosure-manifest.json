@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-25T06:52:22.348Z",
+  "generatedAt": "2026-10-25T14:13:11.241Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -1382,11 +1382,11 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "19bfaf779ced81fabca3069774756c3835674e87f2931718d1f7724ea09d58ac",
-      "originalLines": 817,
-      "prefixSha256": "67bf36437cf205f8d5a5e99120964c9da05b65807dba45beb9da1cba967645f2",
-      "prefixBytes": 4223,
-      "entryLines": 209,
+      "originalSha256": "3f38f36f2d0a0f1287276948a9fdc7419c871dc4ab30902c162d2f29828bb22c",
+      "originalLines": 819,
+      "prefixSha256": "7193a78f9c53122f8df47bf1058ea9147741558c9a132eefa51583ecf1f21807",
+      "prefixBytes": 4679,
+      "entryLines": 211,
       "chunks": [
         {
           "id": "playwright-e2e-000",
@@ -3241,11 +3241,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "abbda6138774be3736faf520d43bcb7ed899b9a77037e12d47dce991061704e2",
-      "originalLines": 722,
-      "prefixSha256": "2c5494a2f868c9666e382772961501714d0d6db73b1b189a491fa45bfbaf77e5",
-      "prefixBytes": 17457,
-      "entryLines": 183,
+      "originalSha256": "e89958b44a0fedfa0703a14625b94d213850751e4e31e9e0b1ce68acb9042960",
+      "originalLines": 730,
+      "prefixSha256": "71cff9ce558d08243e2fd44d4bf911e5b34ba10df508ca37d9703c010406fd0d",
+      "prefixBytes": 19330,
+      "entryLines": 191,
       "chunks": [
         {
           "id": "workspace-conventions-000",
