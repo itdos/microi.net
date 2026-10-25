@@ -1887,6 +1887,7 @@ test("resumed background slices keep task progress monotonic", () => {
     backgroundCheckpointIndex: 4,
     backgroundTaskId: "task-monotonic",
     packagePreflightPassed: true,
+    packageValidateOnly: false,
     backgroundTaskEnvelope: {},
     backgroundChunkingEnabled: false,
     debugLog: {},
@@ -1904,6 +1905,10 @@ test("resumed background slices keep task progress monotonic", () => {
   context.packagePreflightPassed = false;
   vm.runInNewContext("reportProgress(90, '前置检查未通过');", context);
   assert.equal(updates.length, 3, '前置检查未通过时不得写入后台任务进度');
+  context.packagePreflightPassed = true;
+  context.packageValidateOnly = true;
+  vm.runInNewContext("reportProgress(95, '只读预检');", context);
+  assert.equal(updates.length, 3, '只读预检不得写入后台任务进度');
 });
 
 test("schema import uses durable bounded phases before application assets", () => {

@@ -48,6 +48,26 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 
 应用详情显示完整业务信息和可安装版本。当前版本与 `mic_data_version` 中仍保留旧包正文或已验证 HDFS 包指针的历史快照都可选择安装；后台任务保存实际选择的版本，允许在新版出现问题时明确重新安装旧版。版本区使用服务端搜索与分页，当前版本固定置顶，默认每页不超过 20 条，不能一次加载全部历史版本再由浏览器过滤。详情弹层使用宿主级固定毛玻璃遮罩，默认居中；标题栏拖动和窗口缩放后都会按弹层真实宽高限制四边，内容不能移出视口。平台官方发布节点仅显示“平台官方应用源”标记，不允许对自身执行安装、更新或重新安装。
 
+## 最低版本与安装预检
+
+应用包可在 `PackageInfo` 声明 `ServerMinVersion` 和 `ClientMinVersion`。使用包含安装器 **v3.1.1** 的应用商城包后，直接上传、商城下载、同版本重装和后台续跑都会先检查最低版本，再写入表结构、资源和安装记录。
+
+```json
+{"PackageInfo":{"AppId":"sample.orders","Version":"v1.0.0","ServerMinVersion":"8.5.10","ClientMinVersion":"8.5.10"}}
+```
+
+版本接受 `8.5.10`、`v8.5.10` 或四段数字版本，按各段数值比较，不接受 `latest`、范围表达式或预发布后缀。缺失、空白或 `null` 声明按历史包兼容处理，结果为 `NotDeclared`，不表示兼容性已经验证。
+
+| 检查对象 | 安装行为 |
+|---|---|
+| 后端最低版本 | 从当前执行节点的 `V8.Method.GetBackendVersion()` 读取可信版本。低于要求时返回 `PACKAGE_RUNTIME_VERSION_TOO_LOW`；有声明却无法读取运行版本时返回 `PACKAGE_RUNTIME_VERSION_UNAVAILABLE`，停止安装。后台每个分片重新检查，不能沿用其它节点的检查结果。 |
+| 前端最低版本 | 服务端不能据请求参数确认浏览器实际部署的前端版本，返回 `PendingClientVerification` 和警告。安装前仍应核对实际前端版本，并完成对应页面验收。 |
+| 声明格式错误 | 返回 `PACKAGE_RUNTIME_VERSION_INVALID`，不会把错误声明当作“没有限制”。 |
+
+通过现有 `import-microi-store-package` 接口传 `ValidateOnly:true`（或 `Action:"validate"`）可做只读预检。结果中的 `Data.Compatibility` 包含后端版本、最低版本、检查状态和警告；预检不执行物理结构引导，不写入应用资源、后台进度或包正文缓存。它不证明依赖、数据库迁移和页面功能已经安装成功，正式安装后仍须核对安装回执与实际功能。
+
+调用方传入的 `BackendVersion`、`ServerVersion`、`ClientVersion` 或跳过检查参数不会替代可信检查。旧部署应先更新应用商城；若后端缺少可信版本读取能力，需要先更新后端，再安装声明了最低后端版本的包。
+
 ## 组合包中的运行应用身份
 
 普通应用包可以用 `ApplicationBundles` 携带独立微服务工作台，公开商品仍保持原来的

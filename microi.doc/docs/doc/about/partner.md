@@ -96,6 +96,10 @@
 
 ---
 
+## 📰 公开报道
+
+2026 年 5 月 24 日，《宁波晚报》A2 版报道 NBOPC 嘉年华，在 AI 工具板块中介绍了 Microi吾码开源低代码平台。可查看[《宁波打造“一人公司”生态圈》原文](https://epaper.cnnb.com.cn/nbwb/pc/content/202605/24/content_278499.html)核验报道日期、活动背景与平台名称。该记录说明公开活动与媒体曝光，不代表产品认证、技术测评或服务等级承诺。
+
 ## 📸 公司相关照片
 
 ![公司前台](https://file.microi.net/upload/img/csdn/7b68764268b84a559521f2c13c9b49ed.jpeg#pic_center)

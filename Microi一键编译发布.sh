@@ -2207,10 +2207,11 @@ if [ "$PUBLISH_DOC" = true ]; then
     print_info "使用包管理器: pnpm@$DOC_PNPM_VERSION"
 
     print_step "按锁文件安装依赖..."
-    (cd microi.doc && run_release_command "${DOC_PKG_CMD[@]}" install --frozen-lockfile)
+    # 原生 Node 不能直接 spawn Windows 的 pnpm/npx shell shim；Bash 只执行逐项 argv，不拼接命令文本。
+    (cd microi.doc && run_release_command "$BASH" -c 'exec "$@"' microi-doc-package "${DOC_PKG_CMD[@]}" install --frozen-lockfile)
 
     print_step "构建 VitePress 文档..."
-    (cd microi.doc && run_release_command "${DOC_PKG_CMD[@]}" run docs:build)
+    (cd microi.doc && run_release_command "$BASH" -c 'exec "$@"' microi-doc-package "${DOC_PKG_CMD[@]}" run docs:build)
     run_release_command node microi.doc/scripts/check-account-portal.mjs --dist --require-committed
     print_success "VitePress 构建完成"
 
