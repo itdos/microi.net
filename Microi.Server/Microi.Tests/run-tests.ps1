@@ -3,6 +3,8 @@ param(
     [ValidateSet("Quick", "PlatformRelease", "Full", "Panel")]
     [string]$Mode = "Quick",
 
+    [switch]$AllPlatformTests,
+
     [string]$Configuration = "Release",
 
     [string]$ResultsDirectory = "",
@@ -26,6 +28,9 @@ param(
 $ErrorActionPreference = "Stop"
 $testRoot = $PSScriptRoot
 $serverRoot = Split-Path -Parent $testRoot
+if ($AllPlatformTests -and $Mode -ne 'PlatformRelease') {
+    throw 'AllPlatformTests is only valid with PlatformRelease; it does not select desktop products.'
+}
 # 服务器面板独立于业务 API；真实 Docker、ACME、旧协议和两个 Linux 安装顺序走专项门禁。
 # 不把这种有主机副作用的验收混进 Quick，也不让缺少任一专项的回执变成 Full 成功。
 if ($Mode -eq "Panel") {
@@ -105,7 +110,20 @@ if ($freeBytes -lt $reserveBytes) {
     throw "Available physical memory is below the Microi build reserve target. Close other heavy tasks or run later."
 }
 
-if ($Mode -eq "Full") {
+if ($AllPlatformTests) {
+    # 完整发行不能把组件用例当成全部；先盘点已有配置和授权，不自动准备租户或 Docker。
+    New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
+    if ($TestMatrixFile) { $env:MICROI_TEST_MATRIX_FILE = $TestMatrixFile }
+    $allPlatformTool = Join-Path $testRoot 'ReleaseGate/platform-all-tests.mjs'
+    $allPlatformEnvironmentJson = node $allPlatformTool preflight $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'AllPlatformTests preflight failed; inspect all-platform-preflight.json for each missing prerequisite.' }
+    $allPlatformEnvironment = $allPlatformEnvironmentJson | ConvertFrom-Json
+    foreach ($binding in $allPlatformEnvironment.PSObject.Properties) {
+        [Environment]::SetEnvironmentVariable($binding.Name, [string]$binding.Value, 'Process')
+    }
+}
+
+if ($Mode -eq "Full" -or $AllPlatformTests) {
     $stagedRuntime = -not [string]::IsNullOrWhiteSpace($env:MICROI_TEST_RUNTIME_READY_FILE)
     if ($stagedRuntime -ne (-not [string]::IsNullOrWhiteSpace($env:MICROI_TEST_RUNTIME_ENVIRONMENT_FILE)) -or
         $stagedRuntime -ne (-not [string]::IsNullOrWhiteSpace($env:MICROI_TEST_RUNTIME_BUILD_FILE))) {
@@ -114,18 +132,22 @@ if ($Mode -eq "Full") {
     if ($stagedRuntime -and ((Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_READY_FILE) -or (Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_BUILD_FILE))) {
         throw 'Staged Full requires new signal files; previous runtime/build receipts cannot be reused.'
     }
-    # 新 HTTP 门禁仅支持已经具备最终 DLL/进程/凭据身份核验的 staged runtime。
-    # 预检在所有构建/数据库写入前失败，不把缺夹具变成 Skip。
-    $admissionTool = Join-Path $testRoot 'ReleaseGate/fixtures/admission/runtime.mjs'
-    node $admissionTool preflight $ResultsDirectory
-    if ($LASTEXITCODE -ne 0) { throw 'Full admission fixture preflight failed. See Microi.Tests/README.md: Admission fixture.' }
+    if ($Mode -eq 'Full') {
+        # 显式 Full 保留已有准入夹具门禁；全部平台测试只复用既有授权范围。
+        # 预检在所有构建/数据库写入前失败，不把缺夹具变成 Skip。
+        $admissionTool = Join-Path $testRoot 'ReleaseGate/fixtures/admission/runtime.mjs'
+        node $admissionTool preflight $ResultsDirectory
+        if ($LASTEXITCODE -ne 0) { throw 'Full admission fixture preflight failed. See Microi.Tests/README.md: Admission fixture.' }
+    }
     if ([string]::IsNullOrWhiteSpace($TestMatrixFile)) {
         throw 'Full requires MICROI_TEST_MATRIX_FILE with the verified MCP dependency versions and isolated fixture coordinates.'
     }
     $matrixTool = Join-Path $testRoot 'ReleaseGate/release-test-matrix.mjs'
     $matrixReceipt = Join-Path $ResultsDirectory 'release-test-matrix.json'
     # 常规矩阵由实际 MCP 依赖选择；未选提供商标记不适用，不能靠旧连接扩张或靠跳过放行。
-    $matrixJson = node $matrixTool freeze $TestMatrixFile $matrixReceipt
+    $matrixFreezeArguments = @('freeze', $TestMatrixFile, $matrixReceipt)
+    if ($AllPlatformTests) { $matrixFreezeArguments += '--platform-only' }
+    $matrixJson = node $matrixTool @matrixFreezeArguments
     if ($LASTEXITCODE -ne 0) { throw 'Full dependency matrix validation failed before test execution.' }
     $matrixPlan = $matrixJson | ConvertFrom-Json
     $env:MICROI_TEST_MATRIX_FILE = $TestMatrixFile
@@ -151,7 +173,9 @@ if ($Mode -eq 'PlatformRelease') {
     }
     $platformMatrixTool = Join-Path $testRoot 'ReleaseGate/release-test-matrix.mjs'
     $platformPlanFile = Join-Path $ResultsDirectory 'platform-release-plan.json'
-    node $platformMatrixTool freeze-platform $env:MICROI_RELEASE_CANDIDATE $platformPlanFile
+    $platformPlanArguments = @('freeze-platform', $env:MICROI_RELEASE_CANDIDATE, $platformPlanFile)
+    if ($AllPlatformTests) { $platformPlanArguments += '--all-platform-tests' }
+    node $platformMatrixTool @platformPlanArguments
     if ($LASTEXITCODE -ne 0) { throw 'PlatformRelease candidate binding failed before regression execution.' }
 }
 
@@ -371,17 +395,24 @@ dotnet build $project `
     -v:minimal
 if ($LASTEXITCODE -ne 0) { throw "dotnet build failed with exit code $LASTEXITCODE." }
 
-Write-Host "Running deterministic unit/component regression tests..."
+Write-Host $(if ($AllPlatformTests) { 'Running every Microi.Tests C# test without a category exclusion...' } else { 'Running deterministic unit/component regression tests...' })
+$categoryFilterArguments = if ($AllPlatformTests) { @() } else { @('--filter', 'Category!=FullStack') }
 dotnet test $project `
     -c $Configuration `
     --no-build `
     --no-restore `
-    --filter "Category!=FullStack" `
+    @categoryFilterArguments `
     --results-directory $ResultsDirectory `
     --logger "trx;LogFileName=$testTrxName" `
     --collect "XPlat Code Coverage" `
     -m:1
 if ($LASTEXITCODE -ne 0) { throw "$Mode component regression tests failed with exit code $LASTEXITCODE." }
+
+if ($AllPlatformTests) {
+    $allPlatformBrowserJson = node $allPlatformTool browser $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'AllPlatformTests frontend browser gate failed.' }
+    $allPlatformBrowser = $allPlatformBrowserJson | ConvertFrom-Json
+}
 
 if ($Mode -eq "Full") {
     Write-Host "Building the complete backend solution..."
@@ -597,13 +628,15 @@ if ($Mode -eq 'PlatformRelease') {
     $nodeTests = [int](($nodeGroups | Measure-Object -Property tests -Sum).Sum)
     $completedAt = [DateTimeOffset]::UtcNow
     $receipt = [ordered]@{
-        schemaVersion = 1; scope = 'PlatformRelease'; status = 'Passed'; filter = 'Category!=FullStack'
+        schemaVersion = 1; scope = 'PlatformRelease'; status = 'Passed'; filter = $(if ($AllPlatformTests) { 'AllPlatformTests' } else { 'Category!=FullStack' })
+        allPlatformTests = [bool]$AllPlatformTests
         startedAt = $testStartedAt.ToString('o'); completedAt = $completedAt.ToString('o')
         elapsedSeconds = [Math]::Round(($completedAt - $testStartedAt).TotalSeconds, 3)
         dotnet = [ordered]@{ trxFile = $platformTrx.trxFile; trxSha256 = $platformTrx.trxSha256; tests = [int]$counters.total; passed = [int]$counters.passed; failed = 0; skipped = 0 }
         node = [ordered]@{ reportFile = $nodeReportFile; reportSha256 = (Get-FileHash -LiteralPath $nodeReportFile -Algorithm SHA256).Hash.ToLowerInvariant(); groups = $nodeGroups.Count; tests = $nodeTests; passed = $nodeTests; failed = 0; skipped = 0 }
-        excludedScopes = @('CodeAgentDesktopAndVSIX', 'NewTenantAdmission', 'FullStackDependencyMatrix', 'NotificationChatInstallationAndBrowser')
+        excludedScopes = $(if ($AllPlatformTests) { @('CodeAgentDesktopAndVSIX') } else { @('CodeAgentDesktopAndVSIX', 'NewTenantAdmission', 'FullStackDependencyMatrix', 'NotificationChatInstallationAndBrowser') })
     }
+    if ($AllPlatformTests) { $receipt.browser = $allPlatformBrowser }
     $receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $ResultsDirectory 'platform-release-tests.json') -Encoding UTF8
     node $platformMatrixTool verify-platform $platformPlanFile (Join-Path $ResultsDirectory 'platform-release-tests.json') (Join-Path $ResultsDirectory 'platform-release-result.json')
     if ($LASTEXITCODE -ne 0) { throw 'PlatformRelease matrix rejected source drift or inconsistent real test evidence.' }

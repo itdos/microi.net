@@ -138,6 +138,8 @@ SQL Server 验收还应覆盖 Unicode 文本、带单引号的创建人姓名和
 
 测试与发布会自动回收自己新建的临时文件。Full 保留测试报告和 `artifact-cleanup.json`，删除本轮 `.net-artifacts`；一键发布将构建、pack、冒烟日志及 NuGet 替换临时目录统一放入结果目录的唯一 `release-scratch-*`，退出后保留同级 `.cleanup.json` 小回执。已有目录、其它任务工作区和未提交源码不会因本轮使用而取得删除权。
 
+API 发行冒烟临时使用所选本地配置的十个基础设施 `AppSettings` 字段，不复制 `DevLoginBypass`，也不修改源配置。退出时先恢复公共配置原始字节，再回收临时文件；恢复失败会停止发布并保留证据。产物复用、Docker 构建及上传前还会检查公共模板的字节与哈希，拒绝环境配置或冒烟备份进入发行包；镜像配置只按不可变 imageId 静态读取，不启动测试容器。
+
 Windows 清理采用普通 PowerShell 删除，先检查真实路径、祖先链接、Git 标记、受保护属性和文件占用，不默认使用 `-Force`。清理失败保留归属清单及错误，不升级为强删；发布原失败码保留，原成功但清理失败则返回非零。`blocked by policy` 若发生在 shell 启动前，脚本内检查与收尾均未执行，应先定位当前执行器和拒绝阶段；不要改 ACL、清除属性或换工具绕过。硬杀或掉电后需按归属清单重新核验并补清，不能整体清空共享 `.tmp`。
 
 后端测试统一位于 `/Microi.Server/Microi.Tests`。它合并了历史
@@ -150,7 +152,7 @@ FormEngine、ApiEngine、安全与多租户边界测试。
 .\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Quick
 ```
 
-普通吾码 PC/API 完整发布使用 `PlatformRelease`：平台 Node/C# 自动化、Release 编译、闭源 DLL 加密、最终产物冒烟、Docker 推送及远端不可变摘要回读。以 30 分钟为可度量耗时目标并记录各阶段与总耗时；超出目标时告警、说明瓶颈并继续推进，不能仅因达到 30 分钟终止发布或将成功改为失败。真实命令失败、取消、单操作超时及质量检查仍有效，修复后安全续发，以发布成功为目标。该入口不运行 Microi Code/Agent 测试，不新建租户、不安装聊天应用；源码拉取、合并、冲突处理和提交推送按需额外完成，不因此扩大产品发布范围。
+吾码完整正式发布默认执行 `Microi一键编译发布.sh --platform-release`（菜单默认完整选项）：版本号按原规则 +1 一次，发布 NuGet、API Docker、PC Docker 和官方网站文档/Docker。完整入口通过 `PlatformRelease + AllPlatformTests` 执行 Microi.Tests 全部 C# 测试及吾码前端全部 Node/Playwright 测试，再进行 Release 编译、闭源 DLL 加密、最终产物冒烟与各渠道回读；不能以过滤 FullStack 或跳过浏览器测试的子集称为全部通过。默认从 `.microi-local` 选择项目配置并复用已有 MySQL、Redis、MongoDB、MinIO/OSS，使用本机程序验证，不另建 Docker 测试依赖或临时官网运行容器；既有测试授权保护仍有效，缺前置条件不能静默跳过。整体以 30 分钟为耗时目标，超出时记录瓶颈并继续推进至成功，真实错误、取消及单操作超时仍保留。不混入 Microi Code/Agent 独立产品测试，不新建租户、不安装聊天应用。源码拉取、合并、冲突解决和提交推送按需补齐；仅明确要求局部发布时才缩小渠道。
 
 只有明确选择 Full 深度测试时，才对**隔离测试租户和专用测试表**运行下列独立入口；它不属于普通发布前置条件：
 

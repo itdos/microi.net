@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-25T05:49:08.519Z",
+  "generatedAt": "2026-10-25T05:49:10.696Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,10 +763,10 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "3886a76f938a8e5447e9b81a51e4725285ab9d669a842195d8580f2829eb1f00",
+      "originalSha256": "a050e72abcc7841093d9ca07ffc9e94adfe213302df7f33bc04929c57299402b",
       "originalLines": 716,
-      "prefixSha256": "c483217707341ee08df278d2154b7c55296f7509a5ec619af85f0120fc3d9b05",
-      "prefixBytes": 6298,
+      "prefixSha256": "a55252685fd5dc6c366c717b5c09490c93507880e702d5139f01127428a64f48",
+      "prefixBytes": 6378,
       "entryLines": 117,
       "chunks": [
         {
@@ -821,7 +821,7 @@
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "05b88429094231acb093004e84cfd0b4a17188dec1cfa3029d392acee8a28cc6",
+          "sha256": "4b4b49faa8cb349197a9da97e7d2082c3891edb3cbc95a68b7b499456400a0c9",
           "lines": 153,
           "heading": "自动化测试必须覆盖的坑"
         },
@@ -3241,17 +3241,17 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "6b85e5b798b3478044aaba0d44520245725806d8703da928fdbe6dbeedc6b1da",
-      "originalLines": 717,
-      "prefixSha256": "95a089705a65e52a473c1e6fb35fd2fb2e3bf449d6741bef4482f2826df75468",
-      "prefixBytes": 16007,
-      "entryLines": 179,
+      "originalSha256": "b7a1eb6ae2965fd41ac12c9fc4b9a90d2c0940412d981bf9b5a6b4ad7bea11de",
+      "originalLines": 722,
+      "prefixSha256": "0b38301c60fa0c5f5525d17d6c8861b3149268e53ff3503b2a79b2511a7a9fb8",
+      "prefixBytes": 16995,
+      "entryLines": 183,
       "chunks": [
         {
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "6bf10fb8c24bf754a85cc1b77c6db1f5366e611d9c787c43066f7d6c27659e58",
+          "sha256": "200a4f0de556b3002f1ee858dfc501c52ffa9cb526753c8a863f0f386499b127",
           "lines": 60,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
@@ -3563,8 +3563,8 @@
           "id": "workspace-conventions-039",
           "ordinal": 39,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "709deb0b4a17de0548c17f7cb44f923543dd75a7927f15b4afe2da9fb597efd8",
-          "lines": 17,
+          "sha256": "4a24e3f7bd0244debb6efa82ea164265ab5841ccf97372af67ca16e0211bfe9c",
+          "lines": 18,
           "heading": "本地测试程序与依赖生命周期（强制）"
         }
       ],

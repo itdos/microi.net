@@ -25,7 +25,8 @@ for(const scenario of [
  {name:'placeholder configured password',password:'your-password',passed:false},
  {name:'unsupported configured registry',region:'shanghai',passed:false},
  {name:'configured registry login denied',denyLogin:true,passed:false},
- {name:'independent registry cached credential unavailable',cache:false,passed:false}
+ {name:'independent registry cached credential unavailable',cache:false,passed:false},
+ {name:'published website digest is unconfirmed',denyConfirm:true,passed:false}
 ])test(`documentation registry credentials: ${scenario.name}`,()=>{
  const directory=fs.mkdtempSync(path.join(root,'.tmp','docs registry credential '));
  const password=scenario.password??'fictional-docs-password-$"\'\\\nonly-fixture';
@@ -43,7 +44,18 @@ for(const scenario of [
 print_info(){ :; }; print_step(){ :; }; print_success(){ :; }
 print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
 ${budgetFunctions}
-node(){ if [ "$2" = probe ]; then return 0; fi; command node "$@"; }
+node(){
+ if [ "$2" = probe ]; then return 0; fi
+ case "$1" in
+  *release-remote-collision.mjs)
+   printf 'REMOTE=%s\\n' "$2"
+   ${scenario.denyConfirm?'[ "$2" != docker-confirm ] || return 32':':'}
+   return 0 ;;
+  *release-candidate.mjs) return 0 ;;
+ esac
+ command node "$@"
+}
+MICROI_RELEASE_GATE_DIR=.; START_TIME=1; DOC_IMAGE_TAG=fixture-doc; VERSION=1.2.3
 DOCKER_REGION=hangzhou; DOCKER_NAMESPACE=your-namespace; DOCKER_USERNAME=your-username; DOCKER_PASSWORD=your-password
 ${reader}
 ${config}
@@ -97,6 +109,10 @@ printf 'DOC_COMPLETE\\n'
    const targets=['registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest','registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest'];
    assert.deepEqual(run.stdout.split(/\r?\n/).filter(line=>line.startsWith('PUSH=')).map(line=>line.slice(5)),targets,'Existing channels and push order must be retained');
    assert.deepEqual(fs.readFileSync(path.join(directory,'manifest.ok'),'utf8').trim().split(/\r?\n/),targets.map(target=>'MANIFEST='+target));
+   assert.equal(run.stdout.match(/REMOTE=docker-confirm/g)?.length,2,'Each published website registry needs its own digest confirmation');
+  }else if(scenario.denyConfirm){
+   assert.equal(run.stdout.match(/PUSH=/g)?.length,1,'Failed confirmation must stop before the second registry');
+   assert.match(run.stdout,/REMOTE=docker-confirm/);
   }else assert.equal(run.stdout.includes('PUSH='),false,'Credential failures must stop before either upload');
  }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
@@ -224,6 +240,7 @@ prepare_release_workspace
 for(const scenario of [
  {name:'failed platform tests prevent platform publication',backend:true,client:false,exit:19,passed:false,called:true},
  {name:'successful platform tests allow platform publication',backend:true,client:false,exit:0,passed:true,called:true},
+ {name:'complete platform entry explicitly requests all platform tests',complete:true,backend:true,client:true,exit:0,passed:true,called:true},
  {name:'frontend publication also requires platform tests',backend:false,client:true,exit:19,passed:false,called:true},
  {name:'prebuilt Docker push cannot bypass failed tests',backend:false,client:false,docker:true,exit:19,passed:false,called:true},
  {name:'documentation-only work avoids the backend gate',backend:false,client:false,exit:19,passed:true,called:false},
@@ -241,6 +258,7 @@ unset MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT MICROI_TEST_SQLSERVER_EXEMPTION_SH
 set -- ${scenario.fullOnly?'--full-only':''}
 ${policy}
 PUBLISH_BACKEND=${scenario.backend}
+MICROI_COMPLETE_PLATFORM_RELEASE=${scenario.complete||false}
 MICROI_FULL_ONLY=${scenario.fullOnly||false}
 BUILD_CLIENT=${scenario.client}
 PLATFORM_DOCKER_SELECTED=${scenario.docker||false}
@@ -253,6 +271,7 @@ printf 'PUBLICATION_REACHED\\n'
  assert.equal(result.stdout.includes('TEST_ARGUMENTS='),scenario.called);
  if(scenario.called){
   assert.ok(result.stdout.includes(`-Mode ${scenario.fullOnly?'Full':'PlatformRelease'} -Configuration Release`),result.stdout);
+  assert.equal(result.stdout.includes('-AllPlatformTests'),Boolean(scenario.complete));
   if(scenario.exit===0)assert.ok(result.stdout.includes(`release-test-matrix.mjs ${scenario.fullOnly?'verify ':'verify-platform '}`),result.stdout);
  }
 });
@@ -347,11 +366,14 @@ test('selected versions are frozen before scoped tests and every publication wai
  assert.equal(source.match(/print_step "更新 Directory\.Build\.props/g)?.length,1,'Selected version preparation must not execute twice');
 });
 
-test('real schedule stores belong to Full and their settings fail fast before builds',()=>{
+test('real schedule stores belong to explicit Full or all-platform scope and fail fast before builds',()=>{
  const runner=fs.readFileSync(path.join(root,'Microi.Server/Microi.Tests/run-tests.ps1'),'utf8');
- const preflight=runner.slice(runner.indexOf('if ($Mode -eq "Full")'),runner.indexOf('New-Item -ItemType Directory'));
+ const preflightStart=runner.indexOf('if ($Mode -eq "Full" -or $AllPlatformTests)');
+ assert.ok(preflightStart>=0);
+ const preflight=runner.slice(preflightStart,runner.indexOf('New-Item -ItemType Directory',preflightStart));
  const matrix=fs.readFileSync(path.join(root,'Microi.Server/Microi.Tests/ReleaseGate/release-test-matrix.mjs'),'utf8');
- assert.match(preflight,/node \$matrixTool freeze/u);
+ assert.match(preflight,/\$matrixFreezeArguments = @\('freeze', \$TestMatrixFile, \$matrixReceipt\)/u);
+ assert.match(preflight,/node \$matrixTool @matrixFreezeArguments/u);
  assert.match(preflight,/\$required = @\(\$matrixPlan\.requiredEnvironment\)/u);
  for(const name of ['MICROI_TEST_SCHEDULE_REDIS','MICROI_TEST_SCHEDULE_MYSQL'])assert.ok(matrix.includes(name),name);
  for(const name of ['MicroiTaskSchedulingCacheTests','MicroiTaskSchedulingSharedStoreTests']){

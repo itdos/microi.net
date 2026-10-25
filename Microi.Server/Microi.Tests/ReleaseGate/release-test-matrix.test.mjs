@@ -92,6 +92,27 @@ test('Desktop candidate matrix binds the actual Full snapshot and rejects unknow
  }finally{fs.rmSync(directory,{recursive:true,force:true});}
 });
 
+test('all-platform dependency freeze ignores inherited Desktop snapshots while preserving actual database and fixture validation',()=>{
+ const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-platform-dependencies-'));
+ const tool=fileURLToPath(new URL('./release-test-matrix.mjs',import.meta.url));
+ const input=path.join(directory,'matrix.json'),receipt=path.join(directory,'platform.json');
+ const env={...process.env,...environment(),MICROI_UPGRADE_SQLSERVER_TEST_CONN:'',MICROI_TEST_MONGO_LEGACY:'',MICROI_TEST_MONGO_LEGACY_VERSION:''};
+ try{
+  const value=matrix();
+  value.candidateInputs={desktop:{fileCount:1,filesSha256:'obsolete-desktop-hash',formalCandidateModule:'removed-desktop-repository.mjs'}};
+  fs.writeFileSync(input,JSON.stringify(value));
+  const result=spawnSync(process.execPath,[tool,'freeze',input,receipt,'--platform-only'],{env,encoding:'utf8',windowsHide:true});
+  assert.ifError(result.error);assert.equal(result.status,0,result.stderr);
+  const plan=JSON.parse(fs.readFileSync(receipt));assert.equal(plan.scope,'PlatformDependencies');
+  assert.equal(plan.matrix.candidateInputs,undefined);assert.ok(plan.requiredEnvironment.includes('MICROI_TEST_TOKEN'));
+  const full=spawnSync(process.execPath,[tool,'freeze',input,path.join(directory,'full.json')],{env,encoding:'utf8',windowsHide:true});
+  assert.notEqual(full.status,0);assert.equal(fs.existsSync(path.join(directory,'full.json')),false);
+  delete value.dependencies.mongo;fs.writeFileSync(input,JSON.stringify(value));
+  const invalid=spawnSync(process.execPath,[tool,'freeze',input,path.join(directory,'invalid.json'),'--platform-only'],{env,encoding:'utf8',windowsHide:true});
+  assert.notEqual(invalid.status,0);assert.equal(fs.existsSync(path.join(directory,'invalid.json')),false);
+ }finally{fs.rmSync(directory,{recursive:true});}
+});
+
 test('常规桌面足以验收，显式4K选择冻结并要求额外用例',()=>{
  const common=frozen();assert.deepEqual(common.browserGeometryWidths,[1366,1920]);
  assert.doesNotThrow(()=>validateMatrixResults(common,outcomes(),storage()));

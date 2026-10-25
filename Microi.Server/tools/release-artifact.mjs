@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {snapshotCandidate,changedCandidate} from './release-candidate.mjs';
 import {assertCompositionArtifacts} from './release-composition.mjs';
 import {verifyPlatformReleaseEvidence} from '../Microi.Tests/ReleaseGate/release-test-matrix.mjs';
+import {verifyPublishedConfig} from './release-smoke-config.mjs';
 
 export async function artifactFiles(directory,type){
  const files={};
@@ -46,6 +47,9 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  const changed=changedCandidate(candidate,await snapshotCandidate(undefined,undefined,{testPolicy:policy}));
  if(changed.length)throw Error(`Source changed after Full acceptance:\n${changed.slice(0,40).join('\n')}`);
  const directory=path.join(root,type==='api'?'Microi.Server/Microi.net.Api/bin/Release':'Microi.Client/bin/Release');
+ // Capturing a hash of leaked credentials would still bind a bad artifact.
+ // Both fresh captures and reused/pre-push artifacts must match the public template.
+ if(type==='api')verifyPublishedConfig(path.join(directory,'publish'),path.join(root,'Microi.Server/Microi.net.Api/appsettings.json'));
  const files=await artifactFiles(directory,type);
  // PC 镜像没有后端规则 DLL；API 发行才核对后台审批的私有原生制品。
  if(type==='api')assertCompositionArtifacts(candidate,files);

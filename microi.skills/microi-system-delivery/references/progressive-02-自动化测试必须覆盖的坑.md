@@ -6,12 +6,12 @@
 
 临时文件回归必须调用真实 Full `finally` 与发布 `EXIT` 收尾，分别验证成功、原始失败、可捕获中断及清理失败；不能仅断言源码有 `finally`。覆盖祖先/子项链接、Git 标记、已有目录、空格及方括号路径、受保护属性与独占文件锁，断言保护项字节不变、普通删除不传 `-Force`、失败不自动强制重试、回执可定位残留。测试异常与清理异常同时发生时保留原始异常，发布锁仍释放；平台进程被硬杀不能假称已完成收尾。用例位于 `Microi.Tests/ReleaseGate/test-artifact-cleanup.test.mjs` 与 `release-scratch.test.mjs`，不为这些文件生命周期回归启动数据库或 Docker 容器。
 
-<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=05b88429094231acb093004e84cfd0b4a17188dec1cfa3029d392acee8a28cc6 -->
+<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=4b4b49faa8cb349197a9da97e7d2082c3891edb3cbc95a68b7b499456400a0c9 -->
 ## 自动化测试必须覆盖的坑
 
 ### 后端统一测试与发布门禁
 
-普通发布的步骤与耗时目标以 [部署 Skill 的固定流程](../../microi-deployment/SKILL.md#普通吾码发布固定流程30-分钟) 为准。`完整发布` 不等于 `Full`；1800 秒是共享耗时目标，超出时记录并继续，不能仅因总耗时超标终止发布。阶段切换和重试不能隐瞒累计耗时。
+完整发布的步骤与耗时目标以 [部署 Skill 的固定流程](../../microi-deployment/SKILL.md#普通吾码发布固定流程30-分钟) 为准。默认版本 +1、NuGet、API/PC Docker 和官网全部发布；`PlatformRelease + AllPlatformTests` 覆盖 Microi.Tests 全部 C# 测试与吾码前端全部 Node/Playwright 测试，不能以排除 FullStack 的组件子集冒充完整验收。独立 Code/Agent 测试不属于此范围。1800 秒是共享耗时目标，超出时记录并继续，不仅因耗时超标终止。默认读取 `.microi-local` 复用现有项目依赖，不创建本地 Docker 测试环境、不安装聊天应用或新建租户；需要已授权测试夹具但缺失时准确列出并阻断完整成功，不能静默跳过。
 
 发布入口回归须验证：遗留桌面 Node 配置不影响 `PlatformRelease`；新租户准入、聊天应用安装及 Code/Agent 测试入口均不触发；平台测试失败/零用例/跳过仍阻止发布；新推送也必须核对远端 digest，回读失败或不一致不能写成功；超过 30 分钟后仍执行当前及后续发布命令、正常成功仍返回成功并记录超标，真实失败或取消仍非零。使用隔离命令夹具覆盖这些行为，不为验证发布流程启动租户或安装应用。
 

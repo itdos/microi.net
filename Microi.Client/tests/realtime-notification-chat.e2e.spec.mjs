@@ -4,7 +4,8 @@ import path from "node:path";
 
 const frontend = process.env.PW_BASE_URL || "http://localhost:61500";
 const apiBase = process.env.PW_API_BASE || "";
-const password = process.env.PW_LOCAL_PASSWORD || "";
+const password = process.env.PW_LOCAL_PASSWORD || process.env.MICROI_TEST_PASSWORD || "";
+const osClient = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
 const browserChannel = process.env.PW_BROWSER_CHANNEL || "";
 const screenshotDir = path.resolve(
     process.cwd(),
@@ -19,8 +20,9 @@ test.use({
 test.setTimeout(240_000);
 
 async function login(page) {
+    expect(osClient, "An existing fixture tenant must be selected with PW_OS_CLIENT").not.toBe("");
     const apiBaseQuery = apiBase ? `&ApiBase=${encodeURIComponent(apiBase)}` : "";
-    await page.goto(`${frontend}/?OsClient=iTdos${apiBaseQuery}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${frontend}/?OsClient=${encodeURIComponent(osClient)}${apiBaseQuery}`, { waitUntil: "domcontentloaded" });
     const account = page.locator([
         'input[placeholder*="用户名"]',
         'input[placeholder*="账号"]',
@@ -53,7 +55,7 @@ async function login(page) {
     if (apiBase) {
         const runtimeEndpoint = await page.evaluate(() => window.__MICROI_RUNTIME_ENDPOINT__);
         expect(runtimeEndpoint?.apiBase).toBe(apiBase);
-        expect(runtimeEndpoint?.osClient).toBe("iTdos");
+        expect(runtimeEndpoint?.osClient).toBe(osClient);
         expect(runtimeEndpoint?.source?.apiBase).toBe("url-query");
     }
 }
