@@ -136,9 +136,9 @@ AI 能不能提高效率，不只取决于模型本身，更取决于模型要�
 | 局部接口修改 | 2,343 | 3,248 | 增加 38.63% | 小载荷直接传全文 |
 | 微服务菜单配置 | 3,174 | 3,822 | 增加 20.42% | 小载荷直接传全文 |
 
-复测入口：[基准源码](https://gitee.com/ITdos/microi.net/blob/7bdaf49a691dde8ff43313176adc9dc3f993888d/microi.mcp/src/manifest-efficiency-benchmark.ts)、
-[验收测试](https://gitee.com/ITdos/microi.net/blob/7bdaf49a691dde8ff43313176adc9dc3f993888d/microi.mcp/src/manifest-efficiency-benchmark.test.ts)、
-[固定场景](https://gitee.com/ITdos/microi.net/blob/7bdaf49a691dde8ff43313176adc9dc3f993888d/microi.mcp/src/manifest-context-fixtures.ts)。
+复测入口：基准源码（[Gitee](https://gitee.com/ITdos/microi.net/blob/7bdaf49a691dde8ff43313176adc9dc3f993888d/microi.mcp/src/manifest-efficiency-benchmark.ts) / [GitHub](https://github.com/itdos/microi.net/blob/f9fc6145c726dcceb925efdb955b6dc128d481e6/microi.mcp/src/manifest-efficiency-benchmark.ts)）、
+验收测试（[Gitee](https://gitee.com/ITdos/microi.net/blob/7bdaf49a691dde8ff43313176adc9dc3f993888d/microi.mcp/src/manifest-efficiency-benchmark.test.ts) / [GitHub](https://github.com/itdos/microi.net/blob/f9fc6145c726dcceb925efdb955b6dc128d481e6/microi.mcp/src/manifest-efficiency-benchmark.test.ts)）、
+固定场景（[Gitee](https://gitee.com/ITdos/microi.net/blob/7bdaf49a691dde8ff43313176adc9dc3f993888d/microi.mcp/src/manifest-context-fixtures.ts) / [GitHub](https://github.com/itdos/microi.net/blob/f9fc6145c726dcceb925efdb955b6dc128d481e6/microi.mcp/src/manifest-context-fixtures.ts)）。两组固定提交中的这三个文件已逐一核对，Git blob 内容相同；仓库整体历史不据此视为相同。
 复测提交为 `7bdaf49a691dde8ff43313176adc9dc3f993888d`，Node.js 为 `v20.20.1`。
 该次基准源码 SHA-256 为 `5c89f409206f7dfe027d368a1ca79f978ad19b44ebbf4fcaf9be4fc76f6a57f8`；
 后续版本可能改变字节数，复测时记录实际提交号、源码哈希及 Node.js 版本。

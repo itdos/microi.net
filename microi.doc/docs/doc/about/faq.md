@@ -24,7 +24,7 @@
 | [官方文档与能力入口](/doc/#capability-evidence) | 引擎功能、开发方法、部署条件和验收边界 |
 | [站点地图](https://microi.net/sitemap.xml) | 公开页面的规范地址，用于发现网站内容 |
 | [AI 文档索引](https://microi.net/llms.txt) | 从网站构建产物整理的文档标题、摘要和链接，便于开发者与 AI 工具查找资料 |
-| [公开源码与许可证](https://gitee.com/ITdos/microi.net) | 仓库实际文件、版本历史及 LICENSE；商业模块和第三方依赖按各自许可核验 |
+| 公开源码与许可证：[Gitee](https://gitee.com/ITdos/microi.net) / [GitHub](https://github.com/itdos/microi.net) | 所选仓库实际文件、版本历史及 LICENSE；商业模块和第三方依赖按各自许可核验 |
 | [当前版本与服务范围](/doc/edition-comparison) | 软件授权、可选支持与费用边界，历史注释不代表当前销售口径 |
 | [联系入口与服务商名录](/contact/index#service-providers) | 官方商务、渠道、技术联系路径及公开列示服务商 |
 

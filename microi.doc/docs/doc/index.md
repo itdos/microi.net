@@ -46,8 +46,8 @@ Microi吾码适合以 .NET / Vue 技术栈自主管理数据、在线编写业�
 | 评估维度 | 能力与核验入口 | 证据边界 |
 |---|---|---|
 | 产品架构与技术底座 | [源码模块地图](/doc/getting-started/source-code-architecture)、[V8 接口引擎](/doc/v8-engine/api-engine)、[多租户](/doc/system-engine/saas-engine) | 区分公开源码、发布包与商业模块；前端微服务不等于后端微服务架构 |
-| 研发体系与交付效率 | [AI 开发闭环](/doc/v8-engine/ai-apiengine)、[平台测试入口](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)、[应用版本治理](/doc/system-engine/app-store) | 测试代码、执行回执、制品发布与客户部署分别核验 |
-| 开源生态与社区 | [公开仓库](https://gitee.com/ITdos/microi.net)、[许可证](https://gitee.com/ITdos/microi.net/blob/master/LICENSE)、[Skills](https://gitee.com/ITdos/microi.net/tree/master/microi.skills) | Star 表示关注；包下载包含重复还原和 CI，不等于独立用户、付费客户或市场份额 |
+| 研发体系与交付效率 | [AI 开发闭环](/doc/v8-engine/ai-apiengine)、平台测试入口（[Gitee](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md) / [GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）、[应用版本治理](/doc/system-engine/app-store) | 测试代码、执行回执、制品发布与客户部署分别核验 |
+| 开源生态与社区 | 公开仓库（[Gitee](https://gitee.com/ITdos/microi.net) / [GitHub](https://github.com/itdos/microi.net)）、许可证（[Gitee](https://gitee.com/ITdos/microi.net/blob/master/LICENSE) / [GitHub](https://github.com/itdos/microi.net/blob/master/LICENSE)）、Skills（[Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.skills) / [GitHub](https://github.com/itdos/microi.net/tree/master/microi.skills)） | Star 表示关注；包下载包含重复还原和 CI，不等于独立用户、付费客户或市场份额；各仓版本以其提交记录为准 |
 | AI 能力 | [MCP / Agent](/doc/v8-engine/microi-agent)、[AI 引擎](/doc/system-engine/ai-engine)、[工作流与业务蓝图](/doc/system-engine/ai-workflow-suite)、[效率验证](/doc/v8-engine/ai-apiengine#ai-efficiency) | 模型调用能力与任务完成率、Token、耗时的同条件实测分开评价 |
 | 国产化与安全 | [部署说明](/doc/getting-started/docker-run)、[数据库扩展](/doc/system-engine/databases)、[安全基线](/doc/more/security)、[身份验证](/doc/more/identity-verification) | 驱动或跨平台支持不等于每种 CPU、OS、数据库版本已适配，也不代替认证证书 |
 | 商业化与定价 | [版本与授权](/doc/edition-comparison) | 买断授权、可选年度支持、实施与第三方资源费用分别核算 |

@@ -202,7 +202,7 @@ Microi吾码本身是开源平台，开源版就是 Gitee 仓库提供的平台�
 
 | 交付对象 | 核验方式 |
 |---|---|
-| 公开仓库源码 | 以 [Gitee 仓库](https://gitee.com/ITdos/microi.net)实际文件及 [LICENSE](https://gitee.com/ITdos/microi.net/blob/master/LICENSE)为准；保留许可和版权声明，第三方依赖遵循各自许可证 |
+| 公开仓库源码 | 以所选 [Gitee](https://gitee.com/ITdos/microi.net) / [GitHub](https://github.com/itdos/microi.net) 仓库实际文件及 LICENSE（[Gitee](https://gitee.com/ITdos/microi.net/blob/master/LICENSE) / [GitHub](https://github.com/itdos/microi.net/blob/master/LICENSE)）为准；保留许可和版权声明，第三方依赖遵循各自许可证 |
 | NuGet / 镜像运行组件 | 可以下载安装不等于该组件源码已公开；按包内许可、产品版本和实际授权核验使用范围 |
 | 商业版附加源码与能力 | 本页明确列出 WebOS 完整源码及在线 AI；其余源码交付清单和授权范围由采购文件逐项确认，不能推定为全部内部源码 |
 | 培训、咨询与实施 | 区分软件授权、技术支持与具体项目实施；人员投入、交付物、响应时间、验收和维护责任以服务约定为准 |
