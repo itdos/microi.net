@@ -198,22 +198,33 @@ export function verifyPendingPackageUpload(directory,file,version,packageFile){
  assert.ok(expected,`Unverified NuGet package cannot be uploaded: ${packageFile}`);
  assertPackageBytes(expected);return expected;
 }
+// Docker's classic image store uses a config digest as .Id; the containerd
+// store uses an immutable manifest digest and exposes its config binding.
+export function dockerConfigIdentity(inspect){
+ assert.match(inspect?.Id||'',/^sha256:[a-f0-9]{64}$/,'Invalid immutable Docker image ID');
+ const descriptor=inspect.Descriptor;
+ if(!descriptor)return {imageId:inspect.Id,configId:inspect.Id};
+ assert.equal(descriptor.digest,inspect.Id,'Docker descriptor differs from immutable image ID');
+ assert.ok(['application/vnd.oci.image.manifest.v1+json','application/vnd.docker.distribution.manifest.v2+json'].includes(descriptor.mediaType),'Docker image must identify a single manifest');
+ const configId=descriptor.annotations?.['config.digest'];
+ assert.match(configId||'',/^sha256:[a-f0-9]{64}$/,'Docker manifest lacks an authoritative config digest');
+ return {imageId:inspect.Id,configId};
+}
 export function verifyImage(directory,file,image,{runDocker=(args,options)=>execFileSync('docker',args,options)}={}){
  const model=verifyFinal(directory,file),python=findPython();
  assert.ok(python,'Python 3.8+ is required for static Docker image verification');
  const temporary=createReleaseScratch(path.dirname(path.resolve(file)));let failure,proof;
  try{
-  const imageId=runDocker(['image','inspect',image,'--format','{{.Id}}'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
-  assert.match(imageId,/^sha256:[a-f0-9]{64}$/,'Invalid immutable Docker image ID');
+  const {imageId,configId}=dockerConfigIdentity(JSON.parse(runDocker(['image','inspect',image,'--format','{{json .}}'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()));
   const archive=path.join(temporary,'image.tar');
   runDocker(['image','save','--output',archive,imageId],{stdio:['ignore','pipe','pipe']});
-  const inspected=JSON.parse(execFileSync(python,[fileURLToPath(new URL('./inspect-docker-image-dlls.py',import.meta.url)),archive,imageId,JSON.stringify(Object.keys(model.encrypted))],{encoding:'utf8',stdio:['ignore','pipe','pipe']}));
-  assert.equal(inspected.imageId,imageId);
+  const inspected=JSON.parse(execFileSync(python,[fileURLToPath(new URL('./inspect-docker-image-dlls.py',import.meta.url)),archive,configId,JSON.stringify(Object.keys(model.encrypted))],{encoding:'utf8',stdio:['ignore','pipe','pipe']}));
+  assert.equal(inspected.imageId,configId);
   for(const name of Object.keys(model.encrypted)){
    assert.deepEqual(inspected.dlls[name],model.encrypted[name],`Docker contains an unencrypted or stale DLL: ${name}`);
   }
   assert.deepEqual(verifyFinal(directory,file).encrypted,model.encrypted,'Encrypted receipt changed during Docker verification');
-  proof={image,imageId,verifiedAt:new Date().toISOString(),dlls:model.encrypted};
+  proof={image,imageId,configId,verifiedAt:new Date().toISOString(),dlls:model.encrypted};
  }catch(error){failure=error;throw error;
  }finally{
   try{cleanupReleaseScratch(temporary);}catch(error){

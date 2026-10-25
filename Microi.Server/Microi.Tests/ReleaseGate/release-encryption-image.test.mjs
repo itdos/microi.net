@@ -7,7 +7,7 @@ import {execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {gzipSync} from 'node:zlib';
 import test from 'node:test';
-import {projects,capturePlain,verifyEncrypted,verifyImage} from '../../tools/release-encryption.mjs';
+import {projects,capturePlain,verifyEncrypted,verifyImage,dockerConfigIdentity} from '../../tools/release-encryption.mjs';
 
 const helper=fileURLToPath(new URL('../../tools/inspect-docker-image-dlls.py',import.meta.url));
 const python=execFileSync(process.platform==='win32'?'python':'python3',['-c','import sys; print(sys.executable)'],{encoding:'utf8'}).trim();
@@ -105,12 +105,13 @@ function receipt(f){
  fs.writeFileSync(path.join(directory,'.microi-encrypted'),names.map(name=>name+'='+hash(encrypted(name),'md5')).join('\n'));
  verifyEncrypted(directory,file);return {directory,file};
 }
-function mockDocker(f,{failSave=false}={}){
+function mockDocker(f,{failSave=false,containerd=false}={}){
  const calls=[];
+ const imageId=containerd?'sha256:'+hash(Buffer.from('immutable image manifest')):f.imageId;
  return {calls,runDocker(args){
   calls.push(args);
-  if(args[0]==='image'&&args[1]==='inspect')return f.imageId+'\n';
-  assert.deepEqual(args.slice(0,3),['image','save','--output']);assert.equal(args.at(-1),f.imageId);
+  if(args[0]==='image'&&args[1]==='inspect')return JSON.stringify({Id:imageId,...(containerd?{Descriptor:{digest:imageId,mediaType:'application/vnd.oci.image.manifest.v1+json',annotations:{'config.digest':f.imageId}}}:{})})+'\n';
+  assert.deepEqual(args.slice(0,3),['image','save','--output']);assert.equal(args.at(-1),imageId);
   if(failSave)throw Object.assign(new Error('docker image save failed'),{status:47});
   fs.copyFileSync(f.archive,args[3]);return Buffer.alloc(0);
  }};
@@ -124,7 +125,7 @@ test('verifyImage invokes only image inspect/save, reads immutable image, cleans
  const f=fixture();try{
   const r=receipt(f),docker=mockDocker(f),result=verifyImage(r.directory,r.file,'example/api:release',docker);
   assert.equal(result.image.imageId,f.imageId);assert.equal(docker.calls.length,2);
-  assert.deepEqual(docker.calls[0],['image','inspect','example/api:release','--format','{{.Id}}']);
+  assert.deepEqual(docker.calls[0],['image','inspect','example/api:release','--format','{{json .}}']);
   assertCleaned(f);assert.equal(JSON.parse(fs.readFileSync(r.file,'utf8')).image.imageId,f.imageId);
  }finally{f.dispose();}
 });
@@ -139,4 +140,23 @@ test('docker save failure retains its exit status, cannot write success and stil
   const r=receipt(f),docker=mockDocker(f,{failSave:true});assert.throws(()=>verifyImage(r.directory,r.file,'example/api:release',docker),error=>error.status===47);
   assert.equal(JSON.parse(fs.readFileSync(r.file,'utf8')).image,undefined);assertCleaned(f);
  }finally{f.dispose();}
+});
+
+test('containerd manifest ID saves the immutable image while config digest binds actual archive bytes',()=>{
+ const f=fixture();try{
+  const r=receipt(f),docker=mockDocker(f,{containerd:true}),result=verifyImage(r.directory,r.file,'example/api:release',docker);
+  assert.notEqual(result.image.imageId,f.imageId);assert.equal(result.image.configId,f.imageId);
+  assert.deepEqual(result.image.dlls,JSON.parse(fs.readFileSync(r.file,'utf8')).encrypted);assertCleaned(f);
+ }finally{f.dispose();}
+});
+
+test('containerd identity rejects wrong descriptor, missing config and an index instead of one image',()=>{
+ const imageId='sha256:'+'a'.repeat(64),configId='sha256:'+'b'.repeat(64);
+ const valid=()=>({Id:imageId,Descriptor:{digest:imageId,mediaType:'application/vnd.oci.image.manifest.v1+json',annotations:{'config.digest':configId}}});
+ assert.deepEqual(dockerConfigIdentity(valid()),{imageId,configId});
+ assert.deepEqual(dockerConfigIdentity({Id:configId}),{imageId:configId,configId});
+ const wrong=valid();wrong.Descriptor.digest=configId;assert.throws(()=>dockerConfigIdentity(wrong),/descriptor differs/);
+ const missing=valid();delete missing.Descriptor.annotations;assert.throws(()=>dockerConfigIdentity(missing),/authoritative config digest/);
+ const index=valid();index.Descriptor.mediaType='application/vnd.oci.image.index.v1+json';assert.throws(()=>dockerConfigIdentity(index),/single manifest/);
+ const malformed=valid();malformed.Descriptor.annotations['config.digest']='latest';assert.throws(()=>dockerConfigIdentity(malformed),/authoritative config digest/);
 });
