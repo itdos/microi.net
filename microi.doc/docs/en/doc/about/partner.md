@@ -64,9 +64,9 @@ Detailed comparison: [current edition comparison](/doc/edition-comparison)
 | 2020年 | Xiao Wu Technology Won * * $10 million Angel Wheel Venture Capital * *, with a research and development team of more than 30 people. |
 | 2018~2023 | The enterprise version has been applied to * * 5 listed companies * *, a number of state-owned enterprises, * * hundreds of * * enterprises |
 <!-- 暂停个人版销售，保留原文以便恢复
-| November 2024 | Microi code * * officially open source * *, open * * personal version $999 * * |
+| 2025 | Microi code * * officially open source * *, open * * personal version $999 * * |
 -->
-| November 2024 | Microi officially became open source |
+| 2025 | Microi officially became open source |
 
 ---
 

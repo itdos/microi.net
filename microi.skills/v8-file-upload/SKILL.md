@@ -9,7 +9,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 ## 源码仓库资源隔离（默认强制）
 
-截图、配图、PDF/PPT、音视频、压缩包、模型、安装包和其它大体积交付资源统一通过 MCP 上传 CDN，禁止提交到 Gitee/GitHub 源码历史，即使压缩到小于 1 MB 也不能把截图或附件改放源码仓库。官方资源使用已校验的 `microi_itdos`（`https://api.itdos.com + OsClient=iTdos`）公有桶与 `https://file.microi.net` 前缀；私有资料按租户实际权限保持私有。源码只存 URL、字节数、SHA-256、MIME 等轻量清单。上传后独立回读实际字节和类型，PDF 验证 Range；超过 Base64 协议容量使用流式/分片工具。暂存区及每个待推送提交都须排除资源本体，详细门禁遵循 [工作区默认 CDN 规范](../workspace-conventions/SKILL.md#截图与大体积资源必须走-cdn默认强制)。
+截图、配图、PDF/PPT、音视频、压缩包、模型、安装包和其它大体积交付资源统一通过 MCP 上传 CDN，禁止提交到 Gitee/GitHub 源码历史，即使压缩到小于 1 MB 也不能把截图或附件改放源码仓库。官方资源使用已校验的 `microi_itdos`（`https://api.microi.net + OsClient=iTdos`）公有桶与 `https://file.microi.net` 前缀；私有资料按租户实际权限保持私有。源码只存 URL、字节数、SHA-256、MIME 等轻量清单。上传后独立回读实际字节和类型，PDF 验证 Range；超过 Base64 协议容量使用流式/分片工具。暂存区及每个待推送提交都须排除资源本体，详细门禁遵循 [工作区默认 CDN 规范](../workspace-conventions/SKILL.md#截图与大体积资源必须走-cdn默认强制)。
 
 你正在为 Microi 吾码平台编写文件上传/下载/返回相关代码。平台分布式存储（HDFS）支持阿里云OSS、MinIO、亚马逊S3，存储方案由 SaaS 引擎按租户配置。上传对象的 `Content-Type` 由框架按实际对象路径统一确定，覆盖 HTML、JS/MJS、CSS、JSON/MAP、SVG、字体与 WASM，未知后缀保留 `application/octet-stream`。MinIO、S3、OSS 普通与分片上传使用同一映射；该映射不替代上传权限、内容和配额校验。旧对象不会因后端升级自动改变元数据：先核对字节数和 SHA-256，再修正类型或按正式应用发布流程产生新版本。不要把源码与公有编译产物混在一起，也不要关闭 `nosniff` 掩盖类型错误。
 
@@ -97,6 +97,14 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 ## 已提交应用的 CDN 特殊字符别名修复（强制）
 
 使用 i_app_cdn_backfill 的 RepairCommittedCdnAliases 前，必须读取[完整绑定、范围与并发边界](references/cdn-alias-repair.md)。保持默认 DryRun、原始字节哈希与 Base64 摘要分离，并独立回读实际 CDN 字节。
+
+### 历史安装应用的持久别名检查点
+
+- `LegacyUnverified`、协议 2 的已安装微服务可能由后台补齐稳定入口。旧版每 30 秒扫描并反复全读版本与别名对象，会产生与浏览器/CDN 访问无关的 SDK 存储出流量；先按访问日志核对调用方、对象路径及周期，不能仅用 CDN 用量解释 OSS 公网账单。
+- 后端使用受保护 `mci_ai_app_version.BuildLog` 的独立两键对象 `{Contract:'InstalledAliasReconciliation/1',Checkpoint:{...}}`；检查点字段为 `AuthorityHash/Status/Attempt/StablePasses/UpdatedAtUtc/NextCheckAtUtc`，状态仅 `Verifying/Retrying/Verified`。未知非空日志或非法结构拒绝接管，禁止人工清空日志或伪造 `Verified` 来节流。
+- `AuthorityHash` 绑定规范化租户及完整权威应用、版本、服务、公开文件清单；只排除检查点自身，保留版本 `UpdateTime` 发现同版本重装。元数据变更使检查点立即失效，下一轮恢复全量校验。写入只条件更新所属版本的 `BuildLog`，不改 `UpdateTime`、`LegacyUnverified`、协议号、active/committed 指针或 V3 成功状态。
+- 初次成功后等待 5 分钟，第二次稳定成功后等待 30 分钟，第三次及以后每日复核；发生修复复制重新累计稳定次数。失败按 5/10/20/40/60 分钟退避并封顶。先持久化 `Verifying` 再读对象，硬重启仍遵守等待；保存失败不开始昂贵读取。全程持有共享发布租约，结果按主库完整权威和日志独立回读确认，响应未知不能盲重做。
+- 只读验收结合 `VerifiedCheckpointSkipped/RetryBackoffSkipped/NextCheckAtUtc` 与对象存储访问日志，覆盖等待内零重复读取、元数据变更、失败恢复和多个节点。需确认实际 API 节点已部署修复；文档、单测、镜像上传不等于生产节流生效，也不把检查点成功当成正式 V3 发布回执。
 
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=v8-file-upload-000 sha256=9402f7173710e8d110392f184119154a50187138ab7d698fce0b73b5f12123e2 -->

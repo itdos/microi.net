@@ -7,6 +7,8 @@ description: Microi 前端微服务 MicroService 开发与交付指南。用于�
 
 # Microi 前端微服务
 
+> **每次修改前必做：** 重新拉取当前租户完整私有源码，逐文件核对本地字节与远端哈希，并完成 Base/Local/Remote 合并后才开始编辑。记录修改前的 `SourceManifestHash`，源码同步显式传 `expectedSourceManifestHash`。禁止用刚读取的新哈希为旧代码补票；正文不全、远端漂移或冲突未解决时停止写入。完整下载由工具完成，模型只按需要阅读正文。
+
 这里的 MicroService 是运行在吾码主站中的前端微应用，不是 .NET/Java 后端微服务。
 它适合复杂租户页面、多页面应用、完整表格/上传/步骤交互和独立版本交付；业务事务、
 权限和最终校验仍放接口引擎或可信后端。
@@ -29,7 +31,7 @@ description: Microi 前端微服务 MicroService 开发与交付指南。用于�
 开始写代码前：
 
 1. `microi_list_applications` 盘点当前租户全部 Web、UniApp、MicroService 和文件清单。
-2. `microi_get_application_context` 默认只读取元数据、文件哈希、运行时和页面；需要少量正文时显式开启内容读取。
+2. `microi_get_application_context` 默认只读取元数据、文件哈希、运行时和页面；只读分析按需读取正文。准备修改已有应用时必须完整拉取源码到本地并逐文件验签，不能把默认元数据预览当成完整拉取。
 3. 单个大文件按需使用 `microi_get_application_file`，不要为了查看清单把全量源码 Base64 拉入上下文。
 4. 合适应用存在时在其中新增页面/路由，不创建“一页一个微服务”。
 5. 没有合适应用时才脚手架/创建新 AppKey。
@@ -110,6 +112,9 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 
 ### 多人协作发布前远端合并门禁（强制）
 
+- 此门禁首先在**开始修改之前**执行，再在发布前复核。同步现有源码必须显式传修改前记录的 `expectedSourceManifestHash`；缺失或不匹配分别报 `SOURCE_EDIT_BASELINE_REQUIRED/CHANGED`，不能在工具内部用当前远端哈希替调用方建立编辑基线。旧 API 没有原子源码 CAS 时不得覆盖已有源码，先升级；空应用仍可初始化。
+- 路由清单同时维护组件实际注册、`microi.routes.json` 和数据库页面映射。顶层或 `RouteMetaJson` 中的 `LegacyComponentPaths/LegacyMenuUrls` 都应保留。旧发布协议会合并现存兼容别名；V3 不可变快照若遗漏现有启用路由或兼容别名会报 `MICROSERVICE_ROUTE_BASELINE_LOST`。确需停用时保留路由并明确设置 `IsEnable=0`，不能通过空对象或漏传页面隐式删除。
+
 - 每一次同步或发布（包括同版本重试、紧急修复和仅编译产物发布）开始前，必须重新调用 `microi_get_application_context` 拉取目标租户当前完整私有源码清单、正文、版本与逐文件哈希；禁止沿用任务开始时或上一次发布后的旧快照。
 - 以最近一次已确认同步的源码清单为 Base，对 Base、本地 Local、远端 Remote 做逐文件三方比较：仅远端变化先拉取，仅本地变化保留本地，双方变化必须按真实业务语义合并并重新构建测试；删除/重命名同样纳入冲突判断。没有可靠 Base、远端源码不完整或冲突未解决时失败关闭，不能把时间戳较新当作自动胜出规则。
 - `replace`、`ReplacePrivateSourceOnly` 和流式发布都不是覆盖他人代码的授权。发现远端版本、文件正文或哈希晚于本地基线时，禁止直接用本地目录整包覆盖；必须先完成上述合并，并让本地唯一事实源保存合并结果。
@@ -122,7 +127,8 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 创建/更新元数据：`microi_create_microservice`。
 - 同步私有源码：`microi_sync_microservice_source`；本地工程必须优先传 `directory`，不构造 Base64 文件数组。
 - 真实编译目录优先 `microi_publish_application_directory_stream` 流式发布。
-- v3 提示 `mci_app_stream_gate_transition` 或发布门禁列/索引缺失时，先更新目标租户的应用商城责任包，并通过现有“升级租户数据库”入口核验责任包安装；安装完成后回读物理门禁结构及唯一索引，再重新盘点发布基线。不执行已退役 Upgrade25，不手动 reset 锁、fence、Storage 或 active/committed 指针；缺少结构与真正 CAS 漂移分别诊断。
+- 发布前读取 `microi_get_status`，分开报告服务器在线和 `ApplicationAssetStreamGateReady`。`Actual=0` 表示当前读取没有有效门禁行，不证明用户无权限或主控登记缺失。保持用户指定子租户，不索要主租户账号/SSH，不调用补登记接口，不复制业务库 `sys_osclients`，不降级绕过门禁；提交平台排查后端取数来源和版本。
+- 发布门禁由后端从启动主租户的主控库读取当前子租户 `OsClient + Type + Network` 的唯一有效 `sys_osclients` 行，文件、应用和版本仍在当前子租户。门禁转换审计在同一主控库事务中写入。缺少门禁列/审计结构属于平台侧 SaaS/应用商城责任包问题；缺少子租户的 `sys_microistore/mci_ai_app_version/mci_ai_app_file` 则通过该租户应用商城升级。不能因主控结构故障擅自更换业务连接。不执行已退役 Upgrade25，不手动 reset 锁、fence、Storage 或 active/committed 指针；缺少结构与真正 CAS 漂移分别诊断。
 - `changeSummary` 是最多 2000 字符的版本说明文本，不能传对象；v3 在首次 stage 创建版本时存入 `mci_ai_app_version.ChangeSummary`，后续同请求重放和恢复保留原说明。历史节点若发布完成但摘要仍为空，应报告后端版本缺口，不得把编译文件验证成功等同于日志验收通过。
 - 每次创建、修改、升级或重新发布微服务，必须先为目标精确 `AppVersion` 在 `sys_microistore_changelog` 写入完整日志，再同步源码、stage、finalize 或制作商城包。日志必须关联真实 `StoreId`，包含 `Title / ChangeType / Content / ReleaseTime`；流式发布显式传入与日志含义一致的非空 `changeSummary`。发布后同时回读商城日志、`mci_ai_app_version.ChangeSummary` 与包内 `PackageInfo.ChangeLog`；缺失或版本不一致必须失败关闭。
 - 发布动作必须明确区分两种模式：默认“源码+编译产物”先把完整工程同步到私有桶并逐文件回读 SHA-256，再把 `dist` 流式发布到公有桶；显式“仅编译产物”只更新公有桶，必须在界面中告知其他用户仍会拉取上一次私有源码，禁止暗示源码已同步。
@@ -141,8 +147,19 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 服务器暂未部署修复且普通应用产物很小时，可把 `StorageMode=db` 与内联 `ContentBase64` 作为短期恢复手段；必须明确记录为临时方案。修复部署后重新流式发布到公有 HDFS，并恢复 `StorageMode=file`。只有上一条满足严格资源策略的受信任平台启动应用允许长期保留小型数据库产物；禁止借此把普通或大体积 JS/CSS 长期放进数据库 JSON。
 - 子租户发布时，源码、版本资产、回读验签、页面与缓存全部绑定当前 Token 的 `OsClient`；禁止回退到主租户或宿主服务器默认租户。切换前必须由当前 API 节点通过该子租户 HDFS 配置读回每个版本文件并校验大小/SHA-256。
 - CDN 同一不可变对象返回 200 而 API 稳定入口返回 404 时，先检查 API 读取到的当前租户 `FileServer`（含公有桶路径）和已提交 `ReleasePrefix`，不能把默认域名回退当作恢复。配置读取必须将 dynamic 数据显式转为 object/JObject，再调用扩展方法；缺失或无效配置失败关闭。
+- CDN 刷新先验证当前租户可信 `FileServer` 与已校验路径组成的绝对 HTTP(S) 地址，拒绝 UserInfo、Query、Fragment。只有主机名精确匹配 `static.itdos.com`（不区分大小写）才走官方阿里云刷新并强制 HTTPS，刷新资产与入口的 Authority（主机、端口）必须一致；其它合法 HTTP/HTTPS 域名或 IP 不适用官方刷新，不读取其凭据或提交刷新任务。
+- 私有 HTTP/IP 部署在对象投影通过后仍提示“固定入口缺少 HTTPS 公有文件域名”时，应升级 API 的刷新目标分类逻辑，不要求客户为此修改业务源码或伪造 HTTPS 地址。不适用刷新不等于已执行 purge，也不能跳过对象大小/SHA-256 回读、租户隔离与原 RequestId/finalize 门禁；原任务完成和页面实际可用继续分别验收。
+- 首次 CDN 投影的目标尚不存在时，只有提供商验证的明确 `NoSuchKey` 才允许从已校验版本补写。MinIO/S3 必须实际签名 GET 返回 HTTP 404，并完整读取不超过 8 KiB 的合法 S3 XML；精确 Code 与可选 Key/BucketName 均校验通过。OSS 只接受实际 SDK 服务异常的精确 ErrorCode。HDFS 通过 `DataAppend.StorageReadErrorCode=NoSuchKey` 传递语义，MinIO/S3 同时提供 `StorageReadHttpStatusCode=404`；发布器不得按 Msg、路径或桶名中的词推断。普通代理 404、缺桶、拒绝访问、未知错误及不完整读取仍失败关闭。
+- 旧 API 丢失错误码或仍按诊断文字分类时需升级全部 API 节点。恢复 `RepairRequired / ProjectionPending` 前回读原任务，再保留首次 finalize 的 RequestId、版本、清单哈希与原前置条件重放；禁止手工改状态、删除版本或新建同版本发布。验收必须含 Completed、投影完成、服务/页面登记、稳定/版本入口和资产哈希及真实交互。
 - `microi-platform-service` 等受信任 DatabaseOnly 平台包以 `sys_microiservice.StorageMode=db / MsUrl=db` 和内联已验签字节为运行事实。安装后的 `PublicPublishPath=micro-app/{AppKey}/{Version}` 可以没有租户前缀；不能仅凭该字段补前缀或强改为 file。普通 file 应用则核对每项 HdfsPath/FilePathName、当前租户 FileServer 与真实对象。
 - HTML/JS/CSS 被对象存储标为 `application/octet-stream` 时，文件字节可能完全正确。新上传统一设置对象 MIME；运行网关只对已提交资产的空/二进制通用标签按文件路径归一，保留类型兼容、HTML 完整性、大小、哈希及 `nosniff`。需更新全部 API 节点；旧对象的 CDN 直接入口另需修正元数据或正常发布新版本，不能把 API 兼容称为 CDN 已修复。
+
+### 复盘：MinIO 首次 CDN 投影停在 HTTP 404
+
+- 触发场景：不可变版本资产已校验，首次复制的 CDN 目标尚不存在，发布却停在 `RepairRequired / ProjectionPending`。
+- 根因：可信 HDFS 签名读取将明确的 S3 `NoSuchKey` 丢失为通用 HTTP 404，发布器因无法区分代理或权限故障而拒绝补写。
+- 通用规则：MinIO/S3 验证真实 HTTP 404、完整有界 S3 XML 和对象身份，OSS 验证实际 SDK 的精确错误码；只向发布器传递结构化缺对象码，不扫描诊断文字、路径或桶名。部署全部 API 节点后回读并恢复原任务，不改业务源码或发布状态。
+- 自动化检查：`MicroiHdfsMinioStreamReadTests`、`MicroiHdfsStreamErrorContractTests` 与 `ApplicationCdnCredentialTests` 覆盖 MinIO/S3 成功流、提供商缺对象码、路径/桶名词碰撞、权限/缺桶/代理 404、错误 XML、错误桶/Key、超限正文、取消和超时；完整发布与页面验收继续独立执行。
 
 ### 宿主路由查询参数
 
@@ -151,6 +168,13 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 生成宿主页面链接时使用可信上下文的 webBase、apiBase 与 osClient，不猜测父窗口地址，不把Token写入URL。验收覆盖嵌入冷启动、同路径换参数、独立入口、无效参数和跨请求迟到响应。
 
 ## 菜单、弹窗与表单嵌入
+
+宿主统一渲染的“微服务”来源入口、关闭标识按钮和源码定位详情只向当前登录用户
+`Level >= 9999` 展示；普通用户、未知/非法等级和受限访问密钥会话保持隐藏。
+子应用不得自画该标签或通过元数据指定用户等级。管理员关闭仅作用当前页面实例，
+切换页面/账号后恢复，等级降低时同步隐藏并关闭详情；正常业务运行、关闭 Tab 和
+弹窗回调不受影响，后端源码读取及 MCP 操作继续单独鉴权。升级 Microi.Client
+前端后生效，无需修改应用包、页面或菜单资源。
 
 菜单 `OpenType=MicroService` 时一次绑定 `MicroServiceId`、
 `MicroServicePageId`、`MicroServiceRoutePath`、`MicroServiceKey`。
@@ -273,7 +297,7 @@ window.addEventListener('appstate-change', (event) => {
 `isolation:isolate` 作为第二道边界，但不能代替子应用命名空间。验收需检查宿主 Logo/菜单样式、
 内部导航不重挂微服务、内容区局部骨架屏，以及前进/后退恢复。
 
-### 平台主题、明暗模式与租户主色（强制）
+### 平台主题、明暗模式、界面密度与租户主色（强制）
 
 所有新建或修改的 MicroService 都必须跟随宿主平台主题，不能交付只适配固定白底、固定深色或
 单一品牌色的页面。宿主下发的 `themeMode`、`themeColor`、`themePalette`、`themeOnPrimary`、
@@ -285,6 +309,10 @@ window.addEventListener('appstate-change', (event) => {
 - 主操作色优先使用 `--mci-color-primary` / `--el-color-primary` 或宿主 `themeColor`；表面、文字、边框分别使用 `themeTokens.surface/surfaceSoft/textPrimary/textSecondary/border`。成功、警告、错误色可以保持语义独立，但必须分别提供浅色与深色可读状态。
 - 表格、表单、弹窗、上传、骨架屏、空状态、错误态、禁用态、悬停和焦点环都必须覆盖浅色与深色；大面积背景不能直接写死 `#fff` 或某个深色，主题色不能只改按钮而其它视觉仍留在旧配色。
 - 主题切换必须即时生效且不重挂应用、不丢失表单/筛选/内部路由；卸载时清理本应用创建的媒体查询、数据与生命周期监听器。
+- 界面密度与主题属于同一必读契约。宿主 `uiDensity`（兼容 `themeTokens.uiDensity`）提供 `scale/factor/variables`；将 `variables` 映射到应用唯一根容器，写入 `data-mci-ui-density`，在首次挂载、主题消息和缓存实例再次显示时更新。嵌入态不得用自己的旧用户快照或 localStorage 覆盖宿主。iframe 不继承父页面 CSS，禁止声称父框架修改了变量就已适配微服务。
+- 标题、导航、图标容器、表单、表格行、卡片留白及弹层头/内容/底部/按钮都必须使用 `--mci-ui-*`、`--mci-space-*`、`--mci-text-*` 几何 Token；不能只改字体或对整页使用 `zoom/transform:scale`。二维码、图片画布可保留业务尺寸；触屏按钮保留 `--mci-touch-target` 最小点击区域。关闭渐变、阴影和边角风格也按宿主 `themeTokens` 处理。
+- 多页面共用一个微服务 bundle 时，页面 CSS 必须使用 Vue `scoped`、CSS Modules 或应用/页面命名空间。禁止把 `.hero-copy`、`.btn`、`.modal-header` 等通用裸选择器作为全局样式导入，防止切页后标题叠字、颜色冲突与布局串页。外置 CSS 也须使用 `<style scoped src="...">` 或等价隔离，不能仅把源码挪到独立文件。
+- 自动化验收增加“紧凑/标准/大字 × 浅色/深色 × 非默认主色”，在同一已打开的宿主实例中切换并验证输入不丢失。计算标题、表单与弹层各区的实际宽高/间距，确认紧凑时确实缩小、文本无重叠、按钮可点击。默认采用一个常规桌面 CSS 视口（优先用户实际视口，否则 1920×1080）；涉及移动端或响应式改动时补充相关窄屏，只有用户明确要求或缺陷涉及超宽屏时才追加 4K。只搜索 CSS 中出现了 density 变量不算适配完成。
 - 自动化验收至少覆盖“浅色 + 深色 + 一个非默认租户主题色”，同时断言根属性、计算后的主色/表面/文字、基本对比度和宿主 Logo/菜单未被污染，并各保留一张真实宿主截图。只测独立 Vite 预览、只检查 CSS 文本或只显示切换按钮均不算完成。
 
 `closeTab` 与 TagsView 当前页签关闭语义一致，固定页签和最后一个页签拒绝关闭；顶部 Tab

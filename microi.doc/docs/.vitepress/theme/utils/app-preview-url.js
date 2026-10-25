@@ -1,5 +1,5 @@
 import { buildApplicationLaunchUrl } from './uniapp-preview-mode.js'
-import { normalizeUploadPath } from './upload-resource-url.js'
+import { normalizeUploadPath, resolveOfficialPublicFileAlias } from './upload-resource-url.js'
 
 // 新字段排在前面，后续字段仅用于兼容旧商城记录。版本、发布任务字段
 // 故意不在候选集合中，避免首页、应用广场和详情页各自选中不同历史产物。
@@ -30,7 +30,7 @@ function applicationUrlCandidates(application) {
 }
 
 function candidateBaseUrl(candidate, baseUrl, runtime) {
-  const fileServer = String(runtime?.fileServer || '').trim()
+  const fileServer = resolveOfficialPublicFileAlias(String(runtime?.fileServer || '').trim())
   if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(candidate.value)) return baseUrl
   // v3 StableResolverPath 是 API 路由，并不是对象存储中的文件键。
   if (/^\/?micro-app\/v3(?:\/|$)/i.test(candidate.value)) {
@@ -122,7 +122,7 @@ function canonicalStableUrl(candidate, baseUrl, runtime, applicationKey) {
   for (const key of ['v', 'version', 'release', 'request', 'requestId', 'apiBase', 'OsClient', 'osClient']) {
     url.searchParams.delete(key)
   }
-  return url.href
+  return resolveOfficialPublicFileAlias(url.href)
 }
 
 export function resolveStableApplicationEntry(application = {}, baseUrl = 'https://microi.net', runtime = {}) {
@@ -131,7 +131,7 @@ export function resolveStableApplicationEntry(application = {}, baseUrl = 'https
   ).trim().toLowerCase()
   const applicationType = String(application.ApplicationType || application.AppType || '').trim().toLowerCase()
   const tenant = String(runtime.osClient || '').trim().toLowerCase()
-  const fileServer = String(runtime.fileServer || '').replace(/\/+$/, '')
+  const fileServer = resolveOfficialPublicFileAlias(String(runtime.fileServer || '').trim()).replace(/\/+$/, '')
   const projectedPath = `/${tenant}/micro-app/${applicationKey}/index.html`
   // A marketplace record switches only after the physical CDN objects have
   // been verified. Preserve old links while the bulk migration is in flight.

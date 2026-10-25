@@ -1,0 +1,30 @@
+name: 公开证据工具离线回归
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'microi.benchmarks/**'
+      - '.github/workflows/public-evidence.yml'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'microi.benchmarks/ecosystem/**'
+      - 'microi.benchmarks/compatibility/**'
+      - 'microi.benchmarks/case-evidence/**'
+      - 'microi.benchmarks/ai-quality/**'
+      - '.github/workflows/public-evidence.yml'
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+      - name: 合成数据与源码盘点测试（不连接数据库或模型）
+        run: node --max-old-space-size=256 --test --test-concurrency=1 microi.benchmarks/ecosystem/collect.test.mjs microi.benchmarks/compatibility/inspect.test.mjs microi.benchmarks/case-evidence/summarize-saas-registry.test.mjs microi.benchmarks/ai-quality/run.test.mjs

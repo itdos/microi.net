@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-10-25T14:04:06.765Z",
+  "source": "官方主租户 SaaS 引擎，经管理员 MCP 只读查询",
+  "pagination": {
+    "total": 267,
+    "uniqueRecords": 267,
+    "pages": 2,
+    "complete": true
+  },
+  "counts": {
+    "registeredRecords": 267,
+    "emptyNames": 1,
+    "excludedNames": 29,
+    "candidateRecords": 237,
+    "distinctExactNames": 193
+  },
+  "method": {
+    "normalization": "Unicode NFKC + 首尾去空格；相同名称按规范化后的完整字符串去重",
+    "excludedNamePattern": "测试|演示|空库|标准库|压力|压测|回归|test|demo|e2e|smoke|benchmark|fixture",
+    "entityResolution": "未进行法人、项目、环境或商业状态合并",
+    "consistency": "分页总数相同且 Id 唯一；非数据库事务快照"
+  },
+  "limits": [
+    "登记记录不等于客户数、付费客户数、独立法人或成功交付项目数",
+    "名称只用于统计与筛选，不用于推断行业、上线状态、绩效或客户认可",
+    "未读取任何子租户业务数据、联系方式、域名、连接串、密码或密钥"
+  ],
+  "privacy": {
+    "rawNamesPublished": false,
+    "recordIdsPublished": false,
+    "customerContactsPublished": false,
+    "perRecordHashesPublished": false
+  }
+}

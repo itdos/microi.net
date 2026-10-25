@@ -13,6 +13,70 @@
 - 后端接口引擎、后端表单 V8 调用 `V8.FormEngine` 默认不触发表单事件；只有明确传入 `_InvokeType:'Client'` 才触发客户端式表单事件。`_InvokeType` 不是授权开关
 - 主要用于表单属性的前端 V8 事件、模块引擎 V8 按钮代码等
 
+## 独立应用中的双向实时接口
+
+适用版本：后端 **8.6.1 及以上**；通过 MCP 配置时使用开发工具 **6.0.4 及以上**。
+
+数字孪生导播、协同控制等需要“按钮指令和执行回执都走长连接”的场景，
+使用接口引擎 `ResponseType=SignalR` 与 `/api-engine-socket`。
+该通道需要对应后端能力，完整权限、消息格式和容量限制见
+[后端双向实时通道](./v8-server.md#接口引擎双向实时通道-signalr)。
+它不修改现有 `V8.Http`，也不把 SSE 当成双向连接。
+
+在 Vue/微服务项目中将 `@microsoft/signalr` 安装并打包进产物，不依赖临时外链脚本：
+
+```typescript
+import { HubConnectionBuilder, HttpTransportType } from '@microsoft/signalr';
+
+const endpoint = new URL('/api-engine-socket', apiBase);
+endpoint.searchParams.set('OsClient', osClient);
+endpoint.searchParams.set('ApiEngineKey', 'my_realtime_engine');
+const connection = new HubConnectionBuilder()
+  .withUrl(endpoint.href, {
+    transport: HttpTransportType.WebSockets,
+    skipNegotiation: true,
+    accessTokenFactory: () => currentDiyToken // 匿名专用接口可省略
+  })
+  .withAutomaticReconnect([0, 1500, 4000, 8000, 15000])
+  .build();
+
+connection.on('EngineMessage', packet => {
+  // 按业务 RequestId/Version 匹配回执，不把任意收到的消息视为本次成功。
+  handleBusinessPacket(packet);
+});
+connection.onreconnecting(() => showConnectionState('正在重连，待确认指令不可自动重放'));
+connection.onreconnected(async () => {
+  // ConnectionId 已改变；重建业务授权/配对并读取权威状态。
+  await restoreAuthorizedSession(connection);
+});
+connection.onclose(() => showConnectionState('已断开'));
+await connection.start();
+
+// 这个 invoke 在已经建立的 WebSocket 内发送，不会为每次点击发 HTTP 请求。
+const requestId = crypto.randomUUID().replaceAll('-', '');
+const accepted = await connection.invoke('Invoke', requestId, {
+  Action: 'SelectCamera', CameraId: selectedCameraId
+});
+if (accepted.Code !== 1) showError(accepted.Msg);
+// accepted.Code=1 只证明接口成功；目标屏幕实际完成后再收到业务 ACK 才显示控制成功。
+```
+
+示例中的动作、`restoreAuthorizedSession`、心跳和回执处理必须与当前业务接口约定一致。
+页面可每 15 秒通过同一 `Invoke` 发送业务心跳；卸载或停止授权时清理心跳、待回执计时器和
+监听，并 `await connection.stop()`。后台、断网、刷新和服务端拒绝都要显示可恢复状态。
+`withAutomaticReconnect` 不自动重试第一次 `start()`，首次失败应显示重试入口。
+
+使用四位控制码时，由展示屏点击“允许控制”后才连接和登记；localStorage 可保存随机设备秘密和
+偏好的控制码，重新打开页面仍需重新授权，服务端处理码冲突并回传实际分配值。
+不能把四位码当平台登录凭据，也不能在 URL、控制台日志或截图里暴露设备秘密。
+
+多台手机共享一个展示屏时，每台手机使用独立随机会话身份，展示屏的控制码保持相同。
+后端按接收顺序调度镜头命令，手机分别显示“排队中 / 执行中 / 成功或失败”；只有收到展示屏
+实际执行回执才显示成功。单台手机离开只清除自身会话，画面状态同步到所有仍在线的手机。
+本地导播操作或远程手动控制应停止自动巡游，明确点击“开始巡游”后才恢复。
+手机端将发送中、等待执行、执行成功、拒绝、超时和断线区分显示，支持主动断开及前台停止授权。
+配对租约、权限和幂等必须由服务端共享状态判定，localStorage 不是权限事实源。
+
 ## V8.Form
 >* 访问当前表单字段值
 ```js
@@ -1029,8 +1093,16 @@ return { Code: 1, Data: { Added: added, Updated: updated, Failed: errors.length,
 
 模块自带【导入】按钮也支持上述 Excel/CSV 自动识别、全源数据预览、原始工作簿、人工校正和列映射，并在确认后把原始文件及同一份解析范围交给服务端复核。只有需要固定单元格元数据、后台任务、跨表匹配或特殊业务事务时，才使用 `OpenImportDialog`；不要仅为复杂表头或 CSV 重复开发自定义上传界面。
 
+菜单配置了【导入接口替换】（`ImportApi`）时，`/apiengine/Import_StockArch` 这样的相对地址按当前 `ApiBase` 拼接（保留 API 路径前缀）；完整 HTTP(S) 地址和 `$ApiBase$` 占位符继续兼容。上传请求沿用当前登录与租户上下文。如果出现 nginx 的 HTTP 405，应先核对请求是否误发到前端网站，而不能仅凭错误页排除前端地址拼接问题。
+
+同步替换接口完成写入后返回 `Code=1`，未配置 `ImportProgressApi` 且未返回运行中状态时，弹层直接展示完成结果及 `InputCount/AddedCount/UpdatedCount/FailedCount`，不再查询平台标准导入的进度。异步替换接口应显式配置进度接口；标准导入仍保持原进度协议。明确失败后，可保留当前文件、映射和操作标识再次提交。请求超过 90 秒但仍未结束时，弹层提示等待并禁用重复提交；关闭窗口不能保证服务端停止写入，结果不明时应先核对数据。自定义接口仍须自行实现业务幂等，操作标识本身不能保证它不会重复写入。这些修复通过更新 PC 前端镜像生效，无需修改既有菜单地址或扩大权限。
+
 ## V8.NewGuid
->* 生成一个前端Guid值
+>* 生成前端唯一标识。当前实现返回 26 位 ULID，方法名称为兼容保留。
+
+接收该值的接口应按实际格式校验，不能只接受带连字符的 36 位 GUID。
+作为幂等键时，在业务记录与传输层使用同一规范化值，重试时复用原编号。
+
 ```js
 var newGuid = V8.NewGuid();
 ```

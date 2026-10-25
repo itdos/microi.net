@@ -37,6 +37,8 @@ description: 设计、实现、迁移和验收 Microi 多通道消息通知与�
 
 完整字段、接口和可靠性契约见 [references/contracts.md](references/contracts.md)。
 
+旧聊天跨年定位迁移须使用官方 Managed `platform-chat-maintenance`，先升级全部写节点，再执行单租户准入关闭、真实排空、分批扫描、完整校验和条件恢复。不得将“能翻到旧消息”视为“旧消息幂等迁移完成”，也不自动迁移所有租户；参数、冲突和恢复边界见 [历史聊天定位维护](references/contracts.md#历史聊天定位维护)。
+
 ## 实现流程
 
 ### 1. 合并结构
@@ -119,7 +121,9 @@ await V8.Notification.MarkRead({ All: true });
 
 系统聊天门面 `platform-chat-system-message`（`Managed`）完成平台超级管理员校验后，只转调本应用单一拥有的 `platform-chat-runtime`（`Managed`）。运行时统一编排 `PersistMessage / PersistSystemMessage / PersistAssistantMessage / GetHistoryAndMarkRead / GetUnreadCount / TouchContact / ListContacts / DeleteContact`；Hub/Controller 旧入口只保留 DiyToken 认证、SignalR 投递和 AI 流式协议，不得直连 MongoDB/FormEngine 复制业务。访问密钥会话、空 Token、伪造租户/发送人必须失败关闭。
 
-`platform-chat-runtime` 以 `V8.CurrentUser` / `V8.OsClient` 为唯一身份与租户事实源，对“租户 + 稳定 RequestId”生成确定性 Mongo `_id`；只有全部载荷哈希一致才复用旧记录。MongoDB 不参与 `V8.DbTrans`，因此消息/已读/联系人成功后即是已提交事实；SignalR、投影或 After Hook 失败必须保持 `Code=1` 并通过 `DataAppend.HookWarning` / `ProjectionWarnings` 告警，不得伪装未发生而引导盲目重试。调用 `V8.MongoDb.UptFormDataByWhere` / `DelFormDataByWhere` 时必须使用包含当前用户/权威资源边界的非空参数化 `_Where`，规则详见 `../v8-mongodb/SKILL.md`。
+`platform-chat-runtime` 以 `V8.CurrentUser` / `V8.OsClient` 为唯一身份与租户事实源，对“租户 + 稳定 RequestId”生成确定性 Mongo `_id`；在当前旧年度集合或持久定位索引能够定位原记录时，只有全部载荷哈希一致才复用旧记录。MongoDB 不参与 `V8.DbTrans`，因此消息/已读/联系人成功后即是已提交事实；SignalR、投影或 After Hook 失败必须保持 `Code=1` 并通过 `DataAppend.HookWarning` / `ProjectionWarnings` 告警，不得伪装未发生而引导盲目重试。调用 `V8.MongoDb.UptFormDataByWhere` / `DelFormDataByWhere` 时必须使用包含当前用户/权威资源边界的非空参数化 `_Where`，规则详见 `../v8-mongodb/SKILL.md`。
+
+旧年度重放有独立兼容边界：v1.0.2 只在 `chat_当年` 内检查确定性 `_id`；分区版的新写通过 `chat_message_location` 保留跨年定位，但不会在发送时为全部旧 `chat_yyyy` 回填索引。若旧记录在以前年度且没有定位索引，跨年重放原 `RequestId` 仍可能产生一份新月表正文，冲突正文也可能未被识别。跨月、跨年历史分页兼容不代表旧存量的全生命周期重放已安全迁移；不要把这一边界写成已解决。未知历史请求先核对原消息，不盲目补发；不能用每条发送扫描全部历史或阻断全部正常新消息掩盖迁移缺口。验收应分别统计物理集合记录数，不能只看按 Id 去重的界面或 Map。
 
 `platform-chat-runtime` 必须保持 `StopHttp=1`、`AllowAnonymous=0`。SignalR Hub 在 DiyToken 与租户核验后，通过宿主一次性可信协议作用域调用，并携带宿主生成的权威当前用户快照；V8 对 `_InvokeType=Client` 的调用必须先执行 `V8.Method.RequireManagedProtocolContext()` 原子消费。不得为修复 Hub 误报“禁止 HTTP 调用”而开放 `StopHttp`，也不得接受 Param 中的信任布尔值、用户或租户覆盖；接口引擎内部 `Server` 嵌套调用保持原有语义。
 
@@ -139,7 +143,7 @@ await V8.Notification.MarkRead({ All: true });
 - `AfterServerRestart` 用可信后端进程启动标识和主租户当前运行分区的共享 Redis 最新批次计算 occurrence，`Presented` 按数据库稳定回执主键抢占领取资格；同帐号多页面只有一个领取，刷新和重新登录不再次弹出。展示成功前回执应已持久化；响应丢失以同一个页面 `EntryId` 恢复，不以 localStorage 作为事实源。`ShownAt` 与 `ClosedAt` 分离，当前已领取弹窗需保留到关闭、撤回或过期。
 - 超级管理员范围和重启频率的最低接收协议为 2；官方 feed 必须对协议 1 隐去此类公告，接收端出缓存后再次按当前身份裁剪。未知范围、异常协议或无法核验的启动批次失败关闭。重启频率不能再叠加周期计划；多节点滚动发布采用共享最新启动批次，验证负载切换不回退、不重复。
 - 定时任务 `platform-reminder-tick` 每分钟只发送唤醒信号；权威计划与回执保存在数据库。前端监听 `ReceivePlatformReminder` 后回读，SignalR 正常约 60 秒对账、断线约 15 秒轮询并对错误退避；关闭失败重试、撤回和过期收回，禁止使用本机定时器或 localStorage 作为已读事实源。
-- 跨服务器官方源由 `Microi.net` 固定请求 `api.itdos.com`，不允许任意 URL/重定向、不发送用户或密钥，按真实本地 License 筛选并缓存；官方源降级不得阻断本地提醒。匿名 feed 只暴露已发布的版本公告，不可读草稿、租户目标或回执。
+- 跨服务器官方源由 `Microi.net` 固定请求 `api.microi.net`，不允许任意 URL/重定向、不发送用户或密钥，按真实本地 License 筛选并缓存；官方源降级不得阻断本地提醒。匿名 feed 只暴露已发布的版本公告，不可读草稿、租户目标或回执。
 - 官方“消息通知”包单一拥有配置接口 `platform-message-notification-config`、三个提醒接口、四表六索引、统一菜单、每分钟任务与当前内置微服务产物；SaaS 包同步统一菜单、基础空库结构和旧布局退役声明。先更新支持 `DiyFieldRetirements` 的商城，再安装新版 SaaS 包，清理旧入口且保留业务数据。商城包的内置微服务版本需同步。导出母版可能不带物理索引，按已验证 Manifest 补独立 `CREATE INDEX`，由安装器幂等检查；禁止发布测试提醒、真实接收人或回执数据。
 - 共享微服务发布闭包还包含独立“系统日志/监控”包，不能只核对 SaaS、商城和消息通知。先读取相关商城选择清单与实际包，确认 `microi-platform-service` 的所有携带者；按 `platform-service-release.json` 校验同一版本、构建字节与路由。监控包从 `system-observability-package-source.json` 和当前共享运行包经 `configure-system-observability-package.mjs` 再生成，元数据变化要先合并官方母版并升独立包版本。发布前验证各包，安装全部平台应用后再验消息通知页面，避免后安装的旧运行包覆盖新页面；不能通过修改安装器的 Managed 覆盖语义规避。
 - MCP 复用 `microi_get_db_schema / microi_generate_system / microi_admin_table_data / microi_save_engine_code / microi_run_engine`，以及在线应用发现、源码同步和流式发布工具；入口调整使用 `microi_update_module / microi_update_table / microi_delete_field`，写后回读确认不存在旧入口。
@@ -153,4 +157,4 @@ await V8.Notification.MarkRead({ All: true });
 4. 用户只能查询和标记自己的通知；危险链接、超长正文、跨租户接收人和匿名调用被拒绝。
 5. 公众号/服务号发送主体与小程序跳转目标分别验证，不把 `MiniProgramAppId` 当作模板发送主体。
 6. 源码定向测试、后端编译、远端 MCP 回读、真实浏览器点击和商城安装/校验分别报告；未执行的生产发布不得写成已上线。
-7. 聊天空 Token/访问密钥/伪造租户失败关闭；相同 `RequestId` 并发只有一份 Mongo 事实，不同载荷冲突拒绝；已持久后 SignalR/After Hook 失败仍返回成功并可回读。
+7. 聊天空 Token/访问密钥/伪造租户失败关闭；当前写分区或持久定位命中时，相同 `RequestId` 并发只有一份 Mongo 事实，不同载荷冲突拒绝；旧年度无定位记录的重放限制单独记录；已持久后 SignalR/After Hook 失败仍返回成功并可回读。

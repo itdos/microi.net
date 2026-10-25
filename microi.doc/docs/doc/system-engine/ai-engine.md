@@ -1,5 +1,11 @@
 # AI 引擎与 Microi.AI 中转站
 
+AI 引擎把对话、数据分析和内容创作接入吾码的用户权限与业务数据。先配置可用模型，再从 AI 助手选择任务；本页说明部署、会话与后端集成方式。
+
+## 会话历史按需加载
+
+首页嵌入 AI 助手时不预取历史正文。打开历史列表后，由 `platform-ai-runtime` 的 `ListConversationSummaries` 按页返回标题、时间及归档状态；选择会话后，才用 `GetConversationRecords` 分页获取该会话的问答、思考过程和附件。两项动作始终绑定当前登录用户及会话来源，不接受请求指定其他用户。需同时更新 PC 框架和“AI助手”应用 v7.7.5 或更高版本。
+
 ::: tip 推荐部署方式：默认不安装向量组件
 Microi 吾码在线 AI 引擎已内置“**大模型关键词扩展 → 当前用户权限范围内的 Schema 关键词检索 → 精确表/字段回读 → SQL 安全校验与执行**”。对常见的 500～1200 张表、1 万～1.5 万个字段，无需部署 **Ollama + nomic-embed-text + Qdrant** 也能完成 AI 数据分析，启动更快、资源占用更低、实时 Schema 更准确。
 
@@ -48,7 +54,7 @@ AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Mic
 
 1. 吾码官方使用签发私钥生成 `microi.net.lic`；客户发布包和 NuGet 不包含该私钥。
 2. 客户节点使用程序集内嵌的官方公钥验证 RSA 签名，同时验证当前机器 HID 和有效期。显式配置的公钥也只能是同一官方公钥的副本，客户自建“私钥 + 公钥”不能替换信任根。
-3. 验签在本机完成，并非每次 AI 调用都访问 `api.itdos.com`。有效 License 启动后会延迟检查一次作废状态，之后每天检查一次；官网短时不可达或超时会跳过本次心跳，不会立即停用已经通过本地验签的 License。
+3. 验签在本机完成，并非每次 AI 调用都访问 `api.microi.net`。有效 License 启动后会延迟检查一次作废状态，之后每天检查一次；官网短时不可达或超时会跳过本次心跳，不会立即停用已经通过本地验签的 License。
 
 因此，准确说法是“核心在线 AI 需要**由吾码官方签发的有效服务器 License**”，而不是“每次调用都必须在线请求官网授权”。只下载源码或安装包、复制 `Microi.AI.dll`、把租户名改成 `iTdos`，都不能自行签发有效 License。
 
@@ -59,6 +65,27 @@ AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Mic
 `MicroiAI` 与 `AiProxyService` 只接受 `Microi.net` 中封闭的 `MicroiFeatureLicense` 实现；宿主仅重新注册另一个 `IMicroiFeatureLicense` 不会把 AI 变成已授权。签发客户端地址固定为 `https://api.microi.net`，私钥目录从编译、NuGet 和发布内容中排除；签发服务还会核对私钥对应公钥必须与内嵌官方信任根一致。
 
 上述保证针对未被篡改的官方二进制与正常部署。拥有服务器管理员权限的人仍可以替换或修改程序集、改变机器指令，任何纯本地 DRM 都无法从理论上抵抗这种物理控制；但这不等于其能够“伪造 License”。没有官方私钥时，生成的文件不能通过未修改节点内嵌官方公钥的 RSA 验签，也不能拿去给其它正常吾码节点使用。
+
+## 中转额度与无限权益
+
+中转账户分别记录赠送额度、累计用量、剩余赠送额度和 `IsUnlimited` 权益。启用无限权益后，平台中转 Token 余额不再阻止请求，也不再扣减原有剩余额度；用量按该调用既有的计量来源继续累计并写入脱敏账本；供应商用量缺失时可能采用估算，不能当作供应商实测值。取消无限权益后恢复原有有限余额规则。付费订阅、模型供应商配额、服务器 License、登录身份和并发限制仍分别生效。
+
+主租户平台管理员通过既有 `platform-ai-account` 接口引擎管理权益：
+
+```js
+// 使用目标用户的精确 Id；先读取，不通过账号名称模糊匹配。
+{ Action: 'GetRelayTokenAccount', TargetUserId: '目标用户Id' }
+// ExpectedUnlimited 来自刚才读取的 IsUnlimited，只接受布尔值。
+{ Action: 'SetRelayTokenLimit', TargetUserId: '目标用户Id', IsUnlimited: true, ExpectedUnlimited: false }
+```
+
+MCP 可用 `microi_run_engine` 调用同一动作。返回包含 `AccountExists`、`IsUnlimited`、`GiftTokens`、`UsedTokens`、`RemainingTokens`、`UnlimitedUpdatedBy` 和 `UnlimitedUpdatedAt`。管理员须独立回读确认目标及权益；客户端展示以 `IsUnlimited` 显示“无限额度”，保留数值余额供核对。旧数据库缺少权益字段时保持有限额度行为，设置动作要求先升级官方 AI 应用和匹配的 Core/AI 宿主。应用包不附带任何实际账户记录。
+
+管理动作从可信会话与主库重新核验管理员身份，拒绝访问密钥、子租户管理和跨租户目标。普通用户不能经客户端 FormEngine 给自己授予权益。读操作不会创建账户；设置可受控初始化不存在的账户，检测到多条有效账户时停止并要求核验。额度变更只更新权益与最近操作人/时间，保留原余额和历史；并发状态不符时拒绝覆盖。拥有后端脚本编辑权限的开发者仍属于可信执行主体，应按管理员权限管理。
+
+在途请求若在预检后被撤销权益，或余额被其它请求消耗，记账时按当前数据库状态拒绝不足余额，不继续使用旧无限授权。供应商已经发生的用量可能未进入本地成功账本，需要另查供应商回执；平台不会自动重发请求或补扣。
+
+该能力最低要求 Core/AI 宿主 `8.7.0`、官方 AI 应用 `7.7.8` 与 `platform-ai-account` `1.1.1`；MCP `6.1.5` 可通过通用引擎调用工具使用。官方中转账户摘要和用量只能由可信主租户身份读取，子租户复用相同用户 Id 也不能读取主租户记录。
 
 ## 跨界面、前后端 V8、MCP 与外部客户端调用
 
@@ -73,6 +100,10 @@ AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Mic
 | OpenAI 兼容客户端 | `POST /v1/chat/completions` | `Authorization: Bearer sk-microi-*` | `stream:false` | `stream:true` |
 
 ### 参数与安全规则
+
+OpenAI 兼容中转的 SSE 需区分模型终态与传输终止：上游明确返回各候选的 `finish_reason`、存在文本或工具调用载荷且没有错误时，若其正常关闭却缺少 `[DONE]`，代理补齐一个终止帧。已有终止帧不重复发送；纯 EOF、空结果、错误、取消与终态冲突均不能补成成功。`length/content_filter` 原值保留，仍属于截断/过滤，客户端不能因收到 `[DONE]` 就按正常答案保存。正常与错误响应体的读取都接收请求取消，并受既有代理超时约束；取消不能撤销供应商已发生的用量。这一修复需要部署包含该实现的新后端，应用包或 MCP 更新不能替换运行二进制。
+
+固定 JSON 实测需显式记录模型思考设置。`MiniMax-M3` 的公开复核工具协议 `1.1.0` 固定两组 `reasoning_split:true` 与 `thinking:{type:'disabled'}`，避免默认推理文本混入答案及占满同一输出预算；其它模型不照搬其专属参数。按[供应商文档](https://platform.minimax.io/docs/api-reference/text-openai-api)选择参数，不靠删除任意回答内容通过 JSON 校验。旧协议的失败回执保留，新旧设置不能当作同一实验或宣称效率提升。
 
 - `Chat` 和 `ChatStream` 同时声明了 GET/POST，但业务代码默认使用 POST。问题、系统提示、附件和会话信息不应放进 URL、代理日志或浏览器历史。
 - 常用请求字段为 `UserChatMsg`、`AiModel`、`AiModelId`、`RelayModel`、`ConversationId`、`Mode`、`ReasoningEffort` 和 `Attachments`。模型 Endpoint 与供应商 ApiKey 由服务端读取；Controller 和 `V8.AI` 会清除客户端提交的 `ApiKey/Endpoint`。HTTP 来源由 Controller 归一为 `http-ai`，后端 V8 来源固定为 `v8-ai`；不能通过伪造 `Source=ai-intent-router` 绕过中转计量。
@@ -397,7 +428,7 @@ PC 顶栏助手和移动端助手复用 `mci_ai_data_assistant` 的 `Bootstrap`�
 - AI助手包正式拥有 9 张 `mic_sub_*` 订阅表，以及 `mci_ai_token_account`、`mci_ai_token_log` 两张用量表。每张表都必须同时提供 DDL、PhysicalColumns、DiyTables、DiyFields，日志表必须包含 `PromptPreview`；`mci_ai_token_recharge` 不在当前 C# 运行时实体闭包中，不能因为某个线上库存在同名表就擅自打入应用包。
 - `Sys_User.AiApiKey` 不属于 AI助手包，而由 `app.microi.sys_user` 系统账号包统一提供建表 DDL、物理列和隐藏只读的低代码字段。AI助手运行时发现该列缺失时，会明确提示升级系统账号应用；请求路径不会自动改表。
 - v6.3.5 会从 AI助手包的 DDL、PhysicalColumns、DiyTables、DiyFields、DataSets 各层移除重复的 `mci_ai_app_version`、`mci_ai_app_file`、`sys_microistore`，由 Store/SaaS 既有平台包维护；当前仅 AI助手包拥有的 `app_mic_aiapp`、`mci_ai_app` 继续保留。
-- v6.3.6 要求后端同时提供 `V8.Method.ManageAiPlatform`、一次性 `V8.Method.RequireManagedProtocolContext` 与租户/用户绑定的 `V8.AI` 非流式原子（含 `UpdateConversationTitle`）。后端缺少任一能力时应在应用安装预检阶段失败关闭，不能只安装接口后留下运行期半可用状态。
+- 后端需同时提供 `V8.Method.ManageAiPlatform`、一次性 `V8.Method.RequireManagedProtocolContext` 与租户/用户绑定的 `V8.AI` 原子。AI 应用 v7.7.8 的最低平台版本为 8.7.0；安装器 v3.1.1 或更新版本会在写入前读取真实 Core 版本并校验最低要求。包的能力声明用于发布校验，不代表安装器已逐项探测运行能力；混装旧 AI 程序集仍需通过匹配部署和实际动作回读发现。
 
 普通角色进行业务数据分析时，必须通过 `mci_ai_role_policy` 明确配置数据范围、业务域和模型；常规对话不要求先建立这些策略。平台只对后端可信的 `V8.CurrentUser.Level >= 9999` 提供安装后的数据分析安全兜底：动态读取目标租户当前启用的业务域与模型，使用 `All` 范围，但仍关闭原始 SQL并默认隐藏敏感字段。禁止根据客户端参数、账号名称或前端路由判断超级管理员，也不能把发布租户的角色 Id、模型 Id 固化进安装包。
 
@@ -514,9 +545,9 @@ Redis 不可用或无法取得版本时，服务端直接回源当前租户数�
 
 API 发布包必须包含 `ai-mcp/dist`、生产依赖和 Node 22 运行时；只有升级应用商城资源而没有部署匹配的前后端程序，线上页面仍不会获得新工具循环。在线 MCP 的文件路径指向 API 节点，处理用户文件时需经受控上传工具传入文件内容，不能把浏览器本地路径当作服务器路径。
 
-流式取消也要区分入口：OpenAI 代理流式接口会传递 HTTP 请求取消信号；普通 `ChatStream` 和 `NL2V8` 当前主要依赖内部超时 Token，不能宣称浏览器断开后一定立即终止上游调用或计费。
+OpenAI 代理、普通 `/api/Ai/ChatStream` 与 `/api/Ai/NL2V8Engine` 的当前源码将 HTTP 请求取消信号传递给相应模型流读取，并组合模型超时。取消、超时、长度截断与上游失败分别保留完成态，不将部分文本标成完整成功；供应商已经发生的用量不会因取消而撤销。目标环境需要部署对应版本后才具备该行为。
 
-当前中转计量记录除问题摘要外还可能保存完整 `Question` 和 `Answer`，部分诊断日志也会输出问题内容或摘要。它们必须按敏感业务数据保护、限制访问和设置留存策略；在统一脱敏与可配置留存真正实现前，不得宣称 Prompt/Answer 已全面脱敏或不落日志。
+当前源码的两条中转计量路径将 `PromptPreview/Question/Answer` 绑定为空，用量查询仅返回计量与关联字段；普通聊天与 NL2V8 诊断不输出正文。历史账本、用户主动保存的会话、其它分支及供应商留存需要分别保护与核验，不能据此宣称全平台统一留存策略已经完成。实际行为以目标版本发布和运行回读为准。
 
 Microi MCP 同时服务于在线低代码建模模式，以及 Codex、GitHub Copilot、Cursor、Claude Code 等外部客户端；读写仍经过平台 Token、租户边界、权限、确认与审计。
 

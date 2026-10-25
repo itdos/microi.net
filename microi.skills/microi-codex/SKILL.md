@@ -7,6 +7,14 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 
 本插件与 `Microi.Agent`、`@microi.net/cli` 共用配置、Token、MCP Server 和 Microi Skills。不要另写原生 HTTP、SQL 或第二套认证实现。
 
+### MCP 开发角色授权（强制）
+
+- 平台版本号的连接弹窗及角色授权管理仅向 `Level >= 9999` 开放；复制开发 Token 的后端仍须复核当前租户主库身份。普通账号不能通过前端参数申请管理员会话。
+- 非超级管理员必须先获得角色的 MCP 开发授权。默认关闭；权限由 `sys_rolelimit` 的 `McpDevelopment` 类型保存，连接弹窗与角色编辑共享记录、并发版本和事务。不得另建不同步的本地授权表。
+- 按同一角色组合访问范围与创建/修改、删除开关，禁止把 Full 只读角色与 Role 范围写角色拼成全库写权限。受限范围继续检查模块、表单、行、字段；禁止通过脚本、SQL、配置数据源或旧 FormEngine HTTP 路由绕过限制。
+- 完整范围且两个写入开关均开启包含可信服务端开发能力，必须明确其可间接写删的范围；不能声称只授予无风险的界面编辑。管理授权入口仍由超级管理员控制。
+- 被拒绝时回读账号/租户/角色授权与工具版本，不通过改 Header、改终端类型、匿名接口或直接 SQL 绕过。连接说明保持安装 CLI、stdin 导入、初始化及状态验收的短流程，不要求用户提供管理员密码。
+
 本地 HTTPS 连接同样必须验证证书。MCP 不因 `localhost/127.0.0.1` 自动设置
 `NODE_TLS_REJECT_UNAUTHORIZED=0`，也不能覆盖调用方的严格策略。开发节点使用受信
 证书；必要时在启动 MCP 前通过 `NODE_EXTRA_CA_CERTS` 指定已核验的公开 CA PEM。
@@ -32,18 +40,24 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 - Mongo 附件投影保存规范四字段数组的 JSON 字符串，读回仍核对完整消息摘要，不能只比较顶层 ContentHash。冲突先用同源、当前群管理权限限定的只读审计；旧嵌套字段已丢失时不可猜测解码或跳过摘要。派生投影修复仅限 SQL 正文摘要与 outbox 一致、原 outbox 独占租约仍有效、Mongo 同 Message/Group/Owner、时间/序号及其余非附件字段匹配、已知缺陷形态明确的记录；只更新派生附件字段并完整回读核对，不把固定 Id 更新宣称为 Mongo 原子 CAS。未知冲突保留 SQL 兜底，不改业务消息或模型运行、不扫描所有租户。
 - 同一桌面实例的多个 Worker 必须共享本机模型容量预准入，在领取云端任务前取得名额；RPC 超时不等于模型终态，结果未知时停止自动重放并保留核对入口。
 - 员工模型以 16,384 Token 为本功能默认且最高请求预算，不代表厂商输出能力；通过官方 prepareCall 同时冻结路由、能力和派发，按配置中的显式请求上限及剩余上下文收紧，保留用户 thinking/reasoning 控件。max-tokens 表示输出截断，必须记录 Uncertain 并等待核对，不能当完整成果或自动重试；预算不足应在派发前明确拒绝。
+- 1.4.2 起，员工正文使用官方 SDK typed text/reasoning 和实际 finish 终态：必须实际收到 stop，独立 reasoning 不写入群消息；普通文本仅剥离开头完整闭合的标准 think 块，开头未闭合、空白或整份“最终正文”占位（含简单 Markdown 外壳）保留核对状态，不作为群成果。正文内部代码、引用、段落及标签示例不作全局改写；旧随机边界解析器只保留独立兼容测试，不作为新运行的输出要求或失败回退。不得自动重调同一已开始请求，实际供应商 usage 保留，缺失或部分用量沿用原 unknown 规则。实际追加的回答指引计入 prepareCall 的完整保守输入估算，不冒充供应商精确 tokenizer；不删除上下文预留、不放大输出或上下文上限，不绕过预算不足时的派发前拒绝。
+- 自动会话标题仅处理提供方返回内容开头完整闭合的标准 think 块；未闭合、空标题或无可用正文走原回退，不把思考前缀作为标题。历史标题重建投影时保留用户命名、原始事件及正常标题，不为修复旧标题追加模型请求。同步上游时保护生成和历史投影两个接缝、共享纯前缀识别助手及真实普通会话标题断言；共享助手的换行规范不放宽官方源文件的完整 SHA-256 校验。
+- 官方桌面自动欢迎流程必须尊重当前设置 owner：仅在吾码官方桌面标记严格为 true 时排除上游自动欢迎候选，显式模型配置与显式引导保留原行为。账号登录待完成、模型编辑等状态不能因后台自动步骤被卸载；同步上游时同时保护 SettingsRoot 决策接缝及真实 React 生命周期回归。本地内存桥回归不能代替安装包的真实认证与原生验收。
+- 长记录群聊须保留消息条目自身高度及原离屏渲染策略，避免长回复在纵向 flex 日志中被压成零高。上游同步时同时保护消息高度样式、实际群聊组件和官方 Markdown 的浅色 / 深色回归；按唯一消息身份普通滚动后核对可见性和完整 AST / DOM 正文，位置使用正常绘制后的同轮矩形，不靠删除断言或强制改写布局通过。组件夹具结果不能代替新包、同包原生或真实目录升级。
+- 历史消息重新编辑缺少官方安全回退（rewind）时，采用保留审计的安全分支；仅在新分支编辑请求实际持久接收后归档旧分支，活动侧栏以单条当前会话为目标。保留官方归档恢复原正文、附件、工作区的能力；接收结果未知时不归档、不重复 prompt，归档失败只重试归档，不重发模型请求。显式 fork / retract 不改变；上游同步须保护接收确认后归档的顺序及未知、失败、恢复路径，验收独立核对真实侧栏计数与归档恢复，设计不能冒充通过结果。
+- Markdown 验收先定位唯一消息并普通滚动到目标，再保留身份、可见性及整份 AST/DOM 内容断言；签到只按当前岗位本人的明确肯定句判断，不能把引用、代码、请求、假设、否定或其他岗位在线当本人在线。源码回归、实际包校验、原生、真实升级与渠道验收分别记录，不能相互替代。
 - 员工新运行只允许从用户所选且有效的 MCP 完整身份与当前显式项目群领取；未选群不自动领取其它群，切换连接或群后停止旧范围的新领取。已开始运行按原范围安全收尾，已保存的加密成果重报保留；不能因离群丢弃结果或重放结果未知的模型调用。
 
 - 桌面与手机配对的本机 HTTP 监听必须避开 Fetch 标准禁止端口。系统自动分配的端口也可能不可浏览器访问；只有浏览器允许的真实监听端口才能进入配对 URL。自动命中禁止端口时关闭监听再有界重选，显式配置禁止端口须报错；权限和占用错误仍保留原错误，不改变系统动态端口范围、不绕过浏览器安全策略。同步上游时保护共同端口选择器、配对监听与对应回归。
 
 - 1.3.8 起生产宿主为 DeepSeek 官方桌面。同步前读取内部源码根目录 `同步DeepSeek官方上游.md`、`apps/official-desktop/upstream.lock.json` 与维护交接记录；核对官方提交、归档 SHA、版本与完整锁。保留原始快照、自有层和精确接缝，干净安装、回归及真实包验收后才能推进基线。旧 `同步dsh-desktop上游.md` 已删除；历史派生模块只按发行快照追溯，不得恢复退役宿主或 PPT 模式。
 - Microi Agent 是内部仓库中的独立桌面发行物，基于 DeepSeek Harness 官方桌面源码及独立吾码差异层，内置固定 Harness、Node.js、MCP / CLI / Skills；不是需要额外 Agent Token 的 CLI 别名。历史 DataElement 派生模块及许可证仍保留。
-- 官方 AI 登录只走吾码桌面账号窗口，在受支持的 `https://api.microi.net` / `https://api.itdos.com`、`OsClient=iTdos` 使用本人的中转 Key 和额度；它是员工业务 MCP 之外的可选计费来源。不要把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
+- 官方 AI 登录只走吾码桌面账号窗口，在受支持的 `https://api.microi.net` / `https://api.microi.net`、`OsClient=iTdos` 使用本人的中转 Key 和额度；它是员工业务 MCP 之外的可选计费来源。不要把密码或 AI Key 写入对话、命令行、MCP 参数或模型配置。
 - 业务连接在「服务器连接（MCP）」中单独添加、登录；官方 AI 账号不授予业务租户权限。项目初始化和资源同步优先使用桌面「项目资源」；其余业务继续调用同源 MCP 的原工具。
 - macOS 登录凭据通过桌面 Keychain/受限 IPC 管理；不要在 macOS 改跑当前只支持 Windows 凭据恢复的 `microi auth login`。不要手改 Token 文件。
 - 桌面安装包中的 Harness、Node 和同源资产随桌面版本升级；不运行 npm 自更新去改写正在使用或已签名的安装目录。外部 Codex / WorkBuddy / CLI 的后台更新规则保持不变。
 - 桌面 UI 通过官方 slots 接入吾码面板，首页保留官方会话区及吾码 AI 大类与 29 项图像工具。工具目录以 `Microi.Client/src/views/ai-engine/ai-image-tool-directory.js` 为事实源，点击在「Microi吾码」主面板使用；模型来源可选当前对话模型、吾码官方中转或已登录业务连接。AI 数据分析通过同源 MCP 调用 `mci_ai_data_assistant`。1.4.0 起不挂载旧 dsh-desktop PPT 模式、模板 dock 或独立菜单；普通 Office 技能、用户文件与历史不删除。
-- 左侧工作区位于功能区上方；功能区用官方注册表接入插件、自动化任务、审查、吾码账号与 AI、服务器连接（MCP）、AI 员工、采集及环境服务管理，独立滚动且窄屏可达。底部「关于 v版本号」与连接手机同一行；意见反馈显示吾码官网及 QQ 群 51050055，不跳 DeepSeek 登录。自定义应用 Logo/名称只改变桌面本机品牌。默认浅色并支持深色。
+- 1.4.2 起，常用的 AI 员工、插件与自动化任务位于任务/工作区上方，其余工具统一进入官方设置弹窗；底部保留账号和一个设置按钮，关于、手机配对与吾码官网/QQ群 51050055 位于设置的帮助分区。旧版“工作区在功能区上方”规则由用户最新要求取代。旧业务入口通过已注册分区导航保留，不复制设置壳、不用 DOM 隐藏或点击模拟。自定义品牌与浅深主题继续保留。
 - 桌面安装包版本从 `1.0.0` 开始，使用吾码三段十进制进位规则。正式新版本先在发布源码中执行 `version:bump`，核对并提交三个版本文件；Mac 拉取后使用 `bash ./一键打包Mac.sh` 在临时 Git 工作树中打包当前已提交版本，默认不再升版，失败也不能把生成文件留在原检出目录。`--current` 仅作旧命令兼容；同版本本地重打包不得覆盖已公开的不可变产物。测试、类型检查和普通 Web 构建不升版。
 - Windows 安装包的构建成功、Authenticode 签名、SmartScreen/商店信任、HDFS 上传与 CDN 回读是不同证据；双击 `一键打包Windows.cmd` 时自动探测 Microsoft Artifact Signing 或本机可信证书，没有凭据则继续生成明确标记的未签名包，显式 `-Signing Signed` 才失败关闭。签名必须先覆盖安装器及独立执行文件，再计算发布 SHA256。macOS 默认 `bash ./一键打包Mac.sh` 同样自动探测并在无凭据时生成未签名包；`--signed` 是正式门禁，必须在缺少证书或公证钥匙串时失败，并通过 `codesign`、`spctl`、`stapler validate` 后才标记已签名公证。
 - Harness 本机探测必须以独立硬计时器约束 TCP 连接和响应头，Node 失败后用 Chromium 复核。两个通道在认证地址公布后连续连接失败时，仅重启一次到 IPv6 `::1`；IPv6 也必须实际取得有效 HTTP 响应，不得伪造就绪、绑定所有网卡或关闭鉴权。普通模式与安全模式使用同一规则，500 响应不得触发网络回退或算作就绪。日志同时记录桌面版本、实际监听地址和进程内 HTTP 自检；探测不带凭据、不跟随重定向、不输出自检 Token。恢复日志只去除缓冲区之间的重叠，不能用全局 Set 删除重试中的相同超时。发布运行 `scripts/verify-harness-startup.mjs`，以包内 Node/Harness、真实 Chromium 页面验证普通与安全模式、Node 超时回退、IPv4 双通道受阻后 IPv6 鉴权和双通道真实无响应的有界失败。Mac 验收与 Windows 真机、安装升级、客户设备验收分别记录。
@@ -54,7 +68,7 @@ description: 在 Microi Agent、Codex 或 DeepSeek Harness 中完成 Microi吾�
 - 闭源商业项目要求免费可信 EXE 下载时，已发布的免费 Store MSIX 可使用 Microsoft Store Web Installer：从官方 badge 生成器的 Direct 模式取得该产品 `get.microsoft.com/installer/download/` 链接，验证真实下载的 Microsoft 签名及文件摘要。这是联网安装当前商店版的小型 EXE，不是给官网完整 NSIS EXE 签名；保留两渠道并说明版本差异，不把下载成功写成原生安装通过，不将动态安装器冒充固定版本 CDN 产物。按当前包 Manifest 的 MinVersion 和架构记录系统条件，分别说明旧 Windows、x86、ARM 仿真、LTSC/Server、离线与企业策略边界；不降低安全策略或虚构全部系统验收。自签名不能产生公众信任，免费开源签名服务不适用于私有商业源码。
 - 复用已签名 MAS 应用制作开发测试包时，必须替换 `Contents/embedded.provisionprofile`，核对描述文件中的证书与开发签名及当前设备一致；`codesign --verify` 通过仍不能替代实际启动。资料目录中的描述文件保持私有权限，复制到安装包后设为普通用户可读，并检查整个有效载荷，避免 ITMS-90255。沙盒阻止调试监听时不得扩大正式包的网络监听权限；自动化测试入口只放入独立开发副本，正式入口、preload 与界面应核对同源，测试入口和配对口令不得进入正式安装包。安装包上传成功后仍要回读 Apple 处理状态、选择构建、上传高清素材并实际提交审核。
 - 官方账号页和关于标签通过 `platform-current-user` 接口引擎读取当前 `sys_user.LicenseType`。桌面相关平台业务逻辑优先通过 `microi_itdos` 接口引擎实现；只有接口引擎缺少必需底层原子能力时才能改后端源码，并说明原因。
-- 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.itdos.com/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。
+- 正式 Windows/macOS 安装包必须内置固定版本且经过 SHA-256 校验的 cloudflared，运行时优先使用安装包 `resources/bin`，避免首次联网临时下载。检查更新从 `https://api.microi.net/microi-code/updates/` 的匿名接口引擎读取 YAML/JSON，安装包二进制仍通过 HDFS 流式发布。
 - Windows 安装验收必须包含旧卸载器损坏后的升级、同版本重装、超过 260 字符的路径以及全部文件 SHA-256 回读。安装器使用当次发布的兼容卸载器，并用固定哈希的 Unicode 7-Zip 直接解压到目标目录，禁止恢复临时目录解压后使用 NSIS `CopyFiles` 复制的流程；该流程会将路径或复制错误误报为“应用无法关闭”。进程检查仅匹配安装目录内的产品主程序及内置 Node，不能按整个目录匹配安装器或无关程序。
 - 长路径验收必须先安装完整旧版本，再在同一目录覆盖升级及再次重装，不能只在空目录或仅含模拟卸载器的目录安装。卸载清理、旧文件备份迁移和失败回滚均须支持 Windows 扩展路径；通过真实 NSIS 与独占文件句柄验证长路径迁移和占用回滚，不能仅用 JS 文件操作或首次解压测试替代。
 - Windows 1.2.7 起安装失败诊断直接集成于安装器：失败窗口提供「复制安装日志」与「打开日志」，不另发独立诊断工具。`build/microi-installer-log.nsh` 在实际清理/解压/回滚步骤写入安装目录外的 UTF-8 日志，`build/microi-installer-diagnostics.ps1` 作为内嵌的只读补充，记录 Win32 访问错误和 Restart Manager 占用 PID。整份日志通过原生 Unicode 剪贴板复制；超过容量时明确拒绝而不截断。验收须真实点击复制按钮、核对中文长日志、占用文件的 Win32=32 与回滚；卸载退出码 2 不等同于 Win32 错误码 2，本机通过不代表客户机升级通过。
@@ -99,13 +113,13 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 - 远程执行与调试：读取 `v8-debugging/SKILL.md`。Codex 用“获取源码 → 远程执行 → 定位堆栈/日志 → 最小补丁 → 再执行”的结构化循环代替 VS Code DAP 的可视化逐行面板；不得把未执行的源码检查称为真机调试成功。
 - 性能测试：读取 `performance-testing/SKILL.md`，限制并发并输出样本、P95/P99、错误率和停止条件。
 - 系统日志、内存吃满、OOM 与接口/V8 异常分配：读取 `system-observability/SKILL.md` 及其内存事故手册，使用专用 MCP 的 `Capabilities` → `Memory` → 事故历史/详情 → `Trace`，先查采集质量再归因。
-- 微应用：读取 `microi-microservice/SKILL.md`，使用 scaffold、source sync、stream publish 和发布回读原工具；本地构建前遵守内存保护。
+- 微应用：读取 `microi-microservice/SKILL.md`，使用 scaffold、source sync、stream publish 和发布回读原工具；本地构建前遵守内存保护。1.4.2 起，仅在确认 Vite 且缺少 `dev` 时补默认开发命令，保留已有命令；Windows 替换仅对 EPERM / EACCES / EBUSY 最多 4 次、20 / 40 / 80 毫秒有限退避，每次核对原完整字节与文件身份。发现可观察的并发编辑、替换或删除立即停止并保留用户内容，不删目标或强制覆盖，不把核对到替换的窄窗口宣称为跨进程原子 CAS。
 - Playwright：读取 `playwright-e2e/SKILL.md`，使用当前已登录浏览器或受控 Playwright；报告必须来自实际页面执行。
 - 其他领域：从本插件同级 Skills 里选择最小相关 Skill，并完整读取后执行。
 
 ## 同步与安全边界
 
-- 发布扩展与 CLI/AI Plugin 前检查实际 VSIX：完整清单、字节数、SHA-256 和敏感文件扫描回执保存在 `.tmp/development-tools-releases/<版本>/`；逐字节核对 MCP 输出/构建输入与 Skills 全部文件同源。归档超过 64 MiB 或混入签名资料、凭据、桌面安装包、工具链、apps、upstream、同步目录或 node_modules 时停止，修复误包后复测；断点补发使用同一门禁，不用 `vsce ls` 替代归档检查。npm Token 只绑定官方 HTTPS registry，私有 npmrc 仅引用 `${NPM_TOKEN}`；同时固定 `npm_config_userconfig` / `NPM_CONFIG_USERCONFIG` 与 registry 两种大小写变量，避免外层 `npm run` 的配置遮蔽有效 Token。不输出凭据，不因继承错误重复要求登录；已发布正确制品保留，发行内容变化使用新不可变版本。
+- 发布扩展与 CLI/AI Plugin 前检查实际 VSIX：完整清单、字节数、SHA-256 和敏感文件扫描回执保存在 `.tmp/development-tools-releases/<版本>/`；逐字节核对 MCP 输出/构建输入与 Skills 全部文件同源。归档超过 64 MiB 或混入签名资料、凭据、桌面安装包、工具链、apps、upstream、同步目录或 node_modules 时停止，修复误包后复测；断点补发使用同一门禁，不用 `vsce ls` 替代归档检查。npm Token 只绑定官方 HTTPS registry，私有 npmrc 仅引用 `${NPM_TOKEN}`；同时固定 `npm_config_userconfig` / `NPM_CONFIG_USERCONFIG` 与 registry 两种大小写变量，避免外层 `npm run` 的配置遮蔽有效 Token。不输出凭据，不因继承错误重复要求登录；已发布正确制品保留，发行内容变化使用新不可变版本。npm、Visual Studio Marketplace、Open VSX 的发布命令明确提示成功即可报告对应渠道发布成功；默认不追加 `--verify-all` / `--verify-only`、版本轮询或下载回读，不因传播延迟重复发布。只有命令报错、结果未知或用户明确要求核验时才查询渠道状态。
 
 - `Microi-V8-Engine/.microi-config.json` 是三端连接配置事实源；未知字段必须保留。
 - CLI、VS Code、Codex 与 DeepSeek Harness 插件可以在同一工作区并存；各端必须复用同一配置/Token/MCP 协议，带版本写入实行较新 provider 优先，禁止旧入口回写降级。`doctor.coexistence` 未通过时准确报告兼容风险并后台修复，但不得因此停止无关工作。

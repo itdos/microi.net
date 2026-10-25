@@ -3,7 +3,11 @@ import { groupIconMdPlugin, groupIconVitePlugin, localIconLoader } from "vitepre
 import mdItCustomAttrs from "markdown-it-custom-attrs";
 import { createSeoHead, transformSeoHtml, transformSeoPageData } from './seo'
 import { SITE_URL, filterSitemapItems } from './seo-policy.mjs'
+import { sourceIsIndexable } from './seo-source.mjs'
+import { fileURLToPath } from 'node:url'
 import { writeDiscoveryIndex } from '../../../scripts/seo-discovery.mjs'
+import { fancyboxUrls, fancyboxDevPlugin, writeFancyboxAssets } from '../../../scripts/fancybox-assets.mjs'
+import { nugetBuildSnapshotPlugin } from '../../../scripts/nuget-build-snapshot.mjs'
 
 export const shared = defineConfig({
 	title: "Microi吾码",
@@ -11,7 +15,7 @@ export const shared = defineConfig({
 	lastUpdated: true,
 	sitemap: {
 		hostname: SITE_URL,
-		transformItems: filterSitemapItems,
+		transformItems: (items) => filterSitemapItems(items, (url) => sourceIsIndexable(url, fileURLToPath(new URL('../../', import.meta.url)))),
 	},
 	markdown: {
 		theme: "github-dark",
@@ -24,13 +28,16 @@ export const shared = defineConfig({
 		["meta", { name: "author", content: "Microi风闲" }],
 		["script", {}, "document.documentElement.setAttribute('data-mci-site-style','mainstream')"],
 		["link", { rel: "icon", href: "/icon.png" }],
-		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
-		["script", { src: "/assets/fancybox.umd.js" }],
+		["link", { rel: "stylesheet", href: fancyboxUrls.css }],
+		["script", { src: fancyboxUrls.script }],
 	],
 	transformPageData: transformSeoPageData,
 	transformHead: createSeoHead,
 	transformHtml: transformSeoHtml,
-	buildEnd: writeDiscoveryIndex,
+	async buildEnd(siteConfig) {
+		await writeFancyboxAssets(siteConfig)
+		await writeDiscoveryIndex(siteConfig)
+	},
 	themeConfig: {
 		logo: "/icon.png",
 		socialLinks: [
@@ -60,7 +67,7 @@ export const shared = defineConfig({
 		},
 	},
 	vite: {
-		plugins: [],
+		plugins: [fancyboxDevPlugin(), nugetBuildSnapshotPlugin()],
 		server: {
 			port: 61503,
 			strictPort: false,

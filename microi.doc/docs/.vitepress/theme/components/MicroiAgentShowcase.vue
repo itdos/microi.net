@@ -17,7 +17,7 @@
           </div>
         </div>
         <p class="microi-code-store-install"><a href="https://get.microsoft.com/installer/download/9NKCS76ZMFXR?referrer=appbadge" target="_blank" rel="noopener noreferrer">微软签名 EXE 在线安装器 <span aria-hidden="true">↗</span></a><span>商店版 1.3.3 · Windows 10 2004+ / 11 · x64 · 需联网</span></p>
-        <p class="microi-code-store-note">下载按钮实时显示各平台已发布版本，并始终下载 latest。官网 Windows 完整 EXE 当前未签名；微软签名在线安装器提供商店版。macOS 已发布 DMG 的签名与公证状态见版本记录，Mac 商店尚未开放下载。</p>
+        <p class="microi-code-store-note">Windows 与 macOS 分别提供已发布的安装包；版本记录可查看校验值与自动更新状态。官网 Windows 完整 EXE 当前未签名；微软签名在线安装器提供商店版。macOS 已发布 DMG 的签名与公证状态见版本记录，Mac 商店尚未开放下载。</p>
         <ul class="microi-code-facts" aria-label="Microi Agent 产品事实">
           <li><strong>官方账号</strong><span>登录即用 AI 中转站</span></li>
           <li><strong>多端桌面</strong><span>Windows 与 macOS</span></li>
@@ -77,29 +77,31 @@
 </template>
 
 <script setup>
-import { computed, h, onMounted, reactive, ref } from 'vue'
-import { installerFromYaml } from '../utils/microi-agent-download.mjs'
+import { computed, h, onMounted, ref } from 'vue'
+import { installerFromYaml, selectWindowsDownload } from '../utils/microi-agent-download.mjs'
 import { getDocAssetUrl } from '../doc-assets.js'
 
 const svgIcon = (path, fill = 'none') => () => h('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true', fill }, [h('path', { d: path })])
 const DownloadIcon = svgIcon('M12 4v10m0 0 4-4m-4 4-4-4M5 19h14')
 
-// 更新清单由 iTdos 接口引擎发布；版本发布后官网源码无需随之改动。
-const liveVersions = reactive({ windows: '', mac: '' })
-// 下载按钮始终使用永久入口；点击时由官方清单选择当前安装包，首屏不依赖异步请求。
-const downloadUrls = reactive({
-  windows: 'https://microi.net/download/microi-agent/latest.html?platform=windows',
+// 手动发行与自动更新频道分别记录；只从下方已发布版本记录选择不可变 Windows 包。
+const windowsFeedYaml = ref('')
+const macVersion = ref('')
+const windowsDownload = computed(() => selectWindowsDownload(releases, windowsFeedYaml.value))
+const liveVersions = computed(() => ({ windows: windowsDownload.value.version, mac: macVersion.value }))
+const downloadUrls = computed(() => ({
+  windows: windowsDownload.value.url,
   mac: 'https://microi.net/download/microi-agent/latest.html?platform=mac'
-})
+}))
 const UPDATE_BASE = 'https://api.microi.net/microi-code/updates/latest/'
 function versionFromYaml(yaml) {
   return /^version:\s*([0-9]+\.[0-9]+\.[0-9]+)\s*$/m.exec(yaml)?.[1] || ''
 }
 onMounted(async () => {
   await Promise.all([
-    fetch(UPDATE_BASE + 'latest.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => { if (installerFromYaml(yaml, 'windows')) liveVersions.windows = versionFromYaml(yaml) || liveVersions.windows }).catch(() => {}),
+    fetch(UPDATE_BASE + 'latest.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => { windowsFeedYaml.value = yaml }).catch(() => {}),
     fetch(UPDATE_BASE + 'latest-mac.yml', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text() }).then(yaml => {
-      if (installerFromYaml(yaml, 'mac')) liveVersions.mac = versionFromYaml(yaml) || liveVersions.mac
+      if (installerFromYaml(yaml, 'mac')) macVersion.value = versionFromYaml(yaml) || macVersion.value
     }).catch(() => {})
   ])
 })
@@ -135,6 +137,7 @@ const screenshots = [
 ]
 
 const releases = [
+  { version: '1.4.2', platform: 'Windows x64', note: '紧凑群聊与发送确认 · 常用导航与统一设置 · 重新编辑会话去重 · Windows 原生验收通过 · 未签名', url: 'https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.4.3/requests/44f80b44c49aee765542dfd70fec9e427aed8990cb8c05898e0d9d8bd0619e55/assets/Microi-Agent-1.4.2-windows-x64-setup.exe', sha256: 'e0bb17a31d453e3c496cc0168be07bec5bbb81b329d01530ea22fa4af2a222de' },
   { version: '1.4.1', platform: 'Windows x64', note: '启动品牌与关于 · 多 MCP 与员工连接恢复 · 安装兼容修复 · 未签名', url: 'https://static.itdos.com/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.4.2/requests/acce70703e77856f5fbce2cd361c0799b16f30c7cdb4e60b525b23564396c65a/assets/Microi-Agent-1.4.1-windows-x64-setup.exe', sha256: '03bfb220f43c95000f1b8e6df2e02595589792cc5ef23b823c24a052b54a1c32' },
   { version: '1.4.0', platform: 'Windows x64', note: '项目群租户隔离 · 吾码连接与界面修复 · 未签名', url: 'https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.4.1/requests/d15a7a2dde9ad8bb6a54886004bb00557125396537ec2857f02188142e6f4114/assets/Microi-Agent-1.4.0-windows-x64-setup.exe', sha256: '5f39653d339a56056a1967cfcc79622ea4830fa0040761ad272135b0036cf014' },
   { version: '1.3.9', platform: 'Windows x64', note: '吾码登录与恢复 · 工作区优先 · 历史需求共享 · 十一岗真实模型与持续连接验收通过 · 未签名', url: 'https://file.microi.net/microi/application-assets/v3/tenants/itdos/kinds/runtime/apps/microi-code-downloads/releases/v1.4.0/requests/9e5b8e3d0c468efe0f0777583dd1111654d46d473050af76bf53fc60ea6f7a1a/assets/Microi-Agent-1.3.9-windows-x64-setup.exe', sha256: 'b6a76a4e72ac889682a6f68ca07cf58e737ad33c0ea2543c66c693aa352baa47' },

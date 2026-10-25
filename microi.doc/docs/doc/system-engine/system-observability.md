@@ -464,17 +464,19 @@ HTTP 热路径
 
 ### CDN 监控 / 分析 / 安全
 
-在同一个【系统日志/监控】微服务中打开【CDN监控/分析/安全】。首期对接阿里云，包含加速域名同步、带宽趋势、12 类运营报表、SLS 的 IP / URL / Referer / IP 与资源交叉排行、CSV 导出、域名 IP 封禁与解封、下载限速、Referer 黑名单、规则与操作回执。
+在同一个【系统日志/监控】微服务中打开【CDN监控/分析/安全】。阿里云接入包含加速域名、带宽趋势、计费用量、缓存命中率、回源流量、账单与资源包、12 类运营报表、离线日志清单，以及 SLS 的 IP / URL / Referer / IP 与资源交叉排行。安全管理提供域名 IP 封禁与解封、下载限速、Referer 黑名单、规则与操作回执。
 
 在当前租户【系统设置 → 安全与服务接入】保存私密项 `Integration.Cdn.Aliyun.AccessKeyId`、`Integration.Cdn.Aliyun.AccessKeySecret`。后端依次选择完整的 CDN 专用凭据、租户 DNS 私密凭据、当前租户 SaaS 的兼容 DNS 凭据；半组配置报错，不能混用不同来源。密钥不会返回浏览器、写入审计或进入安装包。SLS 可独立配置 `Integration.Cdn.Aliyun.Sls.AccessKeyId`、`Integration.Cdn.Aliyun.Sls.AccessKeySecret`。
 
-- **历史 TOP**：先定制运营报表，再按时间范围查询。未订阅与无流量是不同状态；未开通时不能用空列表证明过去没有流量。报表流量列保留云端原始单位。参见[运营报表 API](https://help.aliyun.com/zh/cdn/developer-reference/api-cdn-2018-05-10-createcdnsubtask)。
+- **历史 TOP**：运营报表定制免费，但不补回订阅前的数据，通常需次日 6 点后查看。未订阅、尚未产出与零流量是不同状态。账号只有一个定制任务，新增域名时合并原域名和报表项，按完整集合回读；不能用域名字符串包含关系判断成功，也不能省略域名而意外扩大到全账号。报表流量保留云端原始单位。参见[报表时效](https://help.aliyun.com/zh/cdn/user-guide/customize-an-operations-report-template-and-create-a-tracking-task)、[免费报表与付费实时日志](https://help.aliyun.com/zh/cdn/use-cases/best-practices-for-preventing-traffic-theft)。
 - **报表范围**：IP 排行可按地区筛选，区域和运营商分布支持中国内地/境外选择；域名排行按云账号统计。各类报表仅传入其支持的参数，不统一附加空 Area、HttpCode 或无关域名筛选。
-- **日志分析**：配置域名对应的 SLS 地域、Project、Logstore，完成实时日志投递和 `domain`、`remote_ip`、`uri`、`refer_domain`、`response_size`、`return_code` 字段索引。流量使用字节，IP 使用 TCP 连接来源 `remote_ip`，URL 不带查询参数。SLS 查询可能计费。
-- **安全操作**：先预览当前云端配置和作用范围，再确认提交。请求号幂等，云端配置变化时要求重新预览；超时或结果不明先回读，不能盲目重试。分钟、小时、天、自定义秒数和永久封禁均可用。限速指每个请求的下载速度，至少 `100k`，不是边缘 QPS 限制。
-- **全账号封禁**：海量 IP 服务须向阿里云申请开通，影响账号下全部 CDN 域名，界面单独确认作用范围；它不是单域名黑名单的替代名称。参见[海量封禁接口](https://help.aliyun.com/zh/cdn/developer-reference/api-cdn-2018-05-10-setcdnfulldomainsblockip)。
-- **自动规则**：默认停用、观察模式；开启自动执行还需要域名总开关。支持流量/请求次数、固定阈值，或历史窗口 P95 × 倍数并叠加绝对下限，以及连续命中、冷却时间、单轮 IP 上限、小时操作上限与白名单。仅使用 SLS 完整窗口；日志滞后、流量字段缺失或动态基线不足时不封禁。每条规则有错峰调度和独立租约。
-- **到期回收**：`mci-cdn-security-tick` 每分钟处理持久化操作和到期解封；只回收应用新增的 IP，保留原有黑名单，有重叠封禁时延长持有期。停用规则不会停用已提交封禁的到期回收。调度停止会推迟解封，需在任务引擎核对状态和最近运行时间。
+- **日志分析**：先用 `LogDelivery` 核对实时投递状态，再配置域名对应的 SLS 地域、Project、Logstore 和 `domain`、`remote_ip`、`uri`、`refer_domain`、`response_size`、`return_code` 字段索引。流量使用字节，IP 使用 TCP 连接来源 `remote_ip`，URL 不带查询参数。实时投递与 SLS 查询可能分别产生费用；权限不足不能解释为未投递。
+- **离线取证**：`Logs` 分页读取最近 31 天内的小时日志清单，每次时间范围不超过一天。`LogDownload` 是独立管理员动作，只能选择同一域名、同一窗口清单中的精确 `LogName`；返回的临时下载地址只能交给受控审计进程，不放进页面、日志或公开报告。原始日志须有界读取、去掉查询凭据后汇总；离线日志有延迟，不能用于实时自动封禁。
+- **安全操作**：先预览当前云端配置和作用范围，再确认提交。请求号绑定同一命令，云端配置变化时要求重新预览；超时或结果不明先回读，不能盲目重试。修改时保留既有黑名单与作用语义；`ip_acl_xfwd` 缺失按阿里云默认开启处理，不能静默改为按 TCP 来源封禁。私网、环回、链路本地、组播、未指定地址、IPv4 映射 IPv6 及保护 CIDR 均受保护。限速指每个请求的下载速度，至少 `100k`，不是边缘 QPS 限制。
+- **账号范围**：`GlobalBlock/GlobalUnblock` 当前禁止写入，因为账号级动作会影响全部 CDN 域名，需要独立的账号范围租约、限额及保护配置。单域名封禁不能借此扩大范围；本模块不自动开通阿里云海量 IP 服务。参见[海量封禁接口](https://help.aliyun.com/zh/cdn/developer-reference/api-cdn-2018-05-10-setcdnfulldomainsblockip)。
+- **域名流量预警**：规则 `Source=CDN` 使用 `Usage` 字节量，固定阈值、观察模式，窗口为 5 分钟的倍数；保留 15 分钟数据延迟，并要求完整的 300 秒样本。连续命中与冷却后向当前租户 `admin` 超级管理员发送站内通知，固定策略 Key 为 `cdn_traffic_alert`。规则状态区分 `AlertPending/AlertSent/AlertFailed`，实际消息回执写入结果；失败保留最近错误且不推进该窗口。未配置通知策略不能视为已送达。
+- **IP 自动规则**：`Source=SLS` 默认停用、观察模式，自动执行还需要域名总开关。支持流量/请求次数、固定阈值或历史窗口 P95 × 倍数加绝对下限，配合连续命中、冷却、单轮/每小时上限与白名单。完整窗口的独立健康查询检查请求总数、缺失字节与最新日志；排行截断、字段缺失、日志过旧或动态样本不足时不封禁。`HealthComplete` 只证明本次查询完整，`DeliveryNotGuaranteed` 提醒日志投递仍可能漏失。
+- **到期回收**：`mci-cdn-security-tick` 每分钟处理持久化操作和到期解封；只回收应用新增的 IP，保留旧黑名单。重叠封禁处于执行中或未知时延后回收；终态记录不会被重新标记成功。每条规则使用同一评估租约，域名写入在租约内重新校验限额并续租。停用规则不会停用已提交封禁的到期回收；调度停止会推迟解封，需核对最近运行时间。
 
 管理员通过现有 MCP `microi_run_engine` 调用 `mci-cdn-manager`，无需第二套 Token。例如：
 
@@ -489,7 +491,35 @@ HTTP 热路径
 }
 ```
 
-只读动作有 `Domains`、`Trend`、`Reports`、`ReportList`、`Sls`、`Configs`、`Config`、`Rules`、`Operations`；写入流程为 `Preview` → `Submit`，保留返回的 `Command/BeforeHash/ExpiresAt/PreviewToken` 并提供稳定 `RequestKey`，结果不明使用 `Reconcile`。后台 `mci-cdn-core`、`mci-cdn-aliyun`、`mci-cdn-worker` 禁止 HTTP 直调。业务资源由【系统日志/监控】包托管，微服务沿用统一平台应用，不新增重复商城条目。
+只读动作有 `Domains`、`Trend`、`Usage`、`CacheHit`、`OriginTraffic`、`Billing`、`StorageHealth`、`StorageLogs`、`Logs`、`LogDelivery`、`Reports`、`ReportList`、`Sls`、`Configs`、`Config`、`Rules`、`Operations`；写入流程为 `Preview` → `Submit`，保留返回的 `Command/BeforeHash/ExpiresAt/PreviewToken` 并提供稳定 `RequestKey`，结果不明使用 `Reconcile`。后台 `mci-cdn-core`、`mci-cdn-aliyun`、`mci-cdn-worker` 禁止 HTTP 直调。业务资源由【系统日志/监控】包托管，微服务沿用统一平台应用，不新增重复商城条目。
+
+#### 核对用量与费用
+
+带宽图、计费用量与账单金额分别回答“何时突增”“用了多少”“实际收了多少”。不能把小时带宽点乘时间当作实际流量，也不能统一乘一个单价生成实际费用。`Trend` 仅展示带宽；流量合计使用 `Usage` 的 `Field=traf`，应付费用使用账单 `PretaxAmount`，并保留账期、币种、计费项和统计截止时间。
+
+| 动作 | 参数与结果 | 用途 |
+| --- | --- | --- |
+| `Usage` | `Domain`、UTC `StartTime/EndTime`、`Interval`；`Field=traf/bps/acc`，`UsageType`、`DataProtocol`、`Area` | CDN 节点计费区域用量。流量/带宽须使用 `UsageType=all`、`DataProtocol=all`；请求数须用 `Area=all` |
+| `CacheHit` / `OriginTraffic` | 同一域名、时间范围和 `Interval`；分别返回百分比、字节，不传地区筛选 | 判断缓存和回源，不能用命中率提高替代下行流量下降的证据 |
+| `Billing` | `Kind=Overview/Instance/Packages/PackageUsage`；原始账单在 `Data.Result` | 区分产品、计费项、资源包和真实抵扣 |
+
+`Interval` 支持 300、3600、86400 秒，以返回的 `DataInterval` 为实际间隔。`Usage` 对应的单次最长范围为 3、7、31 天；`CacheHit/OriginTraffic` 为 3、31、366 天。`Area` 可选择 `CN`、`OverSeas`、`AP1/AP2/AP3`、`NA`、`SA`、`EU`、`MEAA` 或 `all`，不能把客户端 IP 地区当成计费节点地区。近实时数据和账单都可能延迟。参见[计费用量接口](https://help.aliyun.com/zh/cdn/developer-reference/api-cdn-2018-05-10-describedomainusagedata)。
+
+账单查询按以下顺序执行：
+
+1. `Billing + Kind=Overview + BillingCycle=YYYY-MM` 获取产品概览，再选择返回的 `ProductCode`；同时检查 CDN 与对象存储，不能把所有文件流量支出归入 CDN。
+2. `Kind=Instance` 传同一账期、产品代码和 `Granularity=MONTHLY`；按日查询使用 `DAILY` 并传同月 `BillingDate`。每页 `MaxResults` 不超过 300，继续传返回的 `NextToken`，直至为空。分别记录原价 `PretaxGrossAmount`、优惠、应付 `PretaxAmount` 和实付 `PaymentAmount`，不要相互代替。
+3. `Kind=Packages` 按 `Page/PageSize` 查看当前有效资源包；历史抵扣用 `Kind=PackageUsage + InstanceId` 查询，时间使用中国站账单格式 `YYYY-MM-dd HH:mm:ss`，按 `NextToken` 续查。包仍有余量不代表覆盖该产品、地区、计费项或历史时段。
+
+账单使用后端已有完整凭据组调用费用中心只读接口，需要另有相应 RAM 权限；CDN 查询成功不代表有账单权限。概览、明细、资源包列表和抵扣分别需要 `bss:DescribeBillList`、`bssapi:DescribeInstanceBill`、`bss:DescribeInstances`、`bss:FrDeductLogQueryRequest`。页面不申请扩权，也不回传密钥。当前账期为暂计结果，查询失败、未出账与零费用应分开显示。参见[实例账单明细](https://help.aliyun.com/zh/user-center/developer-reference/api-bssopenapi-2017-12-14-describeinstancebill)。
+
+如果对象存储账单的 `NetworkOut` 高于 CDN 回源项，应继续查 OSS 公网直连、后端跨网下载、签名访问或资源地址配置。`NetworkOut` 是 OSS 公网流出，`CdnOut` 是 OSS 向 CDN 回源流出；CDN 黑名单无法拦住绕过 CDN 的 OSS 请求。缓存优化主要减少回源，公开资源迁移到 CDN、私有资源访问控制和大文件重复下载治理须分别验证业务路径。参见[OSS 流量计费口径](https://help.aliyun.com/zh/oss/traffic-fees)。
+
+`StorageHealth` 只读当前租户 SaaS 中的公私桶、地域 Endpoint、日志配置与存储统计，不能从请求覆盖桶、Endpoint 或密钥。多个运行环境的配置不一致时停止猜测；`ConfiguredInternal` 与 SaaS 的运行分区标签不是同一事实。只有显式 `ProbeInternal=true` 才探测同地域内网候选，失败可能来自网络、权限或网络保护策略，不能据此自动改配置。
+
+OSS 来源分析先用 `StorageLogs`，参数为 `StorageScope=Public/Private`、`Day=YYYY-MM-dd` 和续页 `Marker`，每页最多 1000 个文件，完整消费 `HasMore/NextMarker`。日志未开通与读取失败分别返回，不能伪造历史记录。`StorageLogDownload` 只接受该范围及当前页中的精确 `LogName`，单文件不超过 128 MiB，签名有效期 5 分钟；临时地址仅交给受控审计进程，不进入前端或报告。分析按对象、来源 IP、User-Agent、时段和成功响应字节聚合，区分业务重复下载、CDN 回源与公网直连，不把高频来源直接判为攻击。
+
+#### CMS 公有媒体撤稿
 
 CMS 历史公有媒体撤稿使用专门的 `RefreshCmsMedia` 与 `CmsRefreshStatus`。先查 `Capabilities` 中的 `CmsMediaRefresh/CmsRefreshTaskReadback`；管理员提交时只传原 `RendId` 和原 `CmsTaskId`。服务端从当前租户的已撤回衍生、已确认源删除的撤销任务和可信 `FileServer` 计算唯一旧 URL，不接受客户端 URL、目录、查询参数、云密钥或自定义云端入口。
 

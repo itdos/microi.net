@@ -2,12 +2,15 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=workspace-conventions-010 sha256=d4ee69df49b8cba8d6365f485bd44aab8f5fcccc4cc1c8394220af14ff68f83f -->
+<!-- microi-progressive:chunk id=workspace-conventions-010 sha256=f123b0b70030df276188dbb77617c41f74767ab27ea38d5472634cc3b6beca8b -->
 ## 版本更新日志保护规则（强制）
 
 - 日常功能开发、缺陷修复、测试、普通文档补充、Skill 完善和代码重构期间，不得修改 `microi.doc/docs/doc/about/update-log.md`。
 - 只有用户明确提出“发布版本”“准备发版”“更新版本日志”或直接点名要求修改该文件时，才允许编辑更新日志；“完善文档”或“补充官网说明”不等于授权修改版本日志。
 - 如果本轮误改了更新日志，必须先按上节完成多对话归属核验；只撤回有本对话精确写入证据的 hunk。必须保留用户、其它对话或其它任务的已提交和未提交内容，归属不明时不得修改并应询问用户。
+
+- 编写正式更新日志必须以“上一条已发布更新日志所对应的正式候选”为起点，逐仓核对到本次冻结候选之间的全部提交、合并和最终文件差异；不能只取最后一次提交、最后一次推送或仅看当前任务。历史改写导致的等价提交按内容去重，合并提交需要核对实际引入的功能。保留起止提交、逐项来源与纳入/排除原因的本地审计记录；客户私有业务、生成文件与重复提交不得凑成平台功能条目。
+- 页面版本断档（例如 v8.5.6 后直接是 v8.5.11）时，查验中间各正式版本的候选及渠道回执并补齐可证实的遗漏，不能把当前候选新增功能倒写为历史版本已发布。历史条目补充需用户的更新日志授权；本次新版本单列，并区分代码已完成、制品已发布与客户部署。日志内容不能以“六条概括”替代完整区间核对，也不能因条数少直接推断缺失。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=workspace-conventions-011 sha256=8e3904f45392b7c27746de274bbc4725a7eb0964f0aeab1d83918c0174336dc4 -->
@@ -100,13 +103,13 @@ AI 为 Microi 平台新增或修改任何业务逻辑、后台工具、数据维
 - 平台级强制安全校验不能为了“全部低代码化”放进租户可编辑脚本而被绕过；可以留在 C#，但必须是通用、失败关闭的安全边界，不得夹带某个项目的业务文案、字段组合或状态机。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=e33b8387bbe8dbc400249ca9d16f91656149492f5f7ce253cbfa67b80f4ca8ef -->
+<!-- microi-progressive:chunk id=workspace-conventions-018 sha256=9748eb80b50ef72828a14c237d42a1a1cee4815767b47900703902cfcc3a4e9b -->
 ## 应用商城优先于 Microi.Upgrade（强制）
 
 能由应用包声明、差异安装和回读验收完成的升级，不得在 `Microi.Server/Microi.Upgrade/` 新增定制 .NET 升级类。表、字段、Tab、菜单、角色权限、接口引擎、表单事件、数据源、页面、打印、工作流、任务及可幂等安装的种子数据，默认都属于应用商城资源。
 
 - 应用包中的接口引擎必须声明 `ResourcePolicies.ApiEngines`：当前包声明为 `Managed` 的资源以本次选定且已校验的包正文为最终事实，同版本重装、目标端源码/版本差异、软删除、稳定 Id 或路由占用都自动覆盖或重映射；`BaseHash/LocalHash` 只保留审计，不得再形成整包冲突。当前包声明为 `CreateIfMissing` 的租户 Hook 只在 Key 完全不存在时创建，既有记录（含禁用或软删除）保持原样。覆盖范围只限包拥有的声明式资源，禁止整表清空业务数据或覆盖 `InsertIfMissing` 租户配置值。
-- 吾码官方开发者若可调用绑定 `https://api.itdos.com`、`OsClient=iTdos` 的 `microi_itdos`，必须先在官方主租户通过 MCP 更新资源，重新制作并发布对应官方应用，发布后按字段/菜单/引擎/包版本回读；再用目标租户 MCP 安装/更新并轮询后台任务到 `Succeeded`。
+- 吾码官方开发者若可调用绑定 `https://api.microi.net`、`OsClient=iTdos` 的 `microi_itdos`，必须先在官方主租户通过 MCP 更新资源，重新制作并发布对应官方应用，发布后按字段/菜单/引擎/包版本回读；再用目标租户 MCP 安装/更新并轮询后台任务到 `Succeeded`。
 - 当前用户没有 `microi_itdos` 权限时，通过其自己的 MCP/Manifest 幂等升级自己的数据库并回读；不得为了单个租户把定制迁移塞进通用后端。确需让更多用户复用时，应生成其有权维护的社区/私有应用包。
 - 只有应用商城运行前就必须存在的物理兼容基础、跨版本核心协议迁移、存储格式变化，或安装器自身无法安全表达的不可逆平台迁移，才允许进入 `Microi.Upgrade`。每个例外必须写明“为什么应用包不能完成”、影响范围、回滚/前后兼容、分布式幂等和验收依据。
 - 自动恢复只保证启动、普通登录、菜单导航和应用商城安装／更新，SSO、AI、通知、备份、OCR、翻译等应用不能成为自动升级或启动门禁。完整官方资源放在 `Microi.Server/OfficialApplications/Resource/`，按显式清单生成 `Microi.Upgrade/Resource/` 的两项恢复资源；完整官方包的增长不得自动扩大启动闭包。更高版本且就绪的手动商城更新和既有租户 Hook 保留，失败不推进版本。

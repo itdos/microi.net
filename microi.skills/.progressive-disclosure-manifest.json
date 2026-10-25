@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T12:09:43.821Z",
+  "generatedAt": "2026-10-25T18:28:54.966Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -8,7 +8,7 @@
   },
   "skills": {
     "ai-platform-governance": {
-      "originalSha256": "f8dc8d296d47be34249341ad1726a2a0dc89bccb7102a03a15fe65c4c8515f30",
+      "originalSha256": "bc4df0ee7cc70d8c92dd9af29febf75912fa4c59d9e9e075fa3cea4835b6612d",
       "originalLines": 323,
       "prefixSha256": "b171620caf35a706def15dda8a884532f6e4850531e8d30a36e67baad09b84fa",
       "prefixBytes": 817,
@@ -138,7 +138,7 @@
           "id": "ai-platform-governance-015",
           "ordinal": 15,
           "destination": "ai-platform-governance/references/progressive-01-功能开关.md",
-          "sha256": "6fafd84efd63a1607c4c98c4a173d755b2ba22fb7a251a21ed4d4699556656a7",
+          "sha256": "a5f52c0d6b583b07586cbbc1dbb3657aba4670389a9d878313fd6653ea19f2e8",
           "lines": 13,
           "heading": "应用商城发布"
         },
@@ -169,17 +169,17 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "7b65364363bbc4f99b85c3ff2aafeec2767313c399337a4bdd4569835b6c924e",
-      "originalLines": 717,
-      "prefixSha256": "19308dd1a04397f764cc5ab4fefe76093704564592396ce00482d28e952537b7",
-      "prefixBytes": 1400,
-      "entryLines": 259,
+      "originalSha256": "123473e9b345c971f21277aa55d01bbcacd8c9e11152d29c0c22263473637ea8",
+      "originalLines": 725,
+      "prefixSha256": "9c59063f7561713a30d5433fcaba7d9976b790758634f2a95bf827f251d7da4a",
+      "prefixBytes": 1415,
+      "entryLines": 267,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
           "ordinal": 0,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "ea9cdd10772c42cc8202aa50ed3f8bec0a41588b16539b2968f256c7ee05cd3a",
+          "sha256": "9b949c68b0867fc1ecf2e6cb1fd1bec45d22c01ad3be63485e0376d0183d1795",
           "lines": 12,
           "heading": "单行文本插槽按钮约定"
         },
@@ -187,7 +187,7 @@
           "id": "microi-client-frontend-001",
           "ordinal": 1,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "60265fdc9842dcc4f032f80e1a93b88dd5f47f1261d0fa7334c2a7eac8d31c4c",
+          "sha256": "fcc37635c7ac9b9e7054a5e9d76b71d5a53977170d25ae3049af95481eca4061",
           "lines": 32,
           "heading": "1. 技术栈和源码入口"
         },
@@ -195,15 +195,15 @@
           "id": "microi-client-frontend-002",
           "ordinal": 2,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "0d8e3d76a5c8198d562b0af842e109e8d9eeb27ab5ddc43a6fa367d5b08bdd14",
-          "lines": 121,
+          "sha256": "80fada0b0e3e878147bbdcb2017879611a5149324f5bc60cccfa42eb75f2135c",
+          "lines": 127,
           "heading": "2. 表单引擎三层结构"
         },
         {
           "id": "microi-client-frontend-003",
           "ordinal": 4,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "301f766dc1ab1c6b021aa861a76b44844905d432393ab407472f58f00d6283cd",
+          "sha256": "a3e2b822a3c2aacea83d3cae796132786e3be45f3a18ceb621c477b6bd1a2442",
           "lines": 21,
           "heading": "4. 工作流与表单提交"
         },
@@ -211,8 +211,8 @@
           "id": "microi-client-frontend-004",
           "ordinal": 7,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "ab17865c6032884ccd896a0eb62387cf7f89edcf337c024f2251563f3bd0e4d9",
-          "lines": 43,
+          "sha256": "7dc3b1091176a98d652f042c30bc789f5ae6e5b9466ed75951d20ffa3e297a6a",
+          "lines": 45,
           "heading": "7. 验证建议"
         },
         {
@@ -534,8 +534,8 @@
       ]
     },
     "microi-mobile-app-quality": {
-      "originalSha256": "64b7711929b8a7610fe0b528302e576a31839297ac7b3b798b62f5788d04c33a",
-      "originalLines": 562,
+      "originalSha256": "1ff50c437e189d1d4aa40e53e716c0356f13cd24c054d4ea7ce2e0227f8c3452",
+      "originalLines": 563,
       "prefixSha256": "a176be940d146b3651c3940757c256cb845941e102102b7adcd35c1f737f8c12",
       "prefixBytes": 1562,
       "entryLines": 204,
@@ -720,8 +720,8 @@
           "id": "microi-mobile-app-quality-022",
           "ordinal": 22,
           "destination": "microi-mobile-app-quality/references/mobile-first-delivery.md",
-          "sha256": "748fc4a802457bab760ae24281c3bb27cb70841fe72b61b86f088439236867aa",
-          "lines": 68,
+          "sha256": "33bf185e007fab2c8316f090b1f608143deca2e3ff4b010e7577c7f88d751008",
+          "lines": 69,
           "heading": "开发前固定事实源和首版范围"
         }
       ],
@@ -763,17 +763,17 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "369b12a2a06618d318f3c423aa72873547638d90a0eddad910bec8461c8eb8d1",
-      "originalLines": 703,
-      "prefixSha256": "dfe714bb240dbfe10bad0c0922a3da8958cba9efc2a9a823b85a30605e2e1acc",
-      "prefixBytes": 5348,
-      "entryLines": 108,
+      "originalSha256": "ed452a8b65fdba633372d154acf62454d97cc9dfe718153af25d2fe8d80f589d",
+      "originalLines": 716,
+      "prefixSha256": "b6b97e8df68678ea61b8d67ad14057c0deb0c09a3834e8b77994d20aaeb92e7e",
+      "prefixBytes": 6666,
+      "entryLines": 117,
       "chunks": [
         {
           "id": "microi-system-delivery-000",
           "ordinal": 0,
           "destination": "microi-system-delivery/SKILL.md",
-          "sha256": "720e0f2db0997318d879af67cd708b7d25a33c321e47100c4800ee39a25b4c9e",
+          "sha256": "83a624f454346eac4a63fe64e0e6902b5fd1d0d74c8de578208e06ea11e180cf",
           "lines": 13,
           "heading": "交付总原则"
         },
@@ -781,15 +781,15 @@
           "id": "microi-system-delivery-001",
           "ordinal": 1,
           "destination": "microi-system-delivery/SKILL.md",
-          "sha256": "174d99145946baf94a5eee934fc1453921fa7eed544b853f86be515582dc1343",
-          "lines": 15,
+          "sha256": "167c117fc2a52cea49cd1bf2128b450fb3c8af07e8af1e955d1482a454d472ef",
+          "lines": 19,
           "heading": "用户问题编号跟踪（强制）"
         },
         {
           "id": "microi-system-delivery-002",
           "ordinal": 3,
           "destination": "microi-system-delivery/references/progressive-03-安全与跨端验收.md",
-          "sha256": "adeb9e4ec4beadf3b7ba33325e860b378b81f6d7e95b25879b64ca4ee1c91987",
+          "sha256": "1cf73c1365e3f8245b2069f5f2e24bcbfdc7f6e67c0f13524998b16f7bbf029b",
           "lines": 52,
           "heading": "平台安全与存量兼容验收（强制）"
         },
@@ -805,7 +805,7 @@
           "id": "microi-system-delivery-004",
           "ordinal": 6,
           "destination": "microi-system-delivery/SKILL.md",
-          "sha256": "9a259382b07851aaa60a795da3ffa4773e9cf3b9f9d791a52f95e34e1944cc69",
+          "sha256": "cc8ef54619f2f7a1dc3ba4268d02cbe678c855ba17e2d9e9ed3251ac0dc35e18",
           "lines": 16,
           "heading": "交付完成定义"
         },
@@ -821,8 +821,8 @@
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "3c429fa01c7c8b077ccb8bceca59ad0274f7b83e7989e2f21a861dd0e54f11aa",
-          "lines": 149,
+          "sha256": "4980374a6dd1a9af6c5061bc04f350a06e2f0774b0af2f1a85415d3cf28191f2",
+          "lines": 153,
           "heading": "自动化测试必须覆盖的坑"
         },
         {
@@ -980,11 +980,11 @@
       ]
     },
     "microi-uniapp-frontend": {
-      "originalSha256": "f3836deef4b4652d5f1df9907a10a573d1c99359ebb712ca86f9e7020f634836",
-      "originalLines": 558,
+      "originalSha256": "6f79c3b5923b5d849dcb45bd774bcb20e618ea1416801ec9bba6d1901a31a03a",
+      "originalLines": 561,
       "prefixSha256": "55f2799d872b4b9682449adf2e554003eb8642c111af262cacf42265b99dd5f5",
       "prefixBytes": 3040,
-      "entryLines": 213,
+      "entryLines": 216,
       "chunks": [
         {
           "id": "microi-uniapp-frontend-000",
@@ -998,8 +998,8 @@
           "id": "microi-uniapp-frontend-001",
           "ordinal": 1,
           "destination": "microi-uniapp-frontend/SKILL.md",
-          "sha256": "acfd8dd91195e7930896bd54e6ae7ce3d3982bdeb0d674d98337878eab1a5e82",
-          "lines": 31,
+          "sha256": "ad6d719fd27c252c1916c54d65185ecf90846e5f780a81b671a6e0540fbea4a6",
+          "lines": 34,
           "heading": "标准产品、视图协议与租户扩展"
         },
         {
@@ -1234,25 +1234,25 @@
       ]
     },
     "page-engine": {
-      "originalSha256": "fce0a98e8b3b81ccf98cb20d5c93f0b53cfdab7da5050c7c2e94444d65e9aa48",
-      "originalLines": 476,
-      "prefixSha256": "6ae3962d142c190a5ba8a958d749759b6a4fd8266e6f965d4b6f726d7a6350f7",
-      "prefixBytes": 6255,
-      "entryLines": 228,
+      "originalSha256": "fb726d8c2e872790e4738b0212c9c61c549368660e2636a72960cfc41b3be883",
+      "originalLines": 480,
+      "prefixSha256": "14eaec95167be639a71f5d013f528bd3dd9a92a38e2ac1c47d9dc74ca1562671",
+      "prefixBytes": 6309,
+      "entryLines": 232,
       "chunks": [
         {
           "id": "page-engine-000",
           "ordinal": 0,
           "destination": "page-engine/SKILL.md",
-          "sha256": "5b79a31a8484bf0a618c2810e66c0ab542fd86ceeb76e7a5cd07a86284c4f6ac",
-          "lines": 8,
+          "sha256": "44233416e71cc6ff3712347308dadd26e55b14938b81b8a2401478c6bc14921b",
+          "lines": 12,
           "heading": "设计器源码事件"
         },
         {
           "id": "page-engine-001",
           "ordinal": 1,
           "destination": "page-engine/SKILL.md",
-          "sha256": "53cf1992d4adcf8126f4d0a04d373d685d539b38c5d74840ba07905e9cbe4589",
+          "sha256": "57717991f9c7de557b524ec36fc9bdd716080b71b682439f1b6662b0b9b2f45c",
           "lines": 18,
           "heading": "核心数据结构"
         },
@@ -1260,7 +1260,7 @@
           "id": "page-engine-002",
           "ordinal": 2,
           "destination": "page-engine/SKILL.md",
-          "sha256": "227ecf87086231eee28a9d91fde6a178a437e9196dd8f2ef1d14d53e5c5858df",
+          "sha256": "6a1a85b40bcb5f8be694b0aad73a805083acd0d6fcd9cba36278dc9b51d24dcb",
           "lines": 17,
           "heading": "formConfig 页面全局配置"
         },
@@ -1268,7 +1268,7 @@
           "id": "page-engine-003",
           "ordinal": 3,
           "destination": "page-engine/SKILL.md",
-          "sha256": "7bb7cb860f9330002f60748e93de3c639b157cddfd77b63ac8b19f0535306e65",
+          "sha256": "8afb75b0e4d85ab9f56a7ba018e1cc50f758d3e604683d8c38d5f0a45d53f135",
           "lines": 54,
           "heading": "容器类型"
         },
@@ -1276,7 +1276,7 @@
           "id": "page-engine-004",
           "ordinal": 4,
           "destination": "page-engine/SKILL.md",
-          "sha256": "66261254d94455648441bf3519a5c810ede60c64f341dce035f931e284f762ba",
+          "sha256": "9c7c85bb0d25267d07e45d9abeb5691c2f0ffd9da233351cf2f448a9b848cea5",
           "lines": 20,
           "heading": "组件通用结构"
         },
@@ -1284,7 +1284,7 @@
           "id": "page-engine-005",
           "ordinal": 5,
           "destination": "page-engine/SKILL.md",
-          "sha256": "e9667b97462c9089a72d2a407cfde00e873afe7d64593bf33ad49a523255b38d",
+          "sha256": "c1e31dede775f14761182fc197cf428d494806c4503a622ffdad3d16d091d3e0",
           "lines": 14,
           "heading": "widgetParams 参数类型"
         },
@@ -1292,7 +1292,7 @@
           "id": "page-engine-006",
           "ordinal": 6,
           "destination": "page-engine/SKILL.md",
-          "sha256": "7347b2b4290db41ae8c3ef128acc9854a5e17290268b8e274e771de47b8f752a",
+          "sha256": "2c021e43f4f0d730da1f5a5cf6a2d314589435e2bb9ff573148c787538a8cc86",
           "lines": 12,
           "heading": "数据来源（widgetParams[0]）"
         },
@@ -1300,7 +1300,7 @@
           "id": "page-engine-007",
           "ordinal": 8,
           "destination": "page-engine/SKILL.md",
-          "sha256": "5f2ed06aa1e0abbc5f968f026602d92f22f01836d76fdf502fd91ca0f945509b",
+          "sha256": "4170c6e274fc773427057d8606c4800a5bbd5fabd62d63e931aaa388262a51e9",
           "lines": 14,
           "heading": "运行态布局与滚动规范"
         },
@@ -1382,17 +1382,17 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "002f2c3fe59ba4baaf346bd465becd833e8a9bf0c7a44e96a9e1f8eedc514703",
-      "originalLines": 811,
-      "prefixSha256": "40bc53bc27a17c18353ddc22aa123220c53fab7b4f6632924ded2b4239b6f414",
-      "prefixBytes": 3110,
-      "entryLines": 203,
+      "originalSha256": "3f38f36f2d0a0f1287276948a9fdc7419c871dc4ab30902c162d2f29828bb22c",
+      "originalLines": 819,
+      "prefixSha256": "7193a78f9c53122f8df47bf1058ea9147741558c9a132eefa51583ecf1f21807",
+      "prefixBytes": 4679,
+      "entryLines": 211,
       "chunks": [
         {
           "id": "playwright-e2e-000",
           "ordinal": 0,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "f04614f276c139cfa50b9e46e89857675c6dc5e7cf0cfbfde76d6e6dbe9746c9",
+          "sha256": "a6ef528a2a940fd0f58efaee6b73eb5dbc159db93d95afedf41c7b8642536d18",
           "lines": 9,
           "heading": "是否需要 `-e2e` 后缀"
         },
@@ -1400,7 +1400,7 @@
           "id": "playwright-e2e-001",
           "ordinal": 1,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "703786ae7a5a52cb39664f1c82de7fb7aa7dfece511046d3757da64918c23063",
+          "sha256": "b3970a9a4603447651520667c05ab4ecfae01b65b3f752e9f318007c5e2699c1",
           "lines": 11,
           "heading": "适用范围"
         },
@@ -1408,7 +1408,7 @@
           "id": "playwright-e2e-002",
           "ordinal": 2,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "acef3e589cf11f3c197ee0b0ccf56d96b3f286263d54161b3c260e07c2090ed0",
+          "sha256": "5874137c92e16fd5cc729fd9c23d051caa3e64438fc7bee1d717ae9c5a0f2a90",
           "lines": 20,
           "heading": "临时文件与产物放置规则（必须遵守）"
         },
@@ -1416,7 +1416,7 @@
           "id": "playwright-e2e-003",
           "ordinal": 3,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "69b8842a221a0de60f8605c5059deee391be0f16f0b6cbc5ddfb3cfd210268db",
+          "sha256": "247ddb9017c174f0daa88d1f6e4220c5530b79c5ac976e61e128ed8bd0aa1fea",
           "lines": 20,
           "heading": "标准目录"
         },
@@ -1424,7 +1424,7 @@
           "id": "playwright-e2e-004",
           "ordinal": 4,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "4f5e11baf4651c11b5f9819a0b4f33ce2590db1733d4db72814bd1a25daf56ff",
+          "sha256": "f71fe44f7d5753b93804dac958ea8205cddcaee25188a8417b33770e305c46ed",
           "lines": 21,
           "heading": "必备环境变量"
         },
@@ -1432,7 +1432,7 @@
           "id": "playwright-e2e-005",
           "ordinal": 5,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "51567cea5fca434f9b031fef0871454100cf4715dfb65695dc1722bd275399be",
+          "sha256": "a66696c3263f060d0b7be309a527fca6a9bad95dd534eabbe84f1b6539770d8e",
           "lines": 24,
           "heading": "本地测试账号自动发现"
         },
@@ -1440,7 +1440,7 @@
           "id": "playwright-e2e-006",
           "ordinal": 6,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "88e1002cae934acd2de5af2f77f371a9ea152a525eecf11b49fe182b16a56044",
+          "sha256": "6aeefebda3a9e598564c53c2f8028a4ccefe2291c4c7c7ae4781ca15fb5d0697",
           "lines": 12,
           "heading": "后端改动后的 E2E 前置动作"
         },
@@ -1448,8 +1448,8 @@
           "id": "playwright-e2e-007",
           "ordinal": 8,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "5efaf4a0ce03afc3cfc7863e0b7adadbcfcbb031bc64a1c543d611b9a489bccf",
-          "lines": 42,
+          "sha256": "f866625ae131442e50ccee9faacc98672daa138154dd4a0e5deb054271b688b2",
+          "lines": 44,
           "heading": "服务自启动纪律（必做）"
         },
         {
@@ -2259,11 +2259,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "d58c8f3925ec00a977e2aac248083e1cadacc8ec397a8aacb9b37290b177f628",
-      "originalLines": 683,
-      "prefixSha256": "a99216c137f7c72e553628428c80bf20cd53fa48752cbbc5b5c84c8e570d2d58",
-      "prefixBytes": 18006,
-      "entryLines": 262,
+      "originalSha256": "b85e129836a43fe001c56b154644f82d3477dc16f51d6344dd86c6f76e2d0a2d",
+      "originalLines": 691,
+      "prefixSha256": "5b42e3b11954bc1de401574a135c2fee80ef12201bdbaa0271377fb06843baf4",
+      "prefixBytes": 19947,
+      "entryLines": 270,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -2317,7 +2317,7 @@
           "id": "v8-file-upload-006",
           "ordinal": 4,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "2dcf2dd7a571cc4757e9015cf213191be2dc3f041d91b0de51ed8ee00b0b86e7",
+          "sha256": "405f2dc31677040e3b81ae5f2e84820680b13d4384477ec7c4bf9186e3b3abef",
           "lines": 50,
           "heading": "接口直接响应文件（下载/导出）"
         },
@@ -2831,11 +2831,11 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "1ac817c6dba82a11f10a592e7ab8a07bf17bad335c5d3022320e8dba9c9ef75c",
-      "originalLines": 550,
-      "prefixSha256": "5cee41a4d3765eb7052d2d7c2acc48195a4e0596e218e88cfe18f239d2b58152",
-      "prefixBytes": 6158,
-      "entryLines": 234,
+      "originalSha256": "5cb7ae6c184c89b2eb4a6a2309a0f0c6d24e03d3b737d342071b71b614e5b2a9",
+      "originalLines": 566,
+      "prefixSha256": "52262abdb901d909adf460efdd98fbfb715b53536c081816ff0d37f7cfe2d81e",
+      "prefixBytes": 6943,
+      "entryLines": 236,
       "chunks": [
         {
           "id": "v8-security-000",
@@ -2881,8 +2881,8 @@
           "id": "v8-security-005",
           "ordinal": 3,
           "destination": "v8-security/references/progressive-01-2-权限校验.md",
-          "sha256": "09f88aaf8da914fdbec8bc8668cef588a02217354a210515230471fbfdddd27f",
-          "lines": 101,
+          "sha256": "e0f600f6c4d6b654e358f6da229ad60d6814f198f1566c8009948072b1e6e9c2",
+          "lines": 115,
           "heading": "2. 权限校验"
         },
         {
@@ -3241,17 +3241,17 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "c3de42946ede5b631f1f55c774732598d72696e003b0903a5aca6c739c6bd858",
-      "originalLines": 671,
-      "prefixSha256": "1eb3e3e8c90844f9119091af2cf4562b33ed7e15d676bd2d1193c688c261720f",
-      "prefixBytes": 7897,
-      "entryLines": 143,
+      "originalSha256": "c35bf0ca6dec2adf710fdc82621825d9e920cedb78a6cd33359186b13a98ad33",
+      "originalLines": 730,
+      "prefixSha256": "f42cd32cfd8ff7bbe7ac8892aeba19f0806657f9fe9e6f45ecc95831071e6a60",
+      "prefixBytes": 19369,
+      "entryLines": 191,
       "chunks": [
         {
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "0b8322a967e67a45f195860314357a7b974555b6f3d0b642fe910dc769bd7e23",
+          "sha256": "200a4f0de556b3002f1ee858dfc501c52ffa9cb526753c8a863f0f386499b127",
           "lines": 60,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
@@ -3275,8 +3275,8 @@
           "id": "workspace-conventions-003",
           "ordinal": 3,
           "destination": "workspace-conventions/references/progressive-04-工作区与平台专项保障.md",
-          "sha256": "478664d863219c724b8d19d25e7ac17420add6229c9efab5b75823d815aede53",
-          "lines": 19,
+          "sha256": "e2b353a4b8b4c11b4c22d7fa6d60056002f9efc94605f1732079c7940b13a464",
+          "lines": 21,
           "heading": "本地资源与 OOM 保护规范（强制）"
         },
         {
@@ -3323,16 +3323,16 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/references/progressive-04-工作区与平台专项保障.md",
-          "sha256": "7188e45f195a34fc0cf706d3aadea1b9b23215d8cf2e891a0e4d7292ba854661",
-          "lines": 38,
+          "sha256": "9056add84ccdd3ee8d75883aa9b19bd271bc4fc179de1b4c142b8c5f3531e6e2",
+          "lines": 44,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },
         {
           "id": "workspace-conventions-010",
           "ordinal": 10,
           "destination": "workspace-conventions/references/progressive-01-版本更新日志保护规则-强制.md",
-          "sha256": "d4ee69df49b8cba8d6365f485bd44aab8f5fcccc4cc1c8394220af14ff68f83f",
-          "lines": 7,
+          "sha256": "f123b0b70030df276188dbb77617c41f74767ab27ea38d5472634cc3b6beca8b",
+          "lines": 10,
           "heading": "版本更新日志保护规则（强制）"
         },
         {
@@ -3395,7 +3395,7 @@
           "id": "workspace-conventions-018",
           "ordinal": 18,
           "destination": "workspace-conventions/references/progressive-01-版本更新日志保护规则-强制.md",
-          "sha256": "e33b8387bbe8dbc400249ca9d16f91656149492f5f7ce253cbfa67b80f4ca8ef",
+          "sha256": "9748eb80b50ef72828a14c237d42a1a1cee4815767b47900703902cfcc3a4e9b",
           "lines": 13,
           "heading": "应用商城优先于 Microi.Upgrade（强制）"
         },
@@ -3451,7 +3451,7 @@
           "id": "workspace-conventions-025",
           "ordinal": 25,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "4cf40c4ca771f7e04b80279646323a816378b98669f562ff8f4c647d5bf837ca",
+          "sha256": "8a7a3437fbd43fa31d038d8f8c583e6145d4b68dce42faa290f142b5ff390a0b",
           "lines": 32,
           "heading": "多 AI 对话共享本地服务与发布互斥（强制）"
         },
@@ -3555,7 +3555,7 @@
           "id": "workspace-conventions-038",
           "ordinal": 38,
           "destination": "workspace-conventions/references/progressive-03-cli-与-ide-插件错版共存约定.md",
-          "sha256": "5dbfb261596e9c61fcc330adca7a1ff40a3a1508cd89be3c7b10410e591aa557",
+          "sha256": "1b65652abc8ca096a22d79a62b32c74557e5fc3daa7d81f3c192c4b9e37e4665",
           "lines": 30,
           "heading": "CLI 与 IDE 插件错版共存约定"
         },
@@ -3563,8 +3563,8 @@
           "id": "workspace-conventions-039",
           "ordinal": 39,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "8cfc7d1e2a6a0a766845c79775efe8c7fb15ef805a47e8bc1965128e348f3062",
-          "lines": 12,
+          "sha256": "4a24e3f7bd0244debb6efa82ea164265ab5841ccf97372af67ca16e0211bfe9c",
+          "lines": 18,
           "heading": "本地测试程序与依赖生命周期（强制）"
         }
       ],

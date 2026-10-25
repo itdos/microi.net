@@ -2,16 +2,24 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=3c429fa01c7c8b077ccb8bceca59ad0274f7b83e7989e2f21a861dd0e54f11aa -->
+## 自动清理入口回归增补
+
+临时文件回归必须调用真实 Full `finally` 与发布 `EXIT` 收尾，分别验证成功、原始失败、可捕获中断及清理失败；不能仅断言源码有 `finally`。覆盖祖先/子项链接、Git 标记、已有目录、空格及方括号路径、受保护属性与独占文件锁，断言保护项字节不变、普通删除不传 `-Force`、失败不自动强制重试、回执可定位残留。测试异常与清理异常同时发生时保留原始异常，发布锁仍释放；平台进程被硬杀不能假称已完成收尾。用例位于 `Microi.Tests/ReleaseGate/test-artifact-cleanup.test.mjs` 与 `release-scratch.test.mjs`，不为这些文件生命周期回归启动数据库或 Docker 容器。
+
+<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=4980374a6dd1a9af6c5061bc04f350a06e2f0774b0af2f1a85415d3cf28191f2 -->
 ## 自动化测试必须覆盖的坑
 
 ### 后端统一测试与发布门禁
+
+完整发布的步骤与耗时目标以 [部署 Skill 的固定流程](../../microi-deployment/SKILL.md#普通吾码发布固定流程30-分钟) 为准。默认版本 +1、NuGet、API/PC Docker 和官网全部发布；`PlatformRelease + PlatformFrontendTests` 执行常规 Microi.Tests（平台单元/组件，不自动追加 Full 专项）、吾码前端全部通用 Node/Playwright 测试、真实接口检查与最终加密产物启动/运行冒烟。真实付费 AI、鸿地/JUNCHI、XJY 等指定客户数据专项和 SQL Server 等独立提供商专项默认不纳入，不再逐次询问；只有用户另行明确要求专项时才执行，回执逐项列为“不适用/未执行”，不能冒充通过。独立 Code/Agent 测试不属于此范围。1800 秒是共享耗时目标，超出时记录并继续，不仅因耗时超标终止。默认读取 `.microi-local` 复用现有项目依赖，不创建本地 Docker 测试环境、不安装聊天应用或新建租户；需要已授权测试夹具但缺失时准确列出并阻断完整成功，不能静默跳过。
+
+发布入口回归须验证：遗留桌面 Node 配置不影响 `PlatformRelease`；新租户准入、聊天应用安装及 Code/Agent 测试入口均不触发；平台测试失败/零用例/跳过仍阻止发布；新推送也必须核对远端 digest，回读失败或不一致不能写成功；超过 30 分钟后仍执行当前及后续发布命令、正常成功仍返回成功并记录超标，真实失败或取消仍非零。使用隔离命令夹具覆盖这些行为，不为验证发布流程启动租户或安装应用。
 
 - 官方或社区独立业务应用、游戏和客户项目在应用自己的 `tests/` 或独立测试工程维护回归，由应用自己的测试及发布入口执行；不得通过直接放文件、转调包装或自动扫描加入平台 Quick/Full。官方商城发布不使业务应用变为平台内置能力。平台 SDK、商城协议、安装器及通用缺陷的最小回归仍由平台负责。
 
 - 每个平台新功能或 Bug 修复必须提供对应回归用例；平台 C# 进入 `Microi.Tests`，平台前端与内置资源/V8 测试进入平台 Node 自动发现范围。修复先保留失败证据，再跑成功、边界、异常、权限及旧格式兼容用例；不能仅添加字符串存在断言替代行为测试。
 - `run-node-regressions.mjs` 自动发现 `Microi.Tests`、`OfficialApplications/Resource`、`Microi.Client/tests` 的确定性测试。新文件无法分类即失败；Playwright 用例必须走真实浏览器入口，不能用 Node 执行后把跳过当通过。所有计数需回读，0 用例、失败、取消、skipped、todo 均拒绝发布。
-- 仅推送模式也必须取得发布锁并执行 Full。源码候选哈希、构建上下文哈希与 `release-artifact.mjs` 回执必须一致，且每个 Docker push 前再验证；无回执的历史产物不允许上传。文档专用模式不运行无关后端业务测试。
+- 普通吾码发布（含仅推送模式）必须取得所选产品发布锁并执行 PlatformRelease：平台自动化、编译、加密产物冒烟、Docker 推送及远端摘要回读，以 30 分钟为可度量预算，超时如实记未达标。普通发布不运行 Microi Code/Agent 测试，不新建租户或安装聊天应用；Full 保留为显式独立深度测试。源码候选哈希、构建上下文哈希与 `release-artifact.mjs` 回执必须一致，且每个 Docker push 前再验证；无回执的历史产物不允许上传。文档专用模式不运行无关后端业务测试。
 - 测试评审按身份/权限、多租户隔离、CRUD/事务、V8 同步异步与 `return/V8.Result`、存储安全、缓存/任务幂等、升级回滚、应用包幂等、浏览器登录/目标路由、发布脚本失败关闭分类盘点。新增能力补所在分类，不承诺一轮测试覆盖所有未知业务。
 
 - 吾码后端统一测试入口是 `Microi.Server/Microi.Tests/Microi.Tests.csproj`，
@@ -19,12 +27,12 @@
 - 日常源码验证运行
   `Microi.Server/Microi.Tests/run-tests.ps1 -Mode Quick`。Quick 只做
   单元/组件回归，不连接远端、不写数据库，不能称为“全量生产验收”。
-- 发布 API 前运行 `-Mode Full`。默认提供隔离测试租户、专用测试表、
+- 普通 API 发布运行 `-Mode PlatformRelease`。只有明确选择 Full 深度测试时才运行 `-Mode Full`，并提供隔离测试租户、专用测试表、
   测试 ApiEngine、测试 Token，并显式设置
   `MICROI_TEST_ALLOW_WRITES=YES`。只有用户明确授权时才可对真实租户执行；
   真实租户默认只做登录和只读烟测，写入必须限定到名称/说明明确为自动化
   测试用途的专用表，并使用唯一前缀、`finally` 清理和清理回读。
-- Full 的本地程序与依赖按 `../../workspace-conventions/SKILL.md` 的“本地测试程序与依赖生命周期”执行：优先复用健康的本地源码程序、隔离目录中的编译产物和同组既有依赖，以租户、数据库或命名空间隔离测试，不按任务重复创建 Docker/Compose。每次测试成功、失败、取消或因资源不足暂停时，都结束本次自有测试进程并收回新建临时容器，独立回读进程、端口和容器状态；既有共享服务保持原状。这些生命周期要求不减少当前选定 Full 矩阵的用例、断言或发布门禁。
+- Full 的本地程序与依赖按 `../../workspace-conventions/SKILL.md` 的“本地测试程序与依赖生命周期”执行：默认复用当前 MCP 对应的 MySQL、Redis、MongoDB、MinIO/OSS 和健康本地源码程序或隔离编译产物，以租户、数据库或命名空间隔离；不按任务创建整套 Docker/Compose，不例行询问临时容器许可。本机没有容器或旧夹具已清理时，仍先核实 MCP 的实际依赖。确实不能复用才记录证据并采用最小替代方案。每轮成功、失败、取消或资源不足退出时，结束自有进程，精确删除本次临时容器及纯测试资源，并回读进程、端口、容器和测试命名空间；既有共享服务保持原状。这些要求不减少所选模式的用例、断言或发布门禁；普通 PlatformRelease 不触发新租户准入和聊天应用安装。
 - Full 至少覆盖完整 Release 构建、FormEngine 单条/批量/按条件 CRUD、
   查询和计数、ApiEngine GET/JSON POST、API 实际启动与健康检查、真实登录、
   匿名系统配置脱敏、清理回读、NuGet 漏洞/弃用审计。NuGet 全面升级后不能
@@ -43,7 +51,7 @@
 
 ### 按指定 MCP 选择发布测试矩阵
 
-测试范围以 `workspace-conventions/SKILL.md` 的“平台回归与独立应用测试归属”为准。常规发布先核实用户指定的 Profile、ApiBase、OsClient 和实际依赖，再冻结本次必测清单；不能从本机恰好存在的连接或历史 Full 清单推导额外兼容矩阵。
+测试范围以 `workspace-conventions/SKILL.md` 的“平台回归与独立应用测试归属”为准。本次修复或显式 Full 需要真实依赖时，先核实用户指定的 Profile、ApiBase、OsClient 和实际依赖，再冻结专项必测清单；普通 PlatformRelease 不默认扩展为这些深度集成测试；不能从本机恰好存在的连接或历史 Full 清单推导额外兼容矩阵。
 
 | 依赖 | 常规发布范围 | 验收依据 |
 |---|---|---|

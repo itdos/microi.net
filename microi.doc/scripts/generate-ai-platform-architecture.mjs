@@ -23,7 +23,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const workspaceRoot = path.resolve(repoRoot, '..')
 // 新图只在忽略目录生成；官方 MCP 上传并回读后才推进 CDN 清单与公开文本元数据。
-const outputDir = path.join(workspaceRoot, '.tmp', 'microi-docs-images-generated', 'architecture')
+const outputDirectoryOption = process.argv.find(argument => argument.startsWith('--output-dir='))
+const outputDir = outputDirectoryOption
+  ? path.resolve(workspaceRoot, outputDirectoryOption.slice('--output-dir='.length))
+  : path.join(workspaceRoot, '.tmp', 'microi-docs-images-generated', 'architecture')
+const outputRelativePath = path.relative(workspaceRoot, outputDir)
+if (path.isAbsolute(outputRelativePath) || outputRelativePath.split(path.sep)[0] !== '.tmp') {
+  throw new Error('架构图输出目录必须位于工作区 .tmp 内')
+}
+let outputAncestor = workspaceRoot
+for (const segment of outputRelativePath.split(path.sep)) {
+  outputAncestor = path.join(outputAncestor, segment)
+  if (fs.existsSync(outputAncestor) && fs.lstatSync(outputAncestor).isSymbolicLink()) {
+    throw new Error('架构图输出目录禁止符号链接')
+  }
+}
+const synchronizeMarkdown = !process.argv.includes('--assets-only')
 const svgPath = path.join(outputDir, 'microi-ai-platform-architecture.svg')
 const pngPath = path.join(outputDir, 'microi-ai-platform-architecture-1920x1080.png')
 const png4kPath = path.join(outputDir, 'microi-ai-platform-architecture-3840x2160.png')
@@ -323,7 +338,7 @@ fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
 
 const generatedMarkdown = buildArchitectureMarkdown(sourceHash)
 const generatedBlockPattern = /<!-- MICROI_ARCHITECTURE_CAPABILITIES:START -->[\s\S]*?<!-- MICROI_ARCHITECTURE_CAPABILITIES:END -->/
-for (const markdownPath of [readmePath, indexPath]) {
+for (const markdownPath of synchronizeMarkdown ? [readmePath, indexPath] : []) {
   const current = fs.readFileSync(markdownPath, 'utf8')
   if (!generatedBlockPattern.test(current)) throw new Error(`${markdownPath} 缺少架构能力生成标记。`)
   const next = current.replace(generatedBlockPattern, generatedMarkdown)

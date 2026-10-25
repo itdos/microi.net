@@ -17,7 +17,7 @@
 
 ## 官方应用发布
 
-1. 使用官方 `microi_itdos`，核对绑定 `https://api.itdos.com` 与 `OsClient=iTdos`。
+1. 使用官方 `microi_itdos`，核对绑定 `https://api.microi.net` 与 `OsClient=iTdos`。
 2. 在发布源更新真实 `diy_sso`、字段、表单 Tabs 和菜单视图并回读。
 3. 导出精确菜单/表和 35 个接口引擎，不带连接数据、用户绑定、Secret、证书或示例账号；接口源码必须与 `Microi-V8-Engine/.../SSO身份联邦` 逐字同源。
 4. AppId 固定 `app.microi.sso`，PublisherType 为官方应用；34 个核心 Key 为 `Managed/Platform`，`sso_event_hook` 为 `CreateIfMissing/Tenant`。

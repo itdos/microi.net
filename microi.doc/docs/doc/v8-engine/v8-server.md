@@ -76,6 +76,8 @@ ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
 
 接口缓存会同时按记录 Id、`ApiEngineKey`、主路由和全部多路由命中同一份代码。路由按完整路径、不区分大小写精确匹配；Query 不属于路由。主路由与多路由不得重复或与其它启用接口冲突，保存和启动缓存遇到冲突会失败关闭。新代码仍应使用稳定 Key 地址，多路由只用于旧客户端和已登记第三方回调兼容。
 
+同地址存在 Controller 时，当前租户的接口引擎优先；只有权威查询确认引擎缺失，才执行原 Controller，两者均不存在返回 404。引擎停用、禁止 HTTP、鉴权失败或执行异常不触发降级，路由存储故障返回 503。包括 `/api/License/GetManagementState` 在内的地址不再按 Controller 前缀跳过动态解析。此优先级需要更新后端二进制，不能仅修改应用包就视为宿主路由已更新。
+
 若旧租户仅更新后端程序，应用自动升级尚未完成，后端保留 `LegacyMobileCompatibilityController` 作为临时启动兼容入口。`/api/SysUser/Login`、续签、Token 登录、退出、公开系统设置、语言包、登录壁纸、域名租户解析、当前用户及菜单读取，在主库确认对应地址与固定接口 Key 均缺失时复用现有可信后端能力，仍执行密码、验证码、DiyToken 和菜单权限校验。管理员登录后可进入应用商城安装或更新平台应用；资源齐备后立即优先使用接口引擎。已禁用、禁止 HTTP、权限拒绝、数据库异常及接口执行失败不会触发兜底。
 
 历史 `/api/SysUser/*` 地址固定绑定对应会话动作，不能用请求体 `Action` 改成其它操作，并支持 `--OsClient--{OsClient}--` 租户后缀。路径与 Query 同时指定租户时必须一致。兼容 Controller 随后端程序交付，商城 SaaS 应用交付接口源码与多路由；两者需要分别更新。此 Controller 仅用于兼容，未来可能整体删除，新业务继续使用接口引擎。
@@ -183,6 +185,87 @@ if (!decoded || Number(decoded.Code) !== 1) {
 ```
 
 该原子只允许 `platform-chanjet-callback-v2` 调用，租户从当前 V8 执行上下文取得，AES Key 与 AppKey 白名单不会进入脚本；接口引擎不能传入或覆盖租户、密钥。其它回调应沿用同一模式，不要把公开路由和业务流程重新写入 Controller。
+
+### 接口引擎双向实时通道（SignalR）
+
+适用版本：后端 **8.6.1 及以上**；通过 MCP 配置时使用开发工具 **6.0.4 及以上**。
+
+需要浏览器持续发送命令并接收回执时，把接口引擎的 `ResponseType` 设置为 `SignalR`，
+连接 `/api-engine-socket?OsClient={租户}&ApiEngineKey={接口Key}`。这是通用传输入口，
+不为每个项目新增 Hub，也不把配对、房间、设备权限或业务状态写进 C# Hub。
+它要求后端包含 `ApiEngineSocketHub`、MCP Schema 支持 `SignalR`，并更新接口引擎应用包的
+响应类型选项；仅修改数据库中的枚举文字不能让旧后端获得该能力。
+
+| 场景 | 配置与入口 |
+| --- | --- |
+| 普通请求/响应 | `JSON`、`String`、`File`、`HTML` 或 `HTTP` |
+| 服务端持续输出文本 | `Stream`，SSE/NDJSON，不是双向连接 |
+| 已提交事件的订阅刷新 | `/api-engine-realtime`，见下文订阅协议 |
+| 同一连接双向发送命令和回执 | `SignalR`，`/api-engine-socket` |
+
+连接在建立时绑定 `OsClient + ApiEngineKey`，消息不能切换租户或接口。
+需要登录的接口仍使用有效 DiyToken；不接受 AccessKey。
+匿名配对等场景必须由接口显式开启 `AllowAnonymous=1`，并自行实现限次配对、权限与租约。
+`IsEnable`、`StopHttp`、匿名开关和 `ApiRole` 每次调用仍走接口引擎原有校验；
+`StopHttp=1` 同样禁止外部实时调用，不能用 WebSocket 绕过。
+
+客户端调用 `connection.invoke('Invoke', requestId, message)`，服务端注入：
+
+```javascript
+V8.Param.Socket.ConnectionId // 宿主生成的连接 ID
+V8.Param.Socket.Event        // Connected / Message / Disconnected
+V8.Param.Socket.ClientKey    // 宿主生成的客户端地址摘要，用于共享限流；不是业务身份
+V8.Param.RequestId           // 本次消息编号
+V8.Param.Message             // 客户端业务对象，始终与可信上下文分开
+```
+
+接口代码应先验证可信通道，避免普通 HTTP 伪造 `Socket` 参数，亦保证旧节点失败关闭：
+
+```javascript
+var trusted = V8.Method.RequireApiEngineSocketContext();
+if (trusted.Code !== 1) return trusted;
+if (V8.Param.Socket.Event !== 'Message') return { Code: 1 };
+
+// 此例只向当前连接回复；实际业务在这里校验当前用户、动作、资源归属和 RequestId。
+return {
+  Code: 1,
+  Data: { Accepted: true },
+  DataAppend: { SocketMessages: [{
+    ConnectionId: V8.Param.Socket.ConnectionId,
+    Data: { Type: 'Receipt', RequestId: V8.Param.RequestId, At: DateNow('yyyy-MM-dd HH:mm:ss') }
+  }] }
+};
+```
+
+成功提交后，宿主把 `SocketMessages` 投递为 `EngineMessage` 事件。
+接收连接必须属于同一租户与接口的连接组；失败或回滚结果不投递。
+调用方只收到 `Code/Msg/Data`，不会收到内部连接路由或执行堆栈。
+接口成功提交、服务器接受命令与展示屏/设备实际完成是三个不同状态；
+远程控制应由目标端在动作完成后再发送业务 ACK，超时显示“结果未知”，不能直接显示成功。
+
+传输采用 JSON SignalR 协议，接收帧上限 16KB、业务 Message 上限 12KB、深度 16，
+单次最多 16 个目标、投递内容合计 32KB，调用方响应上限 32KB。
+每个租户、接口和客户端地址摘要共享连接/消息限流：每分钟 30 次建立、每 10 秒 240 条消息、
+最多 64 个活动连接；75 秒未发送业务消息会断开。因此客户端应定期发送由业务接口识别的
+心跳消息（例如每 15 秒一次），不能仅依赖 SignalR 协议 Ping 延长业务授权。
+Redis 不可用时失败关闭，多节点复用现有 Redis backplane。
+
+配对码只是低熵定位符，不能替代 DiyToken 或赋予管理员身份。展示屏必须主动允许控制，
+以浏览器随机高熵秘密证明控制码所有权，服务端只保存摘要；处理控制码冲突、配对猜测限流、
+停止授权、离线租约、断线恢复、重复命令和过期回执。权限状态放共享 Redis/数据库，
+`Disconnected` 只是尽力通知，节点退出时仍应由租约到期收回授权。
+Redis 写入不随关系库事务回滚，不能宣称消息与 Redis/数据库已经实现“恰好一次”；
+有持久副作用的业务须增加幂等键、权威版本与 outbox/恢复机制。
+
+部署时代理必须转发 WebSocket Upgrade，所有目标节点必须包含该通道及相同接口配置。
+仅使用 WebSocket 且跳过协商时不需要通过不同 HTTP 请求保持协商节点；启用其它传输时需按
+[SignalR 扩展部署说明](https://learn.microsoft.com/aspnet/core/signalr/scale) 配置节点路由。
+双节点、Redis 故障、滚动升级和真实浏览器两端验收分别记录，编译或单测通过不能替代线上联调。
+
+多端遥控使用双向命令通道：业务脚本维护展示屏与多个独立控制会话的集合，
+在共享分布式锁下实施有界 FIFO 和每端 RequestId 去重。撤销展示屏授权时终止全部会话，
+单台手机离开只撤销自身；同一画面的命令按顺序执行，执行回执仅返回发起端。
+命令入队成功、SignalR 投递成功与展示屏实际执行成功是三个不同状态，不得混为一谈。
 
 ### 接口引擎通用实时事件（SignalR）
 
@@ -701,6 +784,10 @@ var sendResult = V8.Method.SendWeChatTemplateMessage({
 `platform-private-file-url` 不接受“已登录即可签任意路径”。`FormField` 必须提交菜单、表、记录和字段四元组并命中字段原值；`FormFieldDerivedPreview` 还必须提交字段保存的原文件，宿主只重算 DWG→`_preview.dxf`、STEP/STP→`_preview.stl` 的唯一同目录派生对象；`FileManagerObject` 要求单个大小写精确对象 Key、能力探针返回的当前租户文件柜菜单、对象实际存在，并且只接受平台超级管理员 DiyToken，访问密钥即使带 `file:read` 也不能打开文件柜对象。
 
 其中涉及宿主秘密、不可伪造状态或受限匿名投影的能力分别使用 `V8.Method.ResolveOsClientByDomain`、`GetPublicSysConfig`、`GetLangBundle`、`GetLoginWallpapers`、`GetLegacyInitMenuTree` 和 `GetAuthorizedPrivateFileUrl`。这些不是通用 V8 API：宿主会同时校验当前 `OsClient` 与固定 `ApiEngineKey`，其它接口引擎、表单事件或直接调用一律失败关闭。`GetLegacyInitMenuTree(rawToken, osClient?)` 只允许 `microi-init` 调用，内部再次验证原始 DiyToken、拒绝访问密钥与跨租户请求，并用 `SysMenuLogic.GetSysMenuStep` 按权威角色权限构树；它不是通用菜单查询器。`GetLoginWallpapers` 在 Core 内固定查询启用且未删除的壁纸，只投影 `Id/Name/Category/ImgUrl` 并限制 200 条；它不会、也不要求把 `diy_wallpaper.IsAnonymousRead` 打开。公共用户目录继续由已鉴权的 Managed 接口使用 FormEngine 做固定投影与有界分页。
+
+`platform-sys-config` 从 v1.1.0 开始在 V8 内调用 `V8.FormEngine.GetSysConfig` 读取配置、分类失败、组装响应；新宿主的 `ProjectPublicSysConfig(configuration)` 只隔离密钥和服务端脚本，`GetLoginEncryptionPublicKey()` 只读公钥，`GetPlatformEdition()` 只读发行类型。不能直接返回 `V8.SysConfig` 或未经投影的读取结果。旧 `GetPublicSysConfig` 仅保留给旧后端滚动升级和缺引擎兼容入口；新原子链失败不会转调旧门面。该接口唯一归属“SaaS引擎”应用，`Microi.Upgrade` 只从它投影必要启动接口，不默认安装整套 SaaS 管理界面或其它可选应用。
+
+SaaS 应用的 `platform-license-management-state`、`platform-license-server-nodes` 使用旧 License 地址作为 `ApiAddress`，同时保留稳定 Key 地址。前者在 V8 组装只读授权状态；后者对非主租户管理员返回空节点列表。签名校验、授权主体及节点读取继续由固定引擎、可信 DiyToken 和租户边界保护。普通账号不会因此获得签发、刷新、写授权文件或修改服务器节点的权限。这两个可选接口不进入启动恢复包；需要包含 `ReadLicense*` 原子的后端，缺少时返回明确兼容提示，不伪造授权成功。
 
 需要鉴权且允许个性化扩展的 Managed 接口会调用 `platform-runtime-custom-hook`。匿名启动接口（包括登录壁纸和 `microi-init`）不调用租户 Hook，避免匿名请求触发写表、通知或外呼副作用；`microi-init` 即使携带有效 Token，也只执行固定兼容聚合，不把 Token、用户投影或菜单交给租户 Hook。该 Hook 以 `CreateIfMissing` 首次创建，默认只有 `return { Code : 1 };`，之后归租户维护且官方升级不会覆盖。官方 Managed 接口顶部会明确提示其所属应用；从可信官方源安装、更新或重新安装应用会恢复官方代码，因此个性化逻辑必须写入 Hook，不能直接修改 Managed 接口。Hook 只接收阶段、来源 Key、当前用户 Id 或结果数量等脱敏元数据，不得传入 DiyToken、密码、Secret、原始 SSO 断言或私有文件短链。
 
@@ -1280,7 +1367,7 @@ var count = V8.Db.FromSql("select count(1) from sys_user where Status = @p0")
 
 ## 扩展数据库对象 V8.Dbs
 
-“数据库管理”中启用的连接按 `DbKey` 暴露为 `V8.Dbs.<DbKey>`。当前认证类型为 `MySql`、`SqlServer`、`Oracle`、`PostgreSql`、`DaMeng`、`KingBase`；完整配置、MCP 结构读取和附件迁移说明见[扩展数据库与外部数据迁移](../system-engine/databases.md)。
+“数据库管理”中启用的连接按 `DbKey` 暴露为 `V8.Dbs.<DbKey>`。当前支持配置的数据库类型为 `MySql`、`SqlServer`、`Oracle`、`PostgreSql`、`DaMeng`、`KingBase`；完整配置、MCP 结构读取和附件迁移说明见[扩展数据库与外部数据迁移](../system-engine/databases.md)。
 
 安装或更新应用商城中的“数据库扩展”后，`microi_database` 的后端提交后事件会调用 `V8.Method.RefreshExtensionDatabases()`。事件在事务提交后递增按 `OsClient` 隔离的 Redis 版本，因此新增、修改、停用或删除连接后，各 API 节点下一次访问 `V8.Dbs` 即可看到新配置，无需重启；短 TTL 仅作为旧版本节点的兼容兜底。
 
@@ -1485,6 +1572,63 @@ V8.MongoDb.GetTableData({
 });
 ```
 
+### 跨年跨月分页 GetPartitionedTableData
+
+适用于按年分库、按月分集合的海量聊天和日志。接口引擎先校验当前用户与资源权限，再调用有界存储原子；不会把服务器的任意数据库列表开放给客户端。
+
+```javascript
+var result = V8.MongoDb.GetPartitionedTableData({
+  DatabasePrefix: 'audit_log', TablePrefix: 'event',
+  _Where: [['UserId', '=', V8.CurrentUser.Id]],
+  IndexFields: ['UserId'],
+  PageSize: 30, MaxPartitions: 64,
+  Cursor: V8.Param.Cursor || ''
+});
+// 成功：{ Code:1, Data:{ Rows, HasMore, NextCursor, ScannedPartitions } }
+```
+
+存储命名是 `{DatabasePrefix}_{当前租户小写}_{yyyy}` 库与 `{TablePrefix}_{yyyyMM}` 集合，同时兼容无年份旧库、`{TablePrefix}_{yyyy_MM}` 月集合和 `{TablePrefix}_{yyyy}` 年集合。年度库中的集合年份必须一致；业务代码固定前缀，不能直接透传用户输入。前缀仅允许小写字母开头的字母、数字、下划线，最多 48 字符。
+
+| 参数 | 契约 |
+| --- | --- |
+| `PageSize` | 默认 30，范围 1–100；与普通 `GetTableData` 的 `_PageSize` 不同 |
+| `MaxPartitions` | 单次最多扫描 64 个分区，可设 1–128；全目录最多 200 个租户库、2400 个有效集合 |
+| `_Where` / `_WhereAny` | 非空有效条件；`_WhereAny` 支持 1–4 组条件的 OR，替代 `_Where`，每一组都要包含权威业务边界 |
+| `IndexFields` | 可选，最多 3 个互异安全字段；组合这些字段升序与 `CreateTime DESC, _id DESC` 建索引 |
+| `Cursor` | 原样回传上次 `NextCursor`；首次传空，查询条件改变后重置，最大 2048 字符 |
+| `CountOnly` | 可选，`true` 返回 `{ Count }`；超出分区扫描上限失败，不返回部分总数 |
+
+文档应使用 BSON 日期 `CreateTime` 和原生 ObjectId `_id`。普通页按时间、Id 倒序合并，不执行 Count；旧/新分区重复 `_id` 在页内去重。同一时间多条消息通过 Id 继续，不因跨月、跨年或空月丢失。若 `Rows` 为空但 `HasMore=true`，仍要继续使用新游标；目录/扫描超限及存储故障不能作为“没有更早消息”。调用总时限为 20 秒，单集合查询为 10 秒。
+
+游标绑定租户、前缀和查询条件，只代表翻页位置，不能替代权限验证。行内的 `_PartitionDb`、`_PartitionTable` 仅用于受信任接口引擎更新实际分区；对外必须显式选择业务字段，不能直接返回内部行对象。`CountOnly` 计数物理行，迁移时同时保留多个分区中的未读副本可能重复计数，应避免双写或通过权威业务索引计数。
+
+普通 `_Where` 对原生 `_id` 的 `In` / `NotIn` 支持 1–1000 个合法 ObjectId（数组或逗号分隔字符串）；`=`、`!=` 和范围比较也转换为原生 ObjectId。非法值会失败，不能忽略过滤条件。可信重放可在 `AddFormData` 顶层传 `OccurredAt` 保持原始 `CreateTime`；未传则使用服务端当前时间，不应信任客户端自报时间。跨月重试仍需稳定业务 Id 与持久分区定位，防止重复落入新集合。
+
+平台聊天的接入及滚动历史规则见[消息通知](../system-engine/message-notification#跨月跨年的聊天历史)。该接口依赖对应 Core/MongoDB/API 组件与 Managed 运行时版本；未部署时不能用本地测试结论替代线上可用性。
+
+#### 物理审计与索引集合模式
+
+同一 `GetPartitionedTableData` 原子提供两种明确的高级模式，不能同时启用。它们只解决存储读取，业务权限、维护状态和对外字段仍由接口引擎负责。
+
+| 模式 | 参数与边界 |
+| --- | --- |
+| `PhysicalRows:true` | 按物理分区与原生 `_id` 扫描，保留不同分区的同 Id 副本；`PageSize` 默认及上限 100，`MaxPartitions` 默认及上限 8 |
+| 物理扫描范围 | `_Where` 可省略，只有无条件的全物理扫描才返回 `FullPhysicalScope=true`；带条件不能证明全租户迁移完成，不支持 `_WhereAny` 或 `CountOnly` |
+| 物理扫描游标 | 返回 `DirectoryHash`、`NextCursor`、`HasMore`；后续带回目录哈希和游标。目录或集合身份变化、非法原生 Id 均失败，不能跳过后宣告完成 |
+| `CollectionPage:true` | 固定当前租户基础库及可信 `TableName`；`IndexFields` 为 1–4 个字段，`_Where` 必须完整等值匹配这些前缀，不支持 `_WhereAny` |
+| 索引分页 | `SortField` 是不在索引前缀内的文本字段，按该字段和原生 `_id` 倒序；`PageSize` 默认 30、范围 1–100，普通页不计数 |
+| 索引准备与计数 | 维护阶段显式 `EnsureIndex:true`；普通读取只使用已存在的索引。`CountOnly:true` 单独计数，准备和计数均不能携带分页游标 |
+
+返回的物理库、集合与内部定位元数据不能直接透传给浏览器。新增迁移应在明确的维护窗口内扫描，正常用户翻历史不能触发全库扫描或临时建大索引。
+
+#### Managed 存储维护准入
+
+适用版本：后端 **8.6.4 及以上**，并安装消息通知应用 **v8.3.25 及以上**。全部服务节点必须先完成二进制升级。
+
+`V8.Method.ManageManagedStorageMaintenance` 与 `V8.Method.RequireManagedStorageMaintenance` 是可信宿主原子，仅供固定 `platform-chat-maintenance` 接口使用。前者接受固定 `Scope='platform-chat-runtime'` 和 `Operation=Begin/Drain/Status/End`；后者核验排空状态与预期 `ExpectedEpoch`。普通自建引擎、伪造角色/租户参数、匿名与访问密钥会话均不能获得维护权限。
+
+准入和活动票据由共享存储保存；MongoDB 写入、嵌套调用及正常异步调用继承当前可信上下文。脚本不能通过禁止上下文流动的线程 API 脱离边界，也不能通过普通 MongoDB CRUD 改写宿主控制集合。结束维护需实际排空和最新修订号，不接受客户端自报“已完成”。这些原子不替代业务迁移校验，不应由客户端直接拼参数调用；完整顺序见[旧消息定位索引维护](../system-engine/message-notification#旧消息定位索引的维护窗口)。
+
 ### 查询单条数据 GetFormData
 ```javascript
 V8.MongoDb.GetFormData({
@@ -1493,6 +1637,8 @@ V8.MongoDb.GetFormData({
 	Id : '', //数据Id
 });
 ```
+
+单条查询不存在时，MongoDB 返回 `{ Code: 1, Data: null }`；这与 `V8.FormEngine.GetFormData` 的 `Code=2` 不同。必须同时检查 `Code` 与 `Data`，不能将查询失败、异常、空响应或缺失 `Data` 误判为不存在并继续新增。消息等幂等写入使用固定业务标识和分区；写入响应未知时只回读同一 `_id` 并核对载荷摘要，不得换 Id 或月份盲目重发。
 
 `GetFormData` 和 `GetTableData` 属于 dynamic 无模式读取。服务端会在 MongoDB 投影阶段过滤 BSON 内部 `_t` CLR 类型判别字段，避免存量强类型 C# 写入留下的旧类型名称触发反序列化失败。`_t` 不是 V8 业务契约；业务需要类型标记时应使用自有字段（例如 `DocumentType`），不得读取、筛选或依赖 `_t`。强类型 C# MongoDB 模型仍按自身的多态映射处理。
 
@@ -1593,6 +1739,31 @@ return result;
 
 官方 `app.microi.ai-engine` v6.3.6 使用 Managed `platform-ai-runtime` 编排标题修改、意图识别、非流式对话、NL2SQL 与非流式 NL2V8。租户个性化逻辑写在 CreateIfMissing `platform-ai-custom-hook`，该 Hook 只接收来源、阶段和动作，不接收问题、回答、标题、SQL、模型、附件或凭据。浏览器流式请求继续走原生 SSE 路由。
 
+媒体目录和图片持久任务增加以下四个后端原子，由 Managed `platform-ai-runtime` 按同名 `Action` 编排。使用前需同时部署包含这些方法的服务端和对应 AI助手应用包；版本号或应用安装成功不能代替实际能力检查。
+
+| 后端方法 | 用途与返回边界 |
+| --- | --- |
+| `await V8.AI.GetMediaModels()` | 返回当前登录租户可用的脱敏媒体目录，不接受客户端指定租户或用户，不返回供应商密钥。 |
+| `await V8.AI.GenerateMiniMaxImage(param)` | 以稳定 `RequestId` 入队图片任务；`Code=2 + Data.TaskId` 表示已受理，尚未生成成功。 |
+| `await V8.AI.GetMiniMaxImageTask(taskId)` | 查询当前租户、当前用户拥有的原任务；不能通过传入别人的 `TaskId` 越权读取。 |
+| `await V8.AI.RecoverMiniMaxImageTask(taskId)` | 对已有可恢复结果继续转存；复用原任务与供应商回执，不再次生成图片。 |
+
+外部客户端通过 `POST /apiengine/platform-ai-runtime` 提交 `Action` 和白名单业务参数；后端 V8 可直接调用上述方法。租户与用户取自可信 V8 上下文，匿名身份拒绝，伪造的 `OsClient`、`CurrentUser`、`ApiKey`、`Endpoint` 不会改变实际身份或供应商凭据。模型启用、用户权限、额度和许可仍由既有图片任务运行时检查。
+
+```javascript
+// RequestId 应由调用方保存并复用，不能在每次重试时重新生成。
+var result = await V8.ApiEngine.Run('platform-ai-runtime', {
+  Action: 'GenerateMiniMaxImage',
+  RequestId: String(V8.Param.RequestId || ''),
+  Prompt: String(V8.Param.Prompt || ''),
+  Model: String(V8.Param.Model || ''),
+  Count: 1
+});
+return result;
+```
+
+客户端保存原 `RequestId`、`TaskId` 以及所属服务器、租户和账号，异步查询原任务直到明确终态。只有实际图片结果及持久地址回读通过才算交付。超时、断连或空响应属于结果未知，应先复查原任务，不能换 `RequestId` 盲目重发；缺少可恢复回执时，`RecoverMiniMaxImageTask` 也不能把未知结果伪装成成功。旧原生 HTTP 路由保留兼容，应用包更新不会替代服务端二进制更新。
+
 后端流式回调会占用本次 Jint 请求，只适合确实需要由同一脚本消费增量的场景；面向页面的打字机效果仍优先让浏览器使用前端 `V8.AI.ChatStream`。MCP 直接使用专用 `microi_chat` 获取最终结果，不再绕到 `microi_run_engine` 包装接口。不要把 Token、完整问题或回答写入日志。完整代码与授权矩阵见 [AI 引擎与 Microi.AI 中转站](../system-engine/ai-engine.md)。
 
 ## V8.Tcp
@@ -1692,7 +1863,7 @@ return deviceResult;
 
 `V8.Tcp` 是出站客户端；它不负责接收设备连接。对于只会配置“服务器 IP/域名 + 端口”、持续发送二进制帧并等待同连接应答的设备，`Microi.net.Api` 可启用独立的 TCP 入站监听。此监听与现有 HTTP 接口引擎处于**同一个进程、同一个 API Docker 容器**，但必须使用不同端口：设备填 `主机:TCP端口`，不填 `http://`、`https://` 或 `/apiengine/...`。HTTP 端口和现有其它厂商的 HTTP/MQTT 对接保持不变。
 
-无完整规则时默认不监听。先为主租户安装带 `sys_osclients.TcpIngressEnable`、`TcpIngressPort` 与 `TcpIngressRulesJson` 字段的 SaaS 引擎资源包，再由有权限的主租户管理员配置。`TcpIngressEnable` 为空或 `1` 表示允许按完整规则监听，`0` 明确关闭；空规则不监听，坏规则仅使 TCP 进入 `Faulted`。`TcpIngressPort` 是容器内监听端口，空值回退 `1885`；启停和端口均不包含在规则 JSON 中，也不等于 Docker/CLB 对外端口。运行中的 API 每约 30 秒独立回查主库开关：设 `0` 后下一轮关闭 TCP 监听与会话，HTTP 继续运行；从 `0` 改回空值/`1`，以及修改端口、规则、引擎 Key、CIDR，不会热重绑，必须手工重启现有 API 容器。以下是协议为 `AA333380` 上行、`BB666680` 下行、CRC16/XMODEM 的示例；`osClient`、`apiEngineKey` 和来源网段都应换成经过核实的值：
+无完整规则时默认不监听。先为主租户安装带 `sys_osclients.TcpIngressEnable`、`TcpIngressPort` 与 `TcpIngressRulesJson` 字段的 SaaS 引擎资源包，再由有权限的主租户管理员配置。`TcpIngressEnable` 为空或 `1` 表示允许按完整规则监听，`0` 明确关闭；空规则不监听，坏规则仅使 TCP 进入 `Faulted`。`TcpIngressPort` 是容器内监听端口，空值回退 `1885`；启停和端口均不包含在规则 JSON 中，也不等于 Docker/CLB 对外端口。运行中的 API 每约 30 秒独立回查主库开关：设 `0` 后下一轮关闭 TCP 监听与会话，HTTP 继续运行；从 `0` 改回空值/`1`，以及修改端口、规则、引擎 Key、CIDR，不会热重绑，必须手工重启现有 API 容器。以下是协议为 `AA333380` 上行、`BB666680` 下行、CRC16/XMODEM 的窄来源示例；`osClient`、`apiEngineKey` 和来源网段都应换成经过核实的值：
 
 ```json
 {
@@ -1714,13 +1885,246 @@ return deviceResult;
 }
 ```
 
+来源 IP 确实无法事先确定时，可由主租户管理员**显式承担风险**：在上面的完整规则中增加 `"allowAnySource": true`，并把 `allowedCidrs` 改为唯一一项 `["0.0.0.0/0"]`。两项必须同时存在；缺少布尔开关、混入其它网段、使用 IPv6 或把 `/0` 写进普通窄来源规则，都会被拒绝。此设置允许任意 IPv4 客户端尝试连接，**不是默认推荐，更不是设备鉴权**。在接口引擎中按权威设备资料校验设备身份、命令与业务权限，限制重放/重复写入并监控异常连接；若设备协议只有可伪造的设备号和 CRC、没有独立密钥或签名，仍存在冒充上报风险，应记录并尽早收窄网络入口。
+
 监听器按 U16 大端长度字段和帧尾重组拆包/粘包，校验 CRC16/XMODEM，然后把一帧十六进制作为 `frameHex` 通过固定 `_InvokeType=Server` 内部调用**固定**接口引擎。接口引擎负责业务解析、写表、幂等与生成 `Data.ResponseFrameHex`；监听器校验应答帧结构、CRC 和设备号/命令关联后，才在原 TCP 连接回写原始字节。业务 `Code=0` 若携带协议定义的合法失败应答，仍可回写；无合法应答则关闭连接，不伪造成功。设备输入不能覆盖租户、引擎 Key、端口或来源策略。启用 TCP 时目标接口引擎必须 `IsEnable=1`、`StopHttp=1`、`AllowAnonymous=0`，不满足则 TCP 局部失败关闭、不监听，而 HTTP API 继续运行；否则旧匿名 HTTP 入口可绕过 TCP 来源限制。CRC 和匿名标志都不是设备身份认证。
 
 上线应分四阶段：先部署并启动新 API 镜像，确认目标租户 `sys_config.ServerVersion >= 7.6.16.0` 且旧 `MqttEnable` 空值已迁为 `0`；新 TCP 包尚未安装时规则为空、不监听，HTTP 继续。再通过商城安装/更新 SaaS 字段并发布配套前端，明确设主租户 `TcpIngressEnable=0`、规则暂留空，让旧 HTTP 和其它设备通道照常运行；物理迁移不会自动更新旧租户的 UI 元数据，不能先发 `NullValue=1` 的包/界面。核实目标接口不再有合法 HTTP 调用后，仅对该接口关闭 HTTP（`StopHttp=1`）与匿名访问（`AllowAnonymous=0`），并验证旧 URL 不可匿名直调；最后填写完整 TCP 规则、配置端口映射和防火墙，将 `TcpIngressEnable` 设为 `1`，重启同一 API 容器并做心跳及业务验收。若目标接口仍被旧 HTTP 设备使用，须先迁移或拆出受控兼容入口，不得直接切换。其它厂商独立的 HTTP/MQTT 接口及端口保持原样，但 API 容器重启期间会短暂中断，需分别回归。
 
-在同一 API Compose service 增加如 `"19011:1885/tcp"` 的端口映射（对外宿主机 19011 → 容器内默认 1885），保留原有 HTTP `1052` 映射；更新包含此能力的 API 镜像并重启。新执行的官方在线一键安装器会在动态 `61600+` 宿主端口段末尾追加 MQTT/TCP 映射，离线安装器默认使用 `7010/7011`；两者都映射至 API 容器内 `1883/1885` 并尝试开放宿主机防火墙，实际服务是否监听仍受 SaaS 配置控制。已有 Compose 不会自动升级映射；若更改主租户 `TcpIngressPort`，须同步更改容器目标端口。当前入站监听仅支持 IPv4，`allowedCidrs` 应为已核实的 IPv4 窄网段。云安全组/防火墙只放行确认过的来源网段；`allowedCidrs` 也必须配置，不能依赖 HTTP 安全白名单。经 CLB 时先验证后端实际看到的源 IP，再配置相应来源规则；CLB TCP 监听不得启用当前不支持的 Proxy Protocol v2。该协议的 CRC 只校验传输完整性，不能认证设备身份。若设备来源 IP 无法约束，必须先解决网络隔离或设备鉴权，不应直接向公网敞开端口。
+在同一 API Compose service 增加如 `"19011:1885/tcp"` 的端口映射（对外宿主机 19011 → 容器内默认 1885），保留原有 HTTP `1052` 映射；更新包含此能力的 API 镜像并重启。新执行的官方在线一键安装器会在动态 `61600+` 宿主端口段末尾追加 MQTT/TCP 映射，离线安装器默认使用 `7010/7011`；两者都映射至 API 容器内 `1883/1885` 并尝试开放宿主机防火墙，实际服务是否监听仍受 SaaS 配置控制。已有 Compose 不会自动升级映射；若更改主租户 `TcpIngressPort`，须同步更改容器目标端口。当前入站监听仅支持 IPv4；优先在 `allowedCidrs` 和云安全组/防火墙同时限制已核实的来源网段，不能依赖 HTTP 安全白名单。无法限源时仅可采用上文显式全网例外，确认业务身份校验与剩余风险后再开放对应 TCP 端口。经 CLB 时先验证后端实际看到的源 IP，再配置相应来源规则；CLB TCP 监听不得启用当前不支持的 Proxy Protocol v2。该协议的 CRC 只校验传输完整性，不能认证设备身份。
 
-验收要分层记录：TCP 内部状态须为 `Listening` 且日志明确显示端口已监听（目前没有对外的 TCP 状态 HTTP 端点）；从允许网段先探测端口，再做拆包、粘包、连续心跳回环测试；最后由实体设备验证心跳上行、同连接应答和业务快照。配置、引擎安全位或端口冲突失败仅使 TCP 进入 `Faulted` 并记录失败阶段，HTTP API 保持运行；不能让 HTTP 健康误报为 TCP 就绪。只有端口可连或回环通过，也不能宣称设备网络图标已点亮或生产数据已入库。
+验收要分层记录：TCP 内部状态须为 `Listening` 且日志明确显示端口已监听（目前没有对外的 TCP 状态 HTTP 端点）；从允许网段先探测端口，再做拆包、粘包、连续心跳回环测试，并逐帧核对同连接 ACK 的字节、CRC 和设备号关联；最后由实体设备验证心跳上行、同连接应答和业务快照。配置、引擎安全位或端口冲突失败仅使 TCP 进入 `Faulted` 并记录失败阶段，HTTP API 保持运行；不能让 HTTP 健康或单纯端口连通误报为 TCP 已回 ACK。只有端口可连或回环通过，也不能宣称设备网络图标已点亮或生产数据已入库。
+
+## V8.IoT：通过设备现有 TCP 连接下行
+
+`V8.IoT.Send` 把完整协议帧交给持有设备连接的 API 节点发送，适用于设备主动连接平台、
+无法从服务器另开连接访问设备的场景。它与一次性客户端 `V8.Tcp.Send` 的连接方向不同。
+需要配套升级 Core、V8Engine 和 API；只替换 V8Engine DLL 不足以启用此能力。
+
+### 与 MQTT、TCP 的选择
+
+| 接入方式 | 使用能力 | 协议与业务的归属 |
+| --- | --- | --- |
+| 设备连接平台 MQTT Broker | 既有 MQTT 引擎 | Topic、认证、ACL 和下行按 MQTT 文档配置 |
+| 平台主动连接设备开放的 TCP 端口 | `V8.Tcp` | 一次连接内发送/收取原始字节 |
+| 设备主动连接平台原始 TCP 监听 | `V8.IoT.Send` | 沿已授权的原连接下行，跨 API 节点路由 |
+| 厂家提供 HTTP 云接口 | `V8.Http` | 接口引擎调用厂家 API |
+
+`V8.IoT` 不包含任何厂商名、制冷/制热操作码、设备业务表或固定设备编号。
+原子只处理受权连接、字节帧、去重、有效期与传输状态；厂商适配、命令序列号、
+设备权限、回执解析及业务状态机由接口引擎负责。当前公开的 IoT 传输适配器是原始 TCP，
+不会自动把 TCP 报文转换成 MQTT 或 HTTP。
+
+### 可配置的厂商协议
+
+原规则未添加 `framing` 时，保持历史格式：4 字节帧头、2 字节帧尾、
+U16 大端长度、CRC16/XMODEM 大端校验。新协议在既有规则内显式添加 `framing`：
+
+```json
+{
+  "osClient": "<OsClient>",
+  "apiEngineKey": "device-uplink",
+  "allowedCidrs": ["127.0.0.1/32"],
+  "requestHeaderHex": "A1",
+  "responseHeaderHex": "B2",
+  "tailHex": "0D0A",
+  "lengthOffset": 1,
+  "lengthAdjustment": 0,
+  "correlationOffset": 3,
+  "correlationLength": 2,
+  "framing": {
+    "mode": "LengthPrefix",
+    "lengthBytes": 2,
+    "lengthByteOrder": "LittleEndian",
+    "checksum": "Crc16Modbus",
+    "checksumByteOrder": "LittleEndian",
+    "checksumStartOffset": 0
+  },
+  "downlink": {
+    "enabled": true,
+    "deviceOffset": 3,
+    "deviceLength": 2,
+    "sendApiEngineKeys": ["device-control-dispatch"]
+  }
+}
+```
+
+这是另一套匿名示例协议，不能直接覆盖已有设备配置。示例设备地址 `0102`、
+载荷 `55` 的上报帧为 `A10A0001025511F40D0A`；CRC 应由接入方按实际协议计算并核验。
+所有偏移均从帧首按字节计数，地址可位于长度字段前或后，但不能与帧头、长度或校验区重叠。
+
+| 配置 | 语义与范围 |
+| --- | --- |
+| `framing.mode` | `LengthPrefix` 长度字段、`FixedLength` 固定帧长、`Delimiter` 结束符拆帧 |
+| `requestHeaderHex` / `responseHeaderHex` | 显式 `framing` 下各为 0–32 字节；无帧头时明确写空字符串 |
+| `tailHex` | 0–16 字节；`Delimiter` 模式必须非空，载荷不得包含未转义的结束符 |
+| `lengthOffset` / `framing.lengthBytes` | 长度字段偏移 0–128；宽度 1、2、4 字节；只在 `LengthPrefix` 模式读取 |
+| `framing.lengthByteOrder` | `BigEndian`（默认）或 `LittleEndian` |
+| `lengthAdjustment` | 实际总长度 = 长度字段值 + 此值；显式 `framing` 时允许 -65535–65535 |
+| `framing.fixedLength` | `FixedLength` 模式必填正整数，且不超过 `maxFrameBytes` |
+| `framing.checksum` | `Crc16Xmodem`（默认）、`Crc16Modbus`、`None` |
+| `framing.checksumByteOrder` | 校验字段字节序，默认 `BigEndian`；校验字段紧邻帧尾之前 |
+| `framing.checksumStartOffset` | 校验计算起点 0–128，终点为校验字段之前，不包含帧尾 |
+| `downlink.downlinkDeviceOffset` | 下行地址偏移，默认等于上报的 `deviceOffset` |
+
+上报、普通应答和主动下行共用同一套结构规则，头部可按方向不同；普通应答继续严格校验
+`correlationOffset/correlationLength`，主动下行独立验证目标设备，不能放宽 ACK 关联来发送控制帧。
+完整帧最大 65535 字节，仍受连接缓冲与待发队列总预算约束。平台不按未验证的长度分配内存。
+
+一个 API 进程当前只加载主租户的一套监听规则；这不是单端口自动识别任意厂家协议。
+不同协议可用相应的受管接入实例/网关，业务接口共用本原子；单实例多监听、TLS、转义解码、
+动态地址格式和未列出的校验算法尚未提供。遇到不满足描述的协议应补通用适配器，不能写死厂家分支。
+
+### 配置与连接授权
+
+默认不启用。在主租户既有 `sys_osclients.TcpIngressRulesJson` 中添加以下 `downlink` 节点，
+其它帧配置、端口和正常 ACK 关联规则保持原值。修改后重启 API；不增加环境变量或新进程。
+
+```json
+{
+  "downlink": {
+    "enabled": true,
+    "deviceOffset": 6,
+    "deviceLength": 8,
+    "sendApiEngineKeys": ["device-control-dispatch"],
+    "maxPendingCommands": 32,
+    "maxExpireSeconds": 120,
+    "deduplicateSeconds": 86400,
+    "leaseSeconds": 30,
+    "pollIntervalMilliseconds": 500
+  }
+}
+```
+
+上例是**添加到原规则中的节点片段**，不能用它替换完整入站配置。
+设备区域必须按实际协议填写；`deviceOffset` 是从帧首开始的零基字节偏移。
+控制接口引擎必须禁止匿名，并在生成报文前按当前用户校验设备行权限和操作权限。
+调用 Key 从后端执行上下文读取，不能由 `V8.Param` 指定；该白名单授予的是可信业务入口。
+
+内部上报接口在确认设备身份与业务绑定后，每次成功处理都需返回
+`Data.IoTDeviceId`，内容为帧内设备地址的规范十六进制，同时继续返回正常的
+`Data.ResponseFrameHex`。宿主校验两者地址一致，且 ACK 写入成功后才登记连接。
+协议明确无需平台再次应答的消息，可使用下文的显式 `None` 模式，在校验处理完成后登记/复核连接。
+未绑定设备可继续返回心跳 ACK，但不返回 `IoTDeviceId`，因而不能接收下行。
+已登记连接后续失去授权则关闭；同一物理连接不能切换设备身份。
+CRC 和设备号本身不能认证设备，实际凭据或来源限制仍按设备协议处理。
+
+| 配置 | 默认值 / 范围 |
+| --- | --- |
+| `enabled` | 必须显式为 `true`；缺失整个节点或设为 `false` 不启用 |
+| `deviceOffset` / `deviceLength` | 必填；上报偏移 0–128，地址长 1–32 字节，不能覆盖帧头/长度字段；下行偏移可单独指定 |
+| `sendApiEngineKeys` | 必填；1–32 个允许调用的接口引擎 Key |
+| `maxPendingCommands` | 32；1–128，单设备待发载荷预算最多 512 KiB |
+| `maxExpireSeconds` | 120；1–600 秒 |
+| `deduplicateSeconds` | 86400；600–604800 秒；业务去重仍须持久记录 |
+| `leaseSeconds` | 30；10–120 秒；连接持有者续租，旧连接不能删除新连接租约 |
+| `pollIntervalMilliseconds` | 500；100–5000，必须小于租约时长的三分之一 |
+
+### 调用与结果
+
+```javascript
+// 已持久记录指令并提交后，由已授权的派发接口执行。
+// 这些变量由当前业务设备记录和厂家协议生成，不能透传任意前端报文。
+return V8.IoT.Send({
+  DeviceId: deviceAddressHex,
+  CommandId: committedCommandId,
+  FrameHex: fullProtocolFrameHex,
+  ExpireSeconds: 30
+});
+```
+
+`DeviceId` 是协议设备地址，不是业务表记录 Id；接口引擎负责映射。
+`CommandId` 必须稳定，支持 1–128 位字母、数字、点、下划线和横线。
+`FrameHex` 必须是无分隔符的完整十六进制帧，经过配置的帧头、长度、尾部、
+所选校验算法和设备地址校验。其它参数，包括 `OsClient`、`Host`、`Port` 均拒绝。
+当前租户登录用户及可信后台任务身份可使用；匿名上下文、表单事件和未授权 Key 拒绝。
+
+### 动作、参数、报警和定时配置共用原子
+
+`Send` 不限制业务命令码、子操作码和载荷长度；开关、温度、提醒、阀门、定时、模式或其它
+功能都可由接口引擎生成符合配置的完整帧。新增同协议业务动作不需要再次修改 C#。
+平台传输成功、设备命令确认与设备达到目标状态必须分别记录。
+
+| 控制类型 | 接口引擎/命令目录需要配置 |
+| --- | --- |
+| 开机、关机、模式、继电器 | 业务动作 Key、协议命令/子码、允许状态、用户设备与动作权限 |
+| 温度、流量、时长、阈值 | 字段顺序、U8/U16/U32 等宽度、字节序、单位/倍率、机型范围、枚举/步长 |
+| 报警上报与恢复 | 上行命令、位图/枚举、产生/恢复事件、去重与通知；不能把上报码直接当作控制码 |
+| 报警提示开关、消音、复位 | 厂家明确提供的下行命令、字段、权限与回执；没有协议定义时保持不可用 |
+| 定时、分段参数、数组 | 重复组数、时间/时区、启用类型、流水号所在位置、总帧长 |
+| 设备执行回执 | 期望回执命令、子码、流水号偏移、成功/失败/未知值、是否需要平台再应答 |
+
+命令目录属于租户业务配置/接口引擎，不按开机、设水温或清警等具体业务动作增加厂家专属原子。
+前端仅提交受限的动作和参数，后端重新读取受权设备与机型配置，
+禁止把前端的命令码、成功码、目标设备、完整十六进制或可执行表达式直接透传。
+
+平台 `CommandId` 与设备协议流水号不是同一概念。业务 outbox 需保存二者映射，
+在同一设备、同一命令及子码范围内关联回执；重复派发复用同一编号及报文。
+不同命令的回执可能使用不同命令码、成功值或字段顺序，不能固定为单一位置或一律“0=成功”。
+未知结果保留未知；没有回执的命令只能确认传输，不能伪造设备已执行。
+
+参数范围、固件语义或帧长度存在歧义时，默认拒绝生成/派发该动作，待厂家确认后更新可信目录。
+读回快照有延迟时，不用列表字段的旧值直接证明温度、开关或报警已改变。
+
+### 控制回执不需要再次应答时
+
+部分协议中的控制回执本身就是设备对平台命令的确认，不需要平台再发一个 ACK。
+在厂家确认这种行为后，可在既有完整 `TcpIngressRulesJson` 的**根节点**增加：
+
+```json
+{ "allowNoResponse": true }
+```
+
+这是节点片段；不能替换完整规则。默认 `false`，必须是布尔值，修改后重启 API。
+上报接口先验证设备绑定、回执命令、子码、流水号和参数长度，并持久记录结果，再返回：
+
+```javascript
+return {
+  Code: 1,
+  Data: {
+    IoTDeviceId: authorizedDeviceAddressHex,
+    ResponseMode: 'None'
+  }
+};
+```
+
+此返回表示“这条上行消息已按协议处理，不需要写回字节”。它不代表设备执行成功，
+不能代替业务记录中的成功/失败/未知状态。`ResponseMode:'None'` 与 `ResponseFrameHex` 属性互斥。
+普通有应答消息继续返回 `Data.ResponseFrameHex`，可省略模式或显式设置 `ResponseMode:'Reply'`。
+
+只有配置允许且结果为数值 `Code=1`、模式精确为 `None`、物理帧有效时，宿主才保持原连接而不写任何字节。
+空结果、缺失应答、`Code=0` 的 None、未知模式和损坏帧仍关闭连接；普通失败 ACK 的既有行为保持不变。
+需要心跳应答的协议仍必须逐次回心跳 ACK，不能把所有上报都改成 None。
+每条成功的免应答消息同样复核 `IoTDeviceId`；授权撤销或设备身份切换时关闭下行连接。
+
+| 状态 | 含义与后续动作 |
+| --- | --- |
+| `Queued` | 已接受并在共享 Redis 中排队，尚未证明写入设备连接 |
+| `Sending` | 已出队开始发送；进程中断可能停留于此，结果未知，禁止自动重发 |
+| `Written` | 字节已写入 TCP；仍需设备协议回执确认执行结果 |
+| `Unknown` | 写入或保存结果失败，可能已有物理副作用，禁止自动重发 |
+| `Expired` | 排队指令已过期，不再下发 |
+| `Offline` / `QueueFull` / `Conflict` | `Code=0`，分别表示无有效连接、队列已满、相同编号对应不同内容或调用身份 |
+
+`Code=1` 表示本次命令或同编号的既有命令已被接收，不等于设备执行成功。
+相同编号在去重期内重复提交返回既有状态和 `Duplicate=true`；不会延长过期时间，
+不会因设备重连把旧队列转发到新连接。去重期结束后编号可能再次被接受，业务需保留长期唯一约束。
+
+### 事务、多节点与验收边界
+
+设备动作和 Redis 投递无法跟随数据库事务回滚。控制接口应只写已授权的指令/outbox，
+事务提交后由派发任务读取；派发任务使用同一 `CommandId` 调用本原子，再保存投递状态。
+不能在创建业务记录的同一事务里发送设备动作并期待数据库回滚撤销动作。
+设备执行结果由上报接口按厂家流水号更新，不由此原子推断。
+
+连接所有权、排队和去重使用既有租户 Redis，队列绑定连接代次，Socket 只留在持有节点。
+原 ACK 与主动指令共用串行写通道；Redis 原子抢占后不自动重投，优先避免重复物理副作用。
+Redis 故障会拒绝/关闭对应下行连接；共享 Redis 的持久化和故障转移能力由实际部署决定，
+不能把本能力描述为跨断电的绝对零丢失或设备“恰好执行一次”。
+若重连发生在所有权检查与实际写入之间，仍存在短暂竞态窗口；严格设备侧去重需协议支持。
+
+上线前分别验证旧心跳回归、跨节点路由、队列过期、重连、重复提交、写后状态保存失败，
+再验证真实设备回执与动作。离线替身与回环 Socket 测试不能代替真实 Redis/多进程及硬件验收。
 
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
@@ -2643,7 +3047,7 @@ WFNodeStart：流程节点开始V8事件
 
 HTTP/MCP 使用专用 `/api/HDFS/DeleteEmptyDirectoryMarker` 路由，旧后端 `404` 不能降级为普通目录删除。此操作不构成零字节 CAS，也不能证明历史 NoPUT；业务层须先隔离原请求、排除同 key 的活跃写入，并保留原请求键与独立恢复证据。详见[分布式存储](../more/hdfs)。
 
-动态建表、动态字段、数据库备份/清空、缓存连接管理、接口引擎代码写入等属于控制面能力。即使某个低层方法在 V8 对象上可见，也不等于普通业务脚本可以安全暴露；控制面 HTTP API 还会独立执行 `Level >= 9999` 管理员门禁。
+动态建表、动态字段、数据库备份/清空、缓存连接管理等控制面 HTTP API 独立执行管理员门禁，低层方法在 V8 对象上可见不代表可以向普通用户公开。接口引擎标准管理表 `sys_apiengine` 支持真实菜单/表权限委托，读取和代码增删改按各自动作授权；代码写权限仅授予可信开发角色。该委托不豁免其它控制面、接口运行或 MCP 专用鉴权。
 
 ## 执行上下文与资源限制
 

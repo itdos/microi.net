@@ -2,20 +2,6 @@
 
 > **通过 Docker 编排部署 Microi吾码低代码平台全套环境**
 
-## 独立安装吾码服务器运维面板
-
-需要先准备服务器环境时，可直接安装 **Microi.Panel / 吾码服务器运维面板**，再在插件市场安装 Nginx、数据库、MinIO、翻译和 OCR 等服务。面板使用独立账号和 HTTPS 入口，可以与宝塔、1Panel 使用不同端口共存。完整说明见 [服务器运维面板](/doc/server-panel/overview.html)。
-
-在 Linux SSH 终端复制下面一行，按提示填写域名或服务器 IPv4。已有 Docker 会直接复用；没有 Docker 时会询问安装。默认入口端口 `61890`、目录 `/microi/panel`，账号 `paneladmin`，随机密码保存于 `/microi/panel/config/admin-password`。
-
-```bash
-panel_url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh; (if command -v curl >/dev/null 2>&1; then curl -fSL -o install-microi-panel.sh "$panel_url"; else wget -O install-microi-panel.sh "$panel_url"; fi) && sed -i 's/\r$//' install-microi-panel.sh && bash install-microi-panel.sh
-```
-
-安装脚本也提供 [GitHub 备用下载](https://github.com/itdos/microi.net/raw/refs/heads/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh)。
-
-面板与业务服务分别安装。现有 Microi.Ops 使用原 Compose 迁移为 Microi.Panel，保留原账号、目录、端口及任务账本，具体步骤见 [Ops 迁移](/doc/server-panel/overview.html#从-microi-ops-迁移)。同一主机只运行一个吾码 Ops/Panel 控制器。
-
 ## 🚀 一键安装（零门槛部署）
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
@@ -52,6 +38,22 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 ```
 ::::
 
+### 独立安装吾码服务器运维面板（可选） {#独立安装吾码服务器运维面板}
+
+> **可选项：** 按需独立安装或补装；如已通过一键安装获得运维面板，无需重复安装。
+
+需要先准备服务器环境时，可直接安装 **Microi.Panel / 吾码服务器运维面板**，再在插件市场安装 Nginx、数据库、MinIO、翻译和 OCR 等服务。面板使用独立账号和 HTTPS 入口，可以与宝塔、1Panel 使用不同端口共存。完整说明见 [服务器运维面板](/doc/server-panel/overview.html)。
+
+在 Linux SSH 终端复制下面一行，按提示填写域名或服务器 IPv4。已有 Docker 会直接复用；没有 Docker 时会询问安装。默认入口端口 `61890`、目录 `/microi/panel`，账号 `paneladmin`，随机密码保存于 `/microi/panel/config/admin-password`。
+
+```bash
+panel_url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh; (if command -v curl >/dev/null 2>&1; then curl -fSL -o install-microi-panel.sh "$panel_url"; else wget -O install-microi-panel.sh "$panel_url"; fi) && sed -i 's/\r$//' install-microi-panel.sh && bash install-microi-panel.sh
+```
+
+安装脚本也提供 [GitHub 备用下载](https://github.com/itdos/microi.net/raw/refs/heads/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh)。
+
+面板与业务服务分别安装。现有 Microi.Ops 使用原 Compose 迁移为 Microi.Panel，保留原账号、目录、端口及任务账本，具体步骤见 [Ops 迁移](/doc/server-panel/overview.html#从-microi-ops-迁移)。同一主机只运行一个吾码 Ops/Panel 控制器。
+
 ### 📸 预览图
 
 ![Microi吾码 Docker Compose 一键安装终端预览](https://file.microi.net/itdos/official-docs/images/ae8e25597e5b2394dc25c14ef7c5b780107fcf54161e6ad2547a6066cb5023fb/202610/docker-one-click-install-terminal.jpg)
@@ -67,8 +69,12 @@ Docker 的 `cpus`、`mem_limit` 是**单容器**上限。如果给 API 和数据
 - 安装器创建持久化的 `/etc/systemd/system/microi.slice`。Docker 使用 `systemd` cgroup 驱动时，Compose 写入 `cgroup_parent: microi.slice`；使用 `cgroupfs` 时写入 `cgroup_parent: /microi.slice`。
 - 当前一键安装只支持由宿主机 systemd 管理的 rootful Docker；检测到 rootless Docker 或不具备 CPU/内存 cgroup 控制器时，会在写入 Slice 和启动新容器前停止。
 - cgroup v2 会设置父级 `MemoryMax`、`CPUQuota` 和 `MemorySwapMax=0`；cgroup v1 会设置 `MemoryLimit`、`CPUQuota`，内核启用 swap accounting 时再把父级内存与 Swap 合计限制为同一数值。
-- Redis、MongoDB、Web、MinIO、OCR、LibreTranslate、Ollama、Qdrant 以及临时工具容器都不加入这个共享池，也不由本方案新增 Docker CPU/内存硬限制。
+- Redis、MongoDB、Web、MinIO、Ollama、Qdrant 以及临时工具容器不加入这个共享池，也不由本方案新增 Docker CPU/内存硬限制；OCR 和 LibreTranslate 使用下述独立模型限制。
 - Microi.Panel（兼容原 Microi.Ops）使用独立编排和独立资源限制（默认 512 MiB / 1 CPU），不加入 API/主数据库共享池，避免平台升级或该池耗尽时连带中断运维入口。
+- OCR 和 LibreTranslate 使用独立内存保护：实际物理内存低于 **7680 MiB**（兼容标称 8 GiB 主机的内核保留量），或模型启动前可用内存低于 **2048 MiB** 时，安装器直接跳过模型拉取、初始化和启动；已有同名安装容器会停止并关闭自动重启。当前安装一旦降级，即使停止模型后空闲内存增加也不会重新启动。
+- 低内存时，唯一活动主租户回读后设置 `OcrEnabled=0`、`TranslateProvider=None`，保留端点、密钥、模型和数据。禁用配置写后回读成功才刷新 API；禁用失败会明确警告，不能把“容器已停止”当成“租户配置已关闭”。`None` 是显式关闭，空 Provider 会按已保存的 URL 自动回退，不能代替它。
+- 内存充足时，OCR 默认限制 **1024 MiB RAM / 1536 MiB RAM+Swap / 0.75 CPU**，翻译限制 **768 MiB RAM / 1280 MiB RAM+Swap / 0.75 CPU**，并各自保持单模型线程。实际内存低于 7680 MiB 时，新建 MySQL 的 InnoDB buffer pool 至多 **384 MiB**；已有外置数据库保持原配置。
+- 低内存且完全没有 Swap 时，仅在 ext4/XFS 根分区剩余至少 4 GiB、目标文件不存在且 `fstab` 备份成功后，尝试创建权限 `600` 的 **2 GiB `/swapfile.microi`** 并登记开机启用；不会覆盖已有文件或扩大核心共享池的 Swap 上限。Swap 创建失败不取消模型停用，不能用 Swap 替代物理内存门槛。
 - 复用已有 MySQL 时，外部数据库不在安装器管理的本机父 cgroup 内，因此本机共享池实际只约束吾码 API；外部数据库必须在它自己的宿主机或服务平台单独保护。
 - 安装器在启动容器前回读父级 CPU、内存和 Swap 控制文件，启动每个编排前执行 `docker compose config`，启动后再用 `docker inspect` 确认 API 与本脚本创建的主数据库已进入同一 `CgroupParent`。
 
@@ -174,6 +180,10 @@ bash install-microi.sh --repair-network
 该入口保留现有容器、端口、凭据和数据目录，并用 `mc` 镜像在 `microi` 网络中访问 MinIO readiness。正常安装也必须通过相同网络检测，随后才验证凭据、创建或复用桶并回读公私桶权限；宿主机端口可达不会单独显示为 MinIO 验收通过。
 
 **网络修复不等于续装。** 若失败发生于步骤 9、API 和 `microi-install-app/docker-compose.yml` 还没有创建，`--repair-app` 无法补齐此次安装。保留失败汇总与已有编排，按实际配置恢复后续安装；普通安装入口仍会拒绝覆盖已有 `microi-install-*` 容器，防止重新导入数据库。仅在确认是尚未投入使用的新安装且已有备份时，才按中断安装提示停掉对应编排并重新安装，原数据目录继续保留。
+
+如果 MySQL 5.7 在“暂停恢复库中的定时任务”阶段退出，先区分校验 SQL 执行错误与任务状态不一致。旧脚本的无表 `SELECT … WHERE NOT EXISTS …` 会报 `ERROR 1064`；新版使用兼容 MySQL 5.7/8.0 的 `FROM DUAL`，并独立核对命令退出状态和完整成功标记。下载新版后，仍需按上面的备份与中断安装恢复要求处理，不能跳过暂停门禁或删除原数据目录。
+
+安装器保留导入库中的管理员帐号和密码，不会重置为某个固定默认密码。官方标准空库的初始凭据以登录页提示为准；自定义恢复库使用其原管理员凭据。安装完成提示中的访问地址不代表帐号密码已经通过真实登录验证。
 
 #### 复用已有 MySQL / MinIO
 
@@ -1694,7 +1704,14 @@ services:
       - LT_API_KEYS_DB_PATH=/app/db/api_keys.db
       # 仅用于首次向 LibreTranslate 注册密钥；请替换为随机强密钥。
       - LT_BOOTSTRAP_API_KEY=replace-with-a-random-strong-key
-      - LT_WORKERS=1
+      # LibreTranslate 入口使用 LT_THREADS 控制 Gunicorn worker；LT_WORKERS 不生效。
+      - LT_THREADS=1
+      - ARGOS_INTER_THREADS=1
+      - ARGOS_INTRA_THREADS=1
+      - OMP_NUM_THREADS=1
+      - OPENBLAS_NUM_THREADS=1
+      - MKL_NUM_THREADS=1
+      - NUMEXPR_NUM_THREADS=1
       - LT_TIMEOUT=120
     entrypoint: /bin/sh
     command: >

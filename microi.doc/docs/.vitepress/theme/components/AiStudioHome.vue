@@ -6,6 +6,31 @@
         <h2 id="ai-studio-chat-title">{{ copy.chatTitle }}</h2>
         <span>{{ copy.chatDesc }}</span>
       </div>
+      <div class="ai-studio-summary ai-studio-city-actions" :class="{ 'is-motion-paused': motionPaused }" ref="summaryArea">
+        <div class="ai-studio-summary__actions">
+          <a class="is-start" href="/profile.html#/overview">
+            <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M4 12h11m0 0-4-4m4 4-4 4"/></svg>
+            <span>{{ copy.getStartedAction }}</span>
+          </a>
+          <a class="is-primary" :href="locale === 'en-US' ? '/en/doc/about/microi-training-syllabus' : '/doc/about/microi-training-syllabus'">
+            <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h10.5A2.5 2.5 0 0 1 18 7v12.5H7.5A2.5 2.5 0 0 1 5 17V4.5Z"/><path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H18M9 8h5"/></svg>
+            <span>{{ copy.primaryAction }}</span>
+          </a>
+          <a class="is-agent" :href="MICROI_CODE_DOC_URL">
+            <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="12" rx="2"/><path d="M8 20h8M12 16v4m0-13v6m0 0 2.7-2.7M12 13l-2.7-2.7"/></svg>
+            <span>{{ copy.secondaryAction }}</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <EngineCityStage />
+    <details class="ai-studio-text-companion">
+      <summary>{{ locale === 'en-US' ? 'Explore Microi architecture in text' : '文字版：吾码平台能力与技术架构' }}</summary>
+      <section class="ai-studio-stage" aria-label="吾码平台介绍文字版">
 
       <div class="ai-studio-chat" :class="{ 'has-messages': messages.length }">
         <div v-if="messages.length" ref="messageArea" class="ai-studio-messages" aria-live="polite">
@@ -55,25 +80,7 @@
         </div>
       </div>
       <p v-if="chatError" class="ai-studio-error" role="alert">{{ chatError }}</p>
-      <div class="ai-studio-summary" ref="summaryArea" :class="{ 'is-motion-paused': motionPaused }" aria-label="Microi 平台价值与开发路径">
-        <div class="ai-studio-summary__actions">
-          <a class="is-start" href="/profile.html#/overview">
-            <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M4 12h11m0 0-4-4m4 4-4 4"/></svg>
-            <span>{{ copy.getStartedAction }}</span>
-          </a>
-          <a class="is-primary" :href="locale === 'en-US' ? '/en/doc/about/microi-training-syllabus' : '/doc/about/microi-training-syllabus'">
-            <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h10.5A2.5 2.5 0 0 1 18 7v12.5H7.5A2.5 2.5 0 0 1 5 17V4.5Z"/><path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H18M9 8h5"/></svg>
-            <span>{{ copy.primaryAction }}</span>
-          </a>
-          <a class="is-agent" :href="MICROI_CODE_DOC_URL">
-            <span class="mci-home-flow-particles" aria-hidden="true"><i v-for="particle in 12" :key="particle"></i></span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="12" rx="2"/><path d="M8 20h8M12 16v4m0-13v6m0 0 2.7-2.7M12 13l-2.7-2.7"/></svg>
-            <span>{{ copy.secondaryAction }}</span>
-          </a>
-        </div>
-
+      <div class="ai-studio-summary" :class="{ 'is-motion-paused': motionPaused }" aria-label="Microi 平台价值与开发路径">
         <div class="ai-studio-summary__path">
           <header>
             <h2>{{ copy.mapTitle }}</h2>
@@ -101,7 +108,8 @@
       </div>
     </section>
 
-    <MciNugetStats variant="home" :locale="locale" />
+      <MciNugetStats variant="home" :locale="locale" />
+    </details>
     <ProductShowcase :locale="locale" />
   </main>
 </template>
@@ -111,6 +119,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vitepress'
 import ProductShowcase from './ProductShowcase.vue'
 import MciNugetStats from './MciNugetStats.vue'
+import EngineCityStage from './EngineCityStage.vue'
 
 const route = useRoute()
 const inputText = ref('')
@@ -133,9 +142,9 @@ const copy = computed(() => locale.value === 'en-US' ? {
   eyebrow: 'Open-source AI development framework',
   titleLeadParts: ['Open-source AI', 'development framework'],
   titleEmphasisLines: ['30+ mature engines'],
-  lead: 'AI low-code, microservices, and the V8 engine share one delivery path. In high-reuse business scenarios, AI development can use 10×+ fewer tokens and move 10×+ faster.',
+  lead: 'AI low-code, microservices, and the V8 engine share one delivery path. Reuse platform capabilities and compose business logic online; measure results with equivalent tasks and acceptance criteria.',
   getStartedAction: 'Get started', primaryAction: 'Training syllabus', secondaryAction: 'Microi Agent',
-  proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
+  proofAction: 'View the retest method and scope', proofLabel: 'Platform facts',
   proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '30+ mature engines'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
   mapDesc: 'Low-code, V8, and microservices share one AI-ready foundation.',
@@ -150,8 +159,8 @@ const copy = computed(() => locale.value === 'en-US' ? {
   valueLabel: 'Why teams choose Microi',
   values: [
     { kicker: 'Ready out of the box', title: 'Reuse 30+ mature engines', description: 'AI low-code, identity, workflow, data, integration, and delivery capabilities start from a proven foundation.' },
-    { kicker: 'Use 10×+ fewer tokens', title: 'Let AI focus on business change', description: 'MCP, Skills, schemas, and V8 reduce repeated framework and boilerplate generation.' },
-    { kicker: 'Develop 10×+ faster', title: 'Deliver working applications sooner', description: 'Visual modeling, V8, microservices, and source extensions form one continuous delivery path.' }
+    { kicker: 'Reuse platform engines', title: 'Let AI focus on business change', description: 'MCP, Skills, schemas, and V8 reduce repeated framework and boilerplate generation.' },
+    { kicker: 'Compose business logic online', title: 'Compose and verify working applications', description: 'Visual modeling, V8, microservices, and source extensions form one continuous delivery path.' }
   ],
   chatTitle: 'Open-source AI development framework, built on 30+ mature engines',
   chatDesc: 'AI low-code, V8, and microservices share one delivery foundation, so teams can focus on real business change.',
@@ -167,9 +176,9 @@ const copy = computed(() => locale.value === 'en-US' ? {
   eyebrow: '开源 AI 开发框架',
   titleLeadParts: ['开源 AI', '开发框架'],
   titleEmphasisLines: ['30+ 成熟引擎'],
-  lead: '融合 AI 低代码、微服务与 V8 引擎；在平台能力高度复用的典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，更快交付企业应用。',
+  lead: '融合 AI 低代码、微服务与 V8 引擎；复用成熟平台能力，在线编排业务逻辑，让 AI 聚焦业务增量。具体收益按同条件任务实测。',
   getStartedAction: '开始使用', primaryAction: '培训大纲', secondaryAction: 'Microi Agent',
-  proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
+  proofAction: '查看复测方法与适用边界', proofLabel: '平台事实',
   proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '30+ 成熟引擎'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',
   mapDesc: '低代码、V8 与微服务共用一套可复用的 AI 开发底座。',
@@ -184,8 +193,8 @@ const copy = computed(() => locale.value === 'en-US' ? {
   valueLabel: '选择 Microi吾码的核心理由',
   values: [
     { kicker: '开箱即用', title: '复用 30+ 成熟引擎', description: 'AI 低代码、权限、流程、数据、集成与交付能力从成熟底座起步，不再重复造轮子。' },
-    { kicker: 'Token 更省 10 倍+', title: '让 AI 聚焦业务增量', description: 'MCP、Skills、实时 Schema 与 V8 减少框架解释、胶水代码和重复生成。' },
-    { kicker: '速度提升 10 倍+', title: '更快交付可运行应用', description: '可视化建模、V8、微服务与源码扩展贯通一条连续开发和验收链。' }
+    { kicker: '复用通用引擎', title: '让 AI 聚焦业务增量', description: 'MCP、Skills、实时 Schema 与 V8 减少框架解释、胶水代码和重复生成。' },
+    { kicker: '在线编排业务', title: '交付可验收的业务应用', description: '可视化建模、V8、微服务与源码扩展贯通一条连续开发和验收链。' }
   ],
   chatTitle: '开源 AI 开发框架，让 AI 站在 30+ 成熟引擎上，更快交付',
   chatDesc: 'AI 低代码、V8 与微服务共用一套成熟底座，减少重复生成，直接进入业务交付。',
@@ -285,3 +294,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', syncMotionState)
 })
 </script>
+
+<style scoped>
+.ai-studio-city-actions{margin-top:24px}.ai-studio-city-actions .ai-studio-summary__actions{margin-bottom:0}.ai-studio-text-companion{width:min(1440px,calc(100% - 48px));margin:14px auto 0;color:var(--vp-c-text-2);font-size:12px}.ai-studio-text-companion>summary{cursor:pointer;min-height:40px;display:list-item;padding:10px 3px}.ai-studio-text-companion[open]{padding-bottom:24px}.ai-studio-text-companion .ai-studio-stage{width:100%}@media(max-width:760px){.ai-studio-text-companion{width:calc(100% - 24px)}}
+</style>

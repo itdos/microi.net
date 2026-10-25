@@ -104,7 +104,7 @@
 |---|---|
 | `V8.IsNull(value)` | 兼容判断 `null/undefined/''/'null'/'undefined'` |
 | `V8.ChineseToPinyin(text,fullPyLen,type)` | 中文转拼音 |
-| `V8.NewGuid()` | 前端生成 GUID |
+| `V8.NewGuid()` | 前端生成 26 位 ULID；名称为兼容保留，不能据此假设是 36 位 GUID |
 | `await V8.NewServerGuid()` | 请求服务端生成 GUID |
 | `V8.Base64.encode(value)` | 前端 Base64 编码 |
 | `V8.Base64.decode(value)` | 前端 Base64 解码 |

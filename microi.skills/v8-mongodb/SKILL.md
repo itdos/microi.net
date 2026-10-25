@@ -1,6 +1,6 @@
 ---
 name: v8-mongodb
-description: Microi V8 MongoDB 指南。用于使用 V8.MongoDb AddFormData、UptFormData、UptFormDataByWhere、DelFormData、DelFormDataByWhere、GetFormData、GetTableData、对象过滤和文档 Id。
+description: Microi V8 MongoDB 指南。用于使用 V8.MongoDb 文档读写、GetPartitionedTableData 跨年跨月游标分页、对象过滤和原生 ObjectId。
 ---
 
 > **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
@@ -28,6 +28,7 @@ description: Microi V8 MongoDB 指南。用于使用 V8.MongoDb AddFormData、Up
 | `V8.MongoDb.DelFormDataByWhere({...})` | 按非空 `_Where` 批量删除 |
 | `V8.MongoDb.GetFormData({...})` | 查询单个文档（按 Id） |
 | `V8.MongoDb.GetTableData({...})` | 查询文档列表 |
+| `V8.MongoDb.GetPartitionedTableData({...})` | 当前租户年度库、月度集合及旧年度集合的有界游标分页 |
 | `V8.MongoDb.NewId()` | 生成 MongoDB Id |
 
 ## 新增文档
@@ -113,6 +114,10 @@ var result = V8.MongoDb.GetFormData({
 });
 ```
 
+`GetFormData` 的原生不存在结果是 `{ Code: 1, Data: null }`；只有 `Code=1` 且 `Data` 是文档时才表示找到记录。不要套用 `V8.FormEngine.GetFormData` 的 `Code=2` 约定。查询失败、异常、空响应或缺失 `Data` 字段不能当作记录不存在并继续新增。兼容旧适配器时，仅接受 `Code=2` 且没有正文的明确不存在结果。
+
+聊天等幂等写入先使用固定业务标识定位分区；首次不存在时才新增。Mongo 写入结果未知时只回读同一 `_id` 并比对完整载荷摘要，禁止换 Id 或月份盲重发。正文已持久化但联系人、实时推送或后置 Hook 失败时保留已提交事实；业务层分别返回投影警告，不能宣称消息没有写入。
+
 ## 查询文档列表
 
 ```javascript
@@ -132,7 +137,58 @@ var result = V8.MongoDb.GetTableData({
 
 `GetFormData` 和 `GetTableData` 属于 dynamic 无模式读取。服务端会在 MongoDB 投影阶段过滤 BSON 内部 `_t` CLR 类型判别字段，避免存量强类型 C# 写入留下的旧类型名称触发反序列化失败。`_t` 不是 V8 业务契约；业务需要类型标记时应使用自有字段（例如 `DocumentType`），不得读取、筛选或依赖 `_t`。强类型 C# MongoDB 模型仍按自身的多态映射处理。
 
+### 原生 `_id` 过滤
+
+`_Where: [['_id', 'In', ids]]` 支持原生 ObjectId 的数组或逗号分隔字符串，每次 1–1000 项。`=`、`!=`、范围比较与 `NotIn` 同样使用原生 ObjectId；每项必须是合法的 24 位十六进制标识。无效值返回失败，不能忽略条件后退化成全表查询。普通业务字符串 Id 应使用自有字段，不要伪装成原生 `_id`。
+
+## 跨年跨月游标分页
+
+海量聊天/日志不要只查当前月份，不要逐月 `Count + Skip` 或一次加载全历史。使用 `GetPartitionedTableData` 存储原子，接口引擎继续负责 DiyToken、成员资格、消息双方、业务权限与公开 DTO。平台 SignalR 聊天必须继续调用应用商城拥有的 `platform-chat-runtime`，不能另写业务 Controller。
+
+```javascript
+// 必须先完成业务权限校验；身份来自当前 V8 上下文，前缀来自可信代码。
+var result = V8.MongoDb.GetPartitionedTableData({
+  DatabasePrefix: 'audit_log', TablePrefix: 'event',
+  _Where: [['UserId', '=', V8.CurrentUser.Id]],
+  IndexFields: ['UserId'],
+  PageSize: 30, MaxPartitions: 64,
+  Cursor: V8.Param.Cursor || ''
+});
+if (result.Code !== 1) return result;
+// result.Data: { Rows, HasMore, NextCursor, ScannedPartitions }
+// 对外返回前显式选择业务字段，不能透传内部 _PartitionDb / _PartitionTable。
+return { Code: 1, Data: {
+  Rows: result.Data.Rows.map(function(row) {
+    return { Id: row._id, CreateTime: row.CreateTime, Action: row.Action };
+  }),
+  HasMore: result.Data.HasMore, NextCursor: result.Data.NextCursor
+}};
+```
+
+- 命名：只发现当前租户的 `{DatabasePrefix}_{tenant小写}_{yyyy}` 和兼容旧库 `{DatabasePrefix}_{tenant小写}`；集合为 `{TablePrefix}_{yyyyMM}`、`{TablePrefix}_{yyyy_MM}` 或旧 `{TablePrefix}_{yyyy}`。年度库与集合年份必须一致。不能传任意库/集合列表，不能用普通用户输入控制前缀或索引。
+- `PageSize` 默认 30，范围 1–100（不是 `_PageSize`）；`MaxPartitions` 默认 64，范围 1–128。目录最多 200 个租户库、2400 个有效集合。总调用限时 20 秒，单个集合查询限时 10 秒；超限/存储故障返回失败，不能冒充历史结束。
+- `_Where` 必须非空且有效；双向聊天可用 `_WhereAny` 传 1–4 组非空条件，组内 AND、组间 OR。指定 `_WhereAny` 时不再合并 `_Where`，每个分支都必须独立包含权威身份/资源边界。
+- `IndexFields` 可选，最多 3 个互异安全字段；按这些字段升序加 `CreateTime DESC, _id DESC` 创建复合索引。文档必须使用 BSON 日期 `CreateTime` 和原生 ObjectId `_id`。稳定排序按两者倒序，页内旧/新分区重复 `_id` 合并；普通页不执行 Count。
+- `Cursor` 是服务端返回、绑定租户/前缀/过滤条件的 opaque 字符串，最大 2048 字符。它是翻页位置而非鉴权凭据，禁止客户端解析或替换为页码。查询条件改变必须清空游标。即使 `Rows=[]`，只要 `HasMore=true` 仍需用新的 `NextCursor` 继续；跨空月、跨年和旧年度表不能提前截止。
+- `CountOnly:true` 返回 `{ Count }`，仍执行权限条件，扫描范围超过 `MaxPartitions` 直接失败而不返回部分总数。它计数物理行，迁移时不要复制未读事实到多个分区；需要业务去重计数时由权威索引另行维护。
+- 新消息按原始发生时间选择年度库/月度集合。`AddFormData` 的可选顶层 `OccurredAt` 用于可信后端重放保持 `CreateTime`，不得直接信任客户端时间；默认仍使用服务端当前时间。跨月重试必须用稳定业务 Id 和持久分区定位复用原始事实，不能在新月份再写一条。
+- 前端采用滚动异步加载、稳定 Id 合并、请求代际隔离和向前插入锚点补偿。实时消息只增量合并；已读回执读取有界最新页，不能重置旧历史游标或把未展示的全历史标为已读。
+
+该原子需部署相应 Core/MongoDB/API 组件并更新 Managed 应用运行时。源码测试不等于线上 MongoDB、SignalR 或浏览器验收；至少覆盖跨月、跨年、空月、同时间多消息、旧年度集合、重复迁移数据、跨租户拒绝、断线重试和滚动位置。
+
 ## 实战模式
+
+### 物理审计与权威索引分页
+
+`GetPartitionedTableData` 的高级模式需在可信接口引擎完成业务权限校验后使用，不能把客户端参数直接作为库、集合或索引定义：
+
+- `PhysicalRows:true` 保留同 Id 的所有物理副本，按分区和 `_id` 扫描。`PageSize` 默认/上限 100，`MaxPartitions` 默认/上限 8；不接受 `_WhereAny` 或 `CountOnly`。只有省略 `_Where` 的完整扫描才有 `FullPhysicalScope=true`，带条件的扫描不能证明全租户迁移完成。
+- 物理扫描返回 `DirectoryHash/NextCursor/HasMore`，继续时原样带回；目录或集合身份变化、非法 `_id` 必须失败关闭，不得跳过再宣称迁移完成。
+- `CollectionPage:true` 使用可信 `DatabasePrefix/TableName`，`IndexFields` 为 1–4 个字段，`_Where` 必须完整等值匹配这些前缀。`SortField` 是不在前缀内的文本字段，与原生 `_id` 倒序分页。`PageSize` 默认 30、上限 100，普通页不计数。
+- 索引必须在维护阶段用 `EnsureIndex:true` 显式准备；普通读取仅 Hint 已存在的索引。`CountOnly:true` 单独执行索引计数；准备与计数不接受游标。不把首次用户页面加载变成全量索引构建。
+- 两种模式互斥，返回的 `_PartitionDb/_PartitionTable` 仅供可信内部逻辑，公开 DTO 显式选字段。
+
+平台聊天迁移通过固定 Managed `platform-chat-maintenance` 编排。`V8.Method.ManageManagedStorageMaintenance` / `V8.Method.RequireManagedStorageMaintenance` 只接受真实当前租户、固定 Key、超级管理员及非访问密钥会话；普通 V8 MongoDB CRUD 不得读写宿主准入集合。先核实所有写节点升级，再关闭准入、真实排空、分批迁移、完整验证、条件释放；具体流程见 `../message-notification/references/contracts.md`。不能用客户端布尔值、TTL 或清空票据冒充排空。
 
 ### IoT 设备日志存储
 

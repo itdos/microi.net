@@ -64,6 +64,11 @@
           <EmptyTenants v-if="!isLoading && tenants.length === 0" @create="navigateProfile('create')" />
         </section>
 
+        <section v-if="activeMenu === 'star-gift-registration'" class="content-panel">
+          <ProfileStarGiftRecords v-if="starGiftCanView" :request="portalRequest" @denied="starGiftCanView = false" />
+          <div v-else class="state-panel" role="status"><h2>{{ starGiftAccessLoading ? '正在核验访问权限…' : '暂无访问权限' }}</h2><p>{{ starGiftAccessError || '此功能仅对拥有 Star活动登记查看 角色的帐号开放。' }}</p><button type="button" class="ghost-action" @click="refreshStarGiftAccess">重新核验</button></div>
+        </section>
+
         <section v-if="activeMenu === 'licenses'" class="content-panel">
           <div class="panel-head"><div><h2>帐号的系统授权</h2><p>与吾码框架「授权记录」使用同一份记录，包含个人版和企业版。</p></div><span class="record-count">{{ licenseTotal }} 条记录</span></div>
           <p v-if="licenseError" class="error-box" role="alert">{{ licenseError }}</p>
@@ -181,6 +186,7 @@
             :total="relayToken.GiftTokens"
             :used="relayToken.UsedTokens"
             :remaining="relayToken.RemainingTokens"
+            :is-unlimited="relayToken.IsUnlimited"
             :locale="locale"
             :labels="aiSummaryLabels"
             @copy="copyAiApiKey"
@@ -317,7 +323,9 @@
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import ProfileAiChat from './ProfileAiChat.vue'
 import ProfileAiSummary from './ProfileAiSummary.vue'
+import { normalizeRelayQuota } from '../profile-relay-quota.mjs'
 import InvitationTree from './InvitationTree.vue'
+import ProfileStarGiftRecords from './ProfileStarGiftRecords.vue'
 import { buildSiteSessionHeaders, getOrCreateSiteDid } from '../utils/site-session.js'
 import { getInitialProfileLocale, normalizeProfileLocale, translateProfile } from '../profile-i18n'
 import { createOpenClawAuthBridge, isOpenClawBridgeMode } from '../openclaw-auth-bridge'
@@ -332,6 +340,9 @@ const t = (key, params = {}) => translateProfile(locale.value, key, params)
 const authToken = ref('')
 const currentUser = ref(null)
 const tenantCenter = ref({})
+const starGiftCanView = ref(false)
+const starGiftAccessLoading = ref(false)
+const starGiftAccessError = ref('')
 const tenants = ref([])
 const tenantAdminCredentials = ref({})
 const isLoading = ref(false)
@@ -364,11 +375,7 @@ const createSubmitButton = ref(null)
 const starContinueButton = ref(null)
 const tenantSteps = ref([])
 const tenantProgressTick = ref(Date.now())
-const relayToken = ref({
-  GiftTokens: 100000,
-  UsedTokens: 0,
-  RemainingTokens: 100000
-})
+const relayToken = ref(normalizeRelayQuota())
 const aiApiKey = ref('')
 const aiApiEndpoint = ref('https://api.microi.net/v1')
 const relayUsageLogs = ref([])
@@ -404,11 +411,12 @@ const menus = computed(() => [
   { key: 'create', name: t('createTenant'), icon: '+' },
   { key: 'licenses', name: '系统授权', icon: '✓' },
   { key: 'invitations', name: '邀请关系', icon: '♧' },
+  ...(starGiftCanView.value ? [{ key: 'star-gift-registration', name: 'Star活动登记', icon: '☆' }] : []),
   { key: 'ai', name: t('aiRelay'), icon: 'AI' },
   { key: 'account', name: t('account'), icon: '◉' }
 ])
 
-const menuKeys = ['overview', 'systems', 'create', 'licenses', 'invitations', 'ai', 'account']
+const menuKeys = ['overview', 'systems', 'create', 'licenses', 'invitations', 'star-gift-registration', 'ai', 'account']
 const routeAliases = { tenants: 'systems', billing: 'licenses' }
 
 const tenantStepMessages = {
@@ -431,11 +439,6 @@ const tenantStepMessages = {
 }
 
 const isAuthed = computed(() => !!authToken.value && !!currentUser.value)
-const tokenUsagePercent = computed(() => {
-  const total = Math.max(0, Number(relayToken.value.GiftTokens || 0))
-  const used = Math.max(0, Number(relayToken.value.UsedTokens || 0))
-  return total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
-})
 const tenantDatabaseQuota = computed(() => Math.max(1, Number(tenantCenter.value.TenantDatabaseQuota ?? tenantCenter.value.FreeQuota ?? 1)))
 const tenantUsedQuota = computed(() => Math.max(0, Number(tenantCenter.value.UsedQuota ?? tenants.value.length)))
 const canCreateFreeTenant = computed(() => tenantUsedQuota.value < tenantDatabaseQuota.value)
@@ -478,6 +481,7 @@ const pageTitle = computed(() => {
     systems: '我的系统',
     licenses: '系统授权',
     invitations: '邀请关系',
+    'star-gift-registration': 'Star活动登记',
     create: t('createTenant'),
     ai: t('aiRelay'),
     account: t('account')
@@ -487,10 +491,11 @@ const pageTitle = computed(() => {
 const pageDesc = computed(() => {
   if (!isAuthed.value) return t('loginPageDesc')
   if (activeMenu.value === 'create') return t('createPageDesc')
+  if (activeMenu.value === 'star-gift-registration') return '活动登记资料与核验进度，仅授权角色可见。'
   const descriptions = { overview: '你的系统、授权与邀请，一个清晰的工作空间。', systems: '管理你已创建的云端系统。', licenses: '查看这个帐号的全部系统授权和申请进度。', invitations: '分享吾码，查看你的多级邀请关系。', ai: '专注对话和创作，按需查看使用记录。', account: '管理公开资料与账户设置。' }
   return descriptions[activeMenu.value] || t('pageDesc', { name: profileName.value })
 })
-const aiSummaryLabels = computed(() => ({ title: t('aiTitle'), desc: t('aiDesc'), copy: t('copyApiKey'), apiBase: t('apiBase'), apiKey: t('apiKey'), generating: t('generating'), total: t('totalToken'), used: t('usedToken'), remaining: t('remainingToken') }))
+const aiSummaryLabels = computed(() => ({ title: t('aiTitle'), desc: t('aiDesc'), copy: t('copyApiKey'), apiBase: t('apiBase'), apiKey: t('apiKey'), generating: t('generating'), total: t('totalToken'), used: t('usedToken'), remaining: t('remainingToken'), unlimited: t('unlimitedToken') }))
 const tenantStepSummary = computed(() => {
   const errorStep = tenantSteps.value.find(step => step.Status === 'error')
   if (errorStep) return t('failedStep', { title: errorStep.Title, detail: errorStep.Detail })
@@ -1045,6 +1050,8 @@ function clearSession() {
   currentUser.value = null
   tenants.value = []
   tenantCenter.value = {}
+  starGiftCanView.value = false
+  starGiftAccessError.value = ''
   window.dispatchEvent(new CustomEvent('microi-auth-expired'))
   openClawAuthBridge?.notify()
 }
@@ -1123,6 +1130,7 @@ async function acknowledgeTenantBootstrapCredential(traceId, deliveryId) {
 
 async function refreshCenter() {
   if (!isAuthed.value) return
+  await refreshStarGiftAccess()
   isLoading.value = true
   profileError.value = ''
   try {
@@ -1158,6 +1166,16 @@ async function refreshCenter() {
 
 const licenses = ref([]), licenseTotal = ref(0), licensePage = ref(1), licenseLoading = ref(false), licenseError = ref('')
 const invitationRefreshKey = ref(0)
+// 能力来自服务端主库复核，浏览器缓存里的 RoleIds 不决定入口是否可见。
+async function refreshStarGiftAccess() {
+  starGiftCanView.value = false
+  starGiftAccessError.value = ''
+  if (!isAuthed.value) return
+  starGiftAccessLoading.value = true
+  try { const data = await portalRequest('official_star_gift_records', { Action: 'Capabilities' }); starGiftCanView.value = data.CanView === true }
+  catch (error) { starGiftAccessError.value = error.message }
+  finally { starGiftAccessLoading.value = false }
+}
 const invitationLink = computed(() => typeof window === 'undefined' ? '' : `${window.location.origin}/login.html?tab=register&invite=${encodeURIComponent(currentUser.value?.Id || '')}`)
 async function portalRequest(key, params = {}) {
   const response = await authenticatedFetch(apiEngineUrl(key), { method: 'POST', body: JSON.stringify(params) })
@@ -1208,11 +1226,7 @@ async function refreshRelayTokenSummary() {
       return
     }
     if (result.Code === 1 && result.Data) {
-      relayToken.value = {
-        GiftTokens: Number(result.Data.GiftTokens || 100000),
-        UsedTokens: Number(result.Data.UsedTokens || 0),
-        RemainingTokens: Number(result.Data.RemainingTokens || 0)
-      }
+      relayToken.value = normalizeRelayQuota(result.Data)
       openClawAuthBridge?.notify()
     }
   } catch {
@@ -1253,12 +1267,8 @@ async function refreshAiUsage(pageIndex = aiUsagePageIndex.value) {
       return
     }
     if (result.Code === 1 && result.Data) {
-      relayToken.value = {
-        GiftTokens: Number(result.Data.GiftTokens || 100000),
-        UsedTokens: Number(result.Data.UsedTokens || 0),
-        RemainingTokens: Number(result.Data.RemainingTokens || 0)
-      }
-      openClawAuthBridge?.notify()
+      // The legacy usage engine does not return entitlement flags. The summary
+      // endpoint owns quota state so parallel log loads cannot reset unlimited.
       relayUsageLogs.value = Array.isArray(result.Data.Logs) ? result.Data.Logs : []
       aiUsagePageIndex.value = Number(result.Data.PageIndex || pageIndex || 1)
       aiUsagePageSize.value = Number(result.Data.PageSize || aiUsagePageSize.value)

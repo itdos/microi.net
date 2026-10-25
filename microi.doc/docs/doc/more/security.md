@@ -2,6 +2,10 @@
 
 > 本文说明 Microi 吾码平台在 FormEngine、接口引擎、SaaS、多租户、文件、登录会话和外部 HTTP 访问中的服务端安全边界。安全能力必须在服务端生效；隐藏按钮、前端路由和“用户已经登录”都不能代替授权。
 
+安全说明与测试证据分别维护。可复核入口见[适配与安全证据工具](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/compatibility)）：2026-10-25 核对的历史 `8.6.8` TRX 摘要一致，选取的租户配置、访问密钥、Token 轮换、租户边界与 SSRF 兼容共 287 项通过；它是维护方的历史回归记录，不是第三方安全认证，也不代替新版本或目标部署验收。当前源码版本、依赖和历史回执版本在快照中分开显示。测试源码与运行条件见 [Microi.Tests](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）。
+
+上线需逐项核对 HTTPS 与数据库证书、代理信任范围、CORS 来源、是否启用严格 SSRF、角色/租户隔离和敏感日志留存。保留具体平台版本、部署组合、失败与未执行项；没有第三方报告或真实环境回执时，应标注“未核验”。安全问题按[贡献指南的私下报告入口](https://gitee.com/ITdos/microi.net/blob/master/CONTRIBUTING.md#私下报告安全问题)（[GitHub](https://github.com/itdos/microi.net/blob/master/CONTRIBUTING.md#私下报告安全问题)）联系，公开 Issue 不上传凭据或客户数据。
+
 ---
 
 ## 一、先区分身份、授权与可信执行
@@ -163,8 +167,9 @@ Upgrade16/Upgrade35 会在 `sys_osclients` 增加六个现行可空租户字段�
 `sys_osclients` 同时包含租户业务配置和数据库、认证、Redis、对象存储、MQ/MQTT、搜索等基础设施机密。运行时必须使用脱敏投影：
 
 - `V8.OsClientModel` / `V8.ClientModel` 不注入数据库连接、`AuthSecret`、Redis、对象存储、MQ/MQTT、搜索等基础设施凭据。
-- `V8.SysConfig` 不注入 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 及疑似 Password/Secret/Token/Key/Connection 字段。
-- 当前租户自行扩展的微信、支付、ERP 等业务密钥仍可能存在，V8 不得把整个对象或密钥返回前端。
+- 浏览器和前端 V8 的 `V8.SysConfig` 使用匿名 `GetSysConfig` 的独立脱敏投影，不注入 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 及疑似 Password/Secret/Token/Key/Connection 字段。
+- 后端接口引擎和后端 V8 事件使用当前租户独立的 `sys_config`；启用的动态系统设置放在 `V8.SysConfig.ServerPrivateSettings`，其中 Secret 由可信后端按租户解密。浏览器、前端 V8 和普通 FormEngine 不获得该节点；任何运行端都不存在 `PublicSettings` 属性。
+- 后端 V8 可使用当前租户被授权的业务秘密，因此可编辑服务端代码仅授予可信开发者。不得把整个配置、`ServerPrivateSettings` 或其中密钥返回前端、写入日志或应用包。
 - 子租户调用 `GetSysConfig` 时强制绑定当前 `OsClient`，不能借缓存命中读取主租户配置。
 
 SaaS 引擎的“JWT密钥状态”只读显示“已配置”或“待自动生成”，不显示密钥原文。新建或接入旧库租户后，保存/刷新配置由后端生成强随机 Key 并持久写入主控库 `sys_osclients.AuthSecret`；NULL、空字符串和旧弱值均可自动修复，多节点竞争时采用已经持久化的同一个 Key。重复保存、刷新和重启不会替换已有有效 Key。普通表单提交不能写入签名根；如需主动轮换，使用受控的“JWT密钥目标轮换版本”配置。
@@ -172,6 +177,8 @@ SaaS 引擎的“JWT密钥状态”只读显示“已配置”或“待自动生
 新租户不能复制整条主租户记录。受控开库流程必须排除租户身份、数据库、认证、Redis、存储、MQ/MQTT、搜索凭据，为新租户生成独立配置，并在刷新 SaaS 缓存后回读验证。跨租户路由时，Token 身份不能自动带到另一个 `OsClient`；目标接口只有明确允许匿名时才能按匿名边界执行。
 
 DataSource、Translate、Workflow 等引擎在 V8 调用链中统一服从当前 `V8TenantContext`：普通租户脚本即使在参数中伪造其它 `OsClient`，服务端也会绑定回当前租户或拒绝。只有非 V8 的可信平台 C# 调用，或主租户经过明确控制面授权的调用，才可以显式处理目标租户；业务 HTTP 参数本身不能建立这种信任。
+
+从 v8.5.12 起，Redis 管理器由 `Microi.Cache` 强制实施租户边界：主租户身份以 API 宿主的 `OsClient` 配置为准，主租户超级管理员可管理当前受控连接中的全部 Key；子租户超级管理员只能扫描、读取和维护完整的 `Microi:{当前OsClient}:` 前缀，不能靠 `Level=9999`、请求参数或切换数据库取得主租户权限。精确读取、删除、覆盖、重命名的两端、TTL、批量删除和缓存失效均执行同一检查，批量请求中出现越权 Key 时整批拒绝。普通业务 `V8.Cache` 仍只允许当前租户。
 
 Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存的连接。`temporary` 临时连接和匿名任意 Host/密码管理已禁止；保存密码由后端保护且不返回前端。MCP Redis 写操作必须传 `confirmExecution`，不得把 Redis 密码放入参数、日志或对话。
 
@@ -181,7 +188,7 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 在线 AI 默认通过“大模型关键词扩展 + 权限感知 Schema 搜索 + 精确字段回读”工作，不需要安装或连接 Ollama、nomic-embed-text、Qdrant。`mic_ai.EnableVectorDatabase=1` 时才启用向量增强；字段缺失、为空、关闭或服务异常时，必须跳过向量连接/同步或回退到关键词模式。
 :::
 
-- 普通 `Chat/ChatStream` 当前使用服务端会话上下文和固定核心规范 Prompt，不检索完整向量 corpus；`NL2SQL` 默认使用当前租户权限范围内的 Schema 关键词检索，启用向量开关后才叠加 Schema RAG；`NL2V8` 同理叠加可选 Skill / Schema 向量召回。平台在线 AI 不是 MCP Host；只有真正注册 Tools 并处理 `tool_calls` 的宿主才能调用 MCP。模型文字声称“已调用”不能作为执行证据。
+- 普通 `Chat/ChatStream` 当前使用服务端会话上下文和固定核心规范 Prompt，不检索完整向量 corpus；`NL2SQL` 默认使用当前租户权限范围内的 Schema 关键词检索，启用向量开关后才叠加 Schema RAG；`NL2V8` 同理叠加可选 Skill / Schema 向量召回。这些检索入口不等于 MCP Host；低代码建模模式由可信宿主注册 Tools 并处理 `tool_calls`，以当前用户身份调用同版 MCP。模型文字声称“已调用”不能作为执行证据。
 - 关键词、同义词和候选表均不是授权凭据。候选 Schema 必须先与服务端授权快照取交集，再从权威元数据精确回读；缓存按 `OsClient + 授权版本` 隔离，权限变化后失效，不能让模型或客户端提交的表名扩大范围。
 - 启用向量数据库时，Schema 向量的写入、搜索、精确匹配、差量同步、删除和重建必须强制携带规范化 `OsClient`，Qdrant payload/filter 形成同一租户分区；point id 由 `OsClient + TableId` 确定性生成，重试和多节点同步不能生成重复点。
 - HTTP 与 gRPC 使用不同版本/维度的 collection，禁止让 768 维和 384 维向量共用同名 collection。
@@ -192,8 +199,10 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 - NL2SQL 的可信授权标记和最大返回行数只由服务端写入，并由两套 JSON 序列化器忽略客户端输入。表白名单仅取当前租户未删除、非平台受保护的业务表。老数据库中某角色从未保存过 AI 策略时，服务端只按其现有 FormEngine `List` 读取权限兼容放行无行级范围的业务表；一旦存在该角色的策略记录（包括显式禁用），就严格要求启用的全量数据策略与 `AllowRawSql`。两种路径都会与 FormEngine 权限取交集，并按授权版本与用户缓存；Schema 关键词或向量命中后仍按该精确非空白名单再次过滤。
 - 执行层使用严格词法门禁要求单条 `SELECT`，逐个验证每个 `FROM`/`JOIN` 来源表，拒绝注释、多语句、CTE、`UNION`、写操作、危险关键字/函数和变量赋值；按数据库施加 `MaxRows + 1` 行限制、最多返回 100 行并设置 30 秒命令超时。
 - 该门禁不是完整 SQL AST，模型生成的动态值当前也不会被重写为数据库参数。通用 NL2SQL 不执行菜单 `SqlWhere`/`SqlJoin`；普通角色遇到带行级范围的表必须失败关闭，本人、部门或关联记录范围查询改走经过审核、显式参数化并记录审计的业务 ApiEngine。不得把表级读取权限、模型输出或向量命中描述为行级数据授权。
-- OpenAI 代理流式接口会传递请求取消信号；普通 `ChatStream` 与 `NL2V8` 当前主要依赖内部超时，不能承诺客户端断开一定立即取消上游和计费。
-- 当前计量表和诊断日志可能保存完整问题、回答或问题摘要。必须把它们视为敏感业务数据并限制访问、配置留存；全面脱敏和可配置留存实现前，不得宣称 Prompt/Answer 已全部脱敏或不落日志。
+- OpenAI 代理已有请求取消传递。新增源码中，`/api/Ai/ChatStream` 与 `/api/Ai/NL2V8Engine` 通过可选 `IAiCancellableStream` 传入 `RequestAborted`，SSE 写出与刷新也使用该令牌；旧接口签名继续兼容。普通文本流同时受 `mic_ai.AiTimeout` 限制，空流不再隐式发起第二次模型请求。目标服务须部署包含修复的后端并验收，不能把源码更新视为旧部署已经生效。
+- 普通 `ChatStream` 和流式 `NL2V8` 只有模型明确 `Stop` 且正文非空才按完成处理；`DataAppend.CompletionStatus` 区分 `Completed`、`Cancelled`、`TimedOut`、`Truncated`、`Filtered`、`Incomplete`、`Failed`。不完整结果保留部分 `Data` 并返回失败，页面不能因为收到文字就显示成功；请求成功仍须校验 `Code` 和计量状态。Schema 和可选向量查询只在前后检查取消，不承诺中途立即终止；取消也不撤销已执行工具、数据修改或已发生费用。
+- 新计量写入的两条受控路径统一将 `PromptPreview/Question/Answer` 绑定为空，只保留用量与关联元数据；用量查询使用九个计量/关联字段的固定投影。现有数字计量事务保持原行为，缺少供应商 usage 时仍可能估算，`RelayUsageSource=Estimated` 不能当作供应商实耗。
+- 普通聊天和 NL2V8 的此次诊断修复只记录长度、状态和异常类型，NL2V8 异常响应不再透传内部异常正文。旧列、历史计量记录、历史日志及用户主动保存的会话仍保留，需按业务授权另行治理；其它 AI 分支未因此完成全量审计，不宣称全平台正文均不落库或已经实现统一可配置留存。
 
 ---
 
@@ -227,16 +236,12 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 - 若可信代理没有提供可验证的转发头，处理后的 `RemoteIpAddress` 仍是该精确容器网关，平台会跳过这一请求的 IP 自动封禁，但继续执行全局请求压力与内存保护。无法区分真实来源时宁可保留审计，也不能让一个用户触发整站误封。
 - 公网网关、宽泛网段和客户端自报地址不会被自动信任；框架仅额外保留安全的 loopback 直连代理默认值。
 
-Nginx、Ingress、SLB、CDN 或其它 API 节点若不是 loopback 或容器自动发现的私有网关，必须在后端配置其**直接连接 Kestrel 的最后一跳** IP 或 CIDR：
+Nginx、Ingress、SLB、CDN 或其它 API 节点若不是 loopback 或容器自动发现的私有网关，必须在 SaaS 引擎配置其**直接连接 Kestrel 的最后一跳** IP 或 CIDR：
 
-```json
-{
-  "ForwardedHeaders": {
-    "KnownProxies": ["10.20.0.12"],
-    "KnownNetworks": ["10.20.0.0/24"]
-  }
-}
-```
+| SaaS 引擎字段 | 配置示例 | 使用边界 |
+|---|---|---|
+| `BackendForwardedKnownProxies` | `10.20.0.12` | 优先使用实际反向代理的精确 IP |
+| `BackendForwardedKnownNetworks` | `10.20.0.0/24` | 仅在该网段完全受控时使用，不因方便扩大信任范围 |
 
 在主租户 SaaS 引擎【后端运行配置】中，用 `BackendForwardedKnownProxies` 配置受信代理精确 IP、用 `BackendForwardedKnownNetworks` 配置受控 CIDR；多个值用逗号或换行分隔，修改后滚动重启 API 节点。禁止改用容器环境变量或自定义 `appsettings` 节点，也禁止填 `0.0.0.0/0`、`::/0` 或为了“拿到真实 IP”清空已知代理校验。每次只接受离 Kestrel 最近的一跳；多级代理应让最后一跳覆盖并清洗来自公网的转发头。历史租户字段 `SecurityRespectForwardedHeaders` 不再赋予原始 Header 信任，真实 IP 的信任根只由上述 SaaS 字段维护。
 
@@ -387,6 +392,8 @@ https://os.example.com/?OsClient=iTdos#/access-login?access_key=microi_ak_xxx.yy
 
 存量部署将 `sys_user.Pwd` 以可逆 DES 保存时，平台超级管理员可以在【系统账号】页面（/#/mic-sys-user）打开帐号编辑表单后点击【显示密码】。`POST /api/SysUser/GetSysUserPassword` 只允许普通管理员登录会话调用；访问密钥会话和普通角色均拒绝。接口只解密 `PwdEncode=DES`（历史空值按 DES 兼容），自定义 V8 密码编码不做通用解密；成功查看会写安全审计日志，响应禁止缓存且日志不记录明文密码。
 
+SaaS 引擎 v8.4.26 的 `platform-sys-user-session` v1.0.5 在动作归一化后、调用密码读取原子前，使用可信当前身份和当前租户主库重新核验活动用户、`Level >= 9999` 及有效管理员角色；匿名、访问密钥、停用或降级账号均提前拒绝。请求中的 `Level/CurrentUser/RoleIds` 不参与授权，历史路由固定其原动作。为只读角色精确授权本人连接信息等会话初始化入口，不会因此授予显示他人密码的权限；升级后仍应分别验收普通账号拒绝与管理员合法路径。
+
 这是存量可逆密码方案的兼容管理能力，不应扩展给业务 V8、接口引擎、普通菜单或匿名接口。新系统仍建议逐步迁移到不可逆的专用密码哈希；完成迁移后只能重置，不能读取原密码。
 
 Passkey、设备生物识别、严格人脸、改密步进验证和自定义 V8 敏感操作的完整用法见 [Passkey、设备生物识别与严格人脸验证](./identity-verification)。
@@ -435,7 +442,7 @@ Passkey、设备生物识别、严格人脸、改密步进验证和自定义 V8 
 1. 普通角色不能访问管理员专用表；只读委托表只能查询；`mic_page/mic_print` 必须有真实角色权限；伪造菜单、角色字段或可信标记无效。
 2. 真实菜单访问成功；历史无菜单 V8 能安全推断；无候选或范围歧义失败。
 3. TableChild 只能访问父记录范围内子数据，跨父记录失败。
-4. 单表行级写入受真实 SQL 约束，Join 型写入和导入失败关闭。
+4. 主表新增、修改、删除和导入分别验证真实操作权限；查询 `SqlWhere/SqlJoin` 不自动成为行级写权限。需要限制“仅能修改本人记录”时，由后端事件或接口引擎读取权威归属后校验，不能只依赖前端隐藏按钮。
 5. 节点 A 修改权限后，节点 B 不重启即可使用新 `epoch`；Redis 故障时按设计回源或失败关闭。
 6. 上传大小、数量、帐号/租户日额度生效，多节点不能绕过；Redis 故障不会变成无限上传。
 7. 私有文件跨菜单、记录、字段访问失败；授权访问成功；匿名访问失败。

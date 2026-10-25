@@ -2,16 +2,22 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=workspace-conventions-039 sha256=8cfc7d1e2a6a0a766845c79775efe8c7fb15ef805a47e8bc1965128e348f3062 -->
+<!-- microi-progressive:chunk id=workspace-conventions-039 sha256=4a24e3f7bd0244debb6efa82ea164265ab5841ccf97372af67ca16e0211bfe9c -->
 ## 本地测试程序与依赖生命周期（强制）
 
 - 启动前盘点当前源码/Vite/API、数据库、Redis、MongoDB、MinIO、端口及其归属。健康且适用的开发/测试服务优先复用；已有服务不满足时，优先直接启动本地源码，或把本轮编译产物复制到任务隔离目录启动，避免锁住共享构建输出。登记实际源码、配置来源、PID、创建时间、工作目录和监听端口；不能启动另一份旧 DLL 冒充当前候选。
 - 多节点 HTTP、并发和租户隔离测试优先使用多个本机吾码程序进程，连接同组已授权依赖；库、租户、Schema、Redis DB/Key 前缀和存储命名空间负责测试隔离。`fixture`、独立候选目录和 Full 不等于每个 AI 对话或节点都要创建一整套 Docker。复用仅限已授权开发/测试资源，不向生产业务库注入测试数据，也不对共享服务进行破坏性故障测试。
-- 普通联调、登录、表单、V8 和浏览器验收不默认创建本地 Docker/Compose。确实只能通过指定引擎/版本、容器安装或镜像行为验证时，先说明既有依赖为何不能满足、最少容器清单、资源上限和收尾方式，并取得对该动作的明确授权；已授权同一清单不重复询问。一般开发、Full 和镜像发布授权不自动授权新增数据库等测试服务。已授权镜像的构建、推送和不启动容器的镜像字节检查按各自制品流程执行，不能扩张为启动整套测试基础设施。
+- 本地项目启动、平台测试和镜像发布冒烟默认读取 `Microi.Server/Microi.net.Api/.microi-local`，由其选择 `appsettings.<Environment>.json`，复用里面的 MySQL、Redis、MongoDB 以及该租户 SaaS 实际生效的 MinIO/OSS。用户明确指定远端 MCP 业务验证时才按该连接边界执行，不能自动借用其它 MCP 租户。先核实连接归属、版本、可用性和已授权测试范围；配置存在不构成写生产业务数据的授权。使用既有测试资源、独立记录/Key/对象前缀隔离，不新建租户或安装聊天应用，不清空共享 Redis、Bucket 或其它任务数据。
+- 不创建或运行新的本地 MySQL、Redis、MongoDB、MinIO、API 或官网测试容器，也不构建一套仅用于测试的镜像替代项目配置。API 使用本机源码或最终加密 DLL 进程，官网使用现有服务或本机静态预览；正式发行镜像 build/push、静态制品校验仍按发布脚本执行。用户另行明确授权的专项例外须登记用途和清理器，普通测试/完整发布本身不授予例外。
+- 固定夹具库名、Schema、Redis DB/Key、对象前缀或端口被其它任务占用时，先保持原资源不变，为本任务分配唯一名称并修正测试入口的配置传递。测试保护必须同时核验精确目标、任务归属标记及允许的操作范围；不能只删除固定名称断言、伪造归属或借用他人的标记来通过测试。共享服务上没有已授权的安全隔离范围时，记录具体缺口，不能向业务库写测试数据。
+- 不要把“是否允许临时创建测试容器”作为常规确认步骤。固定名称/端口冲突、归属不一致、旧夹具已删除、脚本硬编码、本机无容器、Full 要求独立夹具或为了更方便清理，均不构成新建本地 MySQL、Redis、MongoDB、MinIO/HDFS 等容器的必要性。先修复可配置隔离、连接映射和清理能力，普通测试不另建 Docker/Compose 环境。
+- 分阶段 Full 原生依赖桥由已冻结且通过私有 ACL/SHA 校验的凭据 profile 的 `nativeBridgePorts:{mysql,redis,mongo,scheduleRedis}` 声明四个独占 TCP 端口。省略时兼容历史端口；显式配置必须完整四项、有效整数且互不重复。同步修改已登记的测试连接映射、监听器和退出回执后重新冻结候选；继承的进程环境不得改写验收端口，该字段不进入生产 API 配置。
+- 端口可配置不替代归属门禁：仍独立核对原协调器 PID、创建时间、父进程、CWD、可执行文件、命令行和精确四端口集合，Full 通过后仍验证双 API/Vite 已退出及原桥接进程继续存活。不得复用其它任务监听器或放宽检查来解决冲突。
+- 现有配置无法满足特定协议/版本或服务级故障测试时，记录实际服务版本、不能复用的证据和已尝试方案，优先修复本机程序与配置。普通测试、完整发布及可逆操作的一般授权均不允许自行创建测试容器；只有用户另行明确授权的容器专项才可例外，并须限定资源、回环监听、精确归属与自动清理。用户明确禁止时不得用“迫不得已”绕过。
 - 创建或借用前建立资源台账，区分既有、借用和本轮新建；容器登记完整 Id、任务标签、数据挂载及消费者，进程登记 PID、创建时间、命令入口、工作目录和后代。共享依赖有唯一协调者，消费者退出不删除其它任务仍在使用的服务，也不能把他人资源仅凭名称认领为本任务资源。既有共享开发服务必要重启后的替换进程继承共享身份，收尾时保持健康；任务专用实例仍须结束，不能改称“共享服务”来免除清理。
 - 每轮验证成功、失败、超时、取消、异常或资源门限不足退出时，都立即执行收尾，不等整个功能交付完成。脚本用 `finally` 并处理可捕获的中断；启动到一半失败也回收已创建资源，外层监督程序退出时由已登记归属的清理器兜底。停止本轮自建 API/Vite/测试程序、watcher、浏览器及其子进程，以及获准新建的临时容器；不因“待续”长期保留运行资源。确需继续后台运行时，记录用户要求、负责人和有效期限。
 - 清理前重验精确身份，正常停止后独立回读进程及后代已退出、监听/连接已消失、容器已停止或移除；只输出白名单状态，不回显口令、Env 或连接串。既有或借用的共享实例保持原状态，不按进程名全杀，不执行全局 Docker prune、WSL/Docker 重启或删全部编排。
-- 数据保留与运行资源分开处理：移除临时容器前核对实际持久卷；没有数据卷时，先归档唯一数据或只停止保留容器。Redis 等关闭持久化时，保留空卷不能代替保存内存状态，应先通过现有安全连接显式保存并校验落盘。资源紧张时避免默认使用 fork 式后台保存；保存失败或超时不得无限重试或删除唯一数据，应先停止写入消费者、保留容器与卷、列明失败，并采用有界恢复方案或请求数据处置决定。默认不删除数据卷、绑定目录、镜像及测试证据，不使用 `rm -v` 或 `down -v`；删除这些数据需要对应的明确授权。
+- 数据保留与运行资源分开处理：自建且只含可重建测试数据的临时容器、专用测试卷、任务目录和测试命名空间，用完即按登记归属精确删除并独立回读，不能只停止容器或以“下次可能用到”为由积累。共享依赖、既有卷、缓存镜像、用户数据和其它任务资源不在清理范围。若临时资源含唯一业务数据或归属不明，先归档最小必要数据并验证，不能以清理名义删除；需要数据处置决定时明确指出具体对象。Redis 关闭持久化时，保留空卷不能代替保存唯一数据；避免资源紧张时默认 fork 保存。禁止全局 `prune`、通配删除或对共享编排使用 `down -v`。
 - 资源不足时先盘点并收回本任务闲置/遗留的进程和临时容器，再重新测量，不能留下自建数据库占用后要求用户关闭应用。测试结果、清理结果、数据保留和渠道发布分别记录；清理失败必须列出精确资源及原因，不能声称“已全部退出”或用减少用例、关闭断言、放宽发布门禁代替恢复环境。
 
 <!-- /microi-progressive:chunk -->
@@ -33,7 +39,7 @@ Pop-Location
 **本地后端自动重启要求（强制）**：本地联调需要启动或重启 `Microi.net.Api` 时，先执行 `node Microi.Server/tools/release-lock.mjs assert api <工作区根>`；API 锁存在时禁止启动或重启后端。PC、官网和 Agent 发布不阻塞 API 服务。无发布时先回读标准端口和 `/api/Diagnostics/liveness`，健康服务默认复用；只有本任务修改了需重载的后端代码、服务不健康或用户明确要求重启时，才可精确停止当前工作区的后端进程，然后在 `Microi.Server/Microi.net.Api` 目录执行 `dotnet run --launch-profile Microi.net.Api`。优先使用用户能在 VS Code 中看到和停止的终端（包含 VS Code 集成终端、VS Code 任务终端、用户明确允许的 VS Code 可追踪隐藏终端）；如果当前工具没有 VS Code 终端能力，允许使用本机可见的 `cmd`/PowerShell 窗口启动，禁止使用脱离用户可见窗口的后台服务或守护进程。不要误杀数据库、Redis、Node 前端或其它业务进程。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-025 sha256=4cf40c4ca771f7e04b80279646323a816378b98669f562ff8f4c647d5bf837ca -->
+<!-- microi-progressive:chunk id=workspace-conventions-025 sha256=8a7a3437fbd43fa31d038d8f8c583e6145d4b68dce42faa290f142b5ff390a0b -->
 ## 多 AI 对话共享本地服务与发布互斥（强制）
 
 同一工作区的 4、5 个 AI 对话共用同一份源码和固定端口时，`61500/61501` 是工作区级单例共享服务，不属于某个对话。端口相同意味着无法让每个对话拥有一套独立进程；正确模型是“复用健康服务 + 需要重载时串行重启 + 同范围发布时独占”，不能让每个对话都无条件先杀再启动。
@@ -42,7 +48,7 @@ Pop-Location
 - 长期本地后端必须通过项目目录里的 `dotnet run --launch-profile Microi.net.Api` 使用开发输出。禁止把 `bin/Release/net10.0` 或 `bin/Release/publish` 的 `dotnet Microi.net.Api.dll` 当长期 E2E 服务；运行中的 Release DLL 会让后续 `dotnet build` 报 `MSB3021/MSB3027` 文件锁。
 - 一键编译发布按所选产品创建 `.tmp/microi-process-state/api-release.lock`、`pc-release.lock`、`website-release.lock` 或 `agent-release.lock`。合并发布按固定顺序取得所需锁；任何一项占用时撤回本次已取得的锁。Windows 的 `PrepareRelease -ReleaseScope api|pc|all` 仅清理所选范围：API 处理本工作区后端与 Release DLL，PC 处理本工作区 Vite；官网不停止二者。身份不匹配时停止，不得按进程名全杀。
 - Vite 子进程可能由相对 `node_modules/vite/bin/vite.js` 启动，父 npm/终端退出后命令行不再包含工作区绝对路径。Windows 进程管理器应先匹配命令行绝对路径；无法匹配时只读回读进程 CWD，只有 CWD 精确等于当前工作区 `Microi.Client` 且入口确为 Vite 才可结束。CWD 无法读取、属于其它目录或仅仅“父进程不存在”时必须失败关闭。
-- API、PC、官网和 Agent 可以同时发布，同类发布互斥。旧 `platform-release.lock` 与 `release.lock` 仅在真实 PID 命令入口及共享状态目录证明属于 API 热修复或 Agent 时缩小阻塞范围；未知归属继续保守阻塞，禁止删除活跃旧锁。Full 仍是 PC/API 发布硬门禁；其 .NET 输出放入本次结果目录的 `.net-artifacts`，并行 Full 使用独立结果目录、测试服务和隔离租户。共享版本号或跨产品源码必须先准备冻结，再启动并行发布，禁止测试期间改写候选。 macOS/Linux 的 Full apphost 仅允许当前工作区 `.tmp/microi-release-gate/日期-时间-PID/.net-artifacts/bin/Microi.net.Api/debug|release/Microi.net.Api` 的规范路径，且 CWD 必须精确等于 API 项目；任意外部输出、其它工作区或路径归一化差异继续失败关闭。
+- API、PC、官网和 Agent 可以同时发布，同类发布互斥。旧 `platform-release.lock` 与 `release.lock` 仅在真实 PID 命令入口及共享状态目录证明属于 API 热修复或 Agent 时缩小阻塞范围；未知归属继续保守阻塞，禁止删除活跃旧锁。PC/API 普通发布使用 PlatformRelease，Full 仅在明确选择深度测试时独立运行；.NET 输出放入本次结果目录的 `.net-artifacts`，并行任务使用独立结果目录及所需测试服务，普通发布不新建租户或安装聊天应用，也不运行 Microi Code/Agent 测试。共享版本号或跨产品源码必须先准备冻结，再启动并行发布，禁止测试期间改写候选。 macOS/Linux 的 Full apphost 仅允许当前工作区 `.tmp/microi-release-gate/日期-时间-PID/.net-artifacts/bin/Microi.net.Api/debug|release/Microi.net.Api` 的规范路径，且 CWD 必须精确等于 API 项目；任意外部输出、其它工作区或路径归一化差异继续失败关闭。
 - 启动或重启 API 前检查 `assert api`，PC 前检查 `assert pc`；只有对应范围发布时等待或退出，官网/Agent 不阻塞共享服务。需要同时启动二者时分别检查两项；正常结束或中断由原进程和唯一令牌释放自身锁。
 - Edge/Chrome 主浏览器、VS Code 持有的 Playwright Test Server、语言服务和 MCP Node 进程不属于发布文件锁清理范围。浏览器自动化必须关闭本用例创建的 context/browser；不得通过 `taskkill /IM chrome.exe|msedge.exe|node.exe|dotnet.exe` 清空整机进程。
 - 人工盘点使用：`powershell -NoProfile -ExecutionPolicy Bypass -File Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action Status`。需要单独停止当前工作区服务时使用 `-Action StopBackend` 或 `-Action StopFrontend`，不再让用户根据任务管理器猜进程。

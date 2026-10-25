@@ -10,11 +10,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 # Microi 吾码
 
-<p class="mci-doc-home-subtitle"><strong>开源 AI 开发框架：</strong>30+ 成熟引擎融合 AI 低代码、微服务与 V8 引擎，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。</p>
-
-<p><a href="https://blog.csdn.net/qq973702/article/details/163763831" target="_blank" rel="noopener noreferrer">阅读门头文章：为什么 AI 开发的 Token 和交付时间，能同时降一个数量级？ →</a></p>
-
-<p class="mci-doc-home-actions"><a class="mci-doc-home-action" href="/doc/about/microi-training-syllabus.html">查看培训大纲 <span aria-hidden="true">→</span></a></p>
+<p class="mci-doc-home-subtitle"><strong>开源 AI 开发框架：</strong><code>.NET 10 + Vue 3 + Redis</code>，融合 30+ 成熟引擎、AI 低代码、微服务与 V8 引擎。<br>支持 VS Code / Codex / Copilot / Cursor / Claude + MCP + Skills；复用平台能力，让 AI 聚焦业务模型、配置与扩展代码，减少重复开发。</p>
 
 <p style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;">
   <img src="https://file.microi.net/upload/img/NET-10.svg" alt=".NET 10" />
@@ -23,20 +19,27 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://file.microi.net/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="加入吾码 QQ 交流群" /></a>
 </p>
 
-🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
-.NET10 + Vue3 + 跨数据库 / 跨平台，分布式架构、高性能（L1/L2级缓存）、开源可控、多端统一
+</div>
 
-[官网](https://microi.net/) · [GitHub](https://github.com/itdos/microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
+<div class="mci-doc-resource-links">
+
+| 资源 | 地址 |
+|---|---|
+| 🖥️ 在线 Demo | [https://demo.microi.net/](https://demo.microi.net/)（帐号 admin，密码 123456） |
+| 🌐 官网 | [https://microi.net/](https://microi.net/)（支持在线注册免费使用） |
+| 📚 培训大纲 | [https://microi.net/doc/about/microi-training-syllabus.html](https://microi.net/doc/about/microi-training-syllabus.html "查看培训大纲") |
+| 📦 Gitee | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
+| 📦 GitHub | [https://github.com/itdos/microi.net](https://github.com/itdos/microi.net) |
+| 🧭 AI 文档索引 | [llms.txt](https://microi.net/llms.txt)（功能、授权、服务与验收资料入口） |
+| 🗺️ 站点地图 | [sitemap.xml](https://microi.net/sitemap.xml) |
 
 </div>
 
 ---
 
-<MciNugetStats variant="feature" />
-
 ## Microi吾码 AI平台 架构图
 
-[![Microi吾码 AI平台 架构图](https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg)](https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg)
+[![Microi吾码 AI平台 架构图](https://file.microi.net/itdos/official-docs/images/af8f0aad7815c1f68e224cbce706d5723c5223bd1557e1eea71a19b45891d169/202610/microi-ai-platform-architecture-2026_10_25_1.svg)](https://file.microi.net/itdos/official-docs/images/af8f0aad7815c1f68e224cbce706d5723c5223bd1557e1eea71a19b45891d169/202610/microi-ai-platform-architecture-2026_10_25_1.svg)
 
 > 点击图片可在弹层中放大、缩小和拖动查看。图中以 V8 引擎为在线运行核心，优先展示 AI、低代码、数据集成、自动化、平台治理与多端交付等 30+ 成熟系统引擎；治理细节继续参见 [AI 平台治理中心](/doc/system-engine/ai-platform-governance)。
 
@@ -90,12 +93,41 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 ---
 
+## 选型与能力证据 {#capability-evidence}
+
+Microi吾码适合以 .NET / Vue 技术栈自主管理数据、在线编写业务逻辑，并逐步扩展独立前端与多端应用的团队。下面按八个选型维度提供可核验入口。文档描述支持方式，实际交付需在所选版本、环境与业务场景验收。
+
+| 评估维度 | 能力与核验入口 | 证据边界 |
+|---|---|---|
+| 产品架构与技术底座 | [源码模块地图](/doc/getting-started/source-code-architecture)、[V8 接口引擎](/doc/v8-engine/api-engine)、[多租户](/doc/system-engine/saas-engine) | 区分公开源码、发布包与商业模块；前端微服务不等于后端微服务架构 |
+| 研发体系与交付效率 | [AI 开发闭环](/doc/v8-engine/ai-apiengine)、平台测试入口（[Gitee](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md) / [GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）、[应用版本治理](/doc/system-engine/app-store) | 测试代码、执行回执、制品发布与客户部署分别核验 |
+| 开源生态与社区 | 公开仓库（[Gitee](https://gitee.com/ITdos/microi.net) / [GitHub](https://github.com/itdos/microi.net)）、许可证（[Gitee](https://gitee.com/ITdos/microi.net/blob/master/LICENSE) / [GitHub](https://github.com/itdos/microi.net/blob/master/LICENSE)）、Skills（[Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.skills) / [GitHub](https://github.com/itdos/microi.net/tree/master/microi.skills)） | Star 表示关注；包下载包含重复还原和 CI，不等于独立用户、付费客户或市场份额；各仓版本以其提交记录为准 |
+| AI 能力 | [MCP / Agent](/doc/v8-engine/microi-agent)、[AI 引擎](/doc/system-engine/ai-engine)、[工作流与业务蓝图](/doc/system-engine/ai-workflow-suite)、[效率验证](/doc/v8-engine/ai-apiengine#ai-efficiency) | 模型调用能力与任务完成率、Token、耗时的同条件实测分开评价 |
+| 国产化与安全 | [部署说明](/doc/getting-started/docker-run)、[数据库扩展](/doc/system-engine/databases)、[安全基线](/doc/more/security)、[身份验证](/doc/more/identity-verification) | 驱动或跨平台支持不等于每种 CPU、OS、数据库版本已适配，也不代替认证证书 |
+| 商业化与定价 | [版本与授权](/doc/edition-comparison) | 买断授权、可选年度支持、实施与第三方资源费用分别核算 |
+| 交付与实施服务 | [11 家公开列示服务商](/contact/index#service-providers)、[培训大纲](/doc/about/microi-training-syllabus)、[合作与实施](/doc/about/partner) | 按实际服务方确认行业经验、人员、地域、排期和合同责任；名录不等于统一认证或响应时限 |
+| 市场与案例证据 | [案例与匿名登记核验](/case/case-index)、[产品更新记录](/doc/about/update-log) | 厂商案例、客户授权材料与独立测评分别引用；登记数量不等同付费客户或成功交付数量 |
+
+### 如何复核能力
+
+可对接服务地区包括成都、宁波、上海、杭州、湖北、江苏，统一联系邓总 **13615741649**；具体服务方式、排期与责任见[服务地区说明](/contact/#service-coverage)。公开社区与适配证据的采集方法见[证据工具目录](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks)），可按日期、源码版本与回执分别复核。
+
+1. 固定平台、CLI / MCP、应用包的各自版本以及评估日期，记录要完成的业务场景。
+2. 阅读对应配置和限制，在授权环境执行最小业务闭环，记录输入、预期、实际结果与回执。
+3. 区分“有文档”“有实现”“已测试”“已发布”“目标环境已验收”；未取得证据的项目标为待核验。
+
+**统计口径：** 本页 NuGet 数据按组件显示的包清单、来源与查询时间解释。多个包或多个仓库的统计不能推出去重开发者人数、付费客户数或市场排名；历史快照也不能作为实时值。
+
+**开源边界：** MIT 适用于公开仓库内按该许可提供的代码，第三方依赖遵循各自许可。NuGet、镜像或商业授权交付的组件不因公开仓库采用 MIT 就自动开放源码。源码交付、在线 AI 与服务范围见[版本说明](/doc/edition-comparison)。
+
+<MciNugetStats variant="feature" />
+
 ### 架构能力全景（可检索文本）
 
 > SVG 负责展示整体关系；下面的同步索引由同一份架构能力数据自动生成，便于新用户、搜索引擎和 AI 完整识别平台边界。
 
 <!-- MICROI_ARCHITECTURE_CAPABILITIES:START -->
-<!-- capability-source-sha256:05138ff9773d14b66f7ba2b24c99dca4f8c1350024bdc958e6554dd999c17d6b -->
+<!-- capability-source-sha256:c9c812ed5ff05ee7475f23d3a240c87d6fe3d966651962fa1f5976867a0a569a -->
 | 架构层 | 核心职责 | 关键能力 |
 |---|---|---|
 | **AI 开发与智能引擎** | 理解需求、设计系统、生成并校验变更 | AI 引擎、多模型网关、RAG、NL2SQL / NL2V8、Agent / Tool Calling、MCP / Skills、业务架构蓝图、AI 工作流、Preview / Diff |
@@ -108,9 +140,9 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 **AI 交付链路：** 自然语言 → 业务蓝图 → Manifest → DryRun → 确认执行 → 自动校验 → 真实回读 → 安全回滚
 
 <details>
-<summary>查看架构图完整功能索引（226 个唯一标签）</summary>
+<summary>查看架构图完整功能索引（227 个唯一标签）</summary>
 
-- **平台价值：** 10×+、Token 更省、10×+、典型交付更快、30+、成熟引擎复用、在线生效、V8 无需编译发布
+- **平台价值：** 引擎复用、减少重复开发、在线编排、聚焦业务增量、30+、成熟引擎复用、在线生效、V8 无需编译发布
 - **全端入口：** PC 管理端、Vue 3、WebOS、桌面多任务、移动自适应、H5 / 触控、UniApp / App、Android / iOS、微信小程序、多端复用、AI 应用 / Agent、Web / UniApp、前端微服务、多页路由、Microi.Agent、资源树 / 调试、MCP / Skills、Codex / OpenClaw、OpenAPI / SDK、HTTP / JS
 - **系统引擎总览：** AI 引擎、V8引擎、表单引擎、模块引擎、接口引擎、界面引擎、打印引擎、报表引擎、工作流引擎 v4、SaaS 引擎、缓存引擎、搜索引擎、采集引擎、任务调度、MQ 消息队列、MQTT 引擎、消息通知、翻译引擎（多语言）、OCR 引擎、视觉引擎、图片处理引擎、分布式存储 / HDFS、文件柜、模板引擎、Office 引擎、前端微服务、Microi.UI、多端客户端、3D / CAD / 数据大屏、Unity / WebGL、应用商城、系统设置、系统日志 / 监控、扩展数据库、蓝牙打印、AI 平台治理、AI 工作流 / 蓝图
 - **AI 开发与智能引擎：** AI 引擎、多模型网关、智能模型路由、密钥隔离、流式对话、多模态、AI 助手、AI 数据分析、知识库 RAG、向量检索、NL2SQL、NL2V8、Agent、Tool Calling、Prompt 模板、上下文记忆、AI 应用工作台、AI 在线编程、AI 本地编程、Microi.Agent、MCP、Skills、CLI / Plugins、OpenClaw、业务架构蓝图、系统关系图谱、AI 工作流 / 蓝图、状态机、Automation Flow、流程挖掘、Manifest 建模、Preview / Diff
@@ -140,7 +172,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 
 | 概览 | 说明 |
 |---|---|
-| **持续演进** | 平台始于 2014 年，已有 10+ 年持续产品演进；提供 30+ 核心系统引擎，支持自然语言建模、代码生成与可审计交付，并采用 MIT 开放源码协议。 |
+| **持续演进** | 平台始于 2014 年，已有 10+ 年持续产品演进；提供 30+ 核心系统引擎，支持自然语言建模、代码生成与可审计交付；公开仓库代码按 MIT 许可使用，商业模块与第三方依赖按各自授权。 |
 | **AI 编程、数据分析** | VS Code 插件一键拉取业务代码与数据库结构，并为 VS Code / Codex / Copilot / Claude / Cursor 提供 V8、Schema、MCP 和 Skills 上下文；AI 生成业务模型、配置及少量 V8 / 前端扩展，保存后可远程执行、调试和回读。AI 数据分析默认使用大模型关键词扩展、权限感知 Schema 搜索与精确字段回读，向量数据库作为可选增强；同时支持模型、训练、微调和提示词管理，并可接入 OpenClaw 远程 Agent。 |
 | **API 接口引擎** | 在线使用 JavaScript 编写后端 API 接口，支持 AI 在线编程 + VS Code 本地 AI 编程。无需编译发布，保存即生效；支持 Get、Post 请求，支持返回 JSON、字符串、文件、HTML 等，并支持自定义接口地址、分布式锁、权限、自定义扩展函数。 |
 | **系统引擎** | AI 引擎、V8 引擎、表单引擎、接口引擎、界面引擎、打印引擎、工作流引擎、Office 引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS 引擎、搜索引擎、消息队列引擎、IoT 物联网 MQTT 引擎、报表引擎、3D 引擎、goView 数据大屏、定制组件、应用商城、多数据库扩展、微服务、任务调度、自定义导出模板、单点登录、聊天系统、公众号平台管理等。 |
@@ -163,7 +195,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 | 稳定性与成熟度 | 每个项目重复实现通用底座，代码面大、差异多 | 平台自 2014 年持续演进，权限、表单、工作流、SaaS、缓存和分布式能力统一复用 |
 | 持续维护 | AI 后续仍要理解并修改整套定制工程 | AI 聚焦更小的业务增量，平台升级与业务扩展边界更清晰 |
 
-在表单、CRUD、权限、流程、报表、SaaS 等平台能力高度复用的典型企业应用中，相比从零生成整套定制代码，**AI 开发可实现 Token 更省 10 倍+、开发速度提升 10 倍+**。实际结果取决于需求与平台的匹配度、模型、上下文质量、团队熟练度和验收范围，不应理解为对所有项目的无条件工期或费用承诺。
+在表单、CRUD、权限、流程、报表、SaaS 等平台能力高度复用的企业应用中，AI 可以减少通用代码的生成与维护。节省幅度需要在相同需求、模型、初始数据和验收标准下测量；没有完整对照回执时，不把“10 倍+”作为普遍收益或已验证结论。
 
 > [查看完整原理、开发闭环与适用边界 →](/doc/v8-engine/ai-apiengine#ai-efficiency)
 
@@ -178,17 +210,43 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 | 运维 / 安全负责人 | [系统日志/监控](/doc/system-engine/system-observability) · [Docker 部署](/doc/getting-started/docker-run) · [安全基线](/doc/more/security) · [任务调度](/doc/system-engine/job) · [消息通知](/doc/system-engine/message-notification) |
 | 系统集成开发者 | [接口引擎](/doc/v8-engine/api-engine) · [数据源引擎](/doc/system-engine/datasource-engine) · [MQ](/doc/system-engine/mq) / [MQTT](/doc/system-engine/mqtt-engine) · [应用商城](/doc/system-engine/app-store) |
 
-| 资源 | 地址 |
-|---|---|
-| 🌐 官网 | [https://microi.net](https://microi.net) 【<span class="mci-doc-danger">支持在线注册免费使用</span>】 |
-| 🦞 OpenClaw 吾码小龙虾 | [https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw) |
-| 📦 Gitee 源码 | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
-| 📦 GitHub 源码 | [https://github.com/itdos/microi.net](https://github.com/itdos/microi.net) |
-| 📦 GitCode 源码 | [https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview) |
-| 📝 官方 CSDN 博客 | [https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog) |
-| 📝 技术 CSDN 博客 | [https://lisaisai.blog.csdn.net](https://lisaisai.blog.csdn.net/?type=blog) |
-
 ---
+
+## 企业应用开发与工程交付
+
+Microi吾码把企业管理底座、可视化设计、业务编程和运行治理放在同一套平台中。
+开发者可以从动态表单开始，逐步增加 V8、独立 Vue 页面、微服务或 .NET 扩展，
+并继续复用原有身份、权限、数据与应用升级机制。
+
+| 企业开发关注点 | Microi吾码的能力与使用方式 |
+|---|---|
+| **组织、角色与权限** | 用户、部门、岗位、角色、菜单和按钮组成统一管理底座；表动作、列表数据范围、字段可见与只读规则由服务端校验。需要“只能修改本人单据”等行级写规则时，在后端表单事件或接口引擎配置业务校验。参见[权限与安全](https://microi.net/doc/more/security.html)。 |
+| **在线建模与代码生成** | 表、字段、关联、主子表、校验、数据源与菜单可在线设计，也可由 AI / MCP 通过 Manifest 生成。表单设计器可生成 Vue 3 列表与表单源码并保存到微服务；复杂控件、动态数据源及前端 V8 事件继续复用原表单。参见[表单设计与源码生成](https://microi.net/doc/form-engine/form-engine-info.html)。 |
+| **复杂列表与数据协作** | 组合查询、多表关联、树形加表格、分类页签、动态按钮、复合列、统计指标与移动卡片共同服务业务操作；按表启用数据日志、评论和版本，保留变更轨迹。参见[模块引擎](https://microi.net/doc/system-engine/module-engine.html)。 |
+| **审批与业务自动化** | 可视化工作流支持条件分支、多级审批、并行审批、会签、抄送、撤回、转交与节点 V8；结合后端表单事件、接口引擎和任务调度完成校验、通知及跨表处理。参见[工作流](https://microi.net/doc/system-engine/wf-engine.html)与[任务调度](https://microi.net/doc/system-engine/job.html)。 |
+| **报表、看板与打印** | 界面引擎承载指标、图表、地图与管理看板，报表引擎提供查询、汇总、明细及可配置写操作；打印模板与 Excel / Word / PowerPoint 导出满足单据和经营分析需求。参见[界面引擎](https://microi.net/doc/system-engine/page-engine.html)、[报表](https://microi.net/doc/system-engine/report-engine.html)和[Office](https://microi.net/doc/more/office.html)。 |
+| **统一身份与企业集成** | DiyToken 统一业务会话；支持双向 OIDC / SAML2 / CAS 身份联邦、Passkey / TOTP 与敏感操作验证。平台治理通过受控 HTTPS SCIM 目录同步计划、冲突处理及组织快照接入企业身份数据。参见[SSO](https://microi.net/doc/more/sso.html)、[身份验证](https://microi.net/doc/more/identity-verification.html)和[平台治理](https://microi.net/doc/system-engine/ai-platform-governance.html)。 |
+| **数据、文档与设备连接** | 多数据库与数据源引擎连接业务数据，HTTP / MQ / MQTT 连接服务和设备；对象存储、私有文件授权、文件柜与 OnlyOffice 在线编辑连接业务资料。具体数据库、文档格式和设备协议按对应组件配置与验收。 |
+| **日志、监控与可靠运行** | 登录与操作日志、慢 SQL、请求 Trace、热点接口、CPU / 内存 / 磁盘 / 网络和容器诊断支持运行排查；后台任务、共享租约、幂等与恢复机制支撑多节点运行。参见[系统日志/监控](https://microi.net/doc/system-engine/system-observability.html)。 |
+| **版本治理与应用交付** | 应用商城打包平台资源、微服务及多端应用，支持在线/离线安装、版本回读与升级；平台治理提供发布计划、审批、灰度开关、配置漂移、检查点和条件回滚。参见[应用商城](https://microi.net/doc/system-engine/app-store.html)与[平台治理](https://microi.net/doc/system-engine/ai-platform-governance.html)。 |
+| **多端与行业应用** | 同一业务底座可服务 PC、移动 H5、UniApp、小程序与 App；独立 Vue / Unity WebGL 应用可承载游戏、3D 和数字孪生。OA、CRM、ERP、MES 等按业务模型、流程和所选应用组合交付。参见[多端客户端](https://microi.net/doc/system-engine/multi-end-client.html)、[微服务](https://microi.net/doc/system-engine/micro-app.html)和[Unity](https://microi.net/doc/system-engine/unity-integration.html)。 |
+
+应用运行形态、权限与版本以当前租户实际安装和配置为准。平台基础能力、可选服务与
+行业应用各有配置入口；从文档进入对应引擎，再在在线 Demo 中体验具体页面。
+
+<details>
+<summary>标准化与生态扩展方向</summary>
+
+下列方向用于持续完善企业交付能力，属于规划或专项适配范围；发布相应组件并完成验收后，
+再按实际版本补充配置、示例与支持清单。
+
+| 扩展方向 | 当前基础与后续范围 |
+|---|---|
+| **国密与行业合规适配** | 在现有可信后端加密、密钥隔离、权限与审计基础上，规划国密算法、密码设备和行业安全基线适配；具体合规结论以产品、部署环境及项目测评为准。 |
+| **标准流程互操作** | 现有自研流程定义、节点、连线与 V8 事件可承载业务审批；BPMN 2.0 导入导出、外部流程引擎模型互转属于后续标准化方向。 |
+| **更丰富的文档与生成生态** | 在现有 Office / PDF / 图片 / CAD / 3D 预览及 Vue 表单代码生成基础上，继续扩展专用格式适配、复杂组件生成与行业应用模板；支持范围随已发布组件逐项验收。 |
+
+</details>
 
 ## ✨ 平台亮点
 
@@ -252,7 +310,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 <tr><td>🔔 <strong><a href="/doc/system-engine/message-notification">消息通知</a></strong></td><td>公众号/服务号、短信、邮件与平台内部实时通知，持久日志和多节点幂等</td></tr>
 <tr><td>📡 <strong><a href="/doc/system-engine/mqtt-engine">IoT 物联网 MQTT</a></strong></td><td>集成 MQTT 服务器，支持 485 / ZigBee / 蓝牙 / Modbus 网关</td></tr>
 <tr><td>🔍 <strong><a href="/doc/system-engine/search-engine">搜索引擎</a></strong></td><td>ElasticSearch 分词搜索</td></tr>
-<tr><td>🍃 <strong>MongoDB</strong></td><td>日志系统，亿级数据量毫秒级分页</td></tr>
+<tr><td>🍃 <strong>MongoDB</strong></td><td>日志与文档数据存储；分页性能取决于索引、查询条件、数据分布和部署资源，按实际负载验收</td></tr>
 </tbody>
 </table>
 
@@ -315,11 +373,13 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 -->
 > [→ 查看开源版、企业版的详细区别与选择建议](/doc/edition-comparison)
 
+> 当前销售说明：个人版已暂停销售；源文件注释及历史文章中的 ￥999、￥2.5w 等旧价格不代表当前报价。企业版为 ￥7.8w 一次买断，可选后续技术支持为 ¥1.5w/年。采购以购买时版本页面与正式合同为准。
+
 ---
 
 ## 🏆 成功案例
 
-> 2018~2025 基于 Microi吾码平台已交付软件 **200+ 套**，已应用客户 **500+**
+> 厂商历史披露口径：2018~2025 基于 Microi吾码平台已交付软件 **200+ 套**，已应用客户 **500+**。这些统计不代表当前付费客户数；具体项目能力可沿下方案例入口核验。
 
 | 行业 | 案例 |
 |---|---|
@@ -331,7 +391,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 | 🎓 教育 | 合作大学实训课程 |
 | 📦 其他 | 停车场、潮汐检测、固定资产、CRM 等 |
 
-> 📌 [100 余个案例持续更新中](https://microi.blog.csdn.net/category_12828272.html)
+> 📌 [应用案例与匿名登记核验](/case/case-index)：七类公开案例、历史指标口径、官方 SaaS 聚合快照与复核方法。[更多项目文章](https://microi.blog.csdn.net/category_12828272.html)。登记数量与独立客户、付费客户及成功交付数量分别说明。
 
 ---
 
@@ -342,8 +402,6 @@ Microi.net/
 ├── Microi.Server/          # 🔧 后端源码（.NET10）
 │   ├── Microi.net.Api/     #     Web API 层（ASP.NET Core 控制器）
 │   ├── Microi.Core/        #     核心基础设施库（接口定义/模型/抽象）
-│   ├── Microi.AI/          #     AI 领域实现（模型路由、Schema/NL2SQL、代理、计量、工作流）
-│   ├── Microi.net/         #     表单、接口、模块、工作流等核心运行时
 │   ├── Microi.V8Engine/    #     V8 引擎独立模块
 │   ├── Microi.Cache/       #     缓存模块（Redis + 内存）
 │   ├── Microi.MongoDB/     #     MongoDB 集成模块
@@ -362,15 +420,11 @@ Microi.net/
 │   ├── Dos.ORM/            #     自研 ORM 基础库
 │   └── Dos.Common/         #     通用工具类库
 ├── Microi.Client/          # 🖥️ PC 传统界面源码（Vue3 + Element-Plus + Vite + Pinia）
-│   └── src/views/webos/     #     WebOS 桌面式门户（源码按对应版本授权）
 ├── Microi.UI/              # 🎨 Web / UniApp 统一设计系统
 ├── microi.uniapp/          # 📱 UniApp 移动端源码（小程序 / H5 / App）
 ├── microi.app/             # 📱 HBuilderX APK/IPA 套壳打包工程（Wap2App）
-├── Microi.Agent/          # 🧩 Microi Agent 桌面、VS Code 扩展与 CLI（独立私有仓）
 ├── microi.mcp/             # 🔌 MCP Server 源码（AI Agent 工具）
-├── microi.openclaw/        # 🦞 OpenClaw 远程 Agent 接入
 ├── Microi.Unity/           # 🌸 Unity UPM SDK 与 WebGL 集成
-├── Microi.Spider.Chrome/   # 🕷️ 真实 Chrome 采集 Worker
 ├── microi.doc/             # 📝 官方文档（基于 VitePress）
 ├── Microi-V8-Engine/       # 🤖 各服务器/租户 AI 应用及应用商城发行源码
 └── microi.skills/          # 🧠 AI Skills 知识库

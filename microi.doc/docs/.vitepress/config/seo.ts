@@ -2,6 +2,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { SITE_URL, canonicalPath, isIndexablePage, breadcrumbsFor } from './seo-policy.mjs'
+import { serviceContactPoint, serviceNetworkDescription } from './service-network.mjs'
+import { sourceIsIndexable } from './seo-source.mjs'
 
 const SHARE_IMAGE = `${SITE_URL}/home2.jpg`
 const ZH_BASE_KEYWORDS = ['Microi吾码', '开源 AI 开发框架', '开源 AI 应用开发平台', 'AI低代码', '30+成熟引擎', '微服务', 'V8引擎', 'AI开发省Token', 'AI开发提速', '.NET10', 'Vue3']
@@ -10,6 +12,8 @@ const EN_BASE_KEYWORDS = ['Microi', 'open-source low-code platform', 'AI low-cod
 function cleanText(value) {
   return String(value || '')
     .replace(/^---[\s\S]*?---\s*/m, '')
+    // 注释中的停售价格、旧版本和维护备注不是当前公开内容，须先于 HTML 标签清理。
+    .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -31,7 +35,7 @@ function sourceSummary(pageData, ctx) {
     if (!file) return ''
     const source = readFileSync(resolve(ctx.siteConfig.srcDir, file), 'utf8')
     // 摘要优先解释本页内容，忽略组件初始化代码、图片和重复的一级标题。
-    const body = source.replace(/^---[\s\S]*?---\s*/m, '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, '').replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, '')
+    const body = source.replace(/^---[\s\S]*?---\s*/m, '').replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, '').replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, '')
     const intro = body.split(/\n\s*\n/).filter(block => !/^\s*#{1,6}\s/.test(block)).map(cleanText).find(text => text.length >= 25)
     return (intro || cleanText(body.replace(/^#\s+.+$/gm, ''))).slice(0, 220)
   } catch (_) {
@@ -44,6 +48,9 @@ function isEnglishPage(pageData) {
 }
 
 function ensureSeoDescription(pageData, ctx) {
+  // 地区、电话与可见服务表共用事实源；合作页保留自身主题，避免重复摘要。
+  if (pageData.relativePath === 'contact/index.md') return serviceNetworkDescription()
+  if (pageData.relativePath === 'doc/about/partner.md') return `生态合作、行业方案与实施交付说明。${serviceNetworkDescription()}`
   const en = isEnglishPage(pageData)
   const title = cleanText(pageData.title) || (en ? 'Microi Documentation' : 'Microi吾码官方文档')
   const explicit = cleanText(pageData.frontmatter?.description)
@@ -74,6 +81,7 @@ function alternatePages(pageData, context) {
   const counterpart = relative.startsWith('en/') ? relative.slice(3) : `en/${relative}`
   // 只声明实际存在且同路径对应的译文，不把未翻译文档指向英文首页或失效地址。
   if (!relative || !existsSync(resolve(context.siteConfig.srcDir, counterpart))) return []
+  if (!sourceIsIndexable(relative, context.siteConfig.srcDir) || !sourceIsIndexable(counterpart, context.siteConfig.srcDir)) return []
   const zh = relative.startsWith('en/') ? counterpart : relative
   const en = relative.startsWith('en/') ? relative : counterpart
   return [['zh-CN', zh], ['en-US', en], ['x-default', zh]].map(([lang, path]) =>
@@ -113,7 +121,10 @@ export function createSeoHead(context) {
   const about = en
     ? ['Open-source AI development framework', 'AI low-code', 'Microservices', 'V8 Engine', '30+ mature engines']
     : ['开源 AI 开发框架', 'AI 低代码', '微服务', 'V8 引擎', '30+ 成熟引擎']
-  const modified = Number(pageData.lastUpdated)
+  const modified = new Date(Number(pageData.lastUpdated))
+  // 只使用实际页面修订时间；无 Git 日期或非法日期时省略，不能用本次构建时间冒充更新。
+  const modifiedDate = Number.isFinite(modified.getTime()) && modified.getTime() > 0 ? modified.toISOString() : undefined
+  const isContact = canonicalPath(context.page) === '/contact/'
   const structuredData = isDoc ? {
     '@type': 'TechArticle',
     '@id': `${canonical}#article`,
@@ -124,19 +135,26 @@ export function createSeoHead(context) {
     about,
     mainEntityOfPage: { '@id': canonical },
     isPartOf: { '@id': `${SITE_URL}/#website` },
-    ...(Number.isFinite(modified) && modified > 0 ? { dateModified: new Date(modified).toISOString() } : {}),
+    ...(modifiedDate ? { dateModified: modifiedDate } : {}),
     publisher: { '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'Microi吾码', url: SITE_URL, logo: { '@type': 'ImageObject', url: `${SITE_URL}/icon.png` } }
   } : {
-    '@type': 'WebPage',
+    '@type': isContact ? 'ContactPage' : 'WebPage',
     '@id': canonical,
     name: title,
     description,
     url: canonical,
     inLanguage: en ? 'en-US' : 'zh-CN',
+    ...(modifiedDate ? { dateModified: modifiedDate } : {}),
+    ...(isContact ? { mainEntity: { '@id': `${SITE_URL}/#organization` } } : {}),
     isPartOf: { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, name: 'Microi吾码', url: SITE_URL }
   }
   const crumbs = breadcrumbsFor(context.page, cleanText(pageData.title))
   const graph = [structuredData]
+  // 仅在可见的中文联系页标注已确认地区；不生成地址、分支机构、资质或服务时限。
+  if (isContact) graph.push({
+    '@type': 'Organization', '@id': `${SITE_URL}/#organization`, name: 'Microi吾码', url: SITE_URL,
+    contactPoint: serviceContactPoint(SITE_URL)
+  })
   if (crumbs.length) graph.push({
     '@type': 'BreadcrumbList',
     itemListElement: crumbs.map((item, index) => ({ '@type': 'ListItem', position: index + 1, name: item.name, item: `${SITE_URL}${item.path}` }))

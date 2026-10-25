@@ -63,8 +63,8 @@ MCP 可信写前校验分支确认未执行时标记 `notExecuted`，保留安�
 
 内置在线 AI 有两套不能混淆的授权：
 
-- `Chat/ChatStream/NL2SQL/NL2SQLStreaming/NL2V8Engine` 统一读取宿主 `IMicroiFeatureLicense`。未修改的官方发布物只有本机通过官方 RSA 公钥、当前 HID 和有效期验证的 `Personal/Enterprise` License 才能继续推理；客户自建私钥/公钥不能替换内嵌官方信任根。验签在本机完成，`api.itdos.com` 只负责签发和周期性作废查询，不是每次调用的在线依赖。
-- `MicroiAI` 与 `AiProxyService` 会拒绝宿主替换的 `IMicroiFeatureLicense` 实现，统一回到 `Microi.net` 的封闭校验器；签发地址固定为 `https://api.itdos.com`，签发私钥目录不得进入构建、NuGet 或发布包。拥有服务器管理员权限的人仍可能篡改本地二进制或机器指令，纯本地 DRM 无法从理论上阻止这种物理控制；但没有官方私钥就不能生成可被未修改吾码节点接受、并可转发给其它正常节点使用的有效 License。
+- `Chat/ChatStream/NL2SQL/NL2SQLStreaming/NL2V8Engine` 统一读取宿主 `IMicroiFeatureLicense`。未修改的官方发布物只有本机通过官方 RSA 公钥、当前 HID 和有效期验证的 `Personal/Enterprise` License 才能继续推理；客户自建私钥/公钥不能替换内嵌官方信任根。验签在本机完成，`api.microi.net` 只负责签发和周期性作废查询，不是每次调用的在线依赖。
+- `MicroiAI` 与 `AiProxyService` 会拒绝宿主替换的 `IMicroiFeatureLicense` 实现，统一回到 `Microi.net` 的封闭校验器；签发地址固定为 `https://api.microi.net`，签发私钥目录不得进入构建、NuGet 或发布包。拥有服务器管理员权限的人仍可能篡改本地二进制或机器指令，纯本地 DRM 无法从理论上阻止这种物理控制；但没有官方私钥就不能生成可被未修改吾码节点接受、并可转发给其它正常节点使用的有效 License。
 - 官方中转站另用 `sk-microi-*` ApiKey 和账号 Token 额度鉴权。服务器 License 不能代替中转 ApiKey，中转 ApiKey 也不能把本地核心 AI 入口变成已授权。
 - `AiProxyService` 的 `ProxyChat/ProxyChatStream`、头像生成与 `/v1/chat/completions` 在领域层读取同一服务器 License，并继续执行登录态或平台 ApiKey/订阅链路。模型清单、套餐、订单和用量属于不触发模型推理的发现/账户接口，可以在未授权时用于配置与购买流程。
 
@@ -80,9 +80,14 @@ MCP 可信写前校验分支确认未执行时标记 `notExecuted`，保留安�
 
 `Chat/ChatStream` 虽声明 GET/POST，含问题、附件和会话上下文的业务调用默认使用 POST，避免敏感内容进入 URL 日志。Controller 和 `V8.AI` 必须从可信执行上下文覆盖当前用户和 `OsClient`，并清除客户端提交的 `ApiKey/Endpoint`。所谓打字机效果必须来自真实 SSE 增量块；`microi_chat` 只返回最终结果，不能被描述成逐 token MCP 流。
 
+普通聊天与 NL2V8 流式运行时通过可选 `IAiCancellableStream` 接口接收 HTTP `RequestAborted`，联结模型超时并传入 SDK；既有二参数接口兼容保留。支持该接口的 Core、AI 与 API 必须一起交付，旧 AI 模块回退路径不能声称具有取消传播。`DataAppend.CompletionStatus` 区分 `Completed/Cancelled/TimedOut/Truncated/Filtered/Incomplete/Failed`，只有明确正常结束且非空输出返回 `Code=1`；部分结果保留在 Data/增量回调中，不能自动保存为成功。HTTP `done` 只表示传输结束。取消/断流不撤销已完成工具写入或供应商费用，不自动重试；普通聊天空流不再隐式追加第二次模型请求。NL2V8 关键词扩词接收同一取消信号；数据库/可选向量查询仍有独立超时，当前仅在查询前后检查取消，不能宣称所有外部查询已即时中断。
+
 安全数据分析的新客户端调用 `/apiengine/platform-ai-runtime` 并固定 `Action=NL2SQL`；旧 `/api/Ai/NL2SQL` 只保留兼容转发。最终都由租户/用户绑定的 `V8.AI.NL2SQL` 从当前用户权限生成表白名单；任何通用包装接口都不得接受客户端自报的表名作为授权。
 
 ## 代码分层
+
+- OpenAI 兼容代理按完整 SSE 事件判断模型终态；只在全部请求候选都有显式已知 `finish_reason`、有文本/工具调用载荷且无错误时，给正常 EOF 补单个 `[DONE]`。已有终止帧即为传输边界，忽略其后数据；纯 EOF、取消、空答案、错误和冲突终态不能变成功。`length/content_filter` 保留原值，传输结束不等于业务答案完整；原有计量来源与记录继续生效。正常及错误 body 读取须传取消信号，并沿用代理总超时。需部署包含该修复的新 AI 后端，不能以商城/MCP 更新冒充上线。
+- 固定 JSON 基准须显式记录思考设置。`microi.benchmarks/ai-quality` 协议 1.1.0 对 MiniMax-M3 的两个条件同样固定 `reasoning_split:true`、`thinking:{type:'disabled'}`；其它模型不发送未经确认的参数。保留 1.0.0 失败结果；不剥离任意回答或取消终止帧验收来制造通过，不把不同思考配置比较成效率收益。供应商能力以官方文档和当前实际回执为准。
 
 AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.Api` 只是 HTTP、SSE 与 SignalR 传输层，可以做路由、请求绑定、读取认证中间件产生的可信用户/租户、传递取消信号和写响应，但不能承载模型选择、Schema/Skill 检索、NL2SQL 授权与执行、提示词编排、代理路由、供应商密钥、额度计量、订阅支付状态或 AI 工作流。
 
@@ -91,12 +96,19 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 - AI 的 Qdrant/Ollama/Embedding 配置、Schema 初始化和其它生命周期任务由 `AddMicroiAI()` 在模块内自注册；API 的 `Program.cs` 只负责调用模块注册。
 - `Microi.Core` 只承载跨模块契约和模型。新增入口时先扩展 AI 领域服务，再添加薄 Controller/Hub 适配，禁止复制业务流程。
 - AI 账户统一入口是 Managed 接口引擎 `/apiengine/platform-ai-account`；套餐、订阅和订单由 V8 编排。支付宝回调 C# 只做可信租户选择/归一化、该租户配置验签和一次性 Managed 调用；`CompletePayment` 在同一接口引擎事务内完成订单条件认领、金额校验、订阅续期/新建与平台/供应商 API Key 分配。供应商协议、密钥隔离、分布式额度原子、任务句柄和受控媒体落盘仍由绑定原子完成。
-- 非流式 `UpdateConversationTitle / RecognizeIntent / Chat / NL2SQL / NL2V8EngineSync` 与精确图片 `ProcessImage` 统一进入 Managed `/apiengine/platform-ai-runtime`，旧 Controller 同名路由只做兼容转发；SSE/流式、Provider Proxy、生成式媒体、文件和策略元数据保持原生。`platform-ai-runtime` 只调用绑定当前租户和当前用户的 `V8.AI` / `V8.Image` 原子，不接收客户端伪造的租户、用户、Endpoint、ApiKey、表白名单或管理员标记。
+- 非流式 `UpdateConversationTitle / RecognizeIntent / Chat / NL2SQL / NL2V8EngineSync` 与精确图片 `ProcessImage` 统一进入 Managed `/apiengine/platform-ai-runtime`，旧 Controller 同名路由只做兼容转发。媒体目录与图片/音乐任务的提交、查询、恢复也使用该 Managed 引擎的同名 `Action`；SSE/流式、Provider Proxy、文件传输和其余未迁移协议继续使用原生入口。`platform-ai-runtime` 只调用绑定当前租户和当前用户的 `V8.AI` / `V8.Image` 原子，不接收客户端伪造的租户、用户、Endpoint、ApiKey、表白名单或管理员标记。
 - AI 官方应用只有一个应用级租户扩展点 `platform-ai-custom-hook`，策略为 `CreateIfMissing`。`mci_ai_data_assistant` 与 `platform-ai-runtime` 只传 `Stage`、`SourceApiEngineKey`、`Action`；支付动作最多增加 `EventId`、`Provider`，账户其它动作只增加白名单资源元数据。Hook 禁止接收订单号、交易号、金额、标题、SQL、模型、附件、提示词或问题原文及其摘要、回答、供应商/平台密钥、供应商任务号、文件句柄或媒体内容。匿名发现接口不调用 Hook，`/v1/usage` 继续由 C# 凭据网关直接校验，使 `Authorization` 永不进入 V8。
 - 9 张 `mic_sub_*` 订阅表与 `mci_ai_token_account`、`mci_ai_token_log` 由官方 `app.microi.ai-engine` 应用升级提供，必须同时声明 DDL、PhysicalColumns、DiyTables、DiyFields；`PromptPreview` 属于日志表正式字段。`mci_ai_token_recharge` 当前不在该运行时实体闭包内，禁止根据线上残留自行扩包。运行时发现缺失时失败关闭，禁止在请求路径自动建表、加列或修改业务 Schema。
 - `Sys_User.AiApiKey` 归官方 `app.microi.sys_user`，由系统账号包同时维护建表 DDL、PhysicalColumns 和隐藏只读 DiyField；AI助手包不得重复声明 `Sys_User`。缺列错误必须提示升级系统账号应用，不能误导用户升级 AI助手。
 
 ## 模型与密钥
+
+### 媒体目录与图片任务的 Managed 调用
+
+- 后端新增 `V8.AI.GetMediaModels()`、`V8.AI.GenerateMiniMaxImage(param)`、`V8.AI.GetMiniMaxImageTask(taskId)`、`V8.AI.RecoverMiniMaxImageTask(taskId)` 四个原子。前端及 Microi Agent 调用 `/apiengine/platform-ai-runtime` 的同名 `Action`，后端 V8 可直接调用原子，不自请求本机 HTTP，不新增第二套媒体编排入口。
+- 当前租户和用户绑定于可信 V8 上下文，匿名拒绝；图片任务提交沿用既有运行时的模型、许可、权限、配额与幂等校验。查询和恢复只访问该租户、该用户拥有的任务。目录仅安全投影，Hook 仍只接收来源、阶段和动作，不接收媒体、提示词、任务号或密钥。
+- 提交持久任务后保存原 `RequestId`、`TaskId` 及服务器/租户/账号归属；`Code=2` 仅表示受理。超时、断连、空响应先复查原任务，不能换 Id 重发。恢复仅复用已经保存的供应商回执与结果，不重新生成；没有回执的未知结果明确失败或保持未知，不能伪造成功。
+- 四个原子、Managed 引擎和消费者需一起验收；应用包或版本号不代表服务器能力已部署。至少验证匿名拒绝、跨租户/跨用户隔离、请求参数白名单、幂等回放、未知结果复查，以及图片持久地址回读。没有线上回执时只报告源码与测试已完成，不声称某一版本已经上线。
 
 存量模型配置的兼容验收组合包括 `GenerateMiniMaxImage + image-01`、`GenerateMiniMaxMusic + music-2.6`。这些组合只适用于服务端已配置且供应商账号仍有权限的旧路由；新路由仍遵循下列实时能力选择规则。验收必须同时检查实际返回的模型标识、媒体类型与 HDFS 读取，不能仅凭兼容接口名称判断底层模型。
 
@@ -123,14 +135,20 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 - 管理端【AI视频】应按 `TaskHandle` 轮询任务，成功后优先转存 HDFS，并用 `<video controls preload="metadata">` 原页预览和明确下载按钮消费同一个已校验地址。临时 URL、生成完成、HDFS 转存、媒体可播放和外部平台发布是五个不同事实，必须分别验收。
 - 使用 Microi.AI 中转站时，租户侧 AI Bootstrap 通过官方 `official_ai_relay_models` 发现可用运行模型。该接口是跨租户只读公共契约，必须保持启用、允许匿名 HTTP 调用，并且只返回模型标识、展示名等公开白名单字段，绝不能返回中转密钥或上游 Endpoint。消费者不得把 `NoAuth` 静默伪装为“没有配置模型”；应返回可诊断错误，同时前端显示明确空态。
 - PC、UniApp 和其它客户端通过 `POST /apiengine/{key}` 发送的 JSON Body 必须完整进入 `V8.Param`；兼容入口 `/api/ApiEngine/Run` 的 JSON Body 还必须包含 `ApiEngineKey`。API 层只负责请求绑定和清除客户端伪造的可信字段，模型选择、权限策略与对话逻辑仍全部位于 `Microi.AI` 或受控 AI 接口引擎中。
-- 当前计量记录除问题摘要外还可能持久化完整 `Question`、`Answer`，部分诊断日志也会输出问题或摘要。处理现有版本时必须把这些字段视为敏感业务数据，限制查询权限和留存；不要声称已经全面脱敏。
-- 发布目标是日志只记录 trace id、模型、耗时、token 计数和状态，Prompt/Answer 按租户策略脱敏，密码、Token、连接串和完整业务数据不落日志。该目标必须用源码和真实数据回读证明。
-- OpenAI 代理流式接口会传递 HTTP 请求取消信号；普通 `ChatStream` 与 `NL2V8` 当前主要使用内部超时 Token。不要声称浏览器断开一定立即终止上游调用或计费。
+- 本轮源码的两条中转计量写入路径将 `PromptPreview/Question/Answer` 绑定为空字符串；用量查询只投影计量与关联字段，不返回旧正文预览。旧物理列保留兼容，不批量删除历史数据，不改变数值计量事务或用户主动保存的会话历史。正式运行以目标版本发布和实际读回为准；部署旧版本时这些字段仍可能保存正文。
+- 普通聊天/NL2V8 诊断仅记录长度、状态、异常类型；NL2V8 异常响应也不回显异常正文。历史日志、旧账本、会话存储、其它 AI 分支及外部供应商留存需单独审计；不能据此声称全平台全面脱敏或统一留存策略已完成。
+- 流式回执 `UsageSource=Provider` 仅用于 SDK 实际返回的用量，缺失为 `Unavailable`；存量中转计量估算保留且另标 `RelayUsageSource=Estimated`，不得当作供应商实际 token 或费用。公开实测可用 `microi.benchmarks/ai-quality` 固定合成任务协议，模拟夹具必须标 `harness-test`，真实供应商回执标 `real-provider`；结构化 JSON 校验不能替代端到端数据库/界面/权限验收。
+- OpenAI 代理、普通 `/api/Ai/ChatStream` 与 `/api/Ai/NL2V8Engine` 将 HTTP 取消信号传递到对应模型流读取，并与模型超时组合；`IAiCancellableStream` 为普通聊天提供可取消契约。取消/超时/长度截断/上游失败不能标为完整成功。取消不撤销供应商已经发生的用量，也不能承诺网络断开瞬间停止上游计费。
+- 中转无限额度使用 `mci_ai_token_account.IsUnlimited=1` 的独立权益，不能把负数或极大余额当作无限。赠送余额保持有限数值，无限期间按该调用既有的计量来源继续累计 `UsedTokens` 与脱敏用量账本而不减 `RemainingTokens`，供应商用量缺失时仍可能为估算；各余额预检与扣量 SQL 均读取服务端当前权益，撤销后恢复有限余额规则。该权益不代替服务器 License、登录/API Key、付费订阅、供应商配额或并发保护。
+- 管理中转权益复用 Managed `platform-ai-account`：先 `GetRelayTokenAccount({TargetUserId})`，再 `SetRelayTokenLimit({TargetUserId,IsUnlimited,ExpectedUnlimited})`。后两参数必须为布尔值，ExpectedUnlimited 必须来自刚回读状态；仅当前配置主租户、数据库仍有效的平台管理员可调用，访问密钥与子租户均拒绝。无账户的读取不开户；设置可受控初始化默认赠送账户，多条有效账户立即失败。写后回读 `AccountExists/IsUnlimited/GiftTokens/UsedTokens/RemainingTokens/UnlimitedUpdatedBy/UnlimitedUpdatedAt`，不能只看 Code。
+- MCP 使用既有 `microi_run_engine` 调用同一 Managed 动作，`V8.Method.ManageAiPlatform` 负责可信身份、并发条件更新与计量原子。普通客户端 FormEngine 无权直改账户/用量表；获授权可编辑后端代码仍属于可信开发执行权，不能宣称任意服务端脚本被账本表分类隔离。字段由官方 AI 应用升级，旧库缺列按有限额度兼容，管理设置要求先完成宿主与应用包同步升级；不得临时维护引擎、SQL 绕过 MCP 或清空消费历史。
+- 在途请求若在预检后被撤销权益，或有限余额被其它请求消耗，扣量时按数据库当前状态拒绝不足余额，不沿用旧无限快照、不自动补扣。供应商已经发生的用量可能未进入本地成功账本，应另查供应商回执；不能宣称所有失败用量均已完整入账。
+- 无限权益能力要求 Core/AI 宿主至少 `8.7.0`、官方 AI 应用至少 `7.7.8`、`platform-ai-account` 至少 `1.1.1`；MCP `6.1.5` 的通用 `microi_run_engine` 可调用。当前用户的官方中转摘要/用量同样只在可信主租户上下文访问，子租户不能以相同用户 Id 读取主租户账户。
 
 ## 跨端 AI 助手与商城交付
 
 - PC 与移动端复用 `mci_ai_data_assistant`。`Bootstrap` 返回的 `Enabled`、`Models`、`AllowedDomains` 和 `Prompts` 是跨端共同事实源；快捷问题来自启用的 `mci_ai_data_domain.PromptExamples`，前端不能维护另一套固定文案。
-- 官方 AI助手应用归 `app.microi.ai-engine`。v6.3.6 的接口引擎必须严格只有 Managed `mci_ai_data_assistant`、Managed `platform-ai-account`、Managed `platform-ai-runtime` 和 CreateIfMissing `platform-ai-custom-hook` 四项，并声明 `V8.Method.ManageAiPlatform`、`V8.Method.RequireManagedProtocolContext` 与所需 `V8.AI` 能力；后端缺少任一能力时安装预检失败关闭。
+- 官方 AI助手应用归 `app.microi.ai-engine`，接口引擎保留 Managed `mci_ai_data_assistant`、Managed `platform-ai-account`、Managed `platform-ai-runtime` 和 CreateIfMissing `platform-ai-custom-hook` 四项，并声明 `V8.Method.ManageAiPlatform`、`V8.Method.RequireManagedProtocolContext` 与所需 `V8.AI` 能力。`RequiredPlatformCapabilities` 是发布与 CI 校验的包声明，不能声称安装器逐项探测运行能力。安装器 v3.1.1 或更新版本按 `ServerMinVersion` 读取真实 Core 版本并在写入前校验；AI 应用 v7.7.8 最低为平台 8.7.0。版本校验不能识别混装旧 AI 程序集，仍需部署匹配的 Core/AI/API，并实际调用管理动作和回读结构。
 - `ai_app_list`、`ai_app_detail`、`ai_app_get_file`、`ai_app_save_file`、`ai_app_create`、`ai_app_build`、`ai_app_preview`、`ai_app_download_source_zip`、`ai_app_download_build_zip`、`ai_app_moveobject_probe`、`ai_app_moveobject_exec_probe`、`ai_app_publish_store` 这 12 个 `ai_app_*` 归 `app.microi.store` 维护。AI助手包移除它们的资源选择和所有权声明，但不会删除目标租户既有运行时接口记录；既有记录继续由应用商城包升级。
 - v6.3.6 还必须保持 AI助手包的 DDL、PhysicalColumns、DiyTables、DiyFields、DataSets 全层不再包含重复的 `mci_ai_app_version`、`mci_ai_app_file`、`sys_microistore`，这些表交回 Store/SaaS 既有平台包维护；当前仅 AI助手包拥有的 `app_mic_aiapp`、`mci_ai_app` 继续保留。
 - 普通角色读取业务数据必须匹配启用的 `mci_ai_role_policy`，这不是常规对话的前置条件。只有后端可信的 `V8.CurrentUser.Level >= 9999` 可以在新安装租户缺少角色策略时获得数据分析安全兜底：从目标租户动态读取已启用业务域和模型，范围为 `All`，仍保持 `AllowRawSql=false`、敏感字段默认关闭。不得相信客户端提交的 Level、角色名或账号名。

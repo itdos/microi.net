@@ -1,6 +1,6 @@
 # Microi吾码官网与官方文档
 
-Microi吾码是**开源 AI 开发框架**，融合 30+ 成熟引擎、AI 低代码、微服务与 V8 引擎；在平台能力高度复用的典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付。
+Microi吾码是**开源 AI 开发框架**，融合 30+ 成熟引擎、AI 低代码、微服务与 V8 引擎；复用平台通用能力，在线编排业务逻辑，让 AI 聚焦业务增量；具体收益按同条件任务实测。
 
 ## 运行说明
 
@@ -57,6 +57,8 @@ PDF 与 PPTX 生成器默认输出到工作区 `.tmp/training-deck-downloads/pdf
 
 `robots.txt` 允许公开脚本、样式、字体、图片及中英文文档被抓取。登录、个人资料与仅靠查询参数打开的应用详情页保留正常访问，使用 `noindex, follow`，并从 sitemap 中排除。这个指令是搜索展示策略，不是权限控制。
 
+历史 `itdos.com` / `www.itdos.com` 下的 `/doc`、`/case`、`/contact` 及对应英文阅读路由，通过固定目标的 301 迁移到规范主域，保留路径与查询参数；其它业务路径不在此规则内。代理需要保留访客 Host，发布后用 `--check-public-aliases` 检查实际公网跳转。已有 canonical 和 301 是规范地址信号，不能证明搜索缓存已经刷新；搜索结果中的抓取日期、直链当前正文和网站部署版本应分别记录。
+
 文档摘要以本页正文为主，不强制拼接相同营销关键词。页面具有独立 canonical、真实存在的中英文 hreflang 对应关系、可见面包屑及同源 BreadcrumbList、文章真实修改时间、WebSite/Organization 信息。首屏 HTML 与站内切换共用同一份页面元数据，从错误页返回文档时也会清除旧的 noindex。英文 HTML 和 hreflang 使用 `en-US`；Open Graph locale 按协议保留 `en_US`。
 
 每次构建从实际生成的公开文档、案例页自动创建 `/llms.txt`。它只提供规范链接和已有摘要，不复制私有源码或建立另一套事实来源。它是方便开发者向 AI 工具提供上下文的可选入口，不能保证收录、排名或 AI 引用；AI 搜索仍依赖正文可读、链接可发现、信息准确与爬虫可达。[Google 官方说明](https://developers.google.com/search/docs/appearance/ai-features)
@@ -66,6 +68,8 @@ npm run test:seo
 npm run docs:build
 # 必须对运行正式配置的 nginx 检查；Vite 开发服务器不验证生产状态码和跳转。
 npm run check:seo:http -- --base http://127.0.0.1:61513 --check-alias-hosts
+# 官网发布后的真实域名验收，不新建测试容器
+npm run check:seo:http -- --base https://microi.net --check-public-aliases
 ```
 
 构建检查会交叉验证逐页 canonical 唯一性与正确性、描述重复、noindex、sitemap 目标、双向 hreflang、JSON-LD 和 AI 文档索引。HTTP 检查验证真实 301/404、完整 sitemap、参数保留和友好错误页。它们均不能替代百度搜索资源平台的真实索引和抓取日志。
@@ -83,6 +87,9 @@ npm run check:seo:http -- --base http://127.0.0.1:61513 --check-alias-hosts
 没有 ESA/百度后台与群晖访问权限时，只能完成公开抓取、源码及隔离 nginx 验收；不能把镜像构建或模拟爬虫成功写成生产环境已恢复收录。
 
 ## 执行翻译
+
+由受控运行环境注入 `ALIBABA_CLOUD_ACCESS_KEY_ID`、`ALIBABA_CLOUD_ACCESS_KEY_SECRET`；临时凭据同时注入 `ALIBABA_CLOUD_SECURITY_TOKEN`。这些变量只供翻译工具进程使用，不是生产 API 配置。缺少凭据时在发起请求前停止；不要把真实值写进源码、文档、命令行参数或日志。历史已暴露的凭据应在账号侧撤销并重新签发，删除当前源码中的值不能清除 Git 历史或第三方缓存。
+
 ```
 node translate.mjs
 ```

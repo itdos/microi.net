@@ -90,7 +90,11 @@ return { Code: 1, Data: { IdempotencyKey: idempotencyKey } };
 - 先证明任务真的在执行：读 `Scheduler.IsStarted`、`Scheduler.NumberOfJobsExecuted` 和 `Acquisition.LastAcquisitionError`，参考 `microi.doc/docs/doc/system-engine/job.md` 的“任务不执行”。`diy_schedule_job.Status=正常`、`diy_schedule_job.NextTime` 和“插件启动成功”都不能证明触发成功；列表/详情页的 `LastTime/NextTime` 来自运行时，直接查表看到的是库内快照。
 - 领取错误含 `Key 'IDX_microi_job_T_NFT_ST' doesn't exist` 时，是 Quartz 3.19 MySQL 方言依赖 `USE INDEX (IDX_{tablePrefix}T_NFT_ST)` 与 `IDX_{tablePrefix}T_NFT_ST_MISFIRE`，而触发器表缺少这两个索引（常见于历史租户库仍是旧 `QRTZ_` 前缀索引名）。平台调度器初始化会按前缀幂等补齐；人工抢修可直接执行文档中的两条 `CREATE INDEX`，索引名大小写不敏感，补完后无需重建任务或 Cron。
 - 失败记录错误分类、重试次数和 `NextRetryTime`，采用有上限退避；永久错误进入人工处理。
+- 大应用包安装返回 Id 后长期 `Pending/AttemptCount=0`，先回读原任务和 `WorkerClaimFailed` 持久栈。旧版完整 `ParamJson` 共用 2 秒候选扫描时限，数据库慢读可能触发驱动超时处理中的空引用；不得凭异常文案归因业务脚本或重复提交。新版候选仅含领取必需字段，完整参数在已领取的执行槽中以任务 Id、租户、owner/fence 和有效租约约束读取，独立上限 30 秒，读后再验租约；读取失败不执行正文，仅释放本次仍拥有的租约。验收覆盖大参数慢读、读失败、读取期间租约变化和原任务成功终态；需要更新后端，MCP/CLI 升级不能代替。
+- 已领取的后台任务执行失败时，先按原任务 Id 回读真实状态，再查系统日志 `Source=BackgroundTask`、`Action=ExecutionFailed`。脱敏诊断用 `Stage` 区分接口引擎执行（`ApiEngineExecution`，也包括执行前的权威引擎读取）、分片进度写入（`ContinuationProgress`）、分片重新入队（`ContinuationPersist`）和终态写入（`TerminalPersist`）；后者表示 `Complete` 本身失败，不能据此认定业务脚本失败。结合 `OwnerOsClient/ExecutionOsClient`、运行环境、`TaskId/Fence` 关联原任务；安全异常链最多 4 个节点，保留类型、`HResult`、可读取的提供商 `Number/SqlState/SocketErrorCode` 及每节点最多 4 个 CLR 方法名，不包含源码路径、行号或实参。
+- 此诊断不记录异常消息正文、SQL、参数或连接串。`MessageSha256` 仅用于关联相同消息前缀：最多取前 65,536 个 UTF-16 字符后编码为 UTF-8 计算摘要，并同时记录 `MessageLength/MessageHashChars/MessageHashTruncated`；不能把截断摘要当作完整消息或根因证据。诊断走既有 `QueueSystemLog`，接受入队不等于已经持久化，必须实际查询到日志才算取得诊断证据；日志拒绝或异常不改变原任务的重试、事务、租约和失败结果，也不能触发重复提交。
 - 外部调用设置超时；无法确认对方是否成功时用业务幂等号查询，不盲目重发。
+- SQL Server 业务库可用但商城保存任务时报证书链不受信任时，核对调度节点主数据库连接串和实际后端版本。Dos.ORM 的 `System.Data.SqlClient` 与 Quartz 的 `Microsoft.Data.SqlClient` 缺省加密策略不同；插件仅为缺少 `Encrypt` 的旧串显式保留 ORM 的可选加密语义，普通注册和延迟初始化共用此策略。显式 `Encrypt/TrustServerCertificate` 必须保留，不能全局添加信任证书或吞掉任务保存失败。正式环境优先受信任证书；自签名测试环境仅由管理员显式配置。更新后端或连接配置后重启调度节点，再重装并回读 Quartz 任务及触发器，不能以元数据存在代替。
 - 服务停机先停止接单，再在有限宽限期排空或持久化；重启扫描未完成任务。
 - 若要求 `kill -9` 前也零丢失，业务成功响应前必须获得共享 outbox/MQ/WAL 持久化确认。
 
@@ -120,6 +124,8 @@ if (task.BusinessTable && task.BusinessId) {
 不得让通用后台服务按客户端传入的任意表名/字段名直接写库；需要脱离前端自动标记的专用任务，应在受控接口引擎中使用固定表名和固定字段名。
 
 接口通过 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报已提交的真实工作量，`Log`/`AppendLog` 用于追加任务详情（不得包含密码、Token 或密钥）。平台按实际吞吐计算 `EstimatedEndTime`；总量未知时不传 `Total`，通知中心显示“不定进度/估算中”，禁止用固定 10%、阶段占位或计时器伪造进度。失败和取消停在最后真实进度，不得显示 100%。
+
+后台状态、消息和错误的固定中文同样必须通过 SQL 参数绑定，不能把中文写成普通 SQL 字符串字面量；SQL Server 在 Latin1 等代码页下会先将其变为问号，再写入 `nvarchar` 列。修复覆盖入队、领取、分片重排、取消、重试和失败路径，保留原有租约、fencing 和条件更新。历史 `StatusText` 缺失或仅含问号/替换字符时，前端只能为 `Pending/Running/Retrying/Succeeded/Failed/Canceled` 显示已知状态文案；未知状态及自定义文本不能被吞掉，不批量重写历史审计或原始错误。验收需在真实 Latin1 SQL Server 隔离库证明旧字面量会损坏、新状态和消息完整，且过期 fencing 仍拒绝写入；显示兜底不等于安装成功。
 
 分片接口在仍有后续工作时返回：
 

@@ -53,8 +53,12 @@ MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_pag
 你正在为 Microi 吾码平台生成界面引擎页面的 JSON 数据。界面引擎页面由 `formData` 对象描述，用户导入 JSON 即可使用。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=page-engine-000 sha256=5b79a31a8484bf0a618c2810e66c0ab542fd86ceeb76e7a5cd07a86284c4f6ac -->
+<!-- microi-progressive:chunk id=page-engine-000 sha256=44233416e71cc6ff3712347308dadd26e55b14938b81b8a2401478c6bc14921b -->
 ## 设计器源码事件
+
+设计器选中事件只能在 `isDesignMode` 为真时执行 `preventDefault/stopPropagation` 和选中状态写入。运行和预览页面必须保留 HTML 链接、按钮与键盘激活的浏览器默认行为。链接使用实际授权菜单路由，保存后逐一点击验证，不以 JSON 中存在 href 代替跳转验收；回归入口为 `Microi.Client/tests/page-engine-runtime-click.spec.mjs`。
+
+每个顶层运行路由必须创建并 provide 独立的 `PAGE_ENGINE_STORE_KEY`，其子组件通过 `usePageEngineStore` 使用当前渲染树的状态。不能让多个 KeepAlive 页面共用应用级 `formData`，否则迟到响应和页面激活会导致错页；验收需覆盖地图与看板往返、迟到响应、移动布局和主题隔离。
 
 只有在扩展界面引擎设计器源码时才使用全局事件总线。用
 `EventBus.on(eventName, handler)` 监听保存、日期选择或组件跳转等事件，并在
@@ -62,7 +66,7 @@ MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_pag
 触发多次；普通页面 JSON 生成不需要注册事件总线。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-001 sha256=53cf1992d4adcf8126f4d0a04d373d685d539b38c5d74840ba07905e9cbe4589 -->
+<!-- microi-progressive:chunk id=page-engine-001 sha256=57717991f9c7de557b524ec36fc9bdd716080b71b682439f1b6662b0b9b2f45c -->
 ## 核心数据结构
 
 ```
@@ -81,7 +85,7 @@ formData（页面）
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-002 sha256=227ecf87086231eee28a9d91fde6a178a437e9196dd8f2ef1d14d53e5c5858df -->
+<!-- microi-progressive:chunk id=page-engine-002 sha256=6a1a85b40bcb5f8be694b0aad73a805083acd0d6fcd9cba36278dc9b51d24dcb -->
 ## formConfig 页面全局配置
 
 ```json
@@ -99,7 +103,7 @@ formData（页面）
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-003 sha256=7bb7cb860f9330002f60748e93de3c639b157cddfd77b63ac8b19f0535306e65 -->
+<!-- microi-progressive:chunk id=page-engine-003 sha256=8afb75b0e4d85ab9f56a7ba018e1cc50f758d3e604683d8c38d5f0a45d53f135 -->
 ## 容器类型
 
 | type | label | 说明 |
@@ -154,7 +158,7 @@ formData（页面）
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-004 sha256=66261254d94455648441bf3519a5c810ede60c64f341dce035f931e284f762ba -->
+<!-- microi-progressive:chunk id=page-engine-004 sha256=9c7c85bb0d25267d07e45d9abeb5691c2f0ffd9da233351cf2f448a9b848cea5 -->
 ## 组件通用结构
 
 ```json
@@ -175,7 +179,7 @@ formData（页面）
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-005 sha256=e9667b97462c9089a72d2a407cfde00e873afe7d64593bf33ad49a523255b38d -->
+<!-- microi-progressive:chunk id=page-engine-005 sha256=c1e31dede775f14761182fc197cf428d494806c4503a622ffdad3d16d091d3e0 -->
 ## widgetParams 参数类型
 
 | type | 说明 | value 类型 |
@@ -190,7 +194,7 @@ formData（页面）
 | `radio` | 单选组 | `string` |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-006 sha256=7347b2b4290db41ae8c3ef128acc9854a5e17290268b8e274e771de47b8f752a -->
+<!-- microi-progressive:chunk id=page-engine-006 sha256=2c021e43f4f0d730da1f5a5cf6a2d314589435e2bb9ff573148c787538a8cc86 -->
 ## 数据来源（widgetParams[0]）
 
 大多数组件的第一个参数（sort=0）是"数据来源"：
@@ -203,7 +207,7 @@ $ApiBase$/apiengine/{ApiEngineKey}
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=page-engine-007 sha256=5f2ed06aa1e0abbc5f968f026602d92f22f01836d76fdf502fd91ca0f945509b -->
+<!-- microi-progressive:chunk id=page-engine-007 sha256=4170c6e274fc773427057d8606c4800a5bbd5fabd62d63e931aaa388262a51e9 -->
 ## 运行态布局与滚动规范
 
 - 页面只保留一个主滚动容器：仪表盘、首页和嵌套界面优先继承最外层页面滚动；单个 `pannel`、`workcenter`、`diytable`、`diycalendar`、嵌套 `pageengine` 在运行态默认使用内容自适应高度和 `overflow: visible`，不得无条件设置 `overflow: auto`。

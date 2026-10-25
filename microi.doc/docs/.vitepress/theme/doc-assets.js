@@ -709,44 +709,44 @@ export const docAssets = Object.freeze([
   },
   {
     "legacyPath": "/images/microi-ai-platform-architecture-1920x1080.png",
-    "url": "https://file.microi.net/itdos/official-docs/images/7778c91966c765fff13c40d2d49afdb8dbf9ac5565e679e29aba6b54aba16823/202610/microi-ai-platform-architecture-1920x1080.png",
-    "bytes": 263789,
-    "sha256": "7778c91966c765fff13c40d2d49afdb8dbf9ac5565e679e29aba6b54aba16823",
+    "url": "https://file.microi.net/itdos/official-docs/images/31076b84b0f2e1858107590fcf0d291001e1d12188b78a72562081b2809a9d45/202610/microi-ai-platform-architecture-1920x1080.png",
+    "bytes": 261857,
+    "sha256": "31076b84b0f2e1858107590fcf0d291001e1d12188b78a72562081b2809a9d45",
     "mimeType": "image/png"
   },
   {
-    "legacyPath": "/images/microi-ai-platform-architecture-2026.09.04.1-1920x1080.png",
-    "url": "https://file.microi.net/itdos/official-docs/images/7778c91966c765fff13c40d2d49afdb8dbf9ac5565e679e29aba6b54aba16823/202610/microi-ai-platform-architecture-1920x1080.png",
-    "bytes": 263789,
-    "sha256": "7778c91966c765fff13c40d2d49afdb8dbf9ac5565e679e29aba6b54aba16823",
+    "legacyPath": "/images/microi-ai-platform-architecture-2026.10.25.1-1920x1080.png",
+    "url": "https://file.microi.net/itdos/official-docs/images/31076b84b0f2e1858107590fcf0d291001e1d12188b78a72562081b2809a9d45/202610/microi-ai-platform-architecture-2026_10_25_1-1920x1080.png",
+    "bytes": 261857,
+    "sha256": "31076b84b0f2e1858107590fcf0d291001e1d12188b78a72562081b2809a9d45",
     "mimeType": "image/png"
   },
   {
-    "legacyPath": "/images/microi-ai-platform-architecture-2026.09.04.1-3840x2160.png",
-    "url": "https://file.microi.net/itdos/official-docs/images/602f2635aa82ae8c2ac921f5e61f74fdcfed7949c272e9bc613013bc8039b056/202610/microi-ai-platform-architecture-2026_09_04_1-3840x2160.png",
-    "bytes": 1513871,
-    "sha256": "602f2635aa82ae8c2ac921f5e61f74fdcfed7949c272e9bc613013bc8039b056",
+    "legacyPath": "/images/microi-ai-platform-architecture-2026.10.25.1-3840x2160.png",
+    "url": "https://file.microi.net/itdos/official-docs/images/c9a648ffb0dcdd1fcd6760c22820cfb536e1e9972baed33bfe233a7bd0628e13/202610/microi-ai-platform-architecture-2026_10_25_1-3840x2160.png",
+    "bytes": 1524371,
+    "sha256": "c9a648ffb0dcdd1fcd6760c22820cfb536e1e9972baed33bfe233a7bd0628e13",
     "mimeType": "image/png"
   },
   {
-    "legacyPath": "/images/microi-ai-platform-architecture-2026.09.04.1.svg",
-    "url": "https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg",
-    "bytes": 82732,
-    "sha256": "a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d",
+    "legacyPath": "/images/microi-ai-platform-architecture-2026.10.25.1.svg",
+    "url": "https://file.microi.net/itdos/official-docs/images/af8f0aad7815c1f68e224cbce706d5723c5223bd1557e1eea71a19b45891d169/202610/microi-ai-platform-architecture-2026_10_25_1.svg",
+    "bytes": 81668,
+    "sha256": "af8f0aad7815c1f68e224cbce706d5723c5223bd1557e1eea71a19b45891d169",
     "mimeType": "image/svg+xml"
   },
   {
     "legacyPath": "/images/microi-ai-platform-architecture-3840x2160.png",
-    "url": "https://file.microi.net/itdos/official-docs/images/602f2635aa82ae8c2ac921f5e61f74fdcfed7949c272e9bc613013bc8039b056/202610/microi-ai-platform-architecture-2026_09_04_1-3840x2160.png",
-    "bytes": 1513871,
-    "sha256": "602f2635aa82ae8c2ac921f5e61f74fdcfed7949c272e9bc613013bc8039b056",
+    "url": "https://file.microi.net/itdos/official-docs/images/c9a648ffb0dcdd1fcd6760c22820cfb536e1e9972baed33bfe233a7bd0628e13/202610/microi-ai-platform-architecture-3840x2160.png",
+    "bytes": 1524371,
+    "sha256": "c9a648ffb0dcdd1fcd6760c22820cfb536e1e9972baed33bfe233a7bd0628e13",
     "mimeType": "image/png"
   },
   {
     "legacyPath": "/images/microi-ai-platform-architecture.svg",
-    "url": "https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg",
-    "bytes": 82732,
-    "sha256": "a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d",
+    "url": "https://file.microi.net/itdos/official-docs/images/af8f0aad7815c1f68e224cbce706d5723c5223bd1557e1eea71a19b45891d169/202610/microi-ai-platform-architecture.svg",
+    "bytes": 81668,
+    "sha256": "af8f0aad7815c1f68e224cbce706d5723c5223bd1557e1eea71a19b45891d169",
     "mimeType": "image/svg+xml"
   },
   {

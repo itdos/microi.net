@@ -1,6 +1,6 @@
 ---
 name: v8-api-config
-description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、ApiAddress、StopHttp、AllowAnonymous、ResponseFile、ResponseType=HTTP、锁、日志、超时和 HTTP 暴露。
+description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、ApiAddress、StopHttp、AllowAnonymous、ResponseFile、ResponseType=HTTP/SignalR、双向实时通道、锁、日志、超时和 HTTP 暴露。
 ---
 
 > **Microi吾码基础规范（强制）：** 任何 AI 模型与宿主每次新建或接续吾码任务，先完整读取 `../workspace-conventions/SKILL.md`，必须执行版本播报、`@microi.net/cli` 后台自动升级、Skills/MCP 同步和进度播报。安装与诊断读取 `../microi-codex-installer/SKILL.md`；更新失败延后重试，不阻断当前工作。
@@ -44,6 +44,9 @@ ApiRoutes: /api/SysMenu/GetSysMenuModel;/api/SysMenu/GetSysMenuStep
 - 新客户端仍使用 `/apiengine/{ApiEngineKey}` 或主 `ApiAddress`。多路由用于 Controller 迁移、旧移动端和第三方已登记回调的兼容，不得拿它复制多份相同接口代码。
 - MCP 创建接口时传 `apiRoutes: ['/api/Old/A', '/api/Old/B']`；更新时省略表示保留，传空字符串/空数组表示清空。官方应用包必须同时携带 `ApiRoutes`、醒目 Managed 提示与 `ResourcePolicies.ApiEngines`。
 - 迁移旧 Controller 不能只迁方法名：同时核对历史 GET/POST、JSON/Form/Query、无需 `Action` 的调用和原始返回结构。按服务端 `_RequestPath` 精确识别兼容动作，历史只读地址不得被请求 `Action` 改为写操作；现代稳定 Key 的其它合法动作仍须可用。
+- 同地址采用“当前租户接口引擎优先 → 确认缺失才回退 Controller → 两者均不存在才 404”。不可按 Controller 前缀跳过接口引擎；停用、StopHttp、鉴权拒绝、执行异常及权威查询失败都不等于缺失，不得降级执行旧逻辑。单请求复用已确认的缺失结果，不能用长效负缓存延迟在线新增接口生效。
+- `/api/License/GetManagementState` 也遵循上述同址优先规则；现有 GET/POST Controller 读取授权管理页状态，要求平台管理员身份并按可信租户范围返回。若用接口引擎承接该地址，必须保留相同的身份与租户边界；路由存储故障返回 503，不能回退绕过。动态路由优先级由后端二进制交付，仅更新应用包不代表宿主已支持。
+- 公开设置等启动接口的参数、读取顺序、错误分类和响应组装应留在可编辑 V8；宿主只保留秘密投影、公钥、可信身份、验签及受限存储原子。禁止新增一个返回完整业务响应的 C# 门面再以单行 V8 包装冒充迁移。必要启动包从官方拥有者包显式投影，不能借核心接口升级默认安装可选平台应用。
 - 部门树旧地址 `/api/SysDept/GetSysDeptStep` 由 `platform-sys-dept` 的多路由交付，保留 DiyToken、组织范围及 `_Child`。缺引擎兜底仅登记该历史读地址，不能把整个现代引擎地址截获为只读分发器。验收需对比引擎存在、缺失再恢复的同一用户树结构，并验证匿名、伪造身份、停用/StopHttp 不绕过。
 
 ### 资源预算与嵌套调用（强制理解）
@@ -98,9 +101,21 @@ return {
 - `Set-Cookie` 等高风险头只允许由受限 `V8.Method` 可信原子生成并签名，租户 V8 无法自行伪造签名。SSO 使用 `V8.Method.RunSsoProtocol`；不要把 Secret、Cookie 值或签名密钥暴露给 V8。
 - `204/304` 不得带正文；状态码限制为 100–599，正文和响应头有大小/数量限制。HTTP 契约校验失败时宿主返回标准错误，不写出半截协议响应。
 
+### 双向实时命令（ResponseType=SignalR）
+
+- 浏览器要求持续发送命令并收回执时，选 `ResponseType=SignalR`、通用 `/api-engine-socket?OsClient={tenant}&ApiEngineKey={key}`；仅增量输出选 Stream，订阅提交后事件选下文 `/api-engine-realtime`。不要新建业务专用 Hub，也不要把 HTTP 每按钮调用包装成实时控制。
+- 先验证目标后端包含 `ApiEngineSocketHub`、MCP Schema 支持 SignalR、接口引擎应用包包含该响应选项；仅改 ResponseType 文本不代表旧服务器支持。源码新增平台能力须同步应用包、官方文档、Skills、MCP 并按一键脚本正式发布，之后实测目标地址。
+- `Invoke(requestId,message)` 只接收业务对象。可信 `V8.Param.Socket` 由宿主注入 ConnectionId、Event（Connected/Message/Disconnected）、ClientKey（地址摘要）；客户端输入保留在 Message 内，不能改变租户、接口或 CurrentUser。接口首行调用 `V8.Method.RequireApiEngineSocketContext()`，失败立即返回。
+- 当前有效 DiyToken、IsEnable、StopHttp、AllowAnonymous 和精确 ApiRole 每次仍需校验；AccessKey 不支持。匿名配对必须显式开启 AllowAnonymous，四位码只是定位符，不能创建第二套平台权限 Token。用强随机所有权秘密、服务端摘要、共享状态、碰撞分配、短租约和猜测限流限制到相机等最小业务动作。
+- 成功提交后的 `DataAppend.SocketMessages=[{ConnectionId,Data}]` 通过 EngineMessage 发送，仅能到同租户同接口连接组；失败/回滚不广播，调用方只收到 Code/Msg/Data。支持 JSON 协议，Message≤12KB、深度≤16、最多16目标/32KB，调用响应≤32KB。
+- 共享 Redis 按租户/接口/客户端摘要限制每分钟30次连接、每10秒240消息、64活动连接；75秒无业务消息断开。业务心跳建议15秒，SignalR Ping 不续业务权限。Redis故障失败关闭；节点退出用共享租约兜底，不能只依赖Disconnected。
+- 同码多端遥控用独立会话集合，禁止用单个 ControllerConnectionId 覆盖上一台手机；明确并发上限、共享锁下的队列、每端未完成指令上限、RequestId 去重、超时与实际执行 ACK。状态可广播给所有已授权端，回执只发给对应发起端；单端断开只移除自身。自动巡游在本地/远程手动操作时停止，显式开始巡游除外；不能因重连自行恢复巡游。
+- 目标端完成动作后再回 ACK，收到传输接受结果不能报告控制成功。命令编号稳定并去重，处理中禁止重放；回执超时显示结果未知。断线后重建授权/配对，停止控制立即撤销。Redis和消息不具备关系库事务原子性，持久副作用业务另做幂等/outbox。
+- 浏览器把 `@microsoft/signalr` 打入本地产物；WebSockets + skipNegotiation 可保证按钮操作始终走同一连接，不降级HTTP调用。验收至少两独立浏览器、连续镜头完成回执、取消/离线/过期/重连/重复包/跨租户、手机横竖屏；本地 mock 和单测不能替代部署验收。前后端完整示例原位维护于官方 v8-server.md / v8-client.md。
+
 ### 通用实时事件（SignalR）
 
-订单、协作、设备、审批或多人房间需要实时刷新时，业务写命令仍由接口引擎执行并提交事务；成功结果通过 `DataAppend.RealtimeEvent` 声明提交后事件。新业务统一使用通用 v2 Hub `/api-engine-realtime`，不要再新建业务专用 Hub 或把权威状态放进 C# 进程内字典。
+订单、协作、设备、审批或多人房间只需要订阅状态刷新时，业务写命令仍由接口引擎执行并提交事务；成功结果通过 `DataAppend.RealtimeEvent` 声明提交后事件。此类订阅统一使用通用 v2 Hub `/api-engine-realtime`，双向命令按上节选择 SignalR 响应类型；不要新建业务专用 Hub 或把权威状态放进 C# 进程内字典。
 
 ```javascript
 return {
@@ -229,7 +244,7 @@ ApiAddress: /saml/{OsClient}/sp/{ConnectionKey}/metadata
 
 开启后接口可直接输出二进制流：
 
-后端会统一处理响应头和文件头校验：图片/PDF 浏览器直接打开，其它文件下载；V8 代码只返回文件三字段，不要在接口里手写复杂的魔数判断。`ContentType` 必须匹配真实字节，金蝶 PLM `KD_C_PLM` 等业务封装流不能伪装成 `application/pdf`。
+后端会统一处理响应头和文件头校验：图片/PDF 浏览器直接打开，其它文件下载；V8 代码只返回文件三字段，不要在接口里手写复杂的魔数判断。`ContentType` 必须匹配真实字节，第三方 PLM `KD_C_PLM` 等业务封装流不能伪装成 `application/pdf`。
 
 响应文件动态路由必须同时接受 `GET` 和 `HEAD`。OnlyOffice 等服务端预览器可能先用 `HEAD` 探测文件类型、长度和可达性；如果浏览器直接下载正常但 `HEAD` 返回 `405`，在线预览仍可能一直停在“加载文档”。
 

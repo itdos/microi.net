@@ -21,6 +21,8 @@ Microi吾码的“移动端”不是单一工程。管理后台的响应式页�
 
 两种界面共用当前用户、菜单、表单与 V8 能力，但桌面布局状态由 WebOS Pinia Store 独立管理。修复 WebOS 时不要破坏经典界面；涉及状态栏、快捷入口或触控布局时要分别测试 macOS 风格、Windows 风格与经典风格。
 
+WebOS 直接打开或刷新业务链接时，应用容器使用当前权限路由的菜单标题与图标，即使页面没有发送旧版模型回调，也能显示实际菜单名称。切换页面会清除上页的标题与设计上下文，迟到的旧页面回调不会覆盖当前页面。升级 PC 前端镜像即可生效，无需修改菜单或业务数据。
+
 ## `Microi.Client` 移动 Web
 
 同一 Web 工程内置 `/mobile/home`、`/mobile/workspace`、`/mobile/message`、`/mobile/chat`、`/mobile/ai-assistant` 和 `/mobile/profile`。它适合响应式 Web、平板和 App 壳，不等同于 `microi.uniapp` 的原生小程序页面。

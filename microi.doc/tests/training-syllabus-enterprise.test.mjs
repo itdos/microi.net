@@ -29,13 +29,13 @@ test('体验链接准确覆盖指定七图，技术引擎配图全部使用已�
   const linked = trainingCaseAssets.filter(asset => asset.experienceUrl)
   assert.equal(linked.length, 7)
   assert.deepEqual(linked.map(asset => [asset.fileName, asset.experienceUrl]), [
-    ['microi-enterprise-iot-01.png', 'https://static.itdos.com/itdos/micro-app/warehouse-strategy-twin/index.html'],
-    ['microi-enterprise-iot-02.png', 'https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html'],
-    ['microi-enterprise-iot-03.png', 'https://static.itdos.com/itdos/micro-app/microi-ningbo-city-mall/index.html'],
+    ['microi-enterprise-iot-01.png', 'https://file.microi.net/itdos/micro-app/warehouse-strategy-twin/index.html'],
+    ['microi-enterprise-iot-02.png', 'https://file.microi.net/itdos/micro-app/microi-ningbo-city-mall/index.html'],
+    ['microi-enterprise-iot-03.png', 'https://file.microi.net/itdos/micro-app/microi-ningbo-city-mall/index.html'],
     ['microi-enterprise-games-01.png', 'https://microi.net/apps.html?category=game'],
-    ['microi-enterprise-games-02.png', 'https://static.itdos.com/itdos/micro-app/microi-unity-cs/index.html'],
-    ['microi-enterprise-games-03.png', 'https://static.itdos.com/itdos/micro-app/gomoku-3d-cocos-arena/index.html'],
-    ['microi-enterprise-games-04.png', 'https://static.itdos.com/itdos/micro-app/xiangqi-3d-cocos-arena/index.html'],
+    ['microi-enterprise-games-02.png', 'https://file.microi.net/itdos/micro-app/microi-unity-cs/index.html'],
+    ['microi-enterprise-games-03.png', 'https://file.microi.net/itdos/micro-app/gomoku-3d-cocos-arena/index.html'],
+    ['microi-enterprise-games-04.png', 'https://file.microi.net/itdos/micro-app/xiangqi-3d-cocos-arena/index.html'],
   ])
   const ids = [...component.matchAll(/id: '([^']+)', domain:/gu)].map(match => match[1])
   assert.equal(ids.length, 38)
@@ -174,7 +174,7 @@ test('10 页企业版依用户顺序覆盖平台、系统选型和五类行业�
   assert.doesNotMatch(corpus, /提升\s*\d+\s*%|节省\s*\d+\s*%|收益增长\s*\d+/u, 'do not invent quantified customer returns')
   assert.doesNotMatch(corpus, /AI\s*界面概念图|enterprise-agent-reliability|企业应用版/u, 'the obsolete enterprise AI lesson has been replaced')
   const requirements = new Map([
-    [4, ['上千人工厂', '中大型工厂', '上市公司', '15+', '工艺流程', '采购协同', '计划排产（APS）', '生产派工', '车间管理', '质量管理', '仓储管理', '设备管理', '设备机联', '模具管理', 'BOM', '计件工资', '能耗管理', '追溯', '报表看板', '移动端现场流程办公', '蓝牙打印', '金蝶 / 用友流程对接打通', '实施、交付人员可在线调整']],
+    [4, ['上千人工厂', '中大型工厂', '上市公司', '15+', '工艺流程', '采购协同', '计划排产（APS）', '生产派工', '车间管理', '质量管理', '仓储管理', '设备管理', '设备机联', '模具管理', 'BOM', '计件工资', '能耗管理', '追溯', '报表看板', '移动端现场流程办公', '蓝牙打印', '第三方 ERP 流程对接打通', '实施、交付人员可在线调整']],
     [5, ['AI + Blender / CAD / 3ds Max + Three.js / Unity', '无需人工从零绘图、建模', '照片 / 视频完成AI建模', '30+引擎', 'Socket', 'MQTT', 'TCP透传', '设备与网关', 'Zigbee', 'RS-485', 'Modbus']],
     [6, ['多家国企', '集团公司', 'OA办公系统', '服装ERP', '慈溪服装工厂', '100余家', 'SaaS引擎模式', '电器ERP', '轻量级ERP']],
     [7, ['游戏服务器端', '玩家数据管理', '实时通信', '类CS', '棋牌游戏', '几天', '可商用交付产品']],
@@ -206,7 +206,7 @@ test('两版前三页和致辞复用真实组件，完整重现用户要求的�
     for (const phrase of ['30+', '成熟插件化引擎', '吾码持续升级迭代', '2018', 'ChatGPT、Opus', '连续对话多年', '系统灵活性做到极致', '图片 / 文件上传', '模块引擎列、搜索、按钮、卡片', '1,207', '万+', '截至2026年10月18日', '全方位对比', 'AI 负责理解业务', '引擎负责把事做对', '一句话，开发大型企业应用']) assert.ok(why.includes(phrase), version + '/why: ' + phrase)
     for (const group of commonContent.trainingEngineGroups) for (const engine of group.engines) assert.ok(why.includes(engine))
   }
-  assert.equal(commonContent.trainingArchitectureImage.src, 'https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg')
+  assert.equal(commonContent.trainingArchitectureImage.src, 'https://file.microi.net/itdos/official-docs/images/af8f0aad7815c1f68e224cbce706d5723c5223bd1557e1eea71a19b45891d169/202610/microi-ai-platform-architecture-2026_10_25_1.svg')
 })
 
 test('四类案例保留21张原图、移除指定OA图，并补充3张更多行业案例', () => {

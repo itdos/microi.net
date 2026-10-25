@@ -14,7 +14,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 `SysConfig.HideSystemLicenseVersion` 缺省关闭，标签可点击跳转 `/license`，不能因一次请求失败永久消失。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=microi-client-frontend-000 sha256=ea9cdd10772c42cc8202aa50ed3f8bec0a41588b16539b2968f256c7ee05cd3a -->
+<!-- microi-progressive:chunk id=microi-client-frontend-000 sha256=9b949c68b0867fc1ecf2e6cb1fd1bec45d22c01ad3be63485e0376d0183d1795 -->
 ## 单行文本插槽按钮约定
 
 - `diy-input.vue` 的插槽按钮行为存储在 `diy_field.Config.SlotButtonV8Code`。
@@ -27,7 +27,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=60265fdc9842dcc4f032f80e1a93b88dd5f47f1261d0fa7334c2a7eac8d31c4c -->
+<!-- microi-progressive:chunk id=microi-client-frontend-001 sha256=fcc37635c7ac9b9e7054a5e9d76b71d5a53977170d25ae3049af95481eca4061 -->
 ## 1. 技术栈和源码入口
 
 ### 详情评论、日志与版本的按需读取
@@ -60,7 +60,7 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=0d8e3d76a5c8198d562b0af842e109e8d9eeb27ab5ddc43a6fa367d5b08bdd14 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-002 sha256=80fada0b0e3e878147bbdcb2017879611a5149324f5bc60cccfa42eb75f2135c -->
 ## 2. 表单引擎三层结构
 
 ### 模块级跨端视图
@@ -95,6 +95,12 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 - 业务动作仍由 `ParentV8` 暴露给按钮/模板 V8；`diy-table` 只负责通用渲染、权限和分页。
 
 ### `diy-form-full.vue`
+
+- TableChild 详情的菜单元数据和关联数据请求都要携带完整 `_TableChildAuth`，嵌套子表保留 `Parent` 链；后端 `FormRelatedDataService` 的父记录授权参数也必须转交。不能以隐藏子菜单普遍授予 Read 代替父模块权限、父行范围、配置绑定和子行归属校验。
+
+- 同次打开按服务器、租户、菜单、表、完整授权上下文和打开代次合并菜单请求；初始化失败后的记录回调不重复请求/提示，但主动重试、重开和切记录仍可重试。关闭或切记录后旧响应不得覆盖新状态。
+
+- 关联 Counts 等真实表元数据与记录回调完成再调度；日志、评论、代码版本全部关闭时跳过。相同上下文在途读取可合并，菜单与 Counts 的错误提示按各自分支判断。修改时运行 `tests/tablechild-detail-context.spec.mjs`，并用只有父模块 Read 的真实账号验证正常详情、嵌套、重开、重试及伪造/跨父记录拒绝。
 
 表单外壳，不直接渲染字段。它负责：
 
@@ -150,8 +156,8 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 ### 框架来源标识与水印（强制）
 
-- 微服务和定制组件的来源标识必须由 Microi.Client 宿主统一渲染，子应用不得各自实现。来源标识是框架内置的常驻可发现能力，不得再创建 `RenderSourceBadgeMode`、自动收起、全局关闭等租户配置。
-- `V8.OpenAppDialog` / Drawer 等标准弹层的来源标识放在标题文字之后，始终显示且不提供关闭按钮；菜单/整页微服务由 `micro-app/host.vue` 在内容区右上角直接渲染，必须提供只作用于当前页面实例的手动关闭按钮，切换实例后恢复显示。不得依赖外围路由组件猜测菜单微服务，避免动态路由元数据不同步导致漏标。
+- 微服务和定制组件的来源标识必须由 Microi.Client 宿主统一渲染，子应用不得各自实现。微服务来源入口只向当前登录用户 `Level >= 9999` 展示，普通用户、未知或非法等级、受限访问密钥会话不显示标签、关闭按钮及源码详情；不从账号名称、`_IsAdmin` 或子应用元数据推断权限。定制组件的原有来源展示保持兼容，不新增 `RenderSourceBadgeMode`、自动收起或全局关闭配置。
+- `V8.OpenAppDialog` / Drawer 等标准弹层的来源标识放在标题文字之后，不提供关闭按钮；菜单/整页微服务由 `micro-app/host.vue` 在内容区右上角直接渲染，管理员可手动关闭当前页面实例的标识，切换实例或账号后恢复。当前用户等级降低后立即隐藏入口并关闭已展开详情；这只控制来源辅助工具，不能改变业务菜单、关闭 Tab、弹层或后端源码/MCP 鉴权。不得依赖外围路由组件猜测菜单微服务。修改时运行 `tests/microservice-source-badge-permission.spec.mjs` 与既有来源及宿主契约回归。
 - 来源标识必须使用可点击的 `button` 语义与 `cursor:pointer`。点击后用可拖动、居中、亮/暗色适配的大圆角 Element Plus 弹层展示 AppKey、PageKey、应用内/框架路由、版本、源码定位、运行入口、发布/挂载状态和租户坐标，并生成可复制的 MCP 修改指令；公开详情不得包含 DiyToken、访问密钥、私有配置或用户敏感字段。
 - 框架水印覆盖 `100vw × 100vh` 且固定 `pointer-events:none`。开启后内容空值默认 `$SysTitle$ - $UserName$`（用户名为空回退账号）、方向默认 `DiagonalUp`、密度默认 `Comfortable`、字号空值/0 默认 14，透明度空值/0 默认 30；亮色、深色、弹层、键盘和减少动态效果模式都要验收。
 
@@ -177,12 +183,12 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 - 自助保存优先使用官方 `Managed` 接口引擎，由 `V8.CurrentUser.Id` 与 `V8.OsClient` 推导用户和租户，并在服务端构造固定白名单更新对象；接口参数禁止决定目标 Id/OsClient，也禁止写入 Account、Phone、Tenant、Dept、Role、Level、State、Pwd、认证因子和登录审计字段。只有缺少可复用可信原子能力时才新增 C# DTO/端点。保存成功后调用 `V8.Method.RefreshLoginUser` 刷新登录缓存，并让微服务宿主重新同步 `CurrentUser`。
 - 右上角即时切换可以乐观应用并短防抖保存；远端保存失败时保留当前设备效果并明确提示。个人中心和右上角必须调用同一个应用包交付的白名单接口引擎（当前为 `platform-user-update-preferences`），不能分别形成两套字段、枚举或优先级。
 - 导航切入或退出 `TopSide` 会重建顶栏组件；卸载前必须发送尚未保存的偏好，在途请求与后续选择共用按 store、API 地址、租户、账号和登录会话隔离的运行时队列。新顶栏继承失败状态和重试数据，旧响应不能覆盖更新的选择或跨账号合并队列；标准续签保留 `MicroiSessionId` 时也保留最终待保存选择，计算属性显式依赖 Pinia.Token。JWT 解码仅用于本地队列归属，服务端仍通过标准 DiyToken 验证授权；不得将会话凭据写入偏好存储、日志或响应。使用真实 Vue computed 和组件生命周期回归 `theme-select-autosave-lifecycle.spec.mjs` 验证卸载、在途合并、失败重试、续签及账号/租户/会话切换。
-- 主题回归同时执行 `framework-appearance.spec.mjs`、`ui-density-runtime.spec.mjs` 与 `theme-select-autosave-lifecycle.spec.mjs`；真实浏览器至少验证 4K 系统设置与左菜单在 90/110 两档的尺寸变化、全局/个人继承与恢复、全部顶栏隐藏后账号仍在，以及装饰关闭后的亮暗和焦点可见性。
+- 主题回归同时执行 `framework-appearance.spec.mjs`、`ui-density-runtime.spec.mjs` 与 `theme-select-autosave-lifecycle.spec.mjs`；真实浏览器默认使用一个常规桌面 CSS 视口（优先用户实际视口，否则 1920×1080），验证系统设置与左菜单在 90/110 两档的尺寸变化、全局/个人继承与恢复、全部顶栏隐藏后账号仍在，以及装饰关闭后的亮暗和焦点可见性。只有用户明确要求或缺陷涉及超宽屏时才追加 4K，不把截图文件像素尺寸当作浏览器 CSS 视口。
 
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-003 sha256=301f766dc1ab1c6b021aa861a76b44844905d432393ab407472f58f00d6283cd -->
+<!-- microi-progressive:chunk id=microi-client-frontend-003 sha256=a3e2b822a3c2aacea83d3cae796132786e3be45f3a18ceb621c477b6bd1a2442 -->
 ## 4. 工作流与表单提交
 
 工作流相关文件：
@@ -204,10 +210,12 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=ab17865c6032884ccd896a0eb62387cf7f89edcf337c024f2251563f3bd0e4d9 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=7dc3b1091176a98d652f042c30bc789f5ae6e5b9466ed75951d20ffa3e297a6a -->
 ## 7. 验证建议
 
 ### 本地 ApiBase 与 OsClient 解析（强制）
+
+WebOS 直链容器不能只等旧版 `CallbackSysMenuModel` / `CallbackCurrentDiyTableModel`：标准页面可能不再发送这些事件，标题与图标必须回退当前权限路由的 `meta.title/icon`。路由切换时清空旧模型，回调绑定来源路由并拒绝迟到事件；嵌入窗通知、桌面和手机标题共用同一响应式结果。修改时运行 `tests/webos-page-title.spec.mjs`，并验收直链、刷新、前进后退、桌面窗口和经典界面。
 
 - 域名发现先于租户确定，固定 `platform-os-client-by-domain` 请求不能自动注入默认或缓存租户，也不能携带旧 Token；显式调用租户仍保持。没有 URL/index.html 租户时，每次冷启动重新发现域名，成功后更新缓存，失败立即停止，不写入 `iTdos` 继续请求配置。配置业务失败不是连接故障，健康检查成功不能触发循环重载；只有确认连接故障后的恢复才重载失败启动页。回归覆盖无缓存、错误缓存、显式租户及失败不重载，使用 `domain-tenant-bootstrap.spec.mjs`。
 - 登录回跳使用 Vue Router 解析完整深链接后合并 query/hash；对象式 `push({path, query})` 的 query 会覆盖 path 中原有参数，不能直接传空对象导致记录 Id 丢失。使用 `login-deep-link-query.spec.mjs` 验证编号、编码参数、重复参数和锚点。

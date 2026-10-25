@@ -11,7 +11,7 @@
 - 支持 `Get`/`Post` 请求，返回 JSON、字符串、文件、HTML 等
 - 支持自定义接口地址、分布式锁、权限、自定义扩展函数等
 - 极致的性能（V8 代码预编译、多级缓存）与开发效率，无需本地编译发布
-- 经过 8 年以上成功案例验证，部分项目高达 500+ 接口
+- 平台历经 12 年持续演进（始于2014年，2018年重构，2025年开源），经过大量成功案例验证，部分项目高达 500+ 接口
 
 ::: tip 相关文档
 [[FormEngine 用法]](https://microi.net/doc/v8-engine/form-engine)    [[Where 条件用法]](https://microi.net/doc/v8-engine/where)
@@ -350,7 +350,7 @@ return {
 }
 ```
 
-例如金蝶 PLM 电子仓返回的 `KD_C_PLM` 是业务封装流，不是真实 PDF；即使文件最终可由金蝶客户端处理，也不能用 `application/pdf` 返回给浏览器。需要先取得或转换成以 `%PDF-` 开头的真实 PDF 字节，再按上面的结构返回。
+例如第三方 PLM 电子仓返回的 `KD_C_PLM` 是业务封装流，不是真实 PDF；即使文件最终可由其客户端处理，也不能用 `application/pdf` 返回给浏览器。需要先取得或转换成以 `%PDF-` 开头的真实 PDF 字节，再按上面的结构返回。
 
 ::: details ContentType 常用值清单
 > `ContentType` 必须与真实文件字节一致。平台会自动校验 PDF、PNG、JPEG、GIF、WebP、AVIF、BMP、TIFF、ICO、SVG 等常见可预览类型。

@@ -39,6 +39,12 @@
 
 ## Docker/Compose
 
+恢复库在 API/Worker 启动前必须暂停业务任务与 Quartz 触发器并强回读。MySQL 5.7 的无表 `SELECT` 带 `WHERE` 时显式使用 `FROM DUAL`，兼容 8.0 和空任务表；校验命令非零退出、无标记或仅错误文本包含标记时均停止，区分 SQL 执行失败与状态不一致。中断的新安装先备份编排和数据库，保留原数据目录后恢复，不通过跳过任务暂停门禁续装。
+
+小规格宿主部署翻译与 OCR 时必须实际执行推理并同时检查 SSH/API 响应、线程数和可用内存。LibreTranslate 1.9.6 的容器入口使用 `LT_THREADS` 作为 Gunicorn worker 数，`LT_WORKERS` 不生效；使用 `LT_THREADS=1`、`ARGOS_INTER_THREADS=1`、`ARGOS_INTRA_THREADS=1` 并约束 OMP/OpenBLAS/MKL/NumExpr 原生线程。OCR 同样约束原生数学库线程。容器 Running、模型列表和健康 GET 不能代替首次真实推理验收；这些是附加服务配置，不进入吾码 API 十项启动环境变量。
+
+一键新安装在 Docker 可用后、每个模型启动前检查真实内存：物理低于 7680MiB 或可用低于 2048MiB 时，本次安装固定停用 OCR/LibreTranslate，精确停止已有同名安装容器并将 restart 设为 no，回读必须为 stopped；不删除模型或数据库。唯一活动主租户在核心升级完成后设置 OcrEnabled=0、TranslateProvider=None，保留 URL/Key，写后回读成功才刷新 API。空 Provider 会根据保留 URL 自动回退，不代表禁用。内存充足时模型分别限制 1024/768MiB RAM、1536/1280MiB RAM+Swap、0.75CPU，并保留单线程。小规格新建 MySQL buffer pool 上限 384MiB；无 Swap 时在文件系统、磁盘及备份前提满足后尝试 2GiB Swap，不能覆盖既存文件，也不能将 Swap 计入模型物理内存准入。内存保护已触发时禁止继续做 OCR/翻译真实推理验收；改为验收停止状态、租户开关与核心登录，待资源调整后单独启用和实测。
+
 执行前：
 
 1. 固定目标目录和 compose 文件，解析所有 volume 的绝对宿主路径。
@@ -70,7 +76,7 @@ IIS 进程启动不代表 API 可用，仍要检查 readiness 和真实登录路
 
 macOS 的一键发布探针通过 `run_with_timeout` 使用 GNU `timeout`、`gtimeout` 或仓库 Node 工具 `Microi.Server/tools/run-with-timeout.mjs`。缺少 GNU 命令不能据此判定 Docker 不健康；超时工具只停止自身创建的探针进程。官网专用选项 6 不发布 DLL/NuGet，后端发布的加密门禁保持有效。
 
-Obfuscar 路径转换只适用于 Git Bash/MSYS/Cygwin。macOS/Linux 的 `/Users`、`/usr` 等绝对路径直接传给工具；Windows 优先 `cygpath`，无该命令时只转换完整盘符根路径。修复后使用隔离副本验证五个 DLL 和指纹，再重新执行一键脚本的 Full 与最终加密产物冒烟。
+Obfuscar 路径转换只适用于 Git Bash/MSYS/Cygwin。macOS/Linux 的 `/Users`、`/usr` 等绝对路径直接传给工具；Windows 优先 `cygpath`，无该命令时只转换完整盘符根路径。修复后使用隔离副本验证五个 DLL 和指纹，再重新执行一键脚本的 PlatformRelease 与最终加密产物冒烟。
 
 在线 AI MCP 的生产依赖和命令复制为完整、自足的运行快照，生产命令链接解析为真实文件，保留执行权限；损坏、越界及目录循环链接提前拒绝。临时构建目录清理后命令必须仍能运行，旧依赖不得残留；不放宽原制品门禁。
 
@@ -79,6 +85,9 @@ Obfuscar 路径转换只适用于 Git Bash/MSYS/Cygwin。macOS/Linux 的 `/Users
 后端：
 
 - 使用当前仓库规定的 .NET SDK；
+- 公开源码打开 `Microi.Server/Microi.net.sln`，五个闭源库使用同版本 NuGet；创建人完整源码才使用 `Microi.Anderson.sln`。目标 `net10.0` 需要 Visual Studio 2026 18.0 起及与 SDK 功能带匹配的 IDE，不能把 VS 2022 加装 SDK 视为受支持配置。
+- 排查 `NU1105` / `NETSDK1004` 时，分别检查项目文件是否公开交付、是否完整列入方案、是否被卸载以及还原是否成功。CLI 递归 restore 通过不能证明 VS 方案项目图完整；公开闭包回归还必须检查全部传递依赖及 Debug/Release 配置，包含 `ReferenceOutputAssembly=false` 的独立进程夹具。
+- 修复方案后在不含闭源源码的隔离公开候选中还原、构建；可用 `dotnet restore Microi.Server/Microi.net.sln -p:RestoreRecursive=false` 验证方案列出的全部项目均获得还原资产，再执行 `dotnet build Microi.Server/Microi.net.sln -c Debug --no-restore`。该命令行证据不等于真实 Visual Studio 界面验收，不删除引用或关闭功能来掩盖错误。
 - 配置开发专用数据库/Redis/Mongo/对象存储；
 - 先跑定向测试，再按资源允许程度执行更大构建；
 - 不让本地调试连接生产写库。

@@ -21,8 +21,8 @@ const pptxMime = 'application/vnd.openxmlformats-officedocument.presentationml.p
 const artifacts = [
   { version: 'technical', dark: true, count: 47, filename: 'microi-ai-development-framework-training-syllabus-dark.pptx' },
   { version: 'technical', dark: false, count: 47, filename: 'microi-ai-development-framework-training-syllabus-light.pptx' },
-  { version: 'enterprise', dark: true, count: 12, filename: 'microi-enterprise-application-training-syllabus-dark.pptx' },
-  { version: 'enterprise', dark: false, count: 12, filename: 'microi-enterprise-application-training-syllabus-light.pptx' },
+  { version: 'enterprise', dark: true, count: 10, filename: 'microi-enterprise-application-training-syllabus-dark.pptx' },
+  { version: 'enterprise', dark: false, count: 10, filename: 'microi-enterprise-application-training-syllabus-light.pptx' },
 ].map(artifact => ({ ...artifact, url: trainingDownloads.find(row => row.legacyPath === `/downloads/${artifact.filename}`).url }))
 
 function artifactPath(url) {
@@ -194,7 +194,7 @@ test('SSR、挂载及版本切换均只输出对应版本的两份 PDF', async (
 })
 
 for (const artifact of artifacts) {
-  test(`历史兼容 ${artifact.version}/${artifact.dark ? 'dark' : 'light'} PPTX 仍包含 ${artifact.count} 页原始文字、讲者备注与有效引用`, () => {
+  test(`兼容下载 ${artifact.version}/${artifact.dark ? 'dark' : 'light'} PPTX 仍包含 ${artifact.count} 页原始文字、讲者备注与有效引用`, () => {
     const file = fs.readFileSync(artifactPath(artifact.url))
     const archive = openPptx(file)
     const slides = archive.names.filter(name => /^ppt\/slides\/slide\d+\.xml$/u.test(name))
@@ -223,7 +223,7 @@ for (const artifact of artifacts) {
       const text = nativeText(slide)
       assert.ok(text.length > 10, `slide ${index} cannot be only a flattened image`)
       assert.ok(nativeText(archive.xml(`ppt/notesSlides/notesSlide${index}.xml`)).length > 10, `slide ${index} has no usable speaker notes`)
-      // 旧 URL 兼容的是历史包；新企业版成功案例课件不再与历史 12 页标题比较。
+      if (index === 3) { assert.match(text, /12年/u); assert.match(text, /始于2014年，2018年重构，2025年开源/u) }
     }
   })
 }

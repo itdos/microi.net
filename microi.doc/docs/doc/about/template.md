@@ -8,9 +8,9 @@
 
 | 项目 | 说明 |
 | :-- | :-- |
-| 产品定位 | **开源 AI 开发框架**：30+ 成熟引擎 + AI 低代码 + 微服务 + V8 引擎；典型业务场景下，AI 开发更省 Token 10 倍+、速度提升 10 倍+，开箱即用、更快交付 |
+| 产品定位 | **开源 AI 开发框架**：30+ 成熟引擎 + AI 低代码 + 微服务 + V8 引擎；复用平台通用能力，在线编排业务逻辑，让 AI 聚焦业务增量；具体收益按同条件任务实测 |
 | 技术框架 | **低代码 + AI** 开发模式，支持传统开发，.NET10 + Vue2/3 + Redis + MySQL/SqlServer/Oracle + Element-UI/Element-Plus |
-| 始于 | 2014年（基于 Avalon.js），2018年 Vue 重构，2024年11月开源 |
+| 始于 | 2014年（基于 Avalon.js），2018年 Vue 重构，2025年开源 |
 | 官网 | [https://microi.net/](https://microi.net/) |
 | WebOS 试用 | [https://webos.microi.net](https://webos.microi.net) |
 | 传统界面试用 | [https://web.microi.net/](https://web.microi.net/) |

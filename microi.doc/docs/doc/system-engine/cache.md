@@ -269,9 +269,13 @@ Redis Pub/Sub 丢失或订阅断开时不会补发历史失效消息。L1 TTL �
 Sentinel 的节点、服务名、密码和数据库。租户基础连接统一在
 [SaaS 引擎](./saas-engine#redis配置)维护，凭据不得写入 V8、前端、日志或文档。
 
-平台 Redis 管理器路由为 `#/mci-redis-manager`，当前控制器只允许已登录且
+平台 Redis 管理器路由为 `#/mci-redis-manager`，统一管理入口只允许已登录且
 `Level >= 9999` 的当前租户超级管理员使用 `tenant` 或 `saved` 连接模式；公网
 `temporary` 模式已拒绝。密码由后端保护，列表和错误响应不会回传明文。
+
+从 v8.5.12 起，Redis 管理器由 `Microi.Cache` 强制实施租户边界：主租户身份以 API 宿主的 `OsClient` 配置为准，主租户超级管理员可管理当前受控连接中的全部 Key；子租户超级管理员只能扫描、读取和维护完整的 `Microi:{当前OsClient}:` 前缀，不能靠 `Level=9999`、请求参数或切换数据库取得主租户权限。精确读取、删除、覆盖、重命名的两端、TTL、批量删除和缓存失效均执行同一检查，批量请求中出现越权 Key 时整批拒绝。普通业务 `V8.Cache` 仍只允许当前租户。
+
+子租户连接返回 `CanSelectDatabase=false`、`AllowedKeyPrefix`，界面只显示其配置的数据库，新建 Key 自动预填前缀。MCP 省略 `database` 时也使用连接配置；显式 `0` 仍是 DB 0，但子租户不能选择配置之外的数据库。子租户统计只显示自身扫描样本，`KeyCountIsEstimate=true` 表示尚有后续游标，不返回整个实例的内存、客户端、命中率或总 Key 数。
 
 管理器支持：
 
@@ -287,12 +291,14 @@ Sentinel 的节点、服务名、密码和数据库。租户基础连接统一�
 
 ### 缓存控制接口
 
+当前使用 Managed 接口引擎 `platform-cache-manager`，由 `V8.Method.ManageCache` 验证当前身份并交给 `Microi.Cache`；下表为兼容历史地址。前端、MCP 与直接 HTTP 请求共享同一后端边界。
+
 | 接口 | 作用 | 边界 |
 | --- | --- | --- |
-| `GET /api/cache/statistics` | 当前 API 进程的 L1/L2 命中统计 | 不是集群或单租户汇总 |
-| `POST /api/cache/invalidate` | 删除单个 Key 并广播失效 | 超级管理员 |
-| `POST /api/cache/invalidate-pattern` | 按模式删除并广播 | 超级管理员，谨慎使用 |
-| `/api/cache/redis/*` | Redis 连接、统计、SCAN、内容和白名单写操作 | 超级管理员、受控连接 |
+| `GET /api/cache/statistics` | 当前 API 进程的 L1/L2 命中统计 | 仅主租户；不是集群或单租户汇总 |
+| `POST /api/cache/invalidate` | 删除单个 Key 并广播失效 | 超级管理员；子租户仅自身 Key |
+| `POST /api/cache/invalidate-pattern` | 按模式删除并广播 | 超级管理员；子租户自动限定自身前缀 |
+| `/api/cache/redis/*` | Redis 连接、统计、SCAN、内容和白名单写操作 | 超级管理员、受控连接；子租户只能访问自身前缀与配置数据库 |
 
 `MicroiTwoLevelCache` 的 L1 字典和命中计数是当前进程静态数据，因此某个节点的
 统计接口只能用于该节点诊断。平台级命中率需要聚合所有节点，不能把负载均衡随机
