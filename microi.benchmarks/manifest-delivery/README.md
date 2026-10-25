@@ -6,7 +6,7 @@
 
 ## 从公开源码复跑
 
-需要 Node.js 20.20 或更新版本。公开仓内包含所需的 `microi.mcp` 源码与锁文件：
+建议使用受支持的 Node.js 22 或 24；本机另保留 Node 20.20 兼容运行记录。公开仓内包含所需的 `microi.mcp` 源码与锁文件：
 
 ```sh
 cd microi.mcp
@@ -36,3 +36,17 @@ node microi.benchmarks/manifest-delivery/verify.mjs --out /已有目录/新的�
 
 公开 CI 的系统/Node 组合以实际运行结果为准；Linux 或 Windows 上的 MCP 合约检查
 不能当作后端数据库、CPU/OS 全矩阵或第三方认证。
+
+## 运行器版本与实际结果
+
+[Windows / Node 20 的首次记录](results/2026-10-26-windows-node20.json)使用运行器 1.0.0。
+首次公开矩阵中，Node 22 两系统通过，Node 24 两系统失败；本机 Node 24.22.1 复现了
+“子测试退出 0，但总账无法解析”的同一情况，没有把未知计数当作成功。
+
+原因是 Node 23 起非 TTY 默认报告器由 TAP 改为 spec，参见[官方说明](https://nodejs.org/docs/latest-v24.x/api/test.html#test-reporters)。
+1.0.1 明确指定 TAP，并核对运行器本身和被测源码的前后哈希；完整计数及所有失败/跳过门槛保持不变。
+旧失败及旧结果保留，后续以绑定实际提交的公共 CI 结果判断组合是否通过。
+
+本机 Node 24 的[修复前记录](results/2026-10-26-windows-node24-before.json)保留未知计数和失败退出；
+[修复后记录](results/2026-10-26-windows-node24-after.json)为 54/54，通过显式 TAP 输出获得完整计数。
+两者使用相同正式处理器与责任测试，运行器版本和哈希分别记录，不能把格式修复解释为新增业务覆盖。
