@@ -1186,7 +1186,7 @@ if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ] && [ -z "${MICROI_PLATFORM_RUN
     print_phase "加载已授权的本机发布环境"
     if ! MICROI_PLATFORM_RUNTIME_OWNED_CONTROL=$(run_release_command node Microi.Server/tools/platform-release-runtime.mjs start \
         "$PWD" "$MICROI_RELEASE_GATE_DIR" "${MICROI_PLATFORM_RELEASE_PROFILE:-}" "$MICROI_RELEASE_OWNER_PID"); then
-        print_fail "完整平台发布需要已有授权的私有 profile；不会自动创建租户或容器。"
+        print_fail "已授权本机发布环境的校验或启动失败；请查看本轮私有回执，不会自动创建租户或容器。"
     fi
     export MICROI_PLATFORM_RUNTIME_CONTROL="$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL"
     MICROI_RELEASE_SMOKE_CONFIG=$(node Microi.Server/tools/platform-release-runtime.mjs info "$MICROI_PLATFORM_RUNTIME_CONTROL" smokeConfig)

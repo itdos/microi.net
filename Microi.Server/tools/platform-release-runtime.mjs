@@ -7,7 +7,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {startNativeBridges} from './platform-release-bridges.mjs';
-import {prepareBrowserFixtureConfig} from '../Microi.Tests/ReleaseGate/prepare-browser-fixture.mjs';
+import {prepareBrowserFixtureConfig,prepareBrowserFixtureConfigAsync} from '../Microi.Tests/ReleaseGate/prepare-browser-fixture.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url)),self=fileURLToPath(import.meta.url);
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const read=file=>JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));
@@ -149,7 +149,7 @@ export async function supervise(control){
  }
  try{
   bridges=await startNativeBridges(profile.paths.bridgeScopeFile,{ownerTask:profile.ownerTask,authorization:profile.authorization,ports:profile.ports.bridges});
-  prepareBrowserFixtureConfig(profile.workspace,control,environment);
+  await prepareBrowserFixtureConfigAsync(profile.workspace,control,environment);
   status('WaitingForFormalBuild');write('transport-ready.json',{ready:true,createdContainers:0,createdTenants:0});
   while(!fs.existsSync(path.join(control,'build.json'))&&!stopping())await delay(250);
   if(!stopping()){

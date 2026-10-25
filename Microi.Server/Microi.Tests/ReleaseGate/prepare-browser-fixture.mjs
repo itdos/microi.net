@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
@@ -34,7 +34,7 @@ export function buildBrowserFixtureConfig(scope,settings,osClient){
  for(const key of ['host','port','user','password'])assert.ok(String(db[key])===String(scope.mysql?.[key]),'API connection differs from the authorized fixture transport.');
  return {ownerTask:scope.task,authorization:scope.authorization,osClient,database:db.database,connection:{host:db.host,port:db.port,user:db.user,password:db.password,charset:'utf8mb4'}};
 }
-export function prepareBrowserFixtureConfig(workspaceRoot,results,environment,run=spawnSync){
+function prepareBrowserFixtureInput(workspaceRoot,results,environment,run=spawnSync){
  assert.equal(environment.MICROI_TEST_ALLOW_WRITES,'YES','Browser fixture requires explicit existing-fixture write authorization.');
  const python=regular(environment.MICROI_GATE_TEST_MYSQL_NATIVE_PYTHON);
  const command=(exe,args,options={})=>{const r=run(exe,args,{encoding:'utf8',windowsHide:true,timeout:30000,...options});assert.ok(!r.error&&r.status===0,'Browser fixture private-input/ownership verification failed; no tests were started.');return r.stdout;};
@@ -61,8 +61,35 @@ export function prepareBrowserFixtureConfig(workspaceRoot,results,environment,ru
  assert.ok(targetFile,'Browser fixture needs the selected API appsettings path to verify its exact target.');
  regular(targetFile);acl(targetFile);
  buildBrowserFixtureConfig({task:value.ownerTask,authorization:value.authorization,databases:[value.database],mysql:value.connection},read(targetFile).AppSettings,environment.MICROI_TEST_OSCLIENT);
- const helper=path.join(workspaceRoot,'Microi.Client/tests/helpers/richtext-fixture.py');
- const proof=JSON.parse(command(python,['-X','utf8','-B',regular(helper)],{input:JSON.stringify({config,osClient:environment.MICROI_TEST_OSCLIENT,action:'verify'})}));
+ const helper=regular(path.join(workspaceRoot,'Microi.Client/tests/helpers/richtext-fixture.py'));
+ return {python,helper,config,created,input:JSON.stringify({config,osClient:environment.MICROI_TEST_OSCLIENT,action:'verify'})};
+}
+function verifiedBrowserFixture(prepared,output){
+ const {config,created}=prepared,proof=JSON.parse(output);
  assert.equal(proof.ownerVerified,true,'Existing browser fixture owner verification did not pass.');
  return {environment:{PW_RICHTEXT_FIXTURE_CONFIG:config},receipt:{schemaVersion:1,source:created?'ExistingAuthorizedScope':'ExistingPrivateConfig',ownerVerified:true,createdTenant:false,createdContainer:false,configPath:config}};
+}
+export function prepareBrowserFixtureConfig(workspaceRoot,results,environment,run=spawnSync){
+ const prepared=prepareBrowserFixtureInput(workspaceRoot,results,environment,run);
+ const result=run(prepared.python,['-X','utf8','-B',prepared.helper],{encoding:'utf8',windowsHide:true,timeout:30000,input:prepared.input});
+ assert.ok(!result.error&&result.status===0,'Browser fixture private-input/ownership verification failed; no tests were started.');
+ return verifiedBrowserFixture(prepared,result.stdout);
+}
+// The supervisor owns the loopback bridge. Its event loop must keep forwarding while
+// the short-lived native verifier reads the existing owner through that bridge.
+export function runBrowserFixtureVerification(executable,args,input){
+ return new Promise((resolve,reject)=>{
+  let output='',failed=false;
+  const child=spawn(executable,args,{windowsHide:true,timeout:30000,stdio:['pipe','pipe','pipe']});
+  child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>{output+=chunk;if(output.length>1024*1024){failed=true;child.kill();}});
+  child.stderr.resume();child.stdin.on('error',()=>{});
+  child.once('error',()=>{failed=true;});
+  child.once('close',(code,signal)=>{if(failed||code!==0||signal)reject(Error('Browser fixture private-input/ownership verification failed; no tests were started.'));else resolve(output);});
+  child.stdin.end(input);
+ });
+}
+export async function prepareBrowserFixtureConfigAsync(workspaceRoot,results,environment,runInputs=spawnSync,verify=runBrowserFixtureVerification){
+ const prepared=prepareBrowserFixtureInput(workspaceRoot,results,environment,runInputs);
+ const output=await verify(prepared.python,['-X','utf8','-B',prepared.helper],prepared.input);
+ return verifiedBrowserFixture(prepared,output);
 }
