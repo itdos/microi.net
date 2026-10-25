@@ -278,25 +278,28 @@ async function verifyFrameworkPresentation(page, testInfo, customerSpecific) {
         fullPage: false
     });
     await detailsDialog.locator(".el-dialog__headerbtn").click();
+    await expect(detailsDialog).toBeHidden();
 
-    const closeButton = page.locator('.el-dialog__headerbtn:visible, .el-drawer__close-btn:visible').last();
-    if (await closeButton.count()) {
-        const overlap = await Promise.all([badge.boundingBox(), closeButton.boundingBox()]).then(([left, right]) => {
-            if (!left || !right) return false;
-            return left.x < right.x + right.width
-                && left.x + left.width > right.x
-                && left.y < right.y + right.height
-                && left.y + left.height > right.y;
-        });
-        expect(overlap).toBe(false);
-    }
+    await expect(securityDialog).toBeVisible();
+    const closeButton = securityDialog.locator(".diy-custom-dialog__actions").getByRole("button", { name: /^(?:关闭|Close)$/ });
+    await expect(closeButton).toHaveCount(1);
+    await expect(closeButton).toBeVisible();
+    const [badgeBox, closeBox] = await Promise.all([badge.boundingBox(), closeButton.boundingBox()]);
+    expect(badgeBox).not.toBeNull();
+    expect(closeBox).not.toBeNull();
+    const overlap = badgeBox.x < closeBox.x + closeBox.width
+        && badgeBox.x + badgeBox.width > closeBox.x
+        && badgeBox.y < closeBox.y + closeBox.height
+        && badgeBox.y + badgeBox.height > closeBox.y;
+    expect(overlap).toBe(false);
 
     await page.screenshot({
         path: testInfo.outputPath("framework-watermark-and-microservice-badge.png"),
         fullPage: false
     });
 
-    if (await closeButton.count()) await closeButton.click();
+    await closeButton.click();
+    await expect(securityDialog).toBeHidden();
     const menuAppKey = customerSpecific ? "chemical-bid-management" : "microi-platform-service";
     const menuRoute = customerSpecific ? "/manager-dashboard" : "/system-observability";
     await page.goto(runtimeUrl(`/micro-app/${menuAppKey}${menuRoute}`), {

@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { prepareFormUiFixture, cleanupFormUiFixtures } from "./helpers/form-ui-fixture.mjs";
+import { prepareFormUiFixture, cleanupFormUiFixtures, prepareFormUiSettingFixture } from "./helpers/form-ui-fixture.mjs";
 import { isFormMaskBlurEnabled } from "../src/utils/form-mask-blur.js";
 import { buildUiDensityVariables } from "../src/utils/ui-density.js";
 
@@ -819,6 +819,8 @@ test("系统设置：安全与服务接入统一弹层、紧凑卡片与平台�
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     const runtimeDiagnostics = collectMicroAppDiagnostics(page);
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+    const settingFixture = await prepareFormUiSettingFixture(contactFixture);
+    try {
     await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/system-config");
     await expect(page.locator(".module-form-workbench")).toBeVisible({ timeout: 45_000 });
 
@@ -873,7 +875,8 @@ test("系统设置：安全与服务接入统一弹层、紧凑卡片与平台�
     expect(Math.abs(hostGeometry.appHeight - hostGeometry.bodyHeight), JSON.stringify(hostGeometry)).toBeLessThanOrEqual(2);
     expect(hostGeometry.blankBelowApp, JSON.stringify(hostGeometry)).toBeLessThanOrEqual(2);
 
-    const firstCard = settingsFrame.locator(".config-card").first();
+    const firstCard = settingsFrame.locator(".config-card").filter({ has: settingsFrame.getByText(settingFixture.key, { exact: true }) });
+    await expect(firstCard).toHaveCount(1);
     await expect(firstCard).toBeVisible();
     const cardPresentation = await firstCard.evaluate((card) => {
         const title = card.querySelector(".config-copy b");
@@ -892,6 +895,7 @@ test("系统设置：安全与服务接入统一弹层、紧凑卡片与平台�
     expect(cardPresentation.titleSize).toBeGreaterThan(cardPresentation.keySize);
     expect(cardPresentation.height, JSON.stringify(cardPresentation)).toBeLessThanOrEqual(170);
     await expect(settingsFrame.locator('.value-switch[role="switch"]')).not.toHaveCount(0);
+    await expect(firstCard.getByRole("switch")).toHaveAttribute("aria-checked", "false");
 
     await firstCard.getByRole("button", { name: "编辑", exact: true }).click();
     const editorLayer = settingsFrame.locator("dialog.modal-backdrop[open]:has(.modal-shell.editor)");
@@ -958,6 +962,10 @@ test("系统设置：安全与服务接入统一弹层、紧凑卡片与平台�
     expect(geometry.blankBelow, JSON.stringify(geometry)).toBeLessThanOrEqual(24);
     expect(geometry.listMinHeight).toBe("0px");
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03-system-security-service-access.png"), fullPage: false });
+    } finally {
+        const cleanup = await settingFixture.cleanup();
+        await test.info().attach("owned-system-setting-cleanup", { body: JSON.stringify(cleanup), contentType: "application/json" });
+    }
 });
 
 test("本地员工详情：通用搜索工具栏与日期、单选对齐", async ({ page }) => {

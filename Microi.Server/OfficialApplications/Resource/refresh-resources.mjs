@@ -1195,6 +1195,14 @@ async function readCurrentReleaseVersion() {
   return '';
 }
 
+const prepareCandidate = process.argv.includes('--prepare-candidate');
+if (prepareCandidate && process.argv.some(arg => [
+  '--publish', '--validate-only', '--synchronize-local', '--initialize-base',
+  '--repair-base-from-remote', '--bootstrap-missing', '--require-unchanged-candidate',
+].includes(arg))) {
+  throw new Error('--prepare-candidate 只能读取官网并准备本地候选，不能与发布、基线写入或其它同步模式同时使用');
+}
+
 await mkdir(outputDirectory, { recursive: true });
 if (process.argv.includes('--validate-only')) {
   if (process.argv.some(arg => ['--publish', '--synchronize-local', '--initialize-base', '--repair-base-from-remote', '--bootstrap-missing'].includes(arg))) {
@@ -1510,6 +1518,16 @@ if (process.argv.includes('--validate-only')) {
     if (canonicalizeResource(name, rawLocalStandaloneContents.get(name)) !== resolvedSource) {
       await writeFile(resolve(outputDirectory, name), resolvedSource, 'utf8');
     }
+  }
+
+  // 自动升版和副本合并必须先于冻结测试；准备阶段不发布、不投影，也不推进
+  // 共同基线。测试后仍由 --publish --require-unchanged-candidate 复核远端漂移。
+  if (prepareCandidate) {
+    for (const name of resourceNames) {
+      printResource(name, mergedResources.get(name), '本地候选已准备（未写入官网、未推进共同基线）');
+    }
+    process.stdout.write(`Prepared release candidate: ${resourceNames.length} resources; remote writes=0; synchronization baseline unchanged.\n`);
+    process.exit(0);
   }
 
   if (publish) {

@@ -1279,6 +1279,15 @@ if [ "$BUILD_CLIENT" = true ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then
     print_info "前端发行版本: ${CLIENT_VERSION}；后端发行版本: ${VERSION}（各自保持源码声明）"
 fi
 
+# 先把官网三方合并和包版本推进完成，再冻结并测试最终正文；否则测试后自动
+# 升版会使已验收候选失效。此阶段只准备本地文件，不写官网或共同基线。
+if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ] && [ "$MICROI_FULL_ONLY" != true ]; then
+    print_phase "准备官方应用资源发布候选（仅本地合并）"
+    if ! run_release_command node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --prepare-candidate --allow-verified-offline; then
+        print_fail "官方应用资源候选准备失败；尚未开始整套测试或写入官网，请先解决资源合并问题。"
+    fi
+fi
+
 # 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行平台自动化回归。
 # 常规发行验证 Microi.Tests、全部通用前端、接口及启动运行；不新建租户、不安装聊天应用、不运行独立 Code/Agent 产品测试。
 # 真实付费 AI、JUNCHI/XJY 客户数据、SQL Server 及独立应用源码验收属于独立专项，不进入默认平台发布。

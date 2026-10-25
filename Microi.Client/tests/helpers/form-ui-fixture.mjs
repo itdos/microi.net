@@ -63,3 +63,49 @@ export async function cleanupFormUiFixtures(fixtures) {
     }
     if (failures.length) throw new AggregateError(failures, 'Form UI fixture cleanup failed.');
 }
+
+export async function prepareFormUiSettingFixture(fixture) {
+    if (!/^microi-richtext-e2e:[a-f0-9]{16}$/.test(fixture.owner)
+        || fixture.owner !== `microi-richtext-e2e:${fixture.nonce}`) {
+        throw new Error('System-setting fixture requires the verified form UI owner.');
+    }
+    const key = `Integration.E2e.FormUi.${fixture.nonce}`;
+    const category = 'Codex UI fixture';
+    let id;
+    const readOwned = async () => {
+        const rows = await fixture.call('TenantSystemSettings/List', {});
+        if (!Array.isArray(rows)) throw new Error('System-setting fixture list is not an array.');
+        return rows.filter(row => row.ConfigKey === key);
+    };
+    const cleanup = async () => {
+        const rows = await readOwned();
+        if (rows.length > 1) throw new Error('System-setting fixture key is not unique.');
+        if (rows.length) {
+            const row = rows[0];
+            if (!row.Id || (id && row.Id !== id) || row.Description !== fixture.owner
+                || row.Category !== category || row.ValueType !== 'Bool' || Boolean(row.IsSecret)) {
+                throw new Error('System-setting fixture ownership changed; refusing deletion.');
+            }
+            await fixture.call('TenantSystemSettings/Delete', { Id: row.Id });
+        }
+        if ((await readOwned()).length) throw new Error('System-setting fixture cleanup readback is not empty.');
+        return { id, key, remaining: 0 };
+    };
+    if ((await readOwned()).length) throw new Error('System-setting fixture key already exists.');
+    try {
+        const saved = await fixture.call('TenantSystemSettings/Save', {
+            ConfigKey: key, Value: 'false', ValueType: 'Bool', Category: category,
+            Description: fixture.owner, IsPublic: false, IsSecret: false, IsEnabled: true, Sort: -100000
+        });
+        id = saved?.Id;
+        const rows = await readOwned();
+        if (!id || rows.length !== 1 || rows[0].Id !== id || rows[0].Description !== fixture.owner
+            || rows[0].ValueType !== 'Bool' || Boolean(rows[0].IsSecret) || String(rows[0].ConfigValue) !== 'false') {
+            throw new Error('System-setting fixture readback differs from the owned boolean record.');
+        }
+        return { key, id, cleanup };
+    } catch (error) {
+        try { await cleanup(); } catch (cleanupError) { throw new AggregateError([error, cleanupError], 'System-setting fixture preparation and cleanup failed.'); }
+        throw error;
+    }
+}
