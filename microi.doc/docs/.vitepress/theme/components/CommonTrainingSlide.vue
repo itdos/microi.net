@@ -42,8 +42,8 @@ const coverRoute = computed(() => isEnterprise.value
           <h1><span>Microi吾码</span><strong>AI 开发框架</strong><em>{{ isEnterprise ? '企业版介绍' : '技术培训大纲' }}</em></h1>
           <p class="mci-common-cover__route">{{ coverRoute }}</p>
           <div class="mci-common-cover__metrics" aria-label="平台核心价值">
-            <div><strong>10×+</strong><span>Token 更省*</span></div>
-            <div><strong>10×+</strong><span>AI 开发更快*</span></div>
+            <div><strong>引擎复用</strong><span>减少重复开发</span></div>
+            <div><strong>在线编排</strong><span>聚焦业务增量</span></div>
             <div><strong>30+</strong><span>成熟引擎</span></div>
           </div>
           <button class="mci-common-start mci-screen-only" type="button" @click="$emit('start')">{{ isEnterprise ? '开始介绍' : '开始培训' }}<span aria-hidden="true">→</span></button>
@@ -89,12 +89,12 @@ const coverRoute = computed(() => isEnterprise.value
     </template>
 
     <template v-else-if="kind === 'why'">
-      <header class="mci-common-heading"><div><p class="mci-common-eyebrow">03 · WHY MICROI</p><h2>为什么选择吾码？<em>让 AI 站在 30+ 成熟引擎上</em></h2><p>通用能力由引擎承接，AI 专注业务差异 —— 更快、更稳、更省 Token。</p></div><span>{{ page }}</span></header>
+      <header class="mci-common-heading"><div><p class="mci-common-eyebrow">03 · WHY MICROI</p><h2>为什么选择吾码？<em>让 AI 站在 30+ 成熟引擎上</em></h2><p>通用能力由引擎承接，AI 专注业务差异；实际收益以同任务测试结果为准。</p></div><span>{{ page }}</span></header>
       <div class="mci-engine-proof">
         <aside class="mci-engine-proof__evidence" aria-label="吾码成熟度与系统架构">
           <div class="mci-engine-proof__hero"><strong>30<span>+</span></strong><div><b>成熟插件化引擎</b><span>一套开源 AI 开发框架的底座</span></div></div>
           <div class="mci-engine-proof__metrics"><div><strong>12<span>年</span></strong><b>吾码持续升级迭代</b><small>始于2014年，2018年重构，2025年开源</small></div><div class="mci-common-download-proof"><strong>{{ trainingWhyProof.downloads }}<span>万+</span></strong><b>微软 NuGet 下载量</b><small>截至{{ trainingWhyProof.date }}</small></div></div>
-          <p class="mci-engine-proof__token"><strong>10×+</strong><span>Token 更省*<small>复用通用能力，减少重复实现</small></span></p>
+          <p class="mci-engine-proof__token"><strong>引擎复用</strong><span>聚焦业务增量<small>复用通用能力，减少重复实现</small></span></p>
           <!-- 保留原始CDN架构图，网页可全屏查看；PDF中显示清晰缩略图。 -->
           <button class="mci-common-architecture" type="button" aria-label="全屏查看 Microi吾码系统架构图" @click="$emit('preview', trainingArchitectureImage)"><img :src="trainingArchitectureImage.src" :alt="trainingArchitectureImage.alt" decoding="sync"><span class="mci-screen-only">系统架构图 · 点击全屏 <i aria-hidden="true">⤢</i></span></button>
           <small class="mci-engine-proof__history">与 ChatGPT、Opus 等大模型连续对话多年，持续以 AI 对话升级研发。</small>
@@ -113,7 +113,7 @@ const coverRoute = computed(() => isEnterprise.value
     <template v-else>
       <header class="mci-common-closing"><div class="mci-common-closing__signal"><img src="/icon.png" alt="Microi吾码"><span>READY TO BUILD</span><i aria-hidden="true"></i></div><p class="mci-common-eyebrow">THANK YOU<span v-if="total"> · {{ total }} / {{ total }}</span></p><h2>把 AI 的速度，<br><strong>变成企业交付力。</strong></h2><p>从今天开始，少重复造轮子，多创造真正有差异的业务价值。</p></header>
       <section class="mci-common-benefits is-closing-benefits" aria-label="再次回顾 Microi吾码核心优势"><article v-for="benefit in trainingCoreBenefits" :key="benefit.code" :class="`is-tone-${benefit.tone}`"><span class="mci-common-benefits__glyph" aria-hidden="true">{{ benefit.code }}</span><div><strong>{{ benefit.title }}</strong><small>{{ benefit.text }}</small></div></article></section>
-      <div class="mci-common-closing__outcomes"><span>10×+ Token 更省*</span><span>10×+ AI 开发更快*</span><span>30+ 成熟引擎</span><span v-for="signal in trainingTrustSignals" :key="signal">{{ signal }}</span><span>成熟案例</span></div>
+      <div class="mci-common-closing__outcomes"><span>引擎复用 · 减少重复开发</span><span>在线编排 · 聚焦业务增量</span><span>30+ 成熟引擎</span><span v-for="signal in trainingTrustSignals" :key="signal">{{ signal }}</span><span>成熟案例</span></div>
       <div class="mci-common-closing__actions mci-screen-only"><a href="/profile.html#/overview" class="is-primary">立即开始使用 <span aria-hidden="true">→</span></a><a href="/doc/" target="_blank" rel="noopener noreferrer">打开官方文档 <span aria-hidden="true">↗</span></a></div>
       <small class="mci-common-closing__signature">* 典型平台能力高复用场景；实际收益取决于需求与团队基线。<br>MICROI吾码 · OPEN-SOURCE AI DEVELOPMENT FRAMEWORK</small>
     </template>

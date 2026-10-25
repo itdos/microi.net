@@ -71,7 +71,7 @@ const robotsText = await readFile(resolve(distDir, 'robots.txt'), 'utf8')
 if (/Disallow:\s*\/assets\//i.test(robotsText)) failures.push('robots: public rendering assets are blocked')
 if (!robotsText.includes(`Sitemap: ${SITE_URL}/sitemap.xml`)) failures.push('robots: sitemap uses a different canonical host')
 const discovery = await readFile(resolve(distDir, 'llms.txt'), 'utf8')
-for (const url of indexableUrls) if (/\/(doc|case)\//.test(url) && !discovery.includes(`](${url})`)) failures.push(`llms.txt: missing ${url}`)
+for (const url of indexableUrls) if (/\/(doc|case|contact)\//.test(url) && !discovery.includes(`](${url})`)) failures.push(`llms.txt: missing ${url}`)
 
 if (failures.length) {
   console.error(`SEO audit failed with ${failures.length} issue(s):`)

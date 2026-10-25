@@ -182,7 +182,7 @@ var url = V8.Method.GetPrivateFileUrl({
 - `Limit:false` 的公有文件允许通过 CDN/公有桶直接访问，不要求记录用户行为日志，也不要为了审计强制改走私有代理。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-006 sha256=2dcf2dd7a571cc4757e9015cf213191be2dc3f041d91b0de51ed8ee00b0b86e7 -->
+<!-- microi-progressive:chunk id=v8-file-upload-006 sha256=405f2dc31677040e3b81ae5f2e84820680b13d4384477ec7c4bf9186e3b3abef -->
 ## 接口直接响应文件（下载/导出）
 
 接口引擎需要在配置中开启【**响应文件**】选项，然后返回特殊结构：
@@ -230,7 +230,7 @@ return {
 - `image/png` / `image/jpeg`
 - `application/octet-stream`（通用二进制）
 
-注意：如果远程系统返回的是错误页、登录页、业务容器格式（例如金蝶 PLM 电子仓 `KD_C_PLM`、或其它文件头不是 `%PDF-` 的伪 PDF），不要在 V8 里伪装成 PDF。后端会返回 JSON 错误，包含 `ExpectedFirstAscii`、`ActualFirstAscii`、`ActualFirstHex`、`Length`，按这些信息排查上游下载接口。
+注意：如果远程系统返回的是错误页、登录页、业务容器格式（例如第三方 PLM 电子仓 `KD_C_PLM`、或其它文件头不是 `%PDF-` 的伪 PDF），不要在 V8 里伪装成 PDF。后端会返回 JSON 错误，包含 `ExpectedFirstAscii`、`ActualFirstAscii`、`ActualFirstHex`、`Length`，按这些信息排查上游下载接口。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=v8-file-upload-007 sha256=710eb73f616aff2ebce65a82568abe8208b701c1211a7e95ce500b1ce20b363f -->

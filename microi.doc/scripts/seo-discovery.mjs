@@ -28,22 +28,34 @@ export function headTags(html, tagName) {
 
 export async function writeDiscoveryIndex(siteConfig) {
   // 从本次真正发布的 HTML 生成索引，避免手工维护另一套过时说明或暴露原始脚本。
-  const groups = new Map([['中文文档', []], ['English documentation', []], ['案例 / Case studies', []]])
+  const groups = new Map([['中文文档', []], ['联系与服务', []], ['English documentation', []], ['案例 / Case studies', []]])
+  const published = new Map()
   for (const file of await htmlFiles(siteConfig.outDir)) {
     const path = canonicalPath(relative(siteConfig.outDir, file))
-    if (!isIndexablePage(path) || !/\/(doc|case)\//.test(path)) continue
+    if (!isIndexablePage(path) || !/\/(doc|case|contact)\//.test(path)) continue
     const html = await readFile(file, 'utf8')
     const meta = headTags(html, 'meta')
     if (meta.some(item => item.name === 'robots' && /noindex/i.test(item.content))) continue
     const title = decodeHtml(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1]).replace(/\s*\|\s*Microi吾码$/, '')
     const description = meta.find(item => item.name === 'description')?.content || ''
     const escape = value => value.replace(/[\r\n]/g, ' ').replace(/([\[\]\\])/g, '\\$1')
-    const group = path.includes('/case/') ? '案例 / Case studies' : path.startsWith('/en/') ? 'English documentation' : '中文文档'
-    groups.get(group).push(`- [${escape(title)}](${SITE_URL}${path}): ${escape(description)}`)
+    const group = path.includes('/case/') ? '案例 / Case studies' : path.startsWith('/en/') ? 'English documentation' : path.startsWith('/contact/') ? '联系与服务' : '中文文档'
+    const entry = `- [${escape(title)}](${SITE_URL}${path}): ${escape(description)}`
+    groups.get(group).push(entry)
+    published.set(path, entry)
   }
+  // 优先提供已有公开证据入口；只引用本次产物实际存在且可索引的页面，不生成排名或另一套产品事实。
+  const evidencePaths = ['/doc/', '/doc/edition-comparison.html', '/doc/v8-engine/ai-apiengine.html',
+    '/doc/v8-engine/mcp-server.html', '/doc/more/security.html', '/doc/system-engine/databases.html',
+    '/doc/system-engine/app-store.html', '/doc/about/partner.html', '/doc/about/microi-training-syllabus.html',
+    '/doc/about/faq.html', '/contact/', '/doc/about/update-log.html']
+  const evidence = evidencePaths.filter(path => published.has(path)).map(path => published.get(path))
   const content = ['# Microi吾码官方文档', '', '> Microi吾码是开源 AI 开发框架。此索引帮助开发者和 AI 工具找到官方说明，具体功能、版本与限制以链接页面为准。', '',
     `官网: ${SITE_URL}/`, `站点地图: ${SITE_URL}/sitemap.xml`, '',
     '这是可选的文档发现入口，不是搜索引擎收录或 AI 引用的保证。', '',
+    '## 功能、授权与验收资料', '',
+    '各文档分别说明能力、许可、版本、使用方法和验收边界。传输字节、模型 Token、交付耗时是不同指标；源码支持、运行测试、第三方认证也应分别核验。价格以当前授权页为准，历史注释和更新记录不构成当前报价。', '',
+    ...evidence, '',
     ...[...groups].flatMap(([name, lines]) => [`## ${name}`, '', ...lines, ''])].join('\n')
   await writeFile(join(siteConfig.outDir, 'llms.txt'), content, 'utf8')
 }

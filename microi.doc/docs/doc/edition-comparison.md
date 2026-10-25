@@ -19,6 +19,10 @@ outline: [2, 3]
 -->
 本页汇总 Microi吾码开源版与企业版的功能、授权与支持服务，帮助开发者和企业按交付需求选型。可先阅读版本建议，再对照下方功能表及授权说明确认适用范围。
 
+::: info 当前销售口径与历史内容
+个人版已暂停销售。源文件注释及历史文章中的个人版 ￥999、企业版 ￥2.5w 等价格仅用于保留历史，不是当前报价。当前企业版为 **￥7.8w 一次买断**，后续技术支持为可选 **¥1.5w/年**；不能将买断价与可选服务费合并成固定年度授权费。采购以购买时正式确认的订单、合同与服务范围为准。
+:::
+
 <section class="mci-edition-hero" aria-label="Microi吾码版本买断授权说明">
   <div class="mci-edition-hero__copy">
     <span class="mci-edition-eyebrow">一次买断 · 永久有效</span>
@@ -194,6 +198,17 @@ Microi吾码本身是开源平台，开源版就是 Gitee 仓库提供的平台�
 
 > 表中价格和服务范围为当前官网口径。合同、订单、发票、服务周期，以及大模型 API、短信、对象存储、云服务器、第三方商业软件等外部资源费用，以购买时正式确认的内容为准。
 
+### 源码、运行组件与服务的边界
+
+| 交付对象 | 核验方式 |
+|---|---|
+| 公开仓库源码 | 以 [Gitee 仓库](https://gitee.com/ITdos/microi.net)实际文件及 [LICENSE](https://gitee.com/ITdos/microi.net/blob/master/LICENSE)为准；保留许可和版权声明，第三方依赖遵循各自许可证 |
+| NuGet / 镜像运行组件 | 可以下载安装不等于该组件源码已公开；按包内许可、产品版本和实际授权核验使用范围 |
+| 商业版附加源码与能力 | 本页明确列出 WebOS 完整源码及在线 AI；其余源码交付清单和授权范围由采购文件逐项确认，不能推定为全部内部源码 |
+| 培训、咨询与实施 | 区分软件授权、技术支持与具体项目实施；人员投入、交付物、响应时间、验收和维护责任以服务约定为准 |
+
+按用户数、表单数、数据量和数据库数不设置软件授权数量限制，不代表服务器资源无限、任意规模均达到相同性能，或自动包含云资源与第三方服务。
+
 ## 什么情况下选择开源版
 
 <div class="mci-edition-detail-panel mci-edition-detail-panel--open">
@@ -249,13 +264,13 @@ Microi吾码本身是开源平台，开源版就是 Gitee 仓库提供的平台�
 <p class="mci-edition-section-lead">传统“定制代码 + AI”仍要让 AI 反复生成和理解数据库访问、权限、CRUD、流程、页面、缓存、租户隔离与部署代码。Microi吾码把通用能力沉淀为成熟引擎，让 AI 主要处理业务差异。</p>
 
 <div class="mci-edition-metric-grid">
-  <article><strong>10×<sup>+</sup></strong><span>更省 Token</span><p>复用平台引擎、实时结构、Skills 与 MCP，显著减少重复代码和上下文。</p></article>
-  <article><strong>10×<sup>+</sup></strong><span>更快开发</span><p>表单、模块、接口、流程、报表和权限等能力开箱即用。</p></article>
+  <article><strong>引擎复用</strong><span>减少重复生成</span><p>复用平台引擎、实时结构、Skills 与 MCP，让 AI 聚焦业务差异。</p></article>
+  <article><strong>在线编排</strong><span>缩短开发链路</span><p>表单、模块、接口、流程、报表和权限等能力开箱即用。</p></article>
   <article><strong>成熟底座</strong><span>更稳定</span><p>AI 在经过验证的平台能力上组合业务，减少从零搭建带来的差异和回归风险。</p></article>
   <article><strong>开箱即用</strong><span>更快交付</span><p>从建模、开发、测试到部署都有统一工具链，缩短联调路径。</p></article>
 </div>
 
-> 在平台能力高度复用的典型企业应用中，Token 消耗与开发周期都有机会获得 10 倍以上改善。实际结果受需求匹配度、模型、上下文质量、团队经验和验收范围影响，并非对所有项目的无条件保证。详细原理请阅读 [AI 编程](/doc/v8-engine/ai-apiengine#ai-efficiency)。
+> Token 与开发周期的节省幅度需在相同需求、模型、初始数据和验收标准下实测。功能复用是收益来源，不能直接换算成固定倍数承诺。详细原理和验证方法请阅读 [AI 编程](/doc/v8-engine/ai-apiengine#ai-efficiency)。
 
 ## 一张图做决定
 

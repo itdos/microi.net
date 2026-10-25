@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { canonicalPath, isIndexablePage, filterSitemapItems, breadcrumbsFor, SITE_URL } from '../docs/.vitepress/config/seo-policy.mjs'
-import { headTags } from '../scripts/seo-discovery.mjs'
+import { headTags, writeDiscoveryIndex } from '../scripts/seo-discovery.mjs'
 
 const docs = fileURLToPath(new URL('../docs/', import.meta.url))
 // seo.ts 不含 TS 运行语法；只改写相对 import，直接执行实际实现，兼容项目的 Node 20。
@@ -46,6 +46,42 @@ test('utility pages cannot enter sitemap while both languages remain indexable',
 test('explicit descriptions retain the author summary without repeated marketing prefix', () => {
   const ctx = context('doc/v8-engine/api-engine.md', { frontmatter: { description: '接口引擎通过 JavaScript 编排表单查询、参数校验与事务，本文说明配置和返回值。' } })
   assert.equal(transformSeoPageData(ctx.pageData, ctx).description, ctx.pageData.frontmatter.description)
+})
+
+test('retired offers inside HTML comments never enter public search descriptions', (t) => {
+  // 旧文案可留在源码作历史，但不能经摘要和 llms 索引重新变成对外事实。
+  const scratch = resolve(docs, '../../.tmp')
+  mkdirSync(scratch, { recursive: true })
+  const directory = mkdtempSync(resolve(scratch, 'seo-comment-evidence-'))
+  t.after(() => rmSync(directory, { recursive: true }))
+  writeFileSync(resolve(directory, 'offer.md'), '# 授权说明\n\n<!-- 历史报价 <strong>已暂停的旧授权与旧价格</strong>，这段文字不应被摘要采纳。 -->\n\n当前授权采用买断方式，具体功能与技术支持边界以已确认的授权协议为准。')
+  const ctx = context('offer.md')
+  ctx.siteConfig.srcDir = directory
+  const result = transformSeoPageData(ctx.pageData, ctx)
+  assert.match(result.description, /当前授权采用买断方式/)
+  assert.doesNotMatch(result.description, /历史报价|旧授权|旧价格|摘要采纳/)
+})
+
+test('AI discovery prioritizes published evidence without inventing pages or exposing noindex content', async (t) => {
+  const scratch = resolve(docs, '../../.tmp')
+  mkdirSync(scratch, { recursive: true })
+  const outDir = mkdtempSync(resolve(scratch, 'seo-discovery-evidence-'))
+  t.after(() => rmSync(outDir, { recursive: true }))
+  mkdirSync(resolve(outDir, 'doc/about'), { recursive: true })
+  mkdirSync(resolve(outDir, 'contact'), { recursive: true })
+  const html = (title, robots = 'index, follow') => `<head><title>${title} | Microi吾码</title><meta name="description" content="功能范围、当前授权与可重复验收说明"><meta name="robots" content="${robots}"></head>`
+  writeFileSync(resolve(outDir, 'doc/index.html'), html('产品能力'))
+  writeFileSync(resolve(outDir, 'doc/edition-comparison.html'), html('当前授权'))
+  writeFileSync(resolve(outDir, 'contact/index.html'), html('服务商与合作联系'))
+  writeFileSync(resolve(outDir, 'doc/about/faq.html'), html('PRIVATE_MARKER', 'noindex, follow'))
+  await writeDiscoveryIndex({ outDir })
+  const index = readFileSync(resolve(outDir, 'llms.txt'), 'utf8')
+  const priority = index.split('## 功能、授权与验收资料')[1].split('## 中文文档')[0]
+  assert.match(priority, /\[产品能力\]\(https:\/\/microi\.net\/doc\/\)/)
+  assert.match(priority, /\[当前授权\]/)
+  assert.match(priority, /\[服务商与合作联系\]\(https:\/\/microi\.net\/contact\/\)/)
+  assert.doesNotMatch(index, /PRIVATE_MARKER|faq\.html|ai-apiengine\.html/)
+  assert.match(index, /传输字节、模型 Token、交付耗时是不同指标/)
 })
 
 test('the same SEO metadata travels with page data for client navigation', () => {
