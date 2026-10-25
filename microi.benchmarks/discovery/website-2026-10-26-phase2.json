@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-25T23:32:21.754Z",
+  "completedAt": "2026-10-25T23:32:22.561Z",
+  "sourceCommit": "6322d1a075c008c5fe4f3364759d3df4d67fa796",
+  "previousWebsiteSource": "54c4fa0003c5d44bc8432e0f5448f3eb7b94d59d",
+  "observations": [
+    {
+      "at": "2026-10-25T23:32:21.924Z",
+      "sourceCommit": "6322d1a075c008c5fe4f3364759d3df4d67fa796"
+    }
+  ],
+  "files": [
+    {
+      "path": "/doc/v8-engine/mcp-server.html",
+      "httpStatus": 200,
+      "bytes": 116598,
+      "sha256": "c879fde2f903fdf7ca15d4a2042044d9bebb79efd2e78c14a1a535b822f3cefc",
+      "matchesLocalBuild": true,
+      "markerChecks": 2
+    },
+    {
+      "path": "/doc/more/security.html",
+      "httpStatus": 200,
+      "bytes": 150876,
+      "sha256": "d9c23b7e2818f20d580eb6f276fce3ad8b72be2b47eaf4e62a86bcd60ca91a21",
+      "matchesLocalBuild": true,
+      "markerChecks": 3
+    },
+    {
+      "path": "/llms.txt",
+      "httpStatus": 200,
+      "bytes": 49324,
+      "sha256": "6e3cd9203603a3c135342b903b3d5adb61cbd91b4e26aed45d97cebae8d5db97",
+      "matchesLocalBuild": true,
+      "markerChecks": 2
+    },
+    {
+      "path": "/sitemap.xml",
+      "httpStatus": 200,
+      "bytes": 35810,
+      "sha256": "9c548011a5cddf72e5cb669617614589bfbd84f4ef9811be0ebb066bcf213fc7",
+      "matchesLocalBuild": true,
+      "markerChecks": 2
+    },
+    {
+      "path": "/profile.html",
+      "httpStatus": 200,
+      "bytes": 46814,
+      "sha256": "28bf04463906dfe391d1078dd619152613310bb1cf827b6767c8ff19eda8f450",
+      "matchesLocalBuild": true,
+      "markerChecks": 0
+    },
+    {
+      "path": "/assets/chunks/theme.C0h7t8JT.js",
+      "httpStatus": 200,
+      "bytes": 578668,
+      "sha256": "698da9cc58cd3e4d3fb46807e1b590c080f5cb4484df5dc8668ee02004e4a1a8",
+      "matchesLocalBuild": true,
+      "markerChecks": 0
+    },
+    {
+      "path": "/login.html",
+      "httpStatus": 200,
+      "bytes": 52312,
+      "sha256": "29abc9f05d7fcd0398537140660baea0f4e1c1f59c91bfc756e6d16c0285d059",
+      "matchesLocalBuild": true,
+      "markerChecks": 0
+    }
+  ],
+  "passed": true,
+  "boundaries": {
+    "browserVisualVerified": false,
+    "searchIndexingConfirmed": false,
+    "platformApiOrPcPublishedByThisRun": false
+  }
+}
