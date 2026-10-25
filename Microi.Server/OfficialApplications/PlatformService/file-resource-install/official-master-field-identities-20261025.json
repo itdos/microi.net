@@ -1,0 +1,18 @@
+{
+  "profile": "microi_itdos_api_itdos_com",
+  "apiBase": "https://api.itdos.com",
+  "osClient": "iTdos",
+  "tableName": "Sys_Config",
+  "tableId": "c8570fa6-c10f-4014-8cb4-4b046e7ba69c",
+  "evidence": "readonly-preflight-20261025.json:reads.schema",
+  "remoteWritesByThisAgent": 0,
+  "localMappingOnly": true,
+  "fields": [
+    { "name": "FileServerBak", "id": "01M5RZ4HEKFZ98JMG5C0J5KN4R", "candidateIdChanged": false },
+    { "name": "FileServerBakThresholdGiB", "id": "01M5SHXRP4RB71A1P2FEFKQZV2", "previousCandidateId": "ee0a9b6e6ca1ed1635865609f85b4638", "candidateIdChanged": true },
+    { "name": "FileServerBakWindowHours", "id": "01M5SHXSREBCX50Q02NZES06P2", "previousCandidateId": "4df84135082ec3649c65764e0231b46e", "candidateIdChanged": true }
+  ],
+  "packages": ["app.microi.sys-config.json", "app.microi.saas-engine.json"],
+  "unchanged": ["package versions", "Sys_Config values", "FileServerBak definition", "all unrelated resource identities"],
+  "newTableAndEngineIds": "Not assigned online by this agent; obtain from authoritative master create/readback before official export."
+}

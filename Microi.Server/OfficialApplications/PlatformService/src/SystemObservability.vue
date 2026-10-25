@@ -138,6 +138,7 @@
     </section>
 
     <CdnMonitor v-else-if="activeTab === 'cdn'" ref="cdnMonitor" />
+    <FileResourceDirectory v-else-if="activeTab === 'resources'" ref="fileResourceDirectory" />
     <MemoryDiagnostics v-else-if="activeTab === 'memory'" ref="memoryDiagnostics" :query="query" @trace="openTraceFromTraffic" />
 
     <section v-else-if="activeTab === 'security'" class="obs-stack">
@@ -207,10 +208,12 @@ import { configureV8, dispatch, getContext, subscribeContext } from './microi'
 import ObservabilityTable from './components/ObservabilityTable.vue'
 import MemoryDiagnostics from './components/MemoryDiagnostics.vue'
 import CdnMonitor from './components/CdnMonitor.vue'
+import FileResourceDirectory from './components/FileResourceDirectory.vue'
+const fileResourceDirectory = ref(null)
 const cdnMonitor = ref(null)
 const memoryDiagnostics = ref(null)
 
-const tabs = [{key:'logs',label:'系统日志',icon:'≡'},{key:'traffic',label:'网络流量',icon:'⇅'},{key:'cdn',label:'CDN监控/分析/安全',icon:'◎'},{key:'overview',label:'运行诊断',icon:'⌁'},{key:'requests',label:'请求与接口',icon:'⇄'},{key:'runtime',label:'系统监控',icon:'◫'},{key:'memory',label:'内存与事故',icon:'⌕'},{key:'security',label:'安全数据',icon:'◇'},{key:'appLogs',label:'应用日志',icon:'›_'}]
+const tabs = [{key:'logs',label:'系统日志',icon:'≡'},{key:'traffic',label:'网络流量',icon:'⇅'},{key:'cdn',label:'CDN监控/分析/安全',icon:'◎'},{key:'resources',label:'资源目录',icon:'▤'},{key:'overview',label:'运行诊断',icon:'⌁'},{key:'requests',label:'请求与接口',icon:'⇄'},{key:'runtime',label:'系统监控',icon:'◫'},{key:'memory',label:'内存与事故',icon:'⌕'},{key:'security',label:'安全数据',icon:'◇'},{key:'appLogs',label:'应用日志',icon:'›_'}]
 const rangeOptions = [{key:'live5',label:'实时（近5分钟）'},{key:'today',label:'当天'},{key:'yesterday',label:'昨天'},{key:'3d',label:'近3天'},{key:'7d',label:'近7天'},{key:'15d',label:'近15天'},{key:'30d',label:'近30天'},{key:'3m',label:'近3个月'},{key:'6m',label:'近6个月'},{key:'1y',label:'近1年'}]
 const activeTab = ref('logs'), rangeKey = ref('today'), windowMinutes = ref(5), autoRefresh = ref(false), loading = ref(false), error = ref(''), notice = ref('')
 const data = ref(null), snapshot = computed(() => data.value?.RequestRuntime || null), host = ref(null), docker = ref(null), platformStats = ref({}), appLogs = ref([]), trends = ref([]), legacyMenus = ref([])
@@ -299,7 +302,7 @@ async function loadTrace(id){trace.value=null;if(!/^[0-9a-f]{32}$/i.test(String(
 async function loadSecurity(page=1){const sequence=++securityRequestSequence;try{const nextPage=Math.max(1,Number(page)||1);const result=await query({Action:'SecurityData',Kind:securityKind.value,Keyword:securityKeyword.value,PageIndex:nextPage,PageSize:securityPageSize.value});if(sequence!==securityRequestSequence)return;securityPage.value=nextPage;securityRows.value=result.Data||[];securityCount.value=Number(result.DataCount||0);error.value=''}catch(e){if(sequence===securityRequestSequence)error.value=e?.message||String(e)}}
 async function loadAppLogs(){appLogLoading.value=true;try{appLogs.value=(await query({Action:'AppLogs',Lines:appLogLineCount.value})).Data||[];error.value=''}catch(e){error.value=e?.message||String(e)}finally{appLogLoading.value=false}}
 async function loadLegacyMenus(){try{legacyMenus.value=(await query({Action:'LegacyMenus'})).Data||[]}catch(e){error.value=e?.message||String(e)}}
-async function refreshActive(force=false){if(activeTab.value==='overview')await Promise.all([loadSnapshot(force),loadTrafficHistory(Boolean(force))]);else if(activeTab.value==='cdn')await cdnMonitor.value?.refresh();else if(activeTab.value==='memory')await memoryDiagnostics.value?.refresh();else if(activeTab.value==='requests')await loadSnapshot(force);else if(activeTab.value==='traffic')await Promise.all([loadSnapshot(false),loadTrafficHistory(Boolean(force)),loadTrafficDetails(trafficDetailPage.value)]);else if(activeTab.value==='runtime')await Promise.all([loadSnapshot(true),loadPlatformStats(),loadDocker(Boolean(force))]);else if(activeTab.value==='logs')await loadLogs(logPage.value,false);else if(activeTab.value==='security')await Promise.all([loadSnapshot(false),loadSecurity(securityPage.value)]);else await loadAppLogs()}
+async function refreshActive(force=false){if(activeTab.value==='resources'){if(force===true)await fileResourceDirectory.value?.refresh();return}if(activeTab.value==='overview')await Promise.all([loadSnapshot(force),loadTrafficHistory(Boolean(force))]);else if(activeTab.value==='cdn')await cdnMonitor.value?.refresh();else if(activeTab.value==='memory')await memoryDiagnostics.value?.refresh();else if(activeTab.value==='requests')await loadSnapshot(force);else if(activeTab.value==='traffic')await Promise.all([loadSnapshot(false),loadTrafficHistory(Boolean(force)),loadTrafficDetails(trafficDetailPage.value)]);else if(activeTab.value==='runtime')await Promise.all([loadSnapshot(true),loadPlatformStats(),loadDocker(Boolean(force))]);else if(activeTab.value==='logs')await loadLogs(logPage.value,false);else if(activeTab.value==='security')await Promise.all([loadSnapshot(false),loadSecurity(securityPage.value)]);else await loadAppLogs()}
 function selectTab(key){if(activeTab.value===key)return;activeTab.value=key;void refreshActive(key==='runtime'||key==='traffic')}
 function changeAnalysisRange(){lastTrafficHistoryAt=0;historical.value=null;trafficHistory.value=[];trafficDetailPage.value=1;trafficDetails.value=[];trafficDetailCount.value=0;void refreshActive(true)}
 function selectSecurityKind(key){securityKind.value=key;loadSecurity(1)}
