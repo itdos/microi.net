@@ -34,7 +34,7 @@ Microi 吾码的公开案例覆盖服装生产、客户关系、集团办公、�
 
 名称先进行 Unicode NFKC 规范化并去除首尾空格，再排除包含“测试、演示、空库、标准库、压力、压测、回归”或 `test/demo/e2e/smoke/benchmark/fixture` 的条目（英文不区分大小写）。其余名称只按完整字符串相等去重，不进行主观合并。
 
-[查看聚合快照和复核脚本](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/case-evidence)。公开快照不含客户名称、租户标识、逐行哈希、部署域名或联系方式。
+[查看聚合快照和复核脚本](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/case-evidence)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/case-evidence)）。公开快照不含客户名称、租户标识、逐行哈希、部署域名或联系方式。
 
 ## 如何核验一个案例
 

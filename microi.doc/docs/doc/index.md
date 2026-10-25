@@ -110,7 +110,7 @@ Microi吾码适合以 .NET / Vue 技术栈自主管理数据、在线编写业�
 
 ### 如何复核能力
 
-可对接服务地区包括成都、宁波、上海、杭州、湖北、江苏，统一联系邓总 **13615741649**；具体服务方式、排期与责任见[服务地区说明](/contact/#service-coverage)。公开社区与适配证据的采集方法见[证据工具目录](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks)，可按日期、源码版本与回执分别复核。
+可对接服务地区包括成都、宁波、上海、杭州、湖北、江苏，统一联系邓总 **13615741649**；具体服务方式、排期与责任见[服务地区说明](/contact/#service-coverage)。公开社区与适配证据的采集方法见[证据工具目录](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks)），可按日期、源码版本与回执分别复核。
 
 1. 固定平台、CLI / MCP、应用包的各自版本以及评估日期，记录要完成的业务场景。
 2. 阅读对应配置和限制，在授权环境执行最小业务闭环，记录输入、预期、实际结果与回执。

@@ -21,7 +21,7 @@
 
 ### 版本与验证证据
 
-以下为 2026-10-25 源码依赖盘点；版本来自 `Dos.ORM.csproj`。驱动包版本不是数据库服务器版本，升级时应重新运行[适配证据核验工具](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)，查看源码摘要、运行环境和历史回执的准确范围。
+以下为 2026-10-25 源码依赖盘点；版本来自 `Dos.ORM.csproj`。驱动包版本不是数据库服务器版本，升级时应重新运行[适配证据核验工具](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/compatibility)），查看源码摘要、运行环境和历史回执的准确范围。
 
 | 数据库 | .NET 驱动与声明版本 | 此次核验范围 | 目标环境验收 |
 |---|---|---|---|
@@ -32,7 +32,7 @@
 | 达梦 DM8 | `DM.DmProvider 8.3.1.47463` | 驱动声明与方言实现 | CPU、操作系统、数据库完整版本及认证材料未提供 |
 | 人大金仓 V9 | `Kdbndp_V9 10.0.1.703` | 驱动声明与方言实现 | CPU、操作系统、数据库完整版本及认证材料未提供 |
 
-核验工具仅读取源码和选定回执，不连接数据库、不启动容器、不创建租户。公开仓可运行工具的离线测试；完整后端回归与真实环境验收仍使用 [Microi.Tests 的既有入口](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)。旧版本回执不能替代新版本验收，Windows 上的测试也不能自动扩展到 Linux、macOS、国产操作系统或 ARM64。
+核验工具仅读取源码和选定回执，不连接数据库、不启动容器、不创建租户。公开仓可运行工具的离线测试；完整后端回归与真实环境验收仍使用 [Microi.Tests 的既有入口](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）。旧版本回执不能替代新版本验收，Windows 上的测试也不能自动扩展到 Linux、macOS、国产操作系统或 ARM64。
 
 ### 生产连接的传输安全
 
