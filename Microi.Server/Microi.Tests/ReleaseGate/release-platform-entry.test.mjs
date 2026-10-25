@@ -17,6 +17,34 @@ const plans=section('DOCKER_PLANS=(', '# 【前端 package.json');
 const gitExec=process.platform==='win32'?execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim():'';
 const bash=process.platform==='win32'?path.resolve(gitExec,'../../..','bin/bash.exe'):'bash';
 
+// 回放真正的 Bash 参数解析与测试 argv，防止“完整渠道”又隐式追加扩展浏览器验收。
+for(const scenario of [
+ {name:'default complete publication keeps basic tests',args:'--platform-release',complete:true,expected:0},
+ {name:'explicit browser selection is retained',args:'--platform-release --platform-frontend-tests',complete:true,expected:1},
+ {name:'explicit browser selection works for a partial publication',args:'--platform-frontend-tests',complete:false,expected:1},
+ {name:'inherited browser switch cannot expand the default',args:'--platform-release',complete:true,inherited:true,expected:0},
+ {name:'Full rejects a second browser scope',args:'--full-only --platform-frontend-tests',rejected:true},
+])test(`release basic test scope: ${scenario.name}`,()=>{
+ const begin=source.indexOf('    _release_test_scope_args=()');
+ const end=source.indexOf('    _platform_test_command=(',begin);
+ assert.ok(begin>=0&&end>begin);
+ const result=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:root,encoding:'utf8',timeout:15000,input:`
+set -e
+set -- ${scenario.args}
+MICROI_PLATFORM_FRONTEND_TESTS=${Boolean(scenario.inherited)}
+${policy}
+MICROI_COMPLETE_PLATFORM_RELEASE=${Boolean(scenario.complete)}
+${source.slice(begin,end)}
+printf 'SCOPE_COUNT=%s\\n' "\${#_release_test_scope_args[@]}"
+printf 'SCOPE=%s\\n' "\${_release_test_scope_args[*]}"
+`});
+ assert.ifError(result.error);
+ if(scenario.rejected){assert.notEqual(result.status,0);assert.doesNotMatch(result.stdout,/SCOPE_COUNT=/);return;}
+ assert.equal(result.status,0,result.stderr);
+ assert.match(result.stdout,new RegExp(`SCOPE_COUNT=${scenario.expected}(?:\\r?\\n|$)`));
+ assert.equal(result.stdout.includes('SCOPE=-PlatformFrontendTests'),scenario.expected===1);
+});
+
 for(const scenario of [
  {name:'blank menu defaults to complete formal release',complete:true},
  {name:'explicit menu 8 completes every channel',mode:'8',complete:true},
@@ -119,7 +147,10 @@ test('complete release uses one candidate, one elapsed-time target and the exist
  assert.equal((source.match(/MICROI_RELEASE_DEADLINE=\$\(\(START_TIME \+ 1800\)\)/g)||[]).length,1);
  const preflight=source.indexOf('run_release_command node microi.doc/scripts/check-account-portal.mjs --require-committed');
  assert.ok(preflight>0&&preflight<source.indexOf('# ─── 阶段（条件）: 更新版本号'));
- assert.match(source,/MICROI_COMPLETE_PLATFORM_RELEASE" = true.*_release_test_scope_args\+=\(-PlatformFrontendTests\)/);
+ const repositories=source.indexOf('(cd microi.doc && run_release_command node scripts/check-open-source-links.mjs)');
+ assert.ok(repositories>preflight&&repositories<source.indexOf('# ─── 阶段（条件）: 更新版本号'),'Website mirror-link failures must be detected before version changes, platform tests and uploads');
+ assert.match(source,/MICROI_PLATFORM_FRONTEND_TESTS" = true.*_release_test_scope_args\+=\(-PlatformFrontendTests\)/);
+ assert.doesNotMatch(source,/MICROI_COMPLETE_PLATFORM_RELEASE" = true.*_release_test_scope_args\+=\(-PlatformFrontendTests\)/);
  const lock=section('acquire_workspace_lock() {','prepare_release_workspace() {');
  assert.match(lock,/\[ "\$PUBLISH_DOC" = true \]; then _requested\+=\(website\)/);
  assert.doesNotMatch(source.slice(source.indexOf('# --- 发布模式：')),/bash [^\n]*Microi一键编译发布/,'The complete entry must not recursively run separate release modes');
