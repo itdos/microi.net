@@ -303,7 +303,7 @@ public class FormEngineTenantBoundaryTests
             "sys_osclients", "sys_config", "mci_global_function", "sys_apiengine", "diy_table", "diy_field",
             "sys_menu", "sys_role", "sys_rolelimit", "sys_userfk", "sys_onlineuser", "sys_datasource",
             "diy_schedule_job", "diy_schedule_job_log", "sys_mq", "sys_mqtt", "microi_database", "diy_sso",
-            "sys_log", "sys_servernode", "mic_ai", "mic_email_server", "wx_mp", "mci_database_backup",
+            "sys_log", "sys_servernode", "mic_ai", "mci_ai_token_account", "mci_ai_token_log", "mic_email_server", "wx_mp", "mci_database_backup",
             "mci_background_task", "mci_file_remote_connection", "mci_redis_connection", "mci_license_server",
             "mci_platform_reminder", "mci_platform_reminder_batch", "mci_platform_reminder_target", "mci_platform_reminder_receipt",
             "mci_user_access_key", "mci_security_access_log", "mci_security_attack_event", "mci_security_ip_block", "mci_runtime_incident", "mci_runtime_installation", "mci_app_stream_gate_transition",
