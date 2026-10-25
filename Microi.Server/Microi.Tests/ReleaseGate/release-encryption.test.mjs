@@ -7,7 +7,7 @@ import {execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {deflateRawSync} from 'node:zlib';
 import test from 'node:test';
-import {projects,capturePlain,verifyEncrypted,verifyFinal,verifyPackages,enumeratePendingPackages,readPendingPackageList,verifyPendingPackages,verifyPendingPackageInventory,verifyPendingPackageUpload} from '../../tools/release-encryption.mjs';
+import {projects,capturePlain,verifyEncrypted,verifyFinal,verifyPackageDll,verifyPackages,enumeratePendingPackages,readPendingPackageList,verifyPendingPackages,verifyPendingPackageInventory,verifyPendingPackageUpload} from '../../tools/release-encryption.mjs';
 
 const md5=bytes=>createHash('md5').update(bytes).digest('hex');
 function fixture(){
@@ -58,6 +58,72 @@ function pendingFixture(){
  writeList();
  return {root,server,directory,file,files,list,writeList,dispose:()=>fs.rmSync(root,{recursive:true,force:true})};
 }
+
+for(const scenario of ['already-encrypted-stable-digest','replace-plaintext-without-digest-tools','reject-stale-package'])
+test(`NuGet DLL replacement gate accepts verified bytes: ${scenario}`,()=>{
+ const f=pendingFixture();try{
+  const source=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
+  const begin=source.indexOf('    replace_dll_in_nupkg() {'),end=source.indexOf('    _replace_error=0',begin);
+  assert.ok(begin>0&&end>begin);
+  const gitExec=process.platform==='win32'?execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim():'';
+  const bash=process.platform==='win32'?path.resolve(gitExec,'../../..','bin/bash.exe'):'bash';
+  const cli=fileURLToPath(new URL('../../tools/release-encryption.mjs',import.meta.url));
+  const quote=value=>"'"+value.replaceAll('\\','/').replaceAll("'","'\\''")+"'";
+  if(scenario.startsWith('replace-plaintext')||scenario==='reject-stale-package')zip(f.files[0],[['lib/net10.0/Microi.net.dll','plain-Microi.net']]);
+  const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:f.root,encoding:'utf8',timeout:20000,input:`
+set -e
+print_step(){ :; }; print_success(){ :; }; print_warning(){ :; }
+print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
+run_release_command(){ "$@"; }
+node(){ shift; ${quote(process.execPath)} ${quote(cli)} "$@"; }
+md5(){ ${scenario.startsWith('already-')?"printf '11111111111111111111111111111111\\n'":'return 1'}; }
+md5sum(){ return 1; }
+${scenario==='reject-stale-package'?'zip(){ return 0; }':''}
+VERSION=8.5.2
+PUBLISH_DIR=${quote(f.directory)}
+MICROI_ENCRYPTION_RECEIPT=${quote(f.file)}
+MICROI_RELEASE_SCRATCH=${quote(f.root)}
+${source.slice(begin,end)}
+replace_dll_in_nupkg Microi.net
+printf 'VERIFIED_PACKAGE_REACHED\\n'
+`});
+  assert.ifError(run.error);
+  if(scenario==='reject-stale-package'){
+   assert.equal(run.status,17,run.stdout+'\n'+run.stderr);
+   assert.match(run.stderr,/Unencrypted or stale DLL/);
+   assert.doesNotMatch(run.stdout,/VERIFIED_PACKAGE_REACHED/);
+   return;
+  }
+  assert.equal(run.status,0,run.stdout+'\n'+run.stderr);
+  assert.match(run.stdout,/VERIFIED_PACKAGE_REACHED/);
+  // 成功仍依赖现有完整包内字节门禁，不能仅靠新函数的退出码或日志。
+  assert.equal(verifyPackages(f.directory,f.file,'8.5.2',f.files).packages.files.length,5);
+ }finally{f.dispose();}
+});
+
+test('single-package DLL proof is idempotent and verifies every TFM without changing the archive',()=>{
+ const f=pendingFixture();try{
+  const dll=fs.readFileSync(path.join(f.directory,'Microi.net.dll'));
+  zip(f.files[0],[['lib/netstandard2.1/Microi.net.dll',dll],['lib/net10.0/Microi.net.dll',dll]]);
+  const before=fs.readFileSync(f.files[0]);
+  for(let attempt=0;attempt<2;attempt++)assert.equal(verifyPackageDll(f.directory,f.file,f.files[0],'Microi.net').entries.length,2);
+  assert.deepEqual(fs.readFileSync(f.files[0]),before);
+ }finally{f.dispose();}
+});
+
+for(const scenario of ['wrong-second-tfm','missing-lib','stale-other-closed-copy','duplicate-entry','unknown-project','wrong-package-identity'])
+test(`single-package DLL proof rejects ${scenario}`,()=>{
+ const f=pendingFixture();try{
+  const dll=fs.readFileSync(path.join(f.directory,'Microi.net.dll'));
+  const entries=[['lib/netstandard2.1/Microi.net.dll',dll]];
+  if(scenario==='wrong-second-tfm')entries.push(['lib/net10.0/Microi.net.dll','plain-Microi.net']);
+  if(scenario==='missing-lib')entries[0][0]='tools/Microi.net.dll';
+  if(scenario==='stale-other-closed-copy')entries.push(['tools/[a]/Microi.Vision.dll','plain-Microi.Vision']);
+  if(scenario==='duplicate-entry')entries.push(entries[0]);
+  zip(f.files[0],entries);
+  assert.throws(()=>verifyPackageDll(f.directory,f.file,f.files[0],scenario==='unknown-project'?'Foreign':scenario==='wrong-package-identity'?'Microi.AI':'Microi.net'),/Unencrypted or stale DLL|Missing encrypted lib DLL|Duplicate ZIP entries|Unknown encrypted package project|Encrypted package identity differs/);
+ }finally{f.dispose();}
+});
 
 test('literal ZIP wildcard names cannot read an encrypted neighboring entry instead of a plaintext DLL',()=>{
  const f=fixture(),previousPath=process.env.PATH;try{

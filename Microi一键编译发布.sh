@@ -1772,7 +1772,6 @@ if [ "$DLL_ENCRYPTED" = true ] && { [ "$PUSH_NUGET" = true ] || [ "$DEPLOY_MODE"
         if [ ! -f "$latest_package" ]; then print_warning "未找到本次版本包: $latest_package"; return 1; fi
         if [ ! -f "$encrypted_dll" ]; then print_warning "未找到加密DLL: $encrypted_dll"; return 1; fi
 
-        local nupkg_before_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
         local nupkg_before_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
         local enc_bytes=$(stat -f%z "$encrypted_dll" 2>/dev/null || stat -c%s "$encrypted_dll" 2>/dev/null)
 
@@ -1828,12 +1827,13 @@ if [ "$DLL_ENCRYPTED" = true ] && { [ "$PUSH_NUGET" = true ] || [ "$DEPLOY_MODE"
             return 1
         fi
 
-        local nupkg_after_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
         local nupkg_after_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
-        if [ "$nupkg_before_md5" = "$nupkg_after_md5" ]; then
-            print_fail "$(basename "$latest_package") 替换后MD5未变化，替换未生效！"
+        # 整包摘要不变可能是正确的幂等结果，外部摘要命令失败也不能当作替换事实。
+        # 立即逐个读取实际 ZIP DLL，与最终加密回执核对；错误字节仍必须阻止上传。
+        if ! run_release_command node Microi.Server/tools/release-encryption.mjs package-dll "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$latest_package" "$project_name"; then
+            print_fail "$(basename "$latest_package") 包内DLL与最终加密回执不一致，禁止上传。"
         fi
-        print_success "${project_name}.dll 替换成功（nupkg: $((nupkg_before_bytes/1024))KB → $((nupkg_after_bytes/1024))KB，MD5已变更）"
+        print_success "${project_name}.dll 替换成功（nupkg: $((nupkg_before_bytes/1024))KB → $((nupkg_after_bytes/1024))KB，包内加密DLL字节已核验）"
     }
 
     _replace_error=0
