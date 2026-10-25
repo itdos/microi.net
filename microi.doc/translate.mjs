@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import alimt20181012 from "@alicloud/alimt20181012";
 import OpenApi from "@alicloud/openapi-client";
 import pLimit from "p-limit";
+import { translationConfig } from "./scripts/translation-config.mjs";
 
 // 创建并发限制器，最大并发数20
 const limit = pLimit(10);
@@ -14,12 +15,7 @@ const __dirname = path.dirname(__filename);
 
 // 配置
 const config = {
-	aliyun: {
-		// 赛哥的key
-		accessKeyId: "LTAI5t5ZPCYSqsQMVAWcbqY4",
-		accessKeySecret: "5VVAcWLvFOiOscYCS8UNeFZgikLRO5",
-		endpoint: "mt.aliyuncs.com",
-	},
+	aliyun: translationConfig(),
 	sourceDir: path.join(__dirname, "docs"),
 	translateDirs: ["apiengine", "case", "contact", "doc", "faq", "guide"],
 	// translateDirs: ["doc"],
@@ -86,7 +82,8 @@ async function translateText(text, to = "en") {
 			} catch (err) {
 				attempts++;
 				if (attempts >= retryLimit) {
-					console.error("翻译失败:", err, text);
+				// SDK 错误可能携带请求配置；公共日志不输出原错误对象或待翻译正文。
+				console.error("翻译失败：请求重试后仍未成功，保留原文。");
 				}
 			}
 		}
@@ -635,6 +632,6 @@ async function main() {
 
 // 启动
 main().catch((err) => {
-	console.error("运行失败:", err);
+	console.error("翻译运行失败，请检查凭据配置、网络及输出目录权限。");
 	process.exit(1);
 });

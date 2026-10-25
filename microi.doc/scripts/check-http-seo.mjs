@@ -95,5 +95,19 @@ if (process.argv.includes('--check-alias-hosts')) {
     const { response } = await get(path, { Host: 'microi.net', 'X-Forwarded-Proto': 'https' })
     check(response.status === 200 && !response.headers.get('location'), `${path}: microi.net 必须直接返回内容，不能跳向 www 或循环跳转`)
   }
+  for (const host of ['www.itdos.com', 'itdos.com']) {
+    const { response } = await get('/doc/?source=seo', { Host: host })
+    check(response.status === 301 && response.headers.get('location') === `${SITE_URL}/doc/?source=seo`, `${host}: 历史文档应永久归一且保留参数`)
+    const { response: home } = await get('/', { Host: host })
+    check(home.status === 200, `${host}: 不扩大到非文档业务路径`)
+  }
+}
+// 公网直接访问真实别名，不伪造 Host；独立验证边缘代理是否保留了源站跳转。
+if (process.argv.includes('--check-public-aliases')) {
+  for (const host of ['www.microi.net', 'doc.microi.net', 'www.itdos.com']) {
+    const response = await fetch(`https://${host}/doc/?source=seo`, { redirect: 'manual', signal: AbortSignal.timeout(15000) })
+    await response.text()
+    check(response.status === 301 && response.headers.get('location') === `${SITE_URL}/doc/?source=seo`, `${host}: 公网旧文档入口应永久归一且保留参数`)
+  }
 }
 console.log(`HTTP SEO audit passed: ${checks} assertions, ${urls.length} canonical pages; actual nginx status, redirects, friendly 404, robots and discovery verified.`)

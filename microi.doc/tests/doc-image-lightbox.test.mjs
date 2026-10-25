@@ -26,7 +26,7 @@ test('documentation keeps one shared Fancybox image preview implementation', () 
   }
   assert.match(shared, /await writeFancyboxAssets\(siteConfig\)/)
   assert.match(shared, /await writeDiscoveryIndex\(siteConfig\)/)
-  assert.match(shared, /plugins: \[fancyboxDevPlugin\(\)\]/)
+  assert.match(shared, /plugins: \[fancyboxDevPlugin\(\), nugetBuildSnapshotPlugin\(\)\]/)
   assert.doesNotMatch(theme, /DocImageLightbox/)
 })
 
@@ -244,23 +244,32 @@ test('copied product screenshots preserve the exact original bytes supplied for 
   }
 })
 
-test('platform preview precedes searchable architecture, AI efficiency, role and highlight sections', () => {
+test('platform introduction, resource links, architecture and preview precede supporting evidence', () => {
   const index = read('docs/doc/index.md')
   const readme = fs.readFileSync(path.resolve(projectRoot, '..', 'README.md'), 'utf8')
   for (const content of [index, readme]) {
+    const resources = content.indexOf('| 资源 | 地址 |')
+    const architecture = content.indexOf('## Microi吾码 AI平台 架构图')
     const preview = content.indexOf('## 📸 预览图')
-    assert.ok(preview > 0)
+    const previewEnd = content.indexOf('</table>', preview)
+    assert.ok(resources > 0 && resources < architecture && architecture < preview)
+    assert.ok(previewEnd > preview, 'the full preview gallery should remain before supporting content')
+    const resourceRows = content.slice(resources).split(/\r?\n\s*\r?\n/, 1)[0].split(/\r?\n/)
+    assert.match(resourceRows.at(-2), /AI 文档索引/)
+    assert.match(resourceRows.at(-1), /站点地图/)
     for (const [label, pattern] of [
+      ['选型与能力证据', /^## 选型与能力证据/m],
       ['架构能力全景（可检索文本）', /^### 架构能力全景（可检索文本）/m],
       ['为什么 AI 开发更快、更省 Token', /^#{2,3} 🚀 为什么.*更快、更省 Token/m],
       ['按角色进入', /^### 按角色进入/m],
       ['平台亮点', /^## ✨ 平台亮点/m]
     ]) {
-      assert.ok(content.search(pattern) > preview, `${label} should appear after preview`)
+      assert.ok(content.search(pattern) > previewEnd, `${label} should appear after the complete preview gallery`)
     }
     assert.doesNotMatch(content, /microi-apiengine-20260208\.jpg/)
     assert.ok(content.includes(getDocAssetUrl('/images/product-screenshots/api-engine-ai-copilot.png')))
   }
+  assert.ok(index.indexOf('<MciNugetStats') > index.indexOf('## 选型与能力证据'), 'download statistics should follow the primary introduction and evidence')
 })
 
 test('platform preview keeps the requested three-image row and removes superseded images', () => {
