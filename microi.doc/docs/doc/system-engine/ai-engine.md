@@ -105,7 +105,7 @@ OpenAI 兼容中转的 SSE 需区分模型终态与传输终止：上游明确�
 
 固定 JSON 实测需显式记录模型思考设置。`MiniMax-M3` 的公开复核工具协议 `1.1.0` 固定两组 `reasoning_split:true` 与 `thinking:{type:'disabled'}`，避免默认推理文本混入答案及占满同一输出预算；其它模型不照搬其专属参数。按[供应商文档](https://platform.minimax.io/docs/api-reference/text-openai-api)选择参数，不靠删除任意回答内容通过 JSON 校验。旧协议的失败回执保留，新旧设置不能当作同一实验或宣称效率提升。
 
-2026-10-26 在实际 8.7.1 官方入口完成单轮六次合成任务：六次流均完整结束、答案均可解析为 JSON；固定平台上下文组计划验收 3/3，无上下文组 1/3，合计 4/6，两个失败保留。供应商用量与六条账本均为 2,079 Token。完整参数、逐项检查与脱敏 JSON 见[实测方法与结果](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/ai-quality)。这里只验证模型计划，没有执行业务操作；单轮结果不代表稳定成功率、完整交付率或费用/效率倍数。
+2026-10-26 在实际 8.7.1 官方入口完成单轮六次合成任务：六次流均完整结束、答案均可解析为 JSON；固定平台上下文组计划验收 3/3，无上下文组 1/3，合计 4/6，两个失败保留。供应商用量与六条账本均为 2,079 Token。完整参数、逐项检查与脱敏 JSON 见[实测方法与结果](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/ai-quality)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/ai-quality)）。这里只验证模型计划，没有执行业务操作；单轮结果不代表稳定成功率、完整交付率或费用/效率倍数。
 
 - `Chat` 和 `ChatStream` 同时声明了 GET/POST，但业务代码默认使用 POST。问题、系统提示、附件和会话信息不应放进 URL、代理日志或浏览器历史。
 - 常用请求字段为 `UserChatMsg`、`AiModel`、`AiModelId`、`RelayModel`、`ConversationId`、`Mode`、`ReasoningEffort` 和 `Attachments`。模型 Endpoint 与供应商 ApiKey 由服务端读取；Controller 和 `V8.AI` 会清除客户端提交的 `ApiKey/Endpoint`。HTTP 来源由 Controller 归一为 `http-ai`，后端 V8 来源固定为 `v8-ai`；不能通过伪造 `Source=ai-intent-router` 绕过中转计量。
