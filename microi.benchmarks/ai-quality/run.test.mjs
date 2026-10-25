@@ -9,6 +9,15 @@ test('plan is fixed, balanced, bounded and synthetic', () => {
   for (const { body } of requests) { assert.equal(body.max_tokens, 1024); assert.equal(body.stream, true); assert.equal(body.stream_options.include_usage, true); }
   assert.equal(limits.retries, 0);
 });
+
+test('M3 protocol profile separates reasoning and fixes the same non-thinking policy in both conditions', () => {
+  for (const request of plan('MiniMax-M3')) {
+    assert.equal(request.body.reasoning_split, true);
+    assert.deepEqual(request.body.thinking, { type: 'disabled' });
+  }
+  assert.equal(plan('another-model')[0].body.reasoning_split, undefined);
+  assert.equal(plan('another-model')[0].body.thinking, undefined);
+});
 test('validation rejects invalid JSON, insecure identity and incomplete transactions', () => {
   assert.equal(evaluate('query-plan', '```json\n{}\n```').passed, false);
   assert.equal(evaluate('trust-boundary', '{"identitySource":"requestBody"}').passed, false);

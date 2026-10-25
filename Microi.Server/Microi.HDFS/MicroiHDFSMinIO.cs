@@ -22,7 +22,7 @@ namespace Microi.net
     /// MinIO分布式存储。
     /// 服务器上传一定是走内网EndPoint，外网调试上传一定是走外网EndPoint
     /// </summary>
-	public class MicroiHDFSMinIO : MicroiHDFS, IMicroiHDFS
+	public partial class MicroiHDFSMinIO : MicroiHDFS, IMicroiHDFS
     {
         private static readonly HttpClient UploadReadbackHttpClient = CreateUploadReadbackHttpClient();
         private static readonly HttpClient ObjectReadHttpClient = new HttpClient(new HttpClientHandler

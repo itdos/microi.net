@@ -470,5 +470,9 @@ namespace Microi.net
 
         /// <summary>采集规则/任务摘要；强制当前租户与用户的表、字段和行权限。</summary>
         dynamic ReadSpiderCatalog(dynamic dynamicParam);
+
+        /// <summary>主租户固定 Managed 引擎治理公开热点资源；凭据与复制回执不进入 V8。</summary>
+        DosResult ManagePublicResourceOffload(dynamic dynamicParam);
+        DosResult GetPublicResourceBackupUrl(dynamic dynamicParam);
     }
 }

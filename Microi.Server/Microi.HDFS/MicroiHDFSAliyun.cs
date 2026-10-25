@@ -231,10 +231,21 @@ namespace Microi.net
                     EnableCrcCheck = false
                 });
                 using var source = client.GetObject(bucketName, param.FileFullPath.DosTrimStart('/'));
-                await source.ResponseStream.CopyToAsync(
-                    param.FileStream,
-                    128 * 1024,
-                    param.CancellationToken).ConfigureAwait(false);
+                var buffer = new byte[128 * 1024]; long downloadedBytes = 0;
+                try
+                {
+                    int received;
+                    while ((received = await source.ResponseStream.ReadAsync(buffer, 0, buffer.Length, param.CancellationToken).ConfigureAwait(false)) > 0)
+                    {
+                        downloadedBytes = checked(downloadedBytes + received);
+                        await param.FileStream.WriteAsync(buffer, 0, received, param.CancellationToken).ConfigureAwait(false);
+                    }
+                }
+                finally
+                {
+                    // 实际已读字节是正向下界；失败的部分下载不伪装成完整成功，私有桶和迁移验证不计入晋级。
+                    await PublicResourceOffloadRuntime.RecordPublicSourceReadAsync(param, downloadedBytes).ConfigureAwait(false);
+                }
                 return new DosResult(1, new
                 {
                     Size = source.Metadata?.ContentLength ?? 0,
@@ -665,6 +676,7 @@ namespace Microi.net
                         using (MemoryStream memStream = new MemoryStream())
                         {
                             ossObject.ResponseStream.CopyTo(memStream);
+                            await PublicResourceOffloadRuntime.RecordPublicSourceReadAsync(param, memStream.Length).ConfigureAwait(false);
                             memStream.Seek(0, SeekOrigin.Begin);
                             return new DosResult(1, StreamHelper.StreamToBytes(memStream));
                         }

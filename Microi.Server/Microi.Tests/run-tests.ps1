@@ -279,22 +279,25 @@ if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with ex
 $v8Test = Join-Path $testRoot "V8\empty-database-sanitization.test.mjs"
 $v8Repository = Join-Path (Split-Path -Parent $serverRoot) "Microi-V8-Engine"
 if (Test-Path -LiteralPath $v8Repository) {
-    # 与六应用责任入口共用唯一源码契约；不能扫描 Product.Internal/default 多份副本择新。
-    $suiteContractPath = Join-Path $workspaceRoot 'AI-Project/标准产品套件/source-contract.json'
-    if (-not (Test-Path -LiteralPath $suiteContractPath -PathType Leaf)) {
-        throw "The unique standard-suite source contract is missing: $suiteContractPath"
-    }
-    $suiteContract = Get-Content -LiteralPath $suiteContractPath -Raw | ConvertFrom-Json
-    if ($suiteContract.schemaVersion -ne 1 -or $suiteContract.target.apiBase -cne 'https://api.microi.net' -or $suiteContract.target.osClient -ine 'iTdos') {
-        throw 'The standard-suite contract schema or official ApiBase/OsClient does not match.'
-    }
-    if ([string]::IsNullOrWhiteSpace($suiteContract.sourceParent) -or [IO.Path]::IsPathRooted($suiteContract.sourceParent)) {
-        throw 'The standard-suite sourceParent must be a workspace-relative path.'
-    }
-    $suiteSourceParent = [IO.Path]::GetFullPath((Join-Path $workspaceRoot $suiteContract.sourceParent))
     $workspacePrefix = [IO.Path]::GetFullPath($workspaceRoot).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-    if (-not $suiteSourceParent.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $suiteSourceParent -PathType Container)) {
-        throw "The contracted standard-suite source root is missing or outside the workspace: $suiteSourceParent"
+    # 常规平台只验证官方 Managed V8 正文；存在短信等局部引擎目录不能隐式选入六业务应用。
+    # Full / 显式全平台范围仍验证其唯一源码契约，不能扫描多份副本择新。
+    if ($Mode -ne 'PlatformRelease' -or $AllPlatformTests) {
+        $suiteContractPath = Join-Path $workspaceRoot 'AI-Project/标准产品套件/source-contract.json'
+        if (-not (Test-Path -LiteralPath $suiteContractPath -PathType Leaf)) {
+            throw "The unique standard-suite source contract is missing: $suiteContractPath"
+        }
+        $suiteContract = Get-Content -LiteralPath $suiteContractPath -Raw | ConvertFrom-Json
+        if ($suiteContract.schemaVersion -ne 1 -or $suiteContract.target.apiBase -cne 'https://api.microi.net' -or $suiteContract.target.osClient -ine 'iTdos') {
+            throw 'The standard-suite contract schema or official ApiBase/OsClient does not match.'
+        }
+        if ([string]::IsNullOrWhiteSpace($suiteContract.sourceParent) -or [IO.Path]::IsPathRooted($suiteContract.sourceParent)) {
+            throw 'The standard-suite sourceParent must be a workspace-relative path.'
+        }
+        $suiteSourceParent = [IO.Path]::GetFullPath((Join-Path $workspaceRoot $suiteContract.sourceParent))
+        if (-not $suiteSourceParent.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path -LiteralPath $suiteSourceParent -PathType Container)) {
+            throw "The contracted standard-suite source root is missing or outside the workspace: $suiteSourceParent"
+        }
     }
     if (-not (Test-Path -LiteralPath $v8Test)) {
         throw "The unified V8 regression test is missing: $v8Test"

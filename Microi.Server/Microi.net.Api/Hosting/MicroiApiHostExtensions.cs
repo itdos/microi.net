@@ -92,6 +92,8 @@ public static class MicroiApiHostExtensions
             builder.Services.AddSingleton<IMemoryDiagnosticsRuntime>(sp => sp.GetRequiredService<MemoryDiagnosticsService>());
             builder.Services.AddHostedService(sp => sp.GetRequiredService<MemoryDiagnosticsService>());
             builder.Services.AddHostedService<DatabasePoolRecoveryHostedService>();
+            // 公开热点资源的可信复制/恢复宿主；共享租约防止多API节点重复推进。
+            builder.Services.AddHostedService<PublicResourceOffloadHostedService>();
             var app = builder.Build();
             app.UseMicroiApiTransport();
 

@@ -2893,7 +2893,7 @@ const CORE_TOOL_REGISTRATION_ORDER = [
 ];
 
 const CORE_TOOL_PRIORITY = new Map(CORE_TOOL_REGISTRATION_ORDER.map((name, index) => [name, index]));
-const jsonRecordSchema = z.record(z.unknown());
+const jsonRecordSchema = z.record(z.string(), z.unknown());
 
 interface BufferedToolRegistration {
   name: string;
@@ -2922,13 +2922,13 @@ function getToolDescription(registration: BufferedToolRegistration): string {
   return registration.args.find((arg, index) => index > 0 && typeof arg === 'string') as string || '';
 }
 
-function getToolShape(registration: BufferedToolRegistration): z.ZodRawShape | undefined {
+function getToolShape(registration: BufferedToolRegistration): Record<string, z.ZodType> | undefined {
   for (let index = 1; index < registration.args.length - 1; index += 1) {
     const candidate = registration.args[index];
     if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) continue;
     const values = Object.values(candidate as Record<string, unknown>);
     if (values.length === 0 || values.every(isZodSchema)) {
-      return candidate as z.ZodRawShape;
+      return candidate as Record<string, z.ZodType>;
     }
   }
   return undefined;
@@ -2936,15 +2936,12 @@ function getToolShape(registration: BufferedToolRegistration): z.ZodRawShape | u
 
 function getZodTypeName(schema: z.ZodTypeAny): string {
   let current: z.ZodTypeAny = schema;
-  const wrappers: string[] = [];
-  while (current?._def?.innerType && isZodSchema(current._def.innerType)) {
-    wrappers.push(String(current._def.typeName || current.constructor.name));
-    current = current._def.innerType;
+  while (current instanceof z.ZodOptional || current instanceof z.ZodNullable
+    || current instanceof z.ZodDefault || current instanceof z.ZodReadonly) {
+    current = current.unwrap() as z.ZodType;
   }
-  const rawName = String(current?._def?.typeName || current?.constructor?.name || 'unknown');
-  const name = rawName.replace(/^Zod/, '').toLowerCase();
-  if (wrappers.some(item => /Array/i.test(item))) return `${name}[]`;
-  return name;
+  if (current instanceof z.ZodArray) return `${getZodTypeName(current.element as z.ZodType)}[]`;
+  return current.type;
 }
 
 function parseResourceParams(value: unknown): Record<string, unknown> {
@@ -5086,7 +5083,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     `Run a bounded, parameterized, read-only SELECT/CTE query against an external Dos.ORM database for OsClient "${osClient}". Use this after schema inspection to read source rows for migration or synchronization. Multi-statement, DML, DDL, procedures, and file-reading SQL are rejected.`,
     {
       sql: z.string().min(1).describe('Single read-only SELECT or WITH ... SELECT statement. Use named parameters.'),
-      parameters: z.record(z.unknown()).optional().describe('Named SQL parameter values, e.g. { status: 1 }. Never concatenate dynamic values into SQL.'),
+      parameters: z.record(z.string(), z.unknown()).optional().describe('Named SQL parameter values, e.g. { status: 1 }. Never concatenate dynamic values into SQL.'),
       dbKey: z.string().optional().describe('Saved and enabled microi_database DbKey. Preferred.'),
       databaseType: z.string().optional().describe('Required only with a temporary connectionString.'),
       connectionString: z.string().optional().describe('Temporary connection string. Sensitive and never returned.'),
@@ -5121,7 +5118,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     {
       sql: z.string().min(1).describe('Raw administrative SQL. It may change schema/data or invoke provider-specific capabilities.'),
       mode: z.enum(['Query', 'Scalar', 'NonQuery']).describe('How Dos.ORM should consume the result. Use NonQuery for DML/DDL/scripts.'),
-      parameters: z.record(z.unknown()).optional().describe('Optional named parameters. Use parameters for dynamic values whenever the provider supports them.'),
+      parameters: z.record(z.string(), z.unknown()).optional().describe('Optional named parameters. Use parameters for dynamic values whenever the provider supports them.'),
       dbKey: z.string().optional().describe('Saved and enabled microi_database DbKey. Preferred.'),
       databaseType: z.string().optional().describe('Required only with a temporary connectionString.'),
       connectionString: z.string().optional().describe('Temporary connection string. Sensitive and never returned or audited.'),
@@ -5231,7 +5228,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     {
       sourceUrl: z.string().url().refine(value => /^https?:\/\//i.test(value), 'sourceUrl must use http or https').optional().describe('HTTP(S) attachment URL. Provide exactly one of sourceUrl/sourcePath.'),
       sourcePath: z.string().optional().describe('Absolute path visible to the API service account, including Windows UNC paths such as \\\\server\\share\\file.bin. Provide exactly one source.'),
-      headers: z.record(z.string()).optional().describe('Optional authentication headers. Sensitive values are never returned.'),
+      headers: z.record(z.string(), z.string()).optional().describe('Optional authentication headers. Sensitive values are never returned.'),
       fileName: z.string().optional(),
       path: z.string().optional().describe('Target Microi storage directory.'),
       filePathName: z.string().optional().describe('Exact tenant-scoped target path; bucket visibility follows limit.'),
@@ -5478,7 +5475,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     {
       apiEngineKey: z.string().describe('The unique key of the API engine to execute'),
       params: z
-        .record(z.unknown())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('接口引擎参数，原样传入 V8.Param。标准商城 export-microi-store-package / ai_app_publish_store 支持 SparseTableSelections:[{TableId,FieldIds}]：仅选既有共享表的权威字段，不接受任意正文覆盖；V3仍要求 CommittedProof + ExpectedResourceSnapshotHash，历史稀疏选集必须显式刷新。安装前先升级商城安装器并具备共享表责任包，RuntimeAssetsOnly 禁止稀疏资源。'),
       confirmExecution: z.string().optional().describe('Required because engine execution may write data. Use apiEngineKey or EXECUTE.'),
@@ -5519,7 +5516,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     `Seed sample/demo rows into any low-code table for OsClient "${osClient}". Wraps V8.FormEngine.AddTableData. Use this for filling商品/订单/会员等样例数据。Each row will get Id/CreateTime/OsClient auto-filled by the platform.`,
     {
       tableName: z.string().describe('Target diy_table name (e.g. "mall_product")'),
-      rows: z.array(z.record(z.unknown())).describe('Array of row objects. Each object = one record. Field names must match diy_field PascalCase names.'),
+      rows: z.array(z.record(z.string(), z.unknown())).describe('Array of row objects. Each object = one record. Field names must match diy_field PascalCase names.'),
       skipIfExists: z.boolean().optional().describe('When true, skips seeding if table already has any rows. Default: false.'),
       confirmExecution: z.string().optional().describe('Required because this writes to DB. Use tableName or "EXECUTE".'),
     },
@@ -5548,7 +5545,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     `Read rows through the ordinary FormEngine permission boundary for OsClient "${osClient}". Use this for role-authorized business data and post-write readback. Platform administrators should use microi_admin_table_data for protected system tables.`,
     {
       tableName: z.string().describe('Target diy_table name, e.g. mall_product'),
-      query: z.record(z.unknown()).optional().describe('FormEngine query object: _Where, _SelectFields, _PageSize, _OrderBy, etc.'),
+      query: z.record(z.string(), z.unknown()).optional().describe('FormEngine query object: _Where, _SelectFields, _PageSize, _OrderBy, etc.'),
     },
     async ({ tableName, query }) => {
       try {
@@ -5566,7 +5563,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     `Add one role-authorized business row through the ordinary FormEngine permission boundary for OsClient "${osClient}". Writes to DB; confirmExecution is required. For protected system tables use microi_admin_table_data after capability verification.`,
     {
       tableName: z.string().describe('Target diy_table name, e.g. mall_product'),
-      row: z.record(z.unknown()).describe('Row object. Field names must match diy_field names.'),
+      row: z.record(z.string(), z.unknown()).describe('Row object. Field names must match diy_field names.'),
       confirmExecution: z.string().optional().describe('Required. Use tableName or "EXECUTE".'),
     },
     async ({ tableName, row, confirmExecution }) => {
@@ -5589,7 +5586,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     `Update one role-authorized business row through the ordinary FormEngine permission boundary for OsClient "${osClient}". The row must include Id. Writes to DB; confirmExecution is required. For protected system tables use microi_admin_table_data after capability verification.`,
     {
       tableName: z.string().describe('Target diy_table name, e.g. mall_product'),
-      row: z.record(z.unknown()).describe('Patch object. Must include Id.'),
+      row: z.record(z.string(), z.unknown()).describe('Patch object. Must include Id.'),
       confirmExecution: z.string().optional().describe('Required. Use tableName or "EXECUTE".'),
     },
     async ({ tableName, row, confirmExecution }) => {
@@ -7148,7 +7145,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     {
       apiEngineKey: z.string().min(1).describe('The unique key of the API engine to execute'),
       title: z.string().min(1).optional().describe('User-facing task title shown in the notification center'),
-      params: z.record(z.unknown()).optional().describe('Optional parameters passed to the engine through V8.Param'),
+      params: z.record(z.string(), z.unknown()).optional().describe('Optional parameters passed to the engine through V8.Param'),
       idempotencyKey: z.string().min(12).max(200).describe('Caller-stable key. Reuse it after timeouts so the server returns the same task instead of creating a duplicate.'),
       concurrencyKey: z.string().min(1).max(200).optional().describe('Optional cluster-wide serialization key for tasks that must not overlap'),
       maxAttempts: z.number().int().min(1).max(10).optional().describe('Maximum worker attempts, default 3'),
@@ -7716,8 +7713,8 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
     {
       operation: z.enum(['query', 'get', 'add', 'update', 'delete']).describe('query/get are read-only; add/update/delete are single-row writes.'),
       tableName: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/).describe('Registered current-tenant table name.'),
-      query: z.record(z.unknown()).optional().describe('For query: _Where, _SelectFields, _SelectNotFields, _OrderBy, _OrderByType, _OrderBys, _PageIndex, _PageSize (server-capped at 200), _Top, _Keyword, supported _Search fields, Id/Ids/IsDeleted.'),
-      row: z.record(z.unknown()).optional().describe('For add/update: one row. update requires Id here or in id. Caller-supplied OsClient, identity, transport and secret fields are rejected.'),
+      query: z.record(z.string(), z.unknown()).optional().describe('For query: _Where, _SelectFields, _SelectNotFields, _OrderBy, _OrderByType, _OrderBys, _PageIndex, _PageSize (server-capped at 200), _Top, _Keyword, supported _Search fields, Id/Ids/IsDeleted.'),
+      row: z.record(z.string(), z.unknown()).optional().describe('For add/update: one row. update requires Id here or in id. Caller-supplied OsClient, identity, transport and secret fields are rejected.'),
       id: z.string().max(256).optional().describe('Required for get/update/delete. update may alternatively provide row.Id.'),
       confirmExecution: z.string().optional().describe('Writes only. Exact value: ADD:<tableName>, UPDATE:<tableName>:<Id>, or DELETE:<tableName>:<Id>.'),
     },

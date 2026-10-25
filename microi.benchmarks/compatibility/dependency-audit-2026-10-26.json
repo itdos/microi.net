@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-25T23:12:48.918Z",
+  "evidenceKind": "mcp-production-dependency-advisories",
+  "registry": "https://registry.npmjs.org/",
+  "command": "npm audit --omit=dev --json",
+  "before": {
+    "sourceCommit": "fc12d29ba6398a259e69ea5de010d37f0cb9b777",
+    "gitLockLfSha256": "c280020547333221bfec4e1745d5634559f69fa8ffb23b1f1aff44da4fdd4150",
+    "exitCode": 1,
+    "advisoryPackageCounts": {
+      "info": 0,
+      "low": 0,
+      "moderate": 2,
+      "high": 3,
+      "critical": 0,
+      "total": 5
+    },
+    "affectedPackages": [
+      "@modelcontextprotocol/sdk",
+      "body-parser",
+      "fast-uri",
+      "ip-address",
+      "zod"
+    ]
+  },
+  "after": {
+    "exitCode": 0,
+    "advisoryPackageCounts": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "lock": {
+      "path": "microi.mcp/package-lock.json",
+      "rawSha256": "0ae4d665f6dab0f502f29181b9bc73092ddc221e949d858a7b87b212c8865fe8",
+      "lfSha256": "5b01f4bfcfd35f16771d1b49943f87dfd637b22a99b91794511452c58c10efd3"
+    },
+    "resolved": [
+      {
+        "name": "@modelcontextprotocol/sdk",
+        "version": "1.32.0"
+      },
+      {
+        "name": "body-parser",
+        "version": "1.20.9"
+      },
+      {
+        "name": "fast-uri",
+        "version": "3.1.9"
+      },
+      {
+        "name": "ip-address",
+        "version": "10.7.5"
+      },
+      {
+        "name": "zod",
+        "version": "4.6.7"
+      }
+    ]
+  },
+  "regressions": {
+    "node": "v20.20.1",
+    "platform": "win32",
+    "arch": "x64",
+    "counters": {
+      "tests": 349,
+      "pass": 349,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "rawTapSha256": "ea7f9f99d17afbe34fa41f836eaaf598378d72a3025345389881f4c69443ac3e",
+    "responsibilities": [
+      "oversized constrained arrays reject before per-item issue allocation",
+      "real MCP initialization, tool discovery, record arguments and pre-client validation",
+      "existing complete MCP test command"
+    ],
+    "sourceLfSha256": {
+      "package.json": "fc118be7c22090aaeda27284d3955ad9518d2745497adfb11ba19ba325caf30d",
+      "src/server.ts": "411ffe269387c31a44c1588bc3ea1b524dfa556232f5f24288b7d85342f49045",
+      "src/advanced-tools.ts": "c2e34d70bafb5e75908f35e50c17fc57dda373402e467133a84ded1329d57b91",
+      "src/blueprint-tools.ts": "5a90134e7f85c01505593bf065eee953cd606654432e3220b07388ce7aac8d69",
+      "src/design-tools.ts": "8351e72b02c5f263b85304e8cc4f2659cdbec80089546e286c575328fbbeaeef",
+      "src/dependency-security.test.ts": "cf93e7a6f1161b1304bf448ec3bffaa9fa5fe1decdebc5915d426ec8337b7d54"
+    }
+  },
+  "advisories": [
+    "https://github.com/advisories/GHSA-22jm-h49p-29qw",
+    "https://github.com/advisories/GHSA-6prh-2h8m-c8cw",
+    "https://github.com/advisories/GHSA-46jr-4wx8-v453",
+    "https://github.com/advisories/GHSA-rvq5-wwqv-78pq",
+    "https://github.com/advisories/GHSA-27r3-jxmh-p828",
+    "https://github.com/advisories/GHSA-w74x-v6f9-j3xg",
+    "https://github.com/advisories/GHSA-xhq7-xmqj-769h",
+    "https://github.com/advisories/GHSA-wjr9-j795-jxcr",
+    "https://github.com/advisories/GHSA-333x-w4r6-6crp",
+    "https://github.com/advisories/GHSA-rxp7-6hxx-x8q5",
+    "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5"
+  ],
+  "boundaries": {
+    "pointInTime": true,
+    "productionReachabilityAssessed": false,
+    "penetrationTest": false,
+    "certification": false,
+    "wholePlatformAudit": false,
+    "cliPublicationVerified": false,
+    "productionMcpDeploymentVerified": false,
+    "remoteBusinessWrites": 0,
+    "realModelCalls": 0
+  }
+}

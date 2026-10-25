@@ -105,6 +105,28 @@ $z=[IO.Compression.ZipFile]::OpenRead(${quote(path.resolve(file))}); try {
  assert.equal(new Set(records.map(record=>record.entry)).size,records.length,'Duplicate ZIP entries');
  return records;
 }
+// 替换/幂等续发的事实源是实际 ZIP 内 DLL，整包摘要是否变化不能证明替换成功。
+// 同时核对包中其它闭源 DLL 副本；后续完整清单、版本闭包及上传 CAS 仍单独执行。
+export function verifyPackageDll(directory,file,packageFile,project){
+ assert.ok(projects.includes(project),'Unknown encrypted package project');
+ const stat=fs.lstatSync(packageFile);
+ assert.ok(stat.isFile()&&!stat.isSymbolicLink(),'Encrypted package must be a regular file');
+ assert.match(path.basename(packageFile),new RegExp('^'+project.replaceAll('.','\\.')+'\\.[0-9]+\\.[0-9]+\\.[0-9]+\\.nupkg$'),'Encrypted package identity differs');
+ const model=verifyFinal(directory,file),before=describe(fs.readFileSync(packageFile));
+ const names=new Map(Object.keys(model.encrypted).map(name=>[name.toLowerCase(),name]));
+ const entries=[];let targetFound=false;
+ for(const record of inspectZip(packageFile,names)){
+  const name=names.get(path.posix.basename(record.entry.replaceAll('\\','/')).toLowerCase());
+  if(!name)continue;
+  const actual={bytes:record.bytes,sha256:record.sha256,md5:record.md5};
+  assert.deepEqual(actual,model.encrypted[name],`Unencrypted or stale DLL in ${path.basename(packageFile)}: ${record.entry}`);
+  if(name===project+'.dll'&&/^lib\/[^/]+\/[^/]+$/i.test(record.entry.replaceAll('\\','/')))targetFound=true;
+  entries.push({entry:record.entry,dll:name,...actual});
+ }
+ assert.ok(targetFound,`Missing encrypted lib DLL in ${path.basename(packageFile)}: ${project}`);
+ assert.deepEqual(describe(fs.readFileSync(packageFile)),before,'NuGet package changed during ZIP inspection');
+ return {file:path.resolve(packageFile),bytes:before.bytes,sha256:before.sha256,entries};
+}
 export function verifyPackages(directory,file,version,packages){
  const model=verifyFinal(directory,file),found=new Set(),results=[];
  const dllNames=new Map(Object.keys(model.encrypted).map(name=>[name.toLowerCase(),name]));
@@ -237,10 +259,11 @@ export function verifyImage(directory,file,image,{runDocker=(args,options)=>exec
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [mode,directory,receipt,extra,pending]=process.argv.slice(2);
- assert.ok(directory&&receipt,'Usage: release-encryption.mjs plain|encrypted|final|packages|packages-cas|package-cas|image <publish-directory> <receipt> [version|image] [NUL-list|package]');
+ assert.ok(directory&&receipt,'Usage: release-encryption.mjs plain|encrypted|final|package-dll|packages|packages-cas|package-cas|image <publish-directory> <receipt> [version|image|package] [NUL-list|package|project]');
  if(mode==='plain')capturePlain(directory,receipt);
  else if(mode==='encrypted')verifyEncrypted(directory,receipt);
  else if(mode==='final')verifyFinal(directory,receipt);
+ else if(mode==='package-dll'){assert.ok(extra&&pending);verifyPackageDll(directory,receipt,extra,pending);}
  else if(mode==='image'){assert.ok(extra);verifyImage(directory,receipt,extra);}
  else if(mode==='packages'){
   assert.match(extra||'',/^\d+\.\d+\.\d+$/);assert.ok(pending,'Complete pending NuGet upload list is required');

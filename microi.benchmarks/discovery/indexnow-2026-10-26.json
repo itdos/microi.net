@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-25T20:11:44.976Z",
+  "endpoint": "https://api.indexnow.org/indexnow",
+  "host": "microi.net",
+  "urls": [
+    "https://microi.net/",
+    "https://microi.net/doc/",
+    "https://microi.net/contact/",
+    "https://microi.net/case/case-index.html",
+    "https://microi.net/doc/about/partner.html",
+    "https://microi.net/doc/about/update-log.html",
+    "https://microi.net/doc/more/security.html",
+    "https://microi.net/doc/system-engine/databases.html",
+    "https://microi.net/doc/system-engine/ai-engine.html",
+    "https://microi.net/doc/v8-engine/ai-apiengine.html"
+  ],
+  "urlCount": 10,
+  "retries": 0,
+  "indexingConfirmed": false,
+  "status": "ReceivedKeyValidationPending",
+  "siteProofVerified": true,
+  "httpStatus": 202,
+  "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "accepted": true,
+  "completedAt": "2026-10-25T20:11:45.812Z"
+}

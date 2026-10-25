@@ -175,6 +175,14 @@ namespace Microi.net.Api
             Response.Headers["X-Microi-Application-Asset-Protocol"] = "3";
             Response.Headers["X-Microi-Application-Version"] = GetText(snapshot.Version, "VersionNo");
             Response.Headers["X-Microi-Application-Publish-Fence"] = snapshot.PublishFence;
+            // 已提交公开版本先查询可信备用副本，不能读完OSS正文后再决定分流。
+            var backupUrl = await PublicResourceOffloadRuntime.ResolveRuntimeAsync(osClient, appKey,
+                GetText(snapshot.Version, "VersionNo"), GetText(snapshot.Asset, "Path", "path"), snapshot.Asset);
+            if (!string.IsNullOrEmpty(backupUrl) && Request.Query["OriginalStorage"] != "1")
+            {
+                Response.Headers["X-Microi-File-Delivery"] = "FileServerBak";
+                return Redirect(backupUrl);
+            }
             return await ProxyApplicationAssetV3(
                 osClient,
                 immutableUrl,
@@ -401,6 +409,15 @@ namespace Microi.net.Api
                     return NotFound($"MicroApp file asset has no URL: {assetPath}");
                 }
 
+                // 旧版公开文件清单也保持源版本/摘要校验；不修改 LegacyUnverified 或发布指针。
+                var backupUrl = await PublicResourceOffloadRuntime.ResolveRuntimeAsync(
+                    osClient, appKey, currentVersion, assetPath, asset);
+                if (!string.IsNullOrEmpty(backupUrl) && Request.Query["OriginalStorage"] != "1")
+                {
+                    Response.Headers["Cache-Control"] = "no-store";
+                    Response.Headers["X-Microi-File-Delivery"] = "FileServerBak";
+                    return Redirect(backupUrl);
+                }
                 var proxyBytes = await ReadFileAssetBytes(osClient, asset, redirectUrl);
                 if (proxyBytes != null)
                 {

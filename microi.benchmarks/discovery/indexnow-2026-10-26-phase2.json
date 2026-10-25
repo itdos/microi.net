@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-10-25T23:32:43.695Z",
+  "endpoint": "https://api.indexnow.org/indexnow",
+  "host": "microi.net",
+  "urls": [
+    "https://microi.net/doc/v8-engine/mcp-server.html",
+    "https://microi.net/doc/more/security.html"
+  ],
+  "urlCount": 2,
+  "retries": 0,
+  "indexingConfirmed": false,
+  "status": "Received",
+  "siteProofVerified": true,
+  "httpStatus": 200,
+  "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "accepted": true,
+  "completedAt": "2026-10-25T23:32:44.670Z"
+}

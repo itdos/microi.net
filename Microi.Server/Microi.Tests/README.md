@@ -39,8 +39,8 @@ AI CAD、AI 员工中心和邮箱的统一 Node 入口使用
   SQL 编译、图片/Office、安全边界、租户隔离、升级兼容、Jint 约束等。
   当同级 `Microi-V8-Engine` 存在时，还会执行空数据库接口引擎语法检查和
   Node 行为回归；缺少 Node.js 时失败关闭。
-- `PlatformRelease -PlatformFrontendTests`（普通吾码完整发布）：执行全部常规 `Microi.Tests` C#（`Category!=FullStack`）、全部自动发现的平台 Node、吾码前端通用 Playwright 和 Release 编译，随后由一键发布入口完成闭源 DLL 加密、最终产物冒烟、Docker 推送和远端摘要回读。完整发布以 30 分钟为目标，记录各阶段耗时；超时继续完成并如实记录，不能删断言或把未完成阶段算成功。该模式不运行 Microi Code/Agent 测试，不新建租户、不安装聊天应用，也不自动转入 Full。
-- 常规前端入口由 `ReleaseGate/platform-all-tests.mjs` 自动发现责任文件；真实付费 AI、JUNCHI/XJY 等客户数据和指定素材验收按精确案例清单列为 `NotApplicable`，混合文件的通用案例仍全部执行。执行前冻结 Playwright `--list` 结果，执行后逐项核对案例、文件、原始 JSON 和 SHA-256；所选案例失败、跳过、flaky、漏跑或零用例均阻断。前端使用 `.microi-local` 对应既有依赖及显式授权的现有测试 tenant/API/frontend；配置文件本身不授予业务写权限。
+- `PlatformRelease`（普通吾码完整发布的默认基础范围）：执行常规 `Microi.Tests` C#（`Category!=FullStack`）、全部自动发现的平台与吾码前端 Node 测试及 Release 编译，随后由一键发布入口完成闭源 DLL 加密、最终产物接口/运行冒烟、全部渠道推送和 Docker 远端摘要回读。完整发布以 30 分钟为目标，记录各阶段耗时；超时继续完成并如实记录，不能删断言或把未完成阶段算成功。该模式不运行 Microi Code/Agent 测试，不新建租户、不安装聊天应用，也不自动转入 Full。
+- `PlatformRelease -PlatformFrontendTests` 是显式追加的通用浏览器验收；一键脚本对应 `--platform-frontend-tests`，默认完整发布不自动追加。浏览器入口由 `ReleaseGate/platform-all-tests.mjs` 自动发现责任文件；真实付费 AI、JUNCHI/XJY 等客户数据和指定素材验收按精确案例清单列为 `NotApplicable`，混合文件的通用案例仍全部执行。执行前冻结 Playwright `--list` 结果，执行后逐项核对案例、文件、原始 JSON 和 SHA-256；所选案例失败、跳过、flaky、漏跑或零用例均阻断。前端使用 `.microi-local` 对应既有依赖及显式授权的现有测试 tenant/API/frontend；配置文件本身不授予业务写权限。
 - `PlatformRelease -AllPlatformTests` 保留为独立专项：包含全部 C#（含 FullStack）及全部前端浏览器案例，需要对应的已授权 fixture、依赖矩阵及专项前置。它不是普通发布默认项，也不能与 `-PlatformFrontendTests` 同时使用。SQLServer、真实供应商付费调用与客户验收均须另行明确选择。
 - `Full`（显式深度测试）：保留独立 `-Mode Full` 入口，用户明确选择后执行。先执行 Quick 和完整后端 Release 构建，再对一个隔离测试租户真实
   执行 FormEngine 单条、批量、按条件 CRUD、查询、计数，以及 ApiEngine

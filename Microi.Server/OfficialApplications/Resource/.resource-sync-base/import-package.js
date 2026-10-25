@@ -10,13 +10,14 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v3.1.0
+ * Version: v3.1.1
  * Function:
  * - 导入应用安装包，按可信资源策略管理官方能力；管理员角色从当前租户数据库账号与角色关系动态识别，歧义时失败关闭。
  * - 组合包运行应用严格应用源IsPublic/IsApprove；旧包新建默认私有、旧目标保持公开范围、未审批源保持0；非法声明在包资源写入前失败，保留拥有者、源码授权和工作流严格门禁。
  * - SQL Server 唯一索引先同步声明列，再按真实可空键生成过滤条件；原子修复历史缺失过滤并严格回读，保留非空唯一约束和业务数据。
  * - 随包数据的查重、父记录与元数据读写共享安装事务；保留已有租户配置值，任何真实查询或写入失败均回滚本片。
  * - 每片重读商城权限与不可变指针后复用有界已验包缓存，命中仍校验 SHA-256 和字节数，避免整包重复下载。
+ * - 写入前按当前节点真实后端版本校验包最低要求；前端最低版本明确待核验，ValidateOnly不执行物理自举或缓存写入。
  */
 
 /* EMPTY_SHARED_TABLE_PREREQUISITE_V1
@@ -312,7 +313,66 @@ function validateApplicationBundleFlags(packageModel) {
         readApplicationBundleFlags(bundles[j].Application || bundles[j].App || {});
     }
 }
+
+// PACKAGE_RUNTIME_COMPATIBILITY_PREFLIGHT_V1：包正文声明是安装合同，版本值只能
+// 来自当前节点的可信运行时原子。每个恢复分片重新读取，避免滚动升级中旧节点接管。
+// 无声明旧包保留原行为；客户端/Param/检查点自报版本都不能代替实际宿主版本。
+function readPackageRuntimeVersion(value) {
+    if (typeof value != 'string') return null;
+    var text = value.replace(/^\s+|\s+$/g, '');
+    if (!/^v?\d+\.\d+\.\d+(?:\.\d+)?$/i.test(text) || text.length > 48) return null;
+    var parts = text.replace(/^v/i, '').split('.');
+    for (var i = 0; i < parts.length; i++) {
+        parts[i] = Number(parts[i]);
+        if (!isFinite(parts[i]) || parts[i] > 2147483647) return null;
+    }
+    while (parts.length < 4) parts.push(0);
+    return parts;
+}
+function checkPackageRuntimeCompatibility(packageInfo) {
+    var info = packageInfo || {};
+    var result = { BackendVersion: '', ServerMinVersion: '', ClientMinVersion: '',
+        ServerStatus: 'NotDeclared', ClientStatus: 'NotDeclared', Warnings: [] };
+    var fields = ['ServerMinVersion', 'ClientMinVersion'], minimums = {};
+    for (var i = 0; i < fields.length; i++) {
+        var field = fields[i], value = info[field];
+        if (value === undefined || value === null || (typeof value == 'string' && !value.replace(/^\s+|\s+$/g, ''))) continue;
+        var parts = readPackageRuntimeVersion(value);
+        if (!parts) return { Code: 0, Data: { ErrorType: 'PACKAGE_RUNTIME_VERSION_INVALID', Compatibility: result },
+            Msg: '应用包 ' + field + ' 必须是三段或四段非负整数版本，可带 v 前缀；已停止安装。' };
+        result[field] = value.replace(/^\s+|\s+$/g, '');
+        minimums[field] = parts;
+    }
+    if (minimums.ClientMinVersion) {
+        // 一个 API 可服务多个独立部署的前端；可信后端无法证明当前浏览器构建版本。
+        // 保留明确提醒，不用请求参数制造已兼容，也不阻断合法的先后端后前端升级顺序。
+        result.ClientStatus = 'PendingClientVerification';
+        result.Warnings.push('前端需达到 ' + result.ClientMinVersion + '；后端未核验浏览器实际构建版本，请在启用应用前核对前端。');
+    }
+    if (minimums.ServerMinVersion) {
+        var current = null;
+        try { current = V8.Method.GetBackendVersion(); } catch (runtimeVersionError) { }
+        var currentParts = readPackageRuntimeVersion(current);
+        if (!currentParts) {
+            result.ServerStatus = 'Unavailable';
+            return { Code: 0, Data: { ErrorType: 'PACKAGE_RUNTIME_VERSION_UNAVAILABLE', Compatibility: result },
+                Msg: '应用要求后端最低版本 ' + result.ServerMinVersion + '，但当前节点无法读取可信运行版本；请先升级后端或恢复版本读取能力，未执行安装写入。' };
+        }
+        result.BackendVersion = current.replace(/^\s+|\s+$/g, '');
+        result.ServerStatus = 'Compatible';
+        for (var part = 0; part < 4; part++) {
+            if (currentParts[part] > minimums.ServerMinVersion[part]) break;
+            if (currentParts[part] < minimums.ServerMinVersion[part]) {
+                result.ServerStatus = 'Incompatible';
+                return { Code: 0, Data: { ErrorType: 'PACKAGE_RUNTIME_VERSION_TOO_LOW', Compatibility: result },
+                    Msg: '应用要求后端最低版本 ' + result.ServerMinVersion + '，当前节点为 ' + result.BackendVersion + '；请先升级后端，未执行安装写入。' };
+            }
+        }
+    }
+    return { Code: 1, Data: result };
+}
 var Package = V8.Param.Package;  // 应用数据包
+var packageValidateOnly = V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase() == 'validate';
 // 直接交付的包必须在物理前置检查之前完成旗标预检，连不兼容旧库也不产生DDL。
 // 从商城下载的正文在读取完成后再次预检，且早于该包任何资源/文件写入。
 if (Package) {
@@ -813,6 +873,7 @@ var buildSchemaContinuation = function (phase, index, progress, msg) {
     return {
         Code: 1,
         Data: {
+            Compatibility: packageRuntimeCompatibility,
             BackgroundTask: {
                 HasMore: true,
                 Checkpoint: buildPersistentCheckpoint(phase, index, { Progress: progress }),
@@ -912,7 +973,7 @@ if ((!installUser || !installUser.Id) && V8.Method && V8.Method.GetCurrentToken)
     } catch (installUserError) { }
 }
 var reportProgress = function (progress, msg) {
-    if (!packagePreflightPassed || !backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
+    if (packageValidateOnly || !packagePreflightPassed || !backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
     try {
         progress = parseInt(progress, 10);
         if (isNaN(progress)) progress = lastReportedBackgroundProgress;
@@ -1135,6 +1196,7 @@ var marketplaceEngineParam = function (apiEngineKey, postParam) {
 // MARKETPLACE_HDFS_PACKAGE_POINTER_V1：新版商城响应只返回不可变 HDFS 指针和
 // 短期下载地址。安装端完整下载一次后必须核对 UTF-8 字节数和 SHA-256；旧
 // AppPakcet 继续兼容，但后台任务与数据库版本快照不再复制大包正文。
+var pendingVerifiedPackageCache = null;
 var loadMarketplacePackage = function (storeModel, label) {
     storeModel = storeModel || {};
     if (storeModel.AppPakcet) return storeModel.AppPakcet;
@@ -1200,7 +1262,8 @@ var loadMarketplacePackage = function (storeModel, label) {
         try {
             var cacheValue = JSON.stringify({ Binding: cacheBinding, Content: content });
             if (Number(System.Text.Encoding.UTF8.GetByteCount(cacheValue)) <= 96 * 1024 * 1024) {
-                V8.Cache.Set(cacheKey, cacheValue, 900);
+                // 兼容预检尚未完成，先只保留本片候选；不让被拒绝包或只读预检写缓存。
+                pendingVerifiedPackageCache = { Key: cacheKey, Value: cacheValue };
             }
         } catch (cacheWriteError) { /* 缓存故障不影响已验包；下片仍重新鉴权。 */ }
     }
@@ -1280,17 +1343,27 @@ if (!Package.PackageInfo) {
         Msg: '参数错误：Package.PackageInfo不能为空'
     };
 }
+var packageRuntimeCheck = checkPackageRuntimeCompatibility(Package.PackageInfo);
+if (packageRuntimeCheck.Code != 1) return packageRuntimeCheck;
+var packageRuntimeCompatibility = packageRuntimeCheck.Data;
+debugLog.package_runtime_compatibility = packageRuntimeCompatibility;
 try { validateRuntimeApprovalData(Package); validateApplicationBundleFlags(Package); validateDeclarativePackageDdl(Package); sparseSharedTableNames=validateSparseSharedTableContract(Package); validateSharedTableTargets(Package,sparseSharedTableNames); packagePreflightPassed=true; }
 catch (downloadedBundleFlagError) {
     return { Code: 0, Data: { ErrorType: 'APPLICATION_BUNDLE_FLAG_INVALID' },
         Msg: '应用运行身份预检失败：' + downloadedBundleFlagError.message };
 }
+if (pendingVerifiedPackageCache && !packageValidateOnly) {
+    try { V8.Cache.Set(pendingVerifiedPackageCache.Key, pendingVerifiedPackageCache.Value, 900); }
+    catch (verifiedCacheWriteError) { /* 缓存非权威，失败不改变已验包或版本判断。 */ }
+}
+pendingVerifiedPackageCache = null;
 
 // PACKAGE_PREFLIGHT_BEFORE_BOOTSTRAP_V2：直接包与下载包共用前置门禁，失败不做兼容DDL。
 try {
-    var generatedEntityPhysicalBootstrap = ensureGeneratedEntityPhysicalPrerequisites(
-        physicalBootstrapOwnsSlice ? 1 : 999
-    );
+    // ValidateOnly 是只读安装预检，不能借历史库兼容自举提前执行 ALTER TABLE。
+    var generatedEntityPhysicalBootstrap = packageValidateOnly
+        ? { Added: [], ChangedTableCount: 0, RemainingTableCount: 0 }
+        : ensureGeneratedEntityPhysicalPrerequisites(physicalBootstrapOwnsSlice ? 1 : 999);
     if (generatedEntityPhysicalBootstrap.Added.length > 0) {
         debugLog.generated_entity_physical_bootstrap = generatedEntityPhysicalBootstrap.Added;
     }
@@ -1325,6 +1398,7 @@ try {
         return {
             Code: 1,
             Data: {
+                Compatibility: packageRuntimeCompatibility,
                 BackgroundTask: {
                     HasMore: true,
                     Checkpoint: physicalBootstrapContinuation,
@@ -1674,7 +1748,7 @@ var validatePackageMenuRuntimeContract = function (packageModel) {
 var packageMenuRuntimeContract = validatePackageMenuRuntimeContract(Package);
 
 // 仅检查包体结构，不写数据库、不上传文件。用于发布前及跨平台安装前的安全验收。
-if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase() == 'validate') {
+if (packageValidateOnly) {
     var validationErrors = [];
     for (var validationRuntimeErrorIndex = 0; validationRuntimeErrorIndex < packageMenuRuntimeContract.Errors.length; validationRuntimeErrorIndex++) {
         validationErrors.push(packageMenuRuntimeContract.Errors[validationRuntimeErrorIndex]);
@@ -1816,6 +1890,7 @@ if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase(
     return {
         Code: 1,
         Data: {
+            Compatibility: packageRuntimeCompatibility,
             PackageName: Package.PackageInfo.Name || '',
             PackageVersion: Package.PackageInfo.Version || Package.PackageInfo.AppVersion || '',
             ApplicationCount: validationBundles.length,
@@ -10992,6 +11067,7 @@ try {
     // Code=1 时自动提交事务，Code=0 时自动回滚事务
 
     var hasErrors = errors.length > 0;
+    resultData.Compatibility = packageRuntimeCompatibility;
     reportProgress(98, hasErrors ? '导入完成，正在整理异常详情' : '导入完成，正在返回结果');
     return {
         Code: hasErrors ? 0 : 1,

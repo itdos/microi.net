@@ -5,6 +5,7 @@ import type { McpServerContext } from './server.js';
 import { normalizePageJsonObj, normalizePrintObj, normalizePrintPageObj } from './design-engine.js';
 import { buildFileUploadConfig } from './file-upload-config.js';
 import { bindManifestExecutionClient, ManifestContextStore, type ManifestContextInput } from './manifest-context.js';
+import { validateManifestDeclarations } from './manifest-preflight.js';
 
 type JsonRecord = Record<string, unknown>;
 type ToolContent = { type: 'text'; text: string };
@@ -50,7 +51,7 @@ type ManifestRelationContract = {
 const WF_MARKER_BEGIN = '/* MICROI_WF_LINE_CONDITION_JSON';
 const WF_MARKER_END = 'MICROI_WF_LINE_CONDITION_JSON */';
 
-const jsonRecordSchema = z.record(z.unknown());
+const jsonRecordSchema = z.record(z.string(), z.unknown());
 
 function textResult(text: string, isError = false): ToolResult {
   return { content: [{ type: 'text', text }], isError };
@@ -1546,9 +1547,11 @@ function buildDefaultTableLayout(table: JsonRecord): TableLayoutDefaults {
 }
 
 export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: string[]; warnings: string[] } {
-  const errors: string[] = [];
+  const errors = validateManifestDeclarations(manifest);
   const warnings: string[] = [];
   const plan: string[] = [];
+  // 必须在 asArray/getArray 的兼容过滤前整体拒绝，计划、dry-run、生成和回读共用此门禁。
+  if (errors.length) return { plan, errors, warnings };
   const roles = getArray(manifest, 'roles', 'Roles');
   const tables = getArray(manifest, 'tables', 'Tables');
   const engines = getArray(manifest, 'engines', 'Engines');
@@ -2879,6 +2882,12 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
   const confirmTarget = osClient || 'EXECUTE';
   return {
     osClient,
+    declarationPreflight: {
+      version: 1,
+      order: '原始声明校验 → 关系/权限等领域预检 → dry-run → 已授权写入 → 独立回读',
+      rejects: ['非对象数组或空/无效资源项', '冲突的大小写属性别名', '重复表名/接口Key/数据源Key', '同表重复字段名/显式索引名'],
+      boundary: '声明不合法时在资源调用前整体拒绝；不代替服务端权限、跨资源事务、写入后验证或未知结果回查。',
+    },
     workflow: [
       '先按实际任务范围读取现有表结构；完整新系统须盘点相关资源，局部修改从明确目标和依赖开始，不能凭摘要猜字段。',
       '根据真实需求与本协议整理完整或局部 Manifest，保持原有业务、权限、表单、菜单和验收质量。',
@@ -3214,7 +3223,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
 
   server.tool(
     'microi_plan_system',
-    '创建完整或局部 Manifest 的只读结构计划。首次传 manifest + detail=summary 获得 manifestRef/hash，后续 dry-run/生成/验收复用引用，仍逐次重新检查。action=read_result 按 resultRef 读取本会话完整回执，不执行写入。',
+    '创建完整或局部 Manifest 的只读结构计划。先拒绝非法资源集合、冲突别名及重复资源Key，再进行领域预检。首次传 manifest + detail=summary 获得 manifestRef/hash，后续 dry-run/生成/验收复用引用，仍逐次重新检查。action=read_result 按 resultRef 读取本会话完整回执，不执行写入。',
     { ...manifestInputSchema, action: z.enum(['plan', 'read_result']).optional(), resultRef: z.string().max(128).optional() },
     async (input) => {
       if (input.action === 'read_result') {

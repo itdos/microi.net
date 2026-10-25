@@ -7,9 +7,12 @@ const hash = x => createHash('sha256').update(typeof x === 'string' ? x : JSON.s
 export const limits = Object.freeze({ calls: 6, maxOutputTokens: 1024, timeoutMs: 120000, maxResponseBytes: 100000, retries: 0 });
 export function plan(model) {
   if (typeof model !== 'string' || !model.trim() || model.length > 128) throw new Error('A model ID is required');
+  // M3 默认把思考放进 content，且思考占用同一输出预算。两组固定同一协议设置，
+  // 不剥离任意回答，不回写 1.0.0 失败结果；其他模型不发送未确认的供应商参数。
+  const providerOptions = model === 'MiniMax-M3' ? { reasoning_split: true, thinking: { type: 'disabled' } } : {};
   return cases.flatMap((task, index) => (index % 2 ? [true, false] : [false, true]).map(context => ({
     id: task.id, condition: context ? 'fixed-context' : 'plain',
-    body: { model, stream: true, stream_options: { include_usage: true }, max_tokens: limits.maxOutputTokens,
+    body: { model, stream: true, stream_options: { include_usage: true }, max_tokens: limits.maxOutputTokens, ...providerOptions,
       messages: [{ role: 'system', content: '只输出所要求的 JSON；不执行任何操作。' + (context ? '\n' + platformContext : '') }, { role: 'user', content: task.question }] }
   })));
 }
@@ -81,7 +84,9 @@ function safeUsage(usage) {
 export async function runSuite({ model, transport, evidenceKind = 'harness-test', onRecord = async () => {} }) {
   const requests = plan(model);
   const report = { protocolVersion, evidenceKind, createdAt: new Date().toISOString(), nodeVersion: process.version,
-    endpoint: 'https://api.microi.net/v1/chat/completions', limits, tasksetSha256: hash(requests), records: [] };
+    endpoint: 'https://api.microi.net/v1/chat/completions', limits,
+    requestParameters: Object.fromEntries(['stream','stream_options','max_tokens','reasoning_split','thinking'].filter(key => key in requests[0].body).map(key => [key, requests[0].body[key]])),
+    tasksetSha256: hash(requests), records: [] };
   for (const request of requests) {
     const result = await transport(request.body);
     const validation = evaluate(request.id, result.text ?? '');

@@ -5,6 +5,7 @@
       <div class="mci-resources__actions"><button type="button" :disabled="pending" @click="refresh">刷新目录</button><button class="mci-resources__primary" type="button" :disabled="!canEdit || editor !== ''" @click="openRegister">＋ 登记资源</button></div>
     </header>
     <p class="mci-resources__scope">当前租户：<b>{{ tenant || '等待宿主会话' }}</b> · 仅登记单个公开资源。目录登记不会复制文件或改变下载地址。</p>
+    <FileResourceRuntime :session-identity="runtimeSession" :tenant="tenant" />
 
     <div v-if="state.loading && !state.loaded" class="mci-resources__skeleton" role="status" aria-label="正在读取目录与策略"><i v-for="n in 4" :key="n"></i></div>
     <template v-else-if="state.loaded">
@@ -12,10 +13,10 @@
         <div><dt>备用文件服务器</dt><dd>{{ state.policy?.FileServerBak || '未配置' }}</dd><small>当前系统设置</small></div>
         <div><dt>流量阈值</dt><dd>{{ formatResourceBytes(state.policy?.ThresholdBytes) }}</dd><small>{{ state.policy?.WindowHours ?? '未知' }} 小时完整窗口</small></div>
         <div><dt>实际下载量</dt><dd>待采集</dd><small>当前无可信完整窗口</small></div>
-        <div><dt>自动分流</dt><dd>尚未接通</dd><small>继续使用原下载地址</small></div>
+        <div><dt>单文件登记</dt><dd>元数据目录</dd><small>实际分流见上方运行状态</small></div>
       </dl>
       <p v-if="state.policy?.Blockers?.length" class="mci-resources__hint">配置待完善：{{ state.policy.Blockers.map(blockerLabel).join('；') }}。阈值与备用地址在系统设置中维护。</p>
-      <p class="mci-resources__hint">当前入口只管理资源信息。流量采集、副本校验与运行时分流尚未接通；私有文件、跨租户资源和依赖资源组尚不支持。</p>
+      <p class="mci-resources__hint">下方单文件目录只管理登记信息；上方可信运行状态按完整公开应用依赖组采集、复制与切流。目录字段不能授予分流权限，私有文件不参与匿名分流。</p>
 
       <section v-if="editor" class="mci-resources__editor" aria-labelledby="resource-editor-title">
         <header><h3 id="resource-editor-title">{{ editor === 'register' ? '登记公开资源' : '编辑目录信息' }}</h3><button type="button" :disabled="state.saving" @click="closeEditor">取消编辑</button></header>
@@ -65,10 +66,12 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { configureV8, getContext, subscribeContext } from '../microi'
+import FileResourceRuntime from './FileResourceRuntime.vue'
 import { blockerLabel, createResourceDirectory, directoryState, formatResourceBytes, pendingResourceWrites, resourceEnginePath, resourceSessionIdentity } from '../file-resource-directory.mjs'
 const state = reactive(directoryState()), context = ref(getContext()), editor = ref(''), editingRow = ref(null), evaluatedName = ref(''), evaluationPanel = ref(null)
 const blankForm = () => ({ Kind: 'ApplicationPublicBuild', Name: '', SourceFileId: '', ObjectKey: '', ContentHash: '', Size: '', ContentType: '', Enabled: true })
 const form = reactive(blankForm()), tenant = computed(() => context.value.osClient || '')
+const runtimeSession = computed(() => context.value.apiBase && context.value.osClient && context.value.token ? resourceSessionIdentity(context.value) : '')
 const pending = computed(() => state.loading || state.saving), canEdit = computed(() => Boolean(state.capabilities) && !pending.value && !state.writeUncertain)
 const hasNext = computed(() => state.total === null ? state.rows.length === state.pageSize : state.page * state.pageSize < state.total)
 const feedbackTheme = computed(() => ({ '--mci-resource-feedback-bg': context.value.themeMode === 'dark' ? '#182231' : '#ffffff', '--mci-resource-feedback-fg': context.value.themeMode === 'dark' ? '#edf3fb' : '#1d2736', '--mci-resource-feedback-border': context.value.themeMode === 'dark' ? '#9eacbf' : '#6b778b' }))

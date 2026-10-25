@@ -1,0 +1,217 @@
+{
+  "protocolVersion": "1.0.0",
+  "evidenceKind": "real-provider",
+  "createdAt": "2026-10-25T18:03:23.205Z",
+  "nodeVersion": "v20.20.1",
+  "endpoint": "https://api.microi.net/v1/chat/completions",
+  "limits": {
+    "calls": 6,
+    "maxOutputTokens": 1024,
+    "timeoutMs": 120000,
+    "maxResponseBytes": 100000,
+    "retries": 0
+  },
+  "tasksetSha256": "3f9866f61ad2567cdef42cd730fe7458c9e7aad14fa85559a34aa9cac8b51920",
+  "records": [
+    {
+      "id": "query-plan",
+      "condition": "plain",
+      "requestedModel": "MiniMax-M3",
+      "returnedModel": "MiniMax-M3",
+      "inputSha256": "e066defe5e36449b71c50caf251cc3ee0bac05acb4fb0dc9279f783129b6994f",
+      "outputSha256": "937ec89ed498cde192c76fc28fc8bab3a30187b2016c0b37e21038d98952cb22",
+      "status": "incomplete",
+      "finish": "stop",
+      "httpStatus": null,
+      "elapsedMs": 3343.2948,
+      "firstTextMs": 1855.6426999999999,
+      "usage": {
+        "prompt_tokens": 287,
+        "completion_tokens": 178,
+        "total_tokens": 465,
+        "prompt_tokens_details": {
+          "cached_tokens": 128
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 127
+        }
+      },
+      "usageSource": "provider",
+      "validation": {
+        "passed": false,
+        "checks": {
+          "validJson": false
+        }
+      },
+      "passed": false
+    },
+    {
+      "id": "query-plan",
+      "condition": "fixed-context",
+      "requestedModel": "MiniMax-M3",
+      "returnedModel": "MiniMax-M3",
+      "inputSha256": "54e1c2a6d109fdf7deb3a2f5633c751a83a93e4560706b56941e348d12d3afe2",
+      "outputSha256": "8c6a87f91def384a0dd794e6dcb0d1a574df52d8f23d0a4a9c4f523aee777f09",
+      "status": "incomplete",
+      "finish": "stop",
+      "httpStatus": null,
+      "elapsedMs": 7374.802299999999,
+      "firstTextMs": 1255.2269999999994,
+      "usage": {
+        "prompt_tokens": 359,
+        "completion_tokens": 268,
+        "total_tokens": 627,
+        "prompt_tokens_details": {
+          "cached_tokens": 128
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 219
+        }
+      },
+      "usageSource": "provider",
+      "validation": {
+        "passed": false,
+        "checks": {
+          "validJson": false
+        }
+      },
+      "passed": false
+    },
+    {
+      "id": "trust-boundary",
+      "condition": "fixed-context",
+      "requestedModel": "MiniMax-M3",
+      "returnedModel": "MiniMax-M3",
+      "inputSha256": "8830d92d4cb7a7e597d8a33de3e0f5593b72ec7e1c91fc25ccee609845f7ef0f",
+      "outputSha256": "a10b77fa5f4bcd18ac1e7b23ddee2fe8d1e08aba3c8920c81305d197b9d758d5",
+      "status": "incomplete",
+      "finish": "stop",
+      "httpStatus": null,
+      "elapsedMs": 2264.3186000000005,
+      "firstTextMs": 1313.1798,
+      "usage": {
+        "prompt_tokens": 337,
+        "completion_tokens": 95,
+        "total_tokens": 432,
+        "prompt_tokens_details": {
+          "cached_tokens": 128
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 67
+        }
+      },
+      "usageSource": "provider",
+      "validation": {
+        "passed": false,
+        "checks": {
+          "validJson": false
+        }
+      },
+      "passed": false
+    },
+    {
+      "id": "trust-boundary",
+      "condition": "plain",
+      "requestedModel": "MiniMax-M3",
+      "returnedModel": "MiniMax-M3",
+      "inputSha256": "af42b54541edcc9ba870d4e13f7f8db457b5f9fe69171c47402feca0123302be",
+      "outputSha256": "d6e133477de14cc7df0b1f527d910e0a99f3b98feb6d6cc141fb4637e4378967",
+      "status": "incomplete",
+      "finish": "stop",
+      "httpStatus": null,
+      "elapsedMs": 8153.667100000001,
+      "firstTextMs": 1043.6344000000008,
+      "usage": {
+        "prompt_tokens": 265,
+        "completion_tokens": 449,
+        "total_tokens": 714,
+        "prompt_tokens_details": {
+          "cached_tokens": 128
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 418
+        }
+      },
+      "usageSource": "provider",
+      "validation": {
+        "passed": false,
+        "checks": {
+          "validJson": false
+        }
+      },
+      "passed": false
+    },
+    {
+      "id": "transaction-plan",
+      "condition": "plain",
+      "requestedModel": "MiniMax-M3",
+      "returnedModel": "MiniMax-M3",
+      "inputSha256": "aec98929edcc1b6ece76cc1ab900c786bae9cdc4a727fc0f394faab11a8c16cf",
+      "outputSha256": "f5741179b1b9f86fdc124ee59a7cb8fb144f9e1d9db1a53782c42418c168fa1f",
+      "status": "truncated",
+      "finish": "length",
+      "httpStatus": null,
+      "elapsedMs": 10752.4211,
+      "firstTextMs": 2476.1888,
+      "usage": {
+        "prompt_tokens": 281,
+        "completion_tokens": 1023,
+        "total_tokens": 1304,
+        "prompt_tokens_details": {
+          "cached_tokens": 128
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1023
+        }
+      },
+      "usageSource": "provider",
+      "validation": {
+        "passed": false,
+        "checks": {
+          "validJson": false
+        }
+      },
+      "passed": false
+    },
+    {
+      "id": "transaction-plan",
+      "condition": "fixed-context",
+      "requestedModel": "MiniMax-M3",
+      "returnedModel": "MiniMax-M3",
+      "inputSha256": "9c20cb052cb4e5ea749cd9014abff1cc2831d582593ea6025b1fec3609ab88c3",
+      "outputSha256": "2c8fcb798a5a64533953b9607ce0f201a8ecb907735c8c950273f3c8424e442c",
+      "status": "incomplete",
+      "finish": "stop",
+      "httpStatus": null,
+      "elapsedMs": 9221.035000000003,
+      "firstTextMs": 1493.8392000000022,
+      "usage": {
+        "prompt_tokens": 353,
+        "completion_tokens": 798,
+        "total_tokens": 1151,
+        "prompt_tokens_details": {
+          "cached_tokens": 128
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 765
+        }
+      },
+      "usageSource": "provider",
+      "validation": {
+        "passed": false,
+        "checks": {
+          "validJson": false
+        }
+      },
+      "passed": false
+    }
+  ],
+  "completedCalls": 6,
+  "passed": 0,
+  "cost": null,
+  "costReason": "No verified dated tariff or invoice was supplied; tokens are not currency.",
+  "sourceHashes": {
+    "run.mjs": "0c4d77974a1bb80dfc64633361d8836d7715f8a8e86a8905815953a61dae1fcf",
+    "cases.mjs": "96c7bbe5425317eba64c6f456a31bbba66acd0ee868fb71fe3e0c356bc0a8710"
+  }
+}

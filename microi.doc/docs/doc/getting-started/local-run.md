@@ -152,7 +152,7 @@ FormEngine、ApiEngine、安全与多租户边界测试。
 .\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Quick
 ```
 
-吾码完整正式发布默认执行 `Microi一键编译发布.sh --platform-release`（菜单默认完整选项）：版本号按原规则 +1 一次，发布 NuGet、API Docker、PC Docker 和官方网站文档/Docker。完整入口通过 `PlatformRelease + PlatformFrontendTests` 执行常规 Microi.Tests（平台单元/组件，不自动追加 Full 专项）、吾码前端全部通用 Node/Playwright 测试、真实接口检查与最终加密产物启动/运行冒烟。真实付费 AI、鸿地/JUNCHI、XJY 等指定客户数据专项和 SQL Server 等独立提供商专项默认不纳入，不再逐次询问；只有用户另行明确要求专项时才执行，回执逐项列为“不适用/未执行”，不能冒充通过。常规门禁通过后完成 Release 编译、闭源 DLL 加密、最终产物冒烟与各渠道回读。默认从 `.microi-local` 选择项目配置并复用已有 MySQL、Redis、MongoDB、MinIO/OSS，使用本机程序验证，不另建 Docker 测试依赖或临时官网运行容器；既有测试授权保护仍有效，缺前置条件不能静默跳过。整体以 30 分钟为耗时目标，超出时记录瓶颈并继续推进至成功，真实错误、取消及单操作超时仍保留。不混入 Microi Code/Agent 独立产品测试，不新建租户、不安装聊天应用。源码拉取、合并、冲突解决和提交推送按需补齐；仅明确要求局部发布时才缩小渠道。
+吾码完整正式发布默认执行 `Microi一键编译发布.sh --platform-release`（菜单默认完整选项）：版本号按原规则 +1 一次，发布 NuGet、API Docker、PC Docker 和官方网站文档/Docker。完整入口通过 `PlatformRelease` 执行常规 Microi.Tests（平台单元/组件，不自动追加 Full 专项）、吾码前端通用 Node 测试、真实接口检查与最终加密产物启动/运行冒烟；扩展浏览器验收仅在显式传入 `--platform-frontend-tests` 时追加。真实付费 AI、鸿地/JUNCHI、XJY 等指定客户数据专项和 SQL Server 等独立提供商专项默认不纳入，不再逐次询问；只有用户另行明确要求专项时才执行，回执逐项列为“不适用/未执行”，不能冒充通过。常规门禁通过后完成 Release 编译、闭源 DLL 加密、最终产物冒烟与各渠道回读。默认从 `.microi-local` 选择项目配置并复用已有 MySQL、Redis、MongoDB、MinIO/OSS，使用本机程序验证，不另建 Docker 测试依赖或临时官网运行容器；既有测试授权保护仍有效，缺前置条件不能静默跳过。整体以 30 分钟为耗时目标，超出时记录瓶颈并继续推进至成功，真实错误、取消及单操作超时仍保留。不混入 Microi Code/Agent 独立产品测试，不新建租户、不安装聊天应用。源码拉取、合并、冲突解决和提交推送按需补齐；仅明确要求局部发布时才缩小渠道。
 
 完整入口自动复用本机持久的已授权测试配置，默认位置为工作区 `.microi-e2e/platform-release/profile.json`。该目录必须被 Git 忽略，并限制为当前用户和系统可读写；首次准备只从 `.microi-local` 对应的既有项目配置和明确的测试授权范围保存配置、归属及端口，不复制旧 Token，不创建租户、数据库、容器或应用。凭据只留私有文件，不写命令参数、源码或日志。隔离候选可通过发行进程变量 `MICROI_PLATFORM_RELEASE_PROFILE` 指向同一份稳定配置，不依赖历史 `.tmp`。
 

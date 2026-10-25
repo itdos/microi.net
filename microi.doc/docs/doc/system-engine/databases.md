@@ -34,6 +34,8 @@
 
 核验工具仅读取源码和选定回执，不连接数据库、不启动容器、不创建租户。公开仓可运行工具的离线测试；完整后端回归与真实环境验收仍使用 [Microi.Tests 的既有入口](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）。旧版本回执不能替代新版本验收，Windows 上的测试也不能自动扩展到 Linux、macOS、国产操作系统或 ARM64。
 
+2026-10-26 已补充 `8.7.1` 基础回归的独立脱敏快照：平台 C# 5,756 项通过，其中数据库契约 78 项通过；源码摘要、TRX SHA-256、冻结候选与未执行范围见上述核验入口。该批未运行 SQL Server 实库或全提供商矩阵，不能把基础契约结果扩写为所有数据库服务器版本均已通过。
+
 ### 生产连接的传输安全
 
 上表是连接格式示例，密码须来自后端受限配置。SQL Server 生产连接显式使用 `Encrypt=True;TrustServerCertificate=False`，连接域名应与服务端证书匹配，API 宿主应信任签发 CA。证书错误应修复证书、域名或信任链；`TrustServerCertificate=True` 会跳过服务器身份校验，只能用于明确受控的开发排错，不能作为生产故障的通用修复。此配置适用于当前使用的 `System.Data.SqlClient`，不是更换驱动。详见 [SqlClient 连接字符串与加密说明](https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/connection-string-syntax#sqlclient-connection-strings)。

@@ -128,6 +128,9 @@ fi
 # 不同步官方数据库资源；与正式发布相同，必须通过平台回归和最终混淆产物冒烟。
 MICROI_FULL_ONLY=false
 MICROI_COMPLETE_PLATFORM_RELEASE=false
+# 完整渠道不等于深度浏览器验收；普通发布只执行平台基础 C#/Node 与最终产物冒烟。
+# 显式参数决定扩展范围，避免继承其它测试进程的开关而意外拖长发布。
+MICROI_PLATFORM_FRONTEND_TESTS=false
 MICROI_REQUESTED_RELEASE_VERSION=""
 MICROI_RELEASE_VERSION_EXPLICIT=false
 if [ "${1:-}" = "--full-only" ]; then
@@ -140,6 +143,7 @@ fi
 for _release_argument in "$@"; do
     case "$_release_argument" in
         --full-only) MICROI_FULL_ONLY=true ;;
+        --platform-frontend-tests) MICROI_PLATFORM_FRONTEND_TESTS=true ;;
         --docker-only-hotfix) MICROI_DOCKER_ONLY_HOTFIX=true ;;
         --release-version=*)
             if [ -n "$MICROI_REQUESTED_RELEASE_VERSION" ]; then
@@ -161,6 +165,10 @@ for _release_argument in "$@"; do
         exit 1
     fi
 done
+if [ "$MICROI_FULL_ONLY" = true ] && [ "$MICROI_PLATFORM_FRONTEND_TESTS" = true ]; then
+    echo "--full-only 已包含深度浏览器范围，不能叠加 --platform-frontend-tests。" >&2
+    exit 1
+fi
 if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ] && { [ "$MICROI_FULL_ONLY" = true ] || [ "$MICROI_DOCKER_ONLY_HOTFIX" = true ]; }; then
     echo "完整平台正式发布不能与 --full-only 或 --docker-only-hotfix 混用。" >&2
     exit 1
@@ -1142,7 +1150,10 @@ echo -e "  ${BOLD}════════════════════�
 echo ""
 echo -e "  发布模式: ${BOLD}${_mode_names[$DEPLOY_MODE]}${NC}"
 if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ]; then
-    print_info "默认验收：常规 Microi.Tests + 全部通用前端测试 + 接口检查 + 程序启动运行与冒烟。"
+    print_info "默认验收：基础 Microi.Tests + 吾码前端 Node 测试 + 接口检查 + 最终产物启动运行与冒烟。"
+    if [ "$MICROI_PLATFORM_FRONTEND_TESTS" = true ]; then
+        print_info "已显式追加扩展浏览器验收：--platform-frontend-tests。"
+    fi
     print_info "本次不适用：真实付费 AI、JUNCHI/XJY 客户数据、SQL Server 及独立应用源码专项；这些范围保留独立显式入口。"
 fi
 if [ "$BUMP_VERSION" = true ]; then
@@ -1223,6 +1234,8 @@ fi
 if [ "$PUBLISH_DOC" = true ]; then
     print_step "预检官方网站候选..."
     run_release_command node microi.doc/scripts/check-account-portal.mjs --require-committed
+    # 链接错误应在测试、编译和渠道上传前发现，避免推送 API/PC 后才返工官网。
+    (cd microi.doc && run_release_command node scripts/check-open-source-links.mjs)
 fi
 
 # 前端资源预检必须发生在版本号、升级资源和其它源码变更之前。
@@ -1312,7 +1325,7 @@ if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ] && 
 fi
 
 # 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行平台自动化回归。
-# 常规发行验证 Microi.Tests、全部通用前端、接口及启动运行；不新建租户、不安装聊天应用、不运行独立 Code/Agent 产品测试。
+# 常规发行验证基础 Microi.Tests、前端 Node、接口及启动运行；浏览器仅显式追加，不新建租户、不安装聊天应用、不运行独立 Code/Agent 产品测试。
 # 真实付费 AI、JUNCHI/XJY 客户数据、SQL Server 及独立应用源码验收属于独立专项，不进入默认平台发布。
 # 显式 Full 保留真实业务深度验收；两种范围分别冻结和验证，失败均停止发布。
 if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "${PLATFORM_DOCKER_SELECTED:-false}" = true ]; then
@@ -1349,7 +1362,7 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
         print_fail "SQL Server 跳过例外已停用；请使用冻结依赖矩阵及零跳过 Full。"
     fi
     _release_test_scope_args=()
-    if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ]; then _release_test_scope_args+=(-PlatformFrontendTests); fi
+    if [ "$MICROI_PLATFORM_FRONTEND_TESTS" = true ]; then _release_test_scope_args+=(-PlatformFrontendTests); fi
     _platform_test_command=("$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
         -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode "$MICROI_RELEASE_TEST_POLICY" -Configuration Release -SolutionPath "$SLN_FILE" \
         -ResultsDirectory "$_full_test_results" "${_release_test_scope_args[@]}")
@@ -1779,7 +1792,6 @@ if [ "$DLL_ENCRYPTED" = true ] && { [ "$PUSH_NUGET" = true ] || [ "$DEPLOY_MODE"
         if [ ! -f "$latest_package" ]; then print_warning "未找到本次版本包: $latest_package"; return 1; fi
         if [ ! -f "$encrypted_dll" ]; then print_warning "未找到加密DLL: $encrypted_dll"; return 1; fi
 
-        local nupkg_before_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
         local nupkg_before_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
         local enc_bytes=$(stat -f%z "$encrypted_dll" 2>/dev/null || stat -c%s "$encrypted_dll" 2>/dev/null)
 
@@ -1835,12 +1847,13 @@ if [ "$DLL_ENCRYPTED" = true ] && { [ "$PUSH_NUGET" = true ] || [ "$DEPLOY_MODE"
             return 1
         fi
 
-        local nupkg_after_md5=$(md5 -q "$latest_package" 2>/dev/null || md5sum "$latest_package" 2>/dev/null | awk '{print $1}')
         local nupkg_after_bytes=$(stat -f%z "$latest_package" 2>/dev/null || stat -c%s "$latest_package" 2>/dev/null)
-        if [ "$nupkg_before_md5" = "$nupkg_after_md5" ]; then
-            print_fail "$(basename "$latest_package") 替换后MD5未变化，替换未生效！"
+        # 整包摘要不变可能是正确的幂等结果，外部摘要命令失败也不能当作替换事实。
+        # 立即逐个读取实际 ZIP DLL，与最终加密回执核对；错误字节仍必须阻止上传。
+        if ! run_release_command node Microi.Server/tools/release-encryption.mjs package-dll "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$latest_package" "$project_name"; then
+            print_fail "$(basename "$latest_package") 包内DLL与最终加密回执不一致，禁止上传。"
         fi
-        print_success "${project_name}.dll 替换成功（nupkg: $((nupkg_before_bytes/1024))KB → $((nupkg_after_bytes/1024))KB，MD5已变更）"
+        print_success "${project_name}.dll 替换成功（nupkg: $((nupkg_before_bytes/1024))KB → $((nupkg_after_bytes/1024))KB，包内加密DLL字节已核验）"
     }
 
     _replace_error=0

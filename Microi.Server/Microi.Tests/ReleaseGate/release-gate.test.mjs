@@ -240,7 +240,8 @@ prepare_release_workspace
 for(const scenario of [
  {name:'failed platform tests prevent platform publication',backend:true,client:false,exit:19,passed:false,called:true},
  {name:'successful platform tests allow platform publication',backend:true,client:false,exit:0,passed:true,called:true},
- {name:'complete platform entry explicitly requests general platform frontend tests',complete:true,backend:true,client:true,exit:0,passed:true,called:true},
+ {name:'complete platform entry keeps basic platform tests by default',complete:true,backend:true,client:true,exit:0,passed:true,called:true},
+ {name:'extended browser tests require an explicit selection',complete:true,frontend:true,backend:true,client:true,exit:0,passed:true,called:true},
  {name:'frontend publication also requires platform tests',backend:false,client:true,exit:19,passed:false,called:true},
  {name:'prebuilt Docker push cannot bypass failed tests',backend:false,client:false,docker:true,exit:19,passed:false,called:true},
  {name:'documentation-only work avoids the backend gate',backend:false,client:false,exit:19,passed:true,called:false},
@@ -255,7 +256,7 @@ is_windows_shell(){ return 1; }
 pwsh(){ printf 'TEST_ARGUMENTS=%s\\n' "$*"; return ${scenario.exit}; }
 node(){ printf 'CANDIDATE_ARGUMENTS=%s\\n' "$*"; return 0; }
 unset MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT MICROI_TEST_SQLSERVER_EXEMPTION_SHA256
-set -- ${scenario.fullOnly?'--full-only':''}
+set -- ${scenario.fullOnly?'--full-only':''} ${scenario.frontend?'--platform-frontend-tests':''}
 ${policy}
 PUBLISH_BACKEND=${scenario.backend}
 MICROI_COMPLETE_PLATFORM_RELEASE=${scenario.complete||false}
@@ -271,7 +272,7 @@ printf 'PUBLICATION_REACHED\\n'
  assert.equal(result.stdout.includes('TEST_ARGUMENTS='),scenario.called);
  if(scenario.called){
   assert.ok(result.stdout.includes(`-Mode ${scenario.fullOnly?'Full':'PlatformRelease'} -Configuration Release`),result.stdout);
-  assert.equal(result.stdout.includes('-PlatformFrontendTests'),Boolean(scenario.complete));
+  assert.equal(result.stdout.includes('-PlatformFrontendTests'),Boolean(scenario.frontend));
   if(scenario.exit===0)assert.ok(result.stdout.includes(`release-test-matrix.mjs ${scenario.fullOnly?'verify ':'verify-platform '}`),result.stdout);
  }
 });

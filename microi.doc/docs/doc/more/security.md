@@ -2,9 +2,15 @@
 
 > 本文说明 Microi 吾码平台在 FormEngine、接口引擎、SaaS、多租户、文件、登录会话和外部 HTTP 访问中的服务端安全边界。安全能力必须在服务端生效；隐藏按钮、前端路由和“用户已经登录”都不能代替授权。
 
-安全说明与测试证据分别维护。可复核入口见[适配与安全证据工具](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/compatibility)）：2026-10-25 核对的历史 `8.6.8` TRX 摘要一致，选取的租户配置、访问密钥、Token 轮换、租户边界与 SSRF 兼容共 287 项通过；它是维护方的历史回归记录，不是第三方安全认证，也不代替新版本或目标部署验收。当前源码版本、依赖和历史回执版本在快照中分开显示。测试源码与运行条件见 [Microi.Tests](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）。
+安全说明与测试证据分别维护。可复核入口见[适配与安全证据工具](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/compatibility)）：2026-10-26 本轮 `8.7.1` 基础平台回归 5,756 项通过、零失败、零未通过；选取的租户配置、访问密钥、Token 轮换、租户边界与 SSRF 兼容共 287 项通过。快照公开原始 TRX 摘要、源码文件摘要和所选范围，保留旧版记录。它是维护方的可追踪回归证据，不是独立渗透测试或第三方安全认证，也不代替目标部署验收；本轮未执行全数据库实库矩阵、客户专项和扩展浏览器验收。测试源码与运行条件见 [Microi.Tests](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）。
 
 上线需逐项核对 HTTPS 与数据库证书、代理信任范围、CORS 来源、是否启用严格 SSRF、角色/租户隔离和敏感日志留存。保留具体平台版本、部署组合、失败与未执行项；没有第三方报告或真实环境回执时，应标注“未核验”。安全问题按[贡献指南的私下报告入口](https://gitee.com/ITdos/microi.net/blob/master/CONTRIBUTING.md#私下报告安全问题)（[GitHub](https://github.com/itdos/microi.net/blob/master/CONTRIBUTING.md#私下报告安全问题)）联系，公开 Issue 不上传凭据或客户数据。
+
+公开仓的[安全报告流程](https://gitee.com/ITdos/microi.net/blob/master/SECURITY.md)
+（[GitHub](https://github.com/itdos/microi.net/blob/master/SECURITY.md)）列出了受影响版本、匿名复现、
+权限前提、影响范围及披露要求。AI 建模还需通过[Manifest 原始声明预检](/doc/v8-engine/mcp-server.html#原始声明的整体写前检查)：
+无效资源、冲突别名和重复 Key 在资源调用前整体拒绝，不把模型输出可解析当作可安全执行。
+公开 MCP 合约 CI 与真实部署、独立渗透和认证分别验收。
 
 ---
 
@@ -426,6 +432,20 @@ Passkey、设备生物识别、严格人脸、改密步进验证和自定义 V8 
 ---
 
 ## 十、安全升级与发布约束
+
+### MCP 依赖公告与输入校验
+
+2026-10-26 对公开 MCP 锁文件执行 `npm audit --omit=dev`，最初发现 5 个依赖包公告项
+（3 个高危、2 个中危）。已将 MCP SDK 最低版本提升到 1.32.0、Zod 提升到 4.6.7，
+更新相关传递依赖并迁移正式工具 Schema；同日复核返回 0 个公告项。
+公开 CI 同时执行依赖检查、四组系统/Node 合约以及大集合提前拒绝和真实工具发现回归。
+原始问题、版本、锁文件摘要、扫描边界和复跑命令见
+[依赖核验记录](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)
+（[GitHub 镜像](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/compatibility)）。
+
+该结果只描述所绑定 MCP 锁文件在检查时的生产依赖公告，不能推导平台整体零漏洞、
+所有公告在当前部署均可利用或旧版 CLI/已加载 MCP 已升级。部署前仍需核对实际工具版本，
+对输入、权限和运行路径做相应验收；此项不是渗透测试或安全认证。
 
 - Upgrade15 只清理普通角色对“管理员专用”表的直接授权，不删除正常业务菜单权限；曾被旧策略清理的运行表权限按实际角色重新授予。
 - Upgrade16 只补充六个租户上传配置字段，空值保持升级前兼容行为。
