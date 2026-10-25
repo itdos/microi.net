@@ -96,6 +96,9 @@ namespace Microi.net
             "sys_log",
             "sys_servernode",
             "mic_ai",
+            // 中转余额、无限权益和用量台账属于计费授权；普通角色误授权也不得自授或改账。
+            "mci_ai_token_account",
+            "mci_ai_token_log",
             "mic_email_server",
             "wx_mp",
 

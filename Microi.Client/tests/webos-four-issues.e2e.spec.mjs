@@ -2,13 +2,17 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const FRONTEND = 'http://localhost:61500';
-const API_BASE = 'https://localhost:61501';
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || 'http://localhost:61500';
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || 'https://localhost:61501';
 const PASSWORD = process.env.PW_LOCAL_PASSWORD || '';
 const OUTPUT = path.resolve(process.cwd(), '../.tmp/screenshots/webos-four-issues-2026-08-30');
 const MENU_ROUTE = '**/apiengine/platform-sys-menu**';
 
-const tenantUrl = () => `${FRONTEND}/?OsClient=iTdos&ApiBase=${encodeURIComponent(API_BASE)}`;
+const tenantUrl = () => {
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`;
+};
 
 async function login(page) {
     await page.goto(tenantUrl(), { waitUntil: 'domcontentloaded' });
@@ -20,7 +24,7 @@ async function login(page) {
         'input[placeholder*="user name" i]',
     ].join(', ')).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill('admin');
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(PASSWORD);
     const privacy = page.locator('.privacy-policy-wrapper .el-checkbox').first();
     if (await privacy.isVisible().catch(() => false)) {
@@ -176,7 +180,7 @@ test('WebOS 截图 1-4 专项回归', async ({ page }) => {
     await expect(skeleton).toBeVisible({ timeout: 20_000 });
     await expect(skeleton).toHaveAttribute('aria-busy', 'true');
     expect(await skeleton.locator('.webos-dock-skeleton__item').count()).toBeGreaterThanOrEqual(7);
-    await expect(page.getByText('100%', { exact: true })).toBeHidden({ timeout: 15_000 });
+    await expect(page.locator('#loadPercent')).toBeHidden({ timeout: 15_000 });
     await expect(skeleton).toBeVisible();
     await page.screenshot({ path: path.join(OUTPUT, 'issue-01-dock-loading-skeleton.png') });
     diagnostics.screenshots.push('issue-01-dock-loading-skeleton.png');
@@ -277,20 +281,29 @@ test('WebOS 截图 1-4 专项回归', async ({ page }) => {
     await expect(folderWrap).toBeVisible();
     const folderItems = folderLayer.locator('.webos-desktop-folder__item');
     expect(await folderItems.count()).toBeGreaterThanOrEqual(15);
+    // 外壳可见不表示 CDN 图片已解码；有界等待真实加载，不把 pending 请求当坏图。
+    await expect.poll(() => folderItems.evaluateAll(items => items.every(item => {
+        const image = item.querySelector('.webos-theme-menu-icon img');
+        return image?.complete && image.naturalWidth > 0 && image.naturalHeight > 0;
+    })), { timeout: 30_000 }).toBe(true);
+    await folderItems.locator('.webos-theme-menu-icon img').evaluateAll(images => Promise.all(images.map(image => image.decode())));
     const iconRows = await folderItems.evaluateAll(items => items.map(item => {
         const icon = item.querySelector('.webos-theme-menu-icon');
+        const url = new URL(icon?.querySelector('img')?.src || '', location.href);
         return {
             label: item.querySelector('.webos-desktop-folder__label')?.textContent?.trim() || '',
             hasSvg: Boolean(icon?.querySelector('svg')),
             hasImage: Boolean(icon?.querySelector('img')),
-            src: icon?.querySelector('img')?.src || '',
+            src: url.origin + url.pathname,
+            source: /\/(?:webos-icons|assets\/menu-icons)\/ios-skeuomorphic-v2\//i.test(url.pathname) ? 'official-curated' : 'tenant-custom',
             naturalWidth: icon?.querySelector('img')?.naturalWidth || 0,
             naturalHeight: icon?.querySelector('img')?.naturalHeight || 0,
         };
     }));
     expect(iconRows.every(row => row.hasImage && !row.hasSvg && row.src), JSON.stringify(iconRows)).toBe(true);
-    expect(iconRows.every(row => row.naturalWidth === 320 && row.naturalHeight === 320), JSON.stringify(iconRows)).toBe(true);
-    expect(iconRows.every(row => /webos-icons\/ios-skeuomorphic-v2\/202609\/.+\.webp/i.test(row.src)), JSON.stringify(iconRows)).toBe(true);
+    expect(iconRows.every(row => row.naturalWidth > 0 && row.naturalWidth === row.naturalHeight), JSON.stringify(iconRows)).toBe(true);
+    expect(iconRows.filter(row => row.source === 'official-curated').every(row => row.naturalWidth === 320 && row.naturalHeight === 320), JSON.stringify(iconRows)).toBe(true);
+    expect(iconRows.every(row => row.source === 'official-curated' || /\/itdos\/microi\/menu-icons\/.+\.webp$/i.test(row.src)), JSON.stringify(iconRows)).toBe(true);
     expect(new Set(iconRows.map(row => row.src)).size).toBeGreaterThanOrEqual(15);
     const originalAccent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--mci-color-primary').trim());
     diagnostics.checks.folderMaterial = material;

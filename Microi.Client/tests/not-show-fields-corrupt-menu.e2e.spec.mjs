@@ -1,8 +1,11 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const SCREENSHOT_DIR = path.resolve(
     process.cwd(),
@@ -17,7 +20,8 @@ test.use({
 test.setTimeout(150_000);
 
 function tenantUrl(hash = "") {
-    return `${FRONTEND}/?OsClient=iTdos${hash}`;
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}${hash}`;
 }
 
 async function login(page) {
@@ -30,7 +34,7 @@ async function login(page) {
         'input[placeholder*="user name" i]'
     ].join(", ")).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(PASSWORD);
 
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
@@ -49,6 +53,7 @@ async function login(page) {
     await page.getByRole("button", { name: "登录", exact: true }).click();
     const result = await (await responsePromise).json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 async function tableRuntime(page) {

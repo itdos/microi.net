@@ -103,7 +103,7 @@ export async function snapshotCandidate(root=workspace,repos=repositories,option
   }
  }
  // 所有发布候选都绑定完整测试输入，历史 SmokeOnly 环境不能缩小源码指纹。
- Object.assign(files,await snapshotStandardInputs(root));
+ Object.assign(files,await snapshotStandardInputs(root,{testPolicy:policy}));
  if(policy==='Full')Object.assign(files,await snapshotDesktopInputs(root));
  Object.assign(files,await snapshotLocalSmokeInputs(root));
  // Implicit composition belongs only to this actual workspace; explicit foreign contracts still fail.

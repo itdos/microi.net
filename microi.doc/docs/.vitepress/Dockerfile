@@ -8,5 +8,8 @@ COPY dist/ /usr/share/nginx/html/
 # 复制 nginx 配置
 COPY default.conf /etc/nginx/conf.d/default.conf
 
+# 在正式镜像构建内检查跳转与缓存配置，错误配置不得等到线上启动时才发现。
+RUN nginx -t
+
 # 启动 nginx
 CMD ["nginx", "-g", "daemon off;"]

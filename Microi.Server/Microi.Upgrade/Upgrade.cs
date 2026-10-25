@@ -1092,10 +1092,7 @@ if (_microiLegacyMenuConfigChanged) {
                     if (!System.Text.RegularExpressions.Regex.IsMatch(
                             columnName,
                             @"^[A-Za-z][A-Za-z0-9_]{0,127}$")
-                        || !System.Text.RegularExpressions.Regex.IsMatch(
-                            columnType,
-                            @"^(?:bit|int|datetime|mediumtext|varchar)(?:\(\d+\))?$",
-                            System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                        || !IsSafeRuntimePhysicalColumnType(columnType))
                     {
                         throw new InvalidOperationException(
                             $"启动物理契约包含不安全的列定义：{tableName}.{columnName} {columnType}");
@@ -1107,6 +1104,26 @@ if (_microiLegacyMenuConfigChanged) {
                 item => item.Key,
                 item => (IReadOnlyDictionary<string, string>)item.Value,
                 StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static bool IsSafeRuntimePhysicalColumnType(string columnType)
+        {
+            if (string.IsNullOrEmpty(columnType)) return false;
+            var options = System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                          | System.Text.RegularExpressions.RegexOptions.CultureInvariant;
+            if (System.Text.RegularExpressions.Regex.IsMatch(
+                    columnType,
+                    @"\A(?:bit|int|datetime|mediumtext|varchar)(?:\([0-9]+\))?\z",
+                    options)) return true;
+
+            var decimalType = System.Text.RegularExpressions.Regex.Match(
+                columnType, @"\Adecimal\(([0-9]{1,2}),([0-9]{1,2})\)\z", options);
+            if (!decimalType.Success) return false;
+            var precision = int.Parse(decimalType.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            var scale = int.Parse(decimalType.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+            // 启动包由 MySQL/SQL Server 共用，decimal 在两者间原样传递：
+            // SQL Server 精度最多38，MySQL小数位最多30，取共同可表达范围。
+            return precision >= 1 && precision <= 38 && scale <= 30 && scale <= precision;
         }
 
         private static string NormalizeRuntimePhysicalColumnType(

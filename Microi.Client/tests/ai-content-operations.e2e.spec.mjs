@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -21,7 +22,7 @@ test.use({
 test.setTimeout(150_000);
 
 async function loginThroughUi(page) {
-  await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`, { waitUntil: "domcontentloaded" });
   const account = page.locator([
     'input[placeholder*="用户名"]',
     'input[placeholder*="账号"]',
@@ -56,34 +57,18 @@ async function loginThroughUi(page) {
     || result.DataAppend?.Token;
   const token = String(rawAuthorization || "").replace(/^Bearer\s+/i, "");
   expect(token).toBeTruthy();
-  await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(1_500);
   return token;
 }
 
 async function gotoModule(page, route) {
-  await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}#${route}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}#${route}`, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(new RegExp(`#${route.replaceAll("/", "\\/")}(?:[?&]|$)`), { timeout: 30_000 });
   await expect(page.locator(".el-loading-mask:visible")).toHaveCount(0, { timeout: 45_000 });
 }
 
-test("AI 内容运营菜单、定时入口与 MiniMax 受保护 API 在共享服务中可用", async ({ page }) => {
-  test.skip(!PASSWORD, "PW_TEST_PASSWORD is required for the real UI login.");
-  await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-
-  const pageErrors = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
-
-  const token = await loginThroughUi(page);
-  await gotoModule(page, "/mci-ai-content-plan");
-  await expect(page.getByText("默认 AI 内容创作与发布计划", { exact: false }).first()).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByRole("button", { name: "启用/校准定时发布", exact: true }).first()).toBeVisible({ timeout: 45_000 });
-  await page.screenshot({ path: path.join(SCREENSHOT_DIR, "content-plan-1920x1080.png"), fullPage: false });
-
-  await gotoModule(page, "/mci-ai-content-asset");
-  await expect(page.getByRole("columnheader", { name: "资产类型", exact: true }).first()).toBeVisible({ timeout: 45_000 });
-  await page.screenshot({ path: path.join(SCREENSHOT_DIR, "content-assets-1920x1080.png"), fullPage: false });
-
+async function assertProtectedMiniMaxRoutes(page, token) {
   const sourceResponse = await page.request.get(`${FRONTEND}/src/utils/v8-ai.js`);
   expect(sourceResponse.ok()).toBeTruthy();
   const source = await sourceResponse.text();
@@ -104,6 +89,37 @@ test("AI 内容运营菜单、定时入口与 MiniMax 受保护 API 在共享服
     expect(Number(result.Code), action).toBe(0);
     expect(String(result.Msg || ""), action).not.toMatch(/MissingToken|请求未携带Token/);
   }
+}
+
+// 参数拒绝属于平台通用契约，不依赖其它租户预先创建的内容运营菜单或业务种子。
+test("MiniMax 受保护 API 在真实登录后拒绝无效参数且不调用付费生成", async ({ page }) => {
+  test.skip(!PASSWORD, "PW_TEST_PASSWORD is required for the real UI login.");
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const token = await loginThroughUi(page);
+  await assertProtectedMiniMaxRoutes(page, token);
+  expect(pageErrors.filter((item) => /ReferenceError|TypeError|Unhandled/i.test(item))).toEqual([]);
+});
+
+// 独立业务验收仍完整保留；仅在已预置这两个业务页面和固定种子的环境执行。
+test("AI 内容运营菜单、定时入口与 MiniMax 受保护 API 在共享服务中可用", async ({ page }) => {
+  test.skip(!PASSWORD, "PW_TEST_PASSWORD is required for the real UI login.");
+  await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  const token = await loginThroughUi(page);
+  await gotoModule(page, "/mci-ai-content-plan");
+  await expect(page.getByText("默认 AI 内容创作与发布计划", { exact: false }).first()).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByRole("button", { name: "启用/校准定时发布", exact: true }).first()).toBeVisible({ timeout: 45_000 });
+  await page.screenshot({ path: path.join(SCREENSHOT_DIR, "content-plan-1920x1080.png"), fullPage: false });
+
+  await gotoModule(page, "/mci-ai-content-asset");
+  await expect(page.getByRole("columnheader", { name: "资产类型", exact: true }).first()).toBeVisible({ timeout: 45_000 });
+  await page.screenshot({ path: path.join(SCREENSHOT_DIR, "content-assets-1920x1080.png"), fullPage: false });
+
+  await assertProtectedMiniMaxRoutes(page, token);
 
   expect(pageErrors.filter((item) => /ReferenceError|TypeError|Unhandled/i.test(item))).toEqual([]);
 });

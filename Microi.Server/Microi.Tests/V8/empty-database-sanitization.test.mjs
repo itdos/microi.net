@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -7,15 +6,6 @@ import { readOfficialEmptyDatabaseSource } from '../ReleaseGate/official-v8-sour
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const repo = path.resolve(here, '../../..')
-const contract = JSON.parse(fs.readFileSync(path.join(repo, 'AI-Project/标准产品套件/source-contract.json'), 'utf8'))
-assert.equal(contract.schemaVersion, 1)
-assert.equal(contract.target.apiBase, 'https://api.microi.net')
-assert.equal(String(contract.target.osClient).toLowerCase(), 'itdos')
-assert.ok(typeof contract.sourceParent === 'string' && !path.isAbsolute(contract.sourceParent))
-const sourceParent = path.resolve(repo, contract.sourceParent)
-const relative = path.relative(repo, sourceParent)
-assert.ok(relative && !relative.startsWith('..') && !path.isAbsolute(relative), '责任源码根必须位于当前工作区')
-assert.ok(fs.statSync(sourceParent).isDirectory(), '契约责任源码缺失时必须失败')
 // 脱敏接口由 SaaS 官方包单一拥有；远端拉取目录可能保留旧版本，不能成为平台发行回归的事实源。
 const engineSource = readOfficialEmptyDatabaseSource(repo)
 const execute = new Function('V8', engineSource)

@@ -1,8 +1,11 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-const FRONTEND = process.env.PW_BASE_URL || 'http://localhost:61500'
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || 'http://localhost:61500'
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || 'admin'
 const PASSWORD = process.env.PW_TEST_PASSWORD || ''
 const SCREENSHOT_DIR = path.resolve(
@@ -19,7 +22,8 @@ test.describe.configure({ mode: 'serial' })
 test.setTimeout(180_000)
 
 function tenantUrl(route = '') {
-  return `${FRONTEND}/?OsClient=iTdos${route ? `#${route}` : ''}`
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+  return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}${route ? `#${route}` : ''}`
 }
 
 async function login(page) {
@@ -51,7 +55,7 @@ async function login(page) {
   await page.getByRole('button', { name: '登录', exact: true }).click()
   const payload = await (await responsePromise).json()
   expect(Number(payload.Code), payload.Msg || 'UI login failed').toBe(1)
-  await expect(page.getByRole('button', { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: getLoginIdentityName(payload), exact: true }).first()).toBeVisible({ timeout: 30_000 })
 }
 
 async function openRoute(page, route) {
@@ -123,6 +127,9 @@ test('AI 助手首屏以对话框和完整分类能力目录为核心', async ({
 
   await assistant.getByTestId('unified-ai-history-toggle').click()
   await expect(assistant.getByTestId('unified-ai-history')).toBeVisible()
+  await expect(assistant.getByTestId('unified-ai-new-conversation')).toBeVisible()
+  await expect(assistant.getByTestId('unified-ai-history-active')).toBeVisible()
+  await expect(assistant.getByTestId('unified-ai-history-archived')).toBeVisible()
   await assistant.getByTestId('unified-ai-history-toggle').click()
   await expect(assistant.getByTestId('unified-ai-history')).toHaveCount(0)
 

@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-10-25T14:05:13.584Z",
+  "window": {
+    "since": "2026-07-27T14:03:10.000Z",
+    "until": "2026-10-25T14:03:10.000Z",
+    "convention": "[since, until)"
+  },
+  "method": "匿名公开 REST；默认分支固定提交；提交按 SHA 去重；各站账号按服务端 Id 去重；不输出身份列表、邮箱或邮箱哈希",
+  "limits": {
+    "maxPagesPerDataset": 5,
+    "pageSize": 100,
+    "atomicSnapshot": false,
+    "thirdPartyContributorCount": null,
+    "crossHostUniquePeople": null,
+    "medianMaintainerResponseHours": null
+  },
+  "repositories": [
+    {
+      "host": "gitee",
+      "repository": "https://gitee.com/ITdos/microi.net",
+      "collectedAt": "2026-10-25T14:04:55.009Z",
+      "metadata": {
+        "defaultBranch": "master",
+        "stars": 509,
+        "forks": 199,
+        "pushedAt": "2026-10-25T21:36:23+08:00",
+        "source": "https://gitee.com/api/v5/repos/ITdos/microi.net",
+        "responseSha256": "3b45ce89ea0b53eedd83400495391514889dfe8bb21632f136201d78bc4bb452"
+      },
+      "datasets": {
+        "commits": {
+          "status": "partial",
+          "pages": [
+            {
+              "url": "https://gitee.com/api/v5/repos/ITdos/microi.net/commits?per_page=100&page=1&sha=f1d7eb7440fadaa15e132a7d62644f0783fe2a1b&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "72c48e5bb41401b464ca482579edc7f52a7a0163e565ae47b5849195d082cc60"
+            },
+            {
+              "url": "https://gitee.com/api/v5/repos/ITdos/microi.net/commits?per_page=100&page=2&sha=f1d7eb7440fadaa15e132a7d62644f0783fe2a1b&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "63546698c560f526e66ed8c79dc862831c234f1587c96cdcb1872ecde459a335"
+            },
+            {
+              "url": "https://gitee.com/api/v5/repos/ITdos/microi.net/commits?per_page=100&page=3&sha=f1d7eb7440fadaa15e132a7d62644f0783fe2a1b&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "3e7154ab81b76eeee9082e25e6bbdb1f943550bc33f1ea8eee88ba3d9692ae4a"
+            },
+            {
+              "url": "https://gitee.com/api/v5/repos/ITdos/microi.net/commits?per_page=100&page=4&sha=f1d7eb7440fadaa15e132a7d62644f0783fe2a1b&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "3e295d55ac586cb31eeb0c2c3863f2816531a54e62b61e2458468ea6ba6fd705"
+            },
+            {
+              "url": "https://gitee.com/api/v5/repos/ITdos/microi.net/commits?per_page=100&page=5&sha=f1d7eb7440fadaa15e132a7d62644f0783fe2a1b&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "3df7b56d2bc769c34e30be34cb46ee568520d60aa3412bb39ca98b85782fd489"
+            }
+          ],
+          "metrics": {
+            "observedRecordsInWindow": 500,
+            "identifiedNonBotAccounts": 3,
+            "identifiedBotAccounts": 0,
+            "recordsWithoutMappedAccount": 419
+          },
+          "error": "PAGE_LIMIT"
+        },
+        "issues": {
+          "status": "complete",
+          "pages": [
+            {
+              "url": "https://gitee.com/api/v5/repos/ITdos/microi.net/issues?per_page=100&page=1&state=all&sort=updated&direction=desc",
+              "status": 200,
+              "responseSha256": "00bad9134cc1fffb7e6b6197af88552899a45750d92fd24244f9f14d15ab7ee4"
+            }
+          ],
+          "metrics": {
+            "observedRecordsInWindow": 0,
+            "identifiedNonBotAccounts": 0,
+            "identifiedBotAccounts": 0,
+            "recordsWithoutMappedAccount": 0,
+            "createdInWindow": 0,
+            "closedInWindow": 0
+          }
+        },
+        "pulls": {
+          "status": "complete",
+          "pages": [
+            {
+              "url": "https://gitee.com/api/v5/repos/ITdos/microi.net/pulls?per_page=100&page=1&state=all&sort=updated&direction=desc",
+              "status": 200,
+              "responseSha256": "1e907b7fe1f9741475fb269a2137e1dd6da73a5d82b8814e1829a19f97bd065d"
+            }
+          ],
+          "metrics": {
+            "observedRecordsInWindow": 3,
+            "identifiedNonBotAccounts": 1,
+            "identifiedBotAccounts": 0,
+            "recordsWithoutMappedAccount": 0,
+            "createdInWindow": 3,
+            "closedInWindow": 3,
+            "mergedInWindow": 3
+          }
+        }
+      },
+      "defaultBranchHead": "f1d7eb7440fadaa15e132a7d62644f0783fe2a1b"
+    },
+    {
+      "host": "github",
+      "repository": "https://github.com/itdos/microi.net",
+      "collectedAt": "2026-10-25T14:05:04.315Z",
+      "metadata": {
+        "defaultBranch": "master",
+        "stars": 21,
+        "forks": 9,
+        "pushedAt": "2026-10-19T01:28:14Z",
+        "source": "https://api.github.com/repos/itdos/microi.net",
+        "responseSha256": "77cebed67a0399df256201653acaf4a3f5c481aacc281c897f0325dcb2af3f22"
+      },
+      "datasets": {
+        "commits": {
+          "status": "partial",
+          "pages": [
+            {
+              "url": "https://api.github.com/repos/itdos/microi.net/commits?per_page=100&page=1&sha=f9fc6145c726dcceb925efdb955b6dc128d481e6&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "d2412413a313cc2032c0bf3fda0e378dd0b96be7d1d60e3a8796575446412aee"
+            },
+            {
+              "url": "https://api.github.com/repos/itdos/microi.net/commits?per_page=100&page=2&sha=f9fc6145c726dcceb925efdb955b6dc128d481e6&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "a48e9c5e1fda65a2d1785fc9b3c0044053b757b891f42fadac0368917e05c0dc"
+            },
+            {
+              "url": "https://api.github.com/repos/itdos/microi.net/commits?per_page=100&page=3&sha=f9fc6145c726dcceb925efdb955b6dc128d481e6&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "1eae6223828bd00df5cbaccac56f0f34e7ccf2208eb54f9c17b86a7315f04d95"
+            },
+            {
+              "url": "https://api.github.com/repos/itdos/microi.net/commits?per_page=100&page=4&sha=f9fc6145c726dcceb925efdb955b6dc128d481e6&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "d95ecaabc92ee170fd4c3debc3a11f643f9986d9c6eb514856d2e2a27dde7616"
+            },
+            {
+              "url": "https://api.github.com/repos/itdos/microi.net/commits?per_page=100&page=5&sha=f9fc6145c726dcceb925efdb955b6dc128d481e6&since=2026-07-27T14%3A03%3A10.000Z&until=2026-10-25T14%3A03%3A10.000Z",
+              "status": 200,
+              "responseSha256": "a33110a88412812598321643edc7605d20bd17cf03fd2e70e9393f54038af10b"
+            }
+          ],
+          "metrics": {
+            "observedRecordsInWindow": 500,
+            "identifiedNonBotAccounts": 3,
+            "identifiedBotAccounts": 0,
+            "recordsWithoutMappedAccount": 196
+          },
+          "error": "PAGE_LIMIT"
+        },
+        "issues": {
+          "status": "complete",
+          "pages": [
+            {
+              "url": "https://api.github.com/repos/itdos/microi.net/issues?per_page=100&page=1&state=all&sort=updated&direction=desc",
+              "status": 200,
+              "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            }
+          ],
+          "metrics": {
+            "observedRecordsInWindow": 0,
+            "identifiedNonBotAccounts": 0,
+            "identifiedBotAccounts": 0,
+            "recordsWithoutMappedAccount": 0,
+            "createdInWindow": 0,
+            "closedInWindow": 0
+          }
+        },
+        "pulls": {
+          "status": "complete",
+          "pages": [
+            {
+              "url": "https://api.github.com/repos/itdos/microi.net/pulls?per_page=100&page=1&state=all&sort=updated&direction=desc",
+              "status": 200,
+              "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            }
+          ],
+          "metrics": {
+            "observedRecordsInWindow": 0,
+            "identifiedNonBotAccounts": 0,
+            "identifiedBotAccounts": 0,
+            "recordsWithoutMappedAccount": 0,
+            "createdInWindow": 0,
+            "closedInWindow": 0,
+            "mergedInWindow": 0
+          }
+        }
+      },
+      "defaultBranchHead": "f9fc6145c726dcceb925efdb955b6dc128d481e6"
+    }
+  ],
+  "crossHostCommits": {
+    "observedUniqueShaCount": 1000,
+    "complete": false
+  }
+}

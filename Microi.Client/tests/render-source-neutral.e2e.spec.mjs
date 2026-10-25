@@ -1,9 +1,11 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const frontend = process.env.PW_BASE_URL || "http://localhost:61500";
-const apiBase = process.env.PW_API_BASE || "https://localhost:61501";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const frontend = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
+const apiBase = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
 const password = process.env.PW_LOCAL_PASSWORD || "";
 const browserChannel = process.env.PW_BROWSER_CHANNEL || "";
 const screenshotDir = path.resolve(
@@ -19,7 +21,8 @@ test.use({
 test.setTimeout(180_000);
 
 function tenantUrl(hash = "") {
-    const query = new URLSearchParams({ OsClient: "iTdos", ApiBase: apiBase });
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    const query = new URLSearchParams({ OsClient: OS_CLIENT, ApiBase: apiBase });
     return `${frontend}/?${query.toString()}${hash}`;
 }
 
@@ -33,7 +36,7 @@ async function login(page) {
         'input[placeholder*="user name" i]'
     ].join(", ")).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(password);
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
     if (await privacy.isVisible().catch(() => false)) {
@@ -50,7 +53,7 @@ async function login(page) {
     await page.getByRole("button", { name: "登录", exact: true }).click();
     const result = await (await responsePromise).json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first())
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first())
         .toBeVisible({ timeout: 30_000 });
     await page.waitForFunction(() => window.__MICROI_APP_READY__ === true, null, {
         timeout: 30_000
@@ -72,7 +75,7 @@ test("微服务来源详情使用租户中性的平台文案", async ({ page }) 
 
     const runtimeEndpoint = await page.evaluate(() => window.__MICROI_RUNTIME_ENDPOINT__);
     expect(runtimeEndpoint?.apiBase).toBe(apiBase);
-    expect(runtimeEndpoint?.osClient).toBe("iTdos");
+    expect(runtimeEndpoint?.osClient).toBe(OS_CLIENT);
 
     const securityEntry = page.getByRole("button", {
         name: /安全与服务接入|登录与身份|Login and Identity|Security and Service Access/i

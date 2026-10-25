@@ -1,8 +1,10 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
 const OS_CLIENT = process.env.PW_OS_CLIENT || "iTdos";
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || "admin";
 const PASSWORD = process.env.PW_TEST_PASSWORD || "";
@@ -33,7 +35,7 @@ test.use({
 test.setTimeout(240_000);
 
 async function loginThroughUi(page) {
-  await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`, { waitUntil: "domcontentloaded" });
   const account = page.locator([
     'input[placeholder*="用户名"]',
     'input[placeholder*="账号"]',
@@ -62,7 +64,7 @@ async function loginThroughUi(page) {
   const response = await responsePromise;
   const result = await response.json();
   expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-  await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 async function waitForStudioFrame(page) {
@@ -79,7 +81,7 @@ async function waitForStudioFrame(page) {
 }
 
 async function assertRoute(page, route, title, viewportName) {
-  const target = `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}#/micro-app/ai-platform-studio/${route}`;
+  const target = `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}#/micro-app/ai-platform-studio/${route}`;
   await page.goto(target, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(new RegExp(`/micro-app/ai-platform-studio/${route}(?:[?&]|$)`), { timeout: 30_000 });
   const frame = await waitForStudioFrame(page);

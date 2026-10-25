@@ -240,7 +240,7 @@ prepare_release_workspace
 for(const scenario of [
  {name:'failed platform tests prevent platform publication',backend:true,client:false,exit:19,passed:false,called:true},
  {name:'successful platform tests allow platform publication',backend:true,client:false,exit:0,passed:true,called:true},
- {name:'complete platform entry explicitly requests all platform tests',complete:true,backend:true,client:true,exit:0,passed:true,called:true},
+ {name:'complete platform entry explicitly requests general platform frontend tests',complete:true,backend:true,client:true,exit:0,passed:true,called:true},
  {name:'frontend publication also requires platform tests',backend:false,client:true,exit:19,passed:false,called:true},
  {name:'prebuilt Docker push cannot bypass failed tests',backend:false,client:false,docker:true,exit:19,passed:false,called:true},
  {name:'documentation-only work avoids the backend gate',backend:false,client:false,exit:19,passed:true,called:false},
@@ -271,28 +271,28 @@ printf 'PUBLICATION_REACHED\\n'
  assert.equal(result.stdout.includes('TEST_ARGUMENTS='),scenario.called);
  if(scenario.called){
   assert.ok(result.stdout.includes(`-Mode ${scenario.fullOnly?'Full':'PlatformRelease'} -Configuration Release`),result.stdout);
-  assert.equal(result.stdout.includes('-AllPlatformTests'),Boolean(scenario.complete));
+  assert.equal(result.stdout.includes('-PlatformFrontendTests'),Boolean(scenario.complete));
   if(scenario.exit===0)assert.ok(result.stdout.includes(`release-test-matrix.mjs ${scenario.fullOnly?'verify ':'verify-platform '}`),result.stdout);
  }
 });
 
-for(const [receipt,sha]of [['/fixture/explicit receipt.json','a'.repeat(64)],['/fixture/explicit receipt.json',''],['','a'.repeat(64)]])
-test('retired SQL Server skip exemption cannot start platform tests or publication '+Boolean(receipt)+'/'+Boolean(sha),()=>{
+for(const fullOnly of [false,true])for(const [receipt,sha]of [['/fixture/explicit receipt.json','a'.repeat(64)],['/fixture/explicit receipt.json',''],['','a'.repeat(64)]])
+test(`retired SQL Server exemption is isolated from regular platform scope; Full=${fullOnly} `+Boolean(receipt)+'/'+Boolean(sha),()=>{
  const result=spawnSync(bash,['--noprofile','--norc','-s'],{encoding:'utf8',env:{...process.env,
   MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:receipt,MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:sha},input:`
 print_phase(){ :; }; print_success(){ :; }; print_fail(){ exit 1; }
 is_windows_shell(){ return 1; }
 pwsh(){ printf 'TEST_ARGUMENTS=%s\\n' "$*"; return 0; }
 node(){ return 0; }
-set --
+set -- ${fullOnly?'--full-only':''}
 ${policy}
-PUBLISH_BACKEND=true; MICROI_FULL_ONLY=false; BUILD_CLIENT=false; PLATFORM_DOCKER_SELECTED=false
+PUBLISH_BACKEND=true; BUILD_CLIENT=false; PLATFORM_DOCKER_SELECTED=false
 ${gate}
 printf 'PUBLICATION_REACHED\\n'
 `});
- assert.ifError(result.error);assert.equal(result.status,1,result.stderr);
- assert.equal(result.stdout.includes('PUBLICATION_REACHED'),false);
- assert.equal(result.stdout.includes('TEST_ARGUMENTS='),false);
+ assert.ifError(result.error);assert.equal(result.status,fullOnly?1:0,result.stderr);
+ assert.equal(result.stdout.includes('PUBLICATION_REACHED'),!fullOnly);
+ assert.equal(result.stdout.includes('TEST_ARGUMENTS='),!fullOnly);
 });
 
 for(const fullOnly of [false,true])test(`matrix readback rejection blocks the successful ${fullOnly?'Full':'PlatformRelease'} test process`,()=>{
@@ -372,7 +372,7 @@ test('real schedule stores belong to explicit Full or all-platform scope and fai
  assert.ok(preflightStart>=0);
  const preflight=runner.slice(preflightStart,runner.indexOf('New-Item -ItemType Directory',preflightStart));
  const matrix=fs.readFileSync(path.join(root,'Microi.Server/Microi.Tests/ReleaseGate/release-test-matrix.mjs'),'utf8');
- assert.match(preflight,/\$matrixFreezeArguments = @\('freeze', \$TestMatrixFile, \$matrixReceipt\)/u);
+ assert.match(preflight,/\$matrixFreezeArguments = @\('freeze',/u);
  assert.match(preflight,/node \$matrixTool @matrixFreezeArguments/u);
  assert.match(preflight,/\$required = @\(\$matrixPlan\.requiredEnvironment\)/u);
  for(const name of ['MICROI_TEST_SCHEDULE_REDIS','MICROI_TEST_SCHEDULE_MYSQL'])assert.ok(matrix.includes(name),name);

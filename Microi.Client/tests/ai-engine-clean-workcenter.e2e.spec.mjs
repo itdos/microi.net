@@ -1,8 +1,11 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || "admin";
 const PASSWORD = process.env.PW_TEST_PASSWORD || "";
 const SCREENSHOT_DIR = path.resolve(
@@ -21,7 +24,8 @@ test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
 function tenantUrl(route = "") {
-    return `${FRONTEND}/?OsClient=iTdos${route ? `#${route}` : ""}`;
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}${route ? `#${route}` : ""}`;
 }
 
 async function login(page) {
@@ -53,7 +57,7 @@ async function login(page) {
     await page.getByRole("button", { name: "登录", exact: true }).click();
     const result = await (await responsePromise).json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 async function openRoute(page, route) {
@@ -98,16 +102,19 @@ test("AI 对话清爽化、Markdown 安全渲染与工作中心表单模块全�
     await login(page);
     await openRoute(page, "/mic-ai-engine");
 
-    const assistant = page.getByTestId("unified-ai-assistant");
+    const assistant = page.locator('.ai-engine-page:not(.is-compact)[data-testid="unified-ai-assistant"]:visible').last();
     await expect(assistant).toBeVisible({ timeout: 30_000 });
-    const promptRows = assistant.locator(".quick-prompt");
-    const promptCount = await promptRows.count();
-    expect(promptCount).toBeGreaterThan(0);
-    expect(promptCount).toBeLessThanOrEqual(4);
-
-    const promptStyle = await promptRows.first().evaluate((element) => {
-        const style = getComputedStyle(element);
-        const title = element.querySelector("strong");
+    // 空对话首页已由快捷提示行升级为四类能力目录；验证实际可见内容。
+    await expect(assistant.locator(".quick-prompts")).toBeHidden();
+    const directory = assistant.getByTestId("ai-capability-directory");
+    await expect(directory).toBeVisible();
+    const categories = directory.locator(".creation-category");
+    await expect(categories).toHaveCount(4);
+    for (const title of ["智能助手", "视觉创作", "声音创作", "模型与扩展"]) {
+        await expect(directory.getByText(title, { exact: true })).toBeVisible();
+    }
+    const categoryStyles = await categories.evaluateAll((elements) => elements.map((element) => {
+        const title = element.querySelector("header strong");
         const titleStyle = title ? getComputedStyle(title) : null;
         let background = "";
         let backgroundNode = element;
@@ -120,23 +127,23 @@ test("AI 对话清爽化、Markdown 安全渲染与工作中心表单模块全�
             backgroundNode = backgroundNode.parentElement;
         }
         return {
-            display: style.display,
-            direction: style.flexDirection,
-            radius: style.borderRadius,
-            shadow: style.boxShadow,
             titleColor: titleStyle?.color || "",
-            background
+            background,
+            width: element.getBoundingClientRect().width,
+            height: element.getBoundingClientRect().height,
+            overflow: element.scrollWidth - element.clientWidth
         };
-    });
-    expect(promptStyle.display).toBe("flex");
-    expect(promptStyle.direction).toBe("row");
-    expect(promptStyle.shadow).toBe("none");
-    expect(parseFloat(promptStyle.radius)).toBe(0);
-    const titleRgb = parseRgb(promptStyle.titleColor);
-    const backgroundRgb = parseRgb(promptStyle.background);
-    expect(titleRgb).not.toBeNull();
-    expect(backgroundRgb).not.toBeNull();
-    expect(contrastRatio(titleRgb, backgroundRgb)).toBeGreaterThanOrEqual(4.5);
+    }));
+    for (const category of categoryStyles) {
+        expect(category.width).toBeGreaterThan(0);
+        expect(category.height).toBeGreaterThan(0);
+        expect(category.overflow).toBeLessThanOrEqual(1);
+        const titleRgb = parseRgb(category.titleColor);
+        const backgroundRgb = parseRgb(category.background);
+        expect(titleRgb).not.toBeNull();
+        expect(backgroundRgb).not.toBeNull();
+        expect(contrastRatio(titleRgb, backgroundRgb)).toBeGreaterThanOrEqual(4.5);
+    }
 
     await expect(assistant.locator('.ai-engine-sidebar')).toHaveCount(0);
     await expect(assistant.getByTestId('ai-capability-directory')).toBeVisible();

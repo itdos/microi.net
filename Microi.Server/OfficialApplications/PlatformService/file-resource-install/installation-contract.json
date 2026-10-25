@@ -1,0 +1,75 @@
+{
+  "protocol": "ManagedFileResource/1",
+  "stage": "LocalCandidateOnly",
+  "ownerAppId": "app.microi.sys-log",
+  "officialMasterTarget": {
+    "profile": "microi_itdos_api_itdos_com",
+    "apiBase": "https://api.itdos.com",
+    "osClient": "iTdos"
+  },
+  "publicRoutingEnabled": false,
+  "trustedCollectorsEnabled": false,
+  "replicaWorkersEnabled": false,
+  "currentTenantOnly": true,
+  "allowCrossTenantRegistration": false,
+  "allowPrivateSources": false,
+  "seedResources": false,
+  "copiedObjectCount": 0,
+  "policyFieldNames": [
+    "FileServerBakThresholdGiB",
+    "FileServerBakWindowHours"
+  ],
+  "genericPackageDefaults": {
+    "FileServerBakThresholdGiB": null,
+    "FileServerBakWindowHours": 24
+  },
+  "currentTenantRequestedPolicy": {
+    "Tenant": "iTdos",
+    "FileServerBakThresholdGiB": 1,
+    "FileServerBakWindowHours": 24
+  },
+  "configurationIsPreexisting": true,
+  "configurationIsWrittenByThisManifest": false,
+  "packageOwners": {
+    "catalogAndManager": "app.microi.sys-log",
+    "systemConfiguration": [
+      "app.microi.sys-config",
+      "app.microi.saas-engine"
+    ]
+  },
+  "resourcePolicies": {
+    "ApiEngines": {
+      "mci-file-resource-manager": {
+        "Ownership": "Application",
+        "UpgradePolicy": "Managed"
+      }
+    }
+  },
+  "sourceHashes": {
+    "descriptor": "3a30640d58e05cc8488e41cac42d6d33aaa7341e702c15612a05f938888cd9bb",
+    "manager": "bc19fc968c14011cec4b9b9dd2b144b386865dbf6f5d37dea6bdbf8af76ae3c8"
+  },
+  "counts": {
+    "tables": 3,
+    "fields": 49,
+    "indexes": 5,
+    "engines": 1
+  },
+  "securityLimitations": [
+    "Readonly is a UI property, not a generic FormEngine write restriction.",
+    "No role or module grant is installed. Ordinary unauthorized users remain denied.",
+    "Administrators and users later granted table CRUD can bypass manager invariants through generic CRUD.",
+    "Form events alone are insufficient because _RunV8Event can skip them.",
+    "All traffic/replica rows remain untrusted; Evaluate always returns Unknown/Unverified/UseBackup=false."
+  ],
+  "activationBlockers": [
+    "Trusted backend write boundary for catalog, traffic evidence and replica authority.",
+    "Fresh complete per-object traffic collector; historical summaries do not provide current evidence.",
+    "Verified replica worker and source/runtime version binding.",
+    "Runtime consumers, dependency groups and explicit cross-tenant governance when needed."
+  ],
+  "installMeaning": "Only empty metadata tables/indexes and a fail-closed administrator engine; not file replication or routing.",
+  "officialMasterRule": "Maintain selected master metadata; do not invoke an app import/install engine on the official publishing source, including ValidateOnly.",
+  "publishedPackageVersionChanged": false,
+  "manifestFileSha256": "9e669ab7c4978d6a13eec66b4eeec091221bd9d98bb98e03f9a65c81ecec6fb6"
+}

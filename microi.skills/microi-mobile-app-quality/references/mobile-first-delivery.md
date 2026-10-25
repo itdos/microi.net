@@ -4,7 +4,7 @@
 快捷登录和会话协议以 `microi-uniapp-frontend`、`microi-frontend-sdk` 为准；本参考负责
 把源码、外部服务、后台与正式入口组成一条可回读的交付链，避免只有静态页面。
 
-<!-- microi-progressive:chunk id=microi-mobile-app-quality-022 sha256=748fc4a802457bab760ae24281c3bb27cb70841fe72b61b86f088439236867aa -->
+<!-- microi-progressive:chunk id=microi-mobile-app-quality-022 sha256=33bf185e007fab2c8316f090b1f608143deca2e3ff4b010e7577c7f88d751008 -->
 ## 开发前固定事实源和首版范围
 
 - 使用指定 MCP 的实际 Profile，先回读 `ApiBase + OsClient`，不能因为官网发布归主租户就让试用端请求主租户。不同租户用独立浏览器 context，不能只新开标签。

@@ -1,9 +1,11 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [ValidateSet("Quick", "PlatformRelease", "Full", "Panel")]
     [string]$Mode = "Quick",
 
     [switch]$AllPlatformTests,
+
+    [switch]$PlatformFrontendTests,
 
     [string]$Configuration = "Release",
 
@@ -28,8 +30,12 @@ param(
 $ErrorActionPreference = "Stop"
 $testRoot = $PSScriptRoot
 $serverRoot = Split-Path -Parent $testRoot
-if ($AllPlatformTests -and $Mode -ne 'PlatformRelease') {
-    throw 'AllPlatformTests is only valid with PlatformRelease; it does not select desktop products.'
+if (($AllPlatformTests -or $PlatformFrontendTests) -and $Mode -ne 'PlatformRelease') {
+    throw 'Platform browser switches are only valid with PlatformRelease; they do not select desktop products.'
+}
+if ($AllPlatformTests -and $PlatformFrontendTests) { throw 'Select the regular frontend scope or the explicit all-platform scope, not both.' }
+if ($Mode -eq 'PlatformRelease' -and ($env:MICROI_GATE_TEST_MYSQL_AUTO -eq '1' -or $env:MICROI_GATE_TEST_MYSQL_CONTAINER)) {
+    throw 'PlatformRelease must reuse existing native database fixtures; automatic Docker test provisioning is not allowed.'
 }
 # 服务器面板独立于业务 API；真实 Docker、ACME、旧协议和两个 Linux 安装顺序走专项门禁。
 # 不把这种有主机副作用的验收混进 Quick，也不让缺少任一专项的回执变成 Full 成功。
@@ -110,13 +116,14 @@ if ($freeBytes -lt $reserveBytes) {
     throw "Available physical memory is below the Microi build reserve target. Close other heavy tasks or run later."
 }
 
-if ($AllPlatformTests) {
+if ($AllPlatformTests -or $PlatformFrontendTests) {
     # 完整发行不能把组件用例当成全部；先盘点已有配置和授权，不自动准备租户或 Docker。
     New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
     if ($TestMatrixFile) { $env:MICROI_TEST_MATRIX_FILE = $TestMatrixFile }
     $allPlatformTool = Join-Path $testRoot 'ReleaseGate/platform-all-tests.mjs'
-    $allPlatformEnvironmentJson = node $allPlatformTool preflight $ResultsDirectory
-    if ($LASTEXITCODE -ne 0) { throw 'AllPlatformTests preflight failed; inspect all-platform-preflight.json for each missing prerequisite.' }
+    $platformPreflightMode = if ($PlatformFrontendTests) { 'frontend-preflight' } else { 'preflight' }
+    $allPlatformEnvironmentJson = node $allPlatformTool $platformPreflightMode $ResultsDirectory
+    if ($LASTEXITCODE -ne 0) { throw 'Platform browser preflight failed; inspect the scope preflight receipt for missing prerequisites.' }
     $allPlatformEnvironment = $allPlatformEnvironmentJson | ConvertFrom-Json
     foreach ($binding in $allPlatformEnvironment.PSObject.Properties) {
         [Environment]::SetEnvironmentVariable($binding.Name, [string]$binding.Value, 'Process')
@@ -132,9 +139,9 @@ if ($Mode -eq "Full" -or $AllPlatformTests) {
     if ($stagedRuntime -and ((Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_READY_FILE) -or (Test-Path -LiteralPath $env:MICROI_TEST_RUNTIME_BUILD_FILE))) {
         throw 'Staged Full requires new signal files; previous runtime/build receipts cannot be reused.'
     }
+    # 新 HTTP 门禁仅支持已经具备最终 DLL/进程/凭据身份核验的 staged runtime。
+    # 预检在所有构建/数据库写入前失败，不把缺夹具变成 Skip。
     if ($Mode -eq 'Full') {
-        # 显式 Full 保留已有准入夹具门禁；全部平台测试只复用既有授权范围。
-        # 预检在所有构建/数据库写入前失败，不把缺夹具变成 Skip。
         $admissionTool = Join-Path $testRoot 'ReleaseGate/fixtures/admission/runtime.mjs'
         node $admissionTool preflight $ResultsDirectory
         if ($LASTEXITCODE -ne 0) { throw 'Full admission fixture preflight failed. See Microi.Tests/README.md: Admission fixture.' }
@@ -175,6 +182,7 @@ if ($Mode -eq 'PlatformRelease') {
     $platformPlanFile = Join-Path $ResultsDirectory 'platform-release-plan.json'
     $platformPlanArguments = @('freeze-platform', $env:MICROI_RELEASE_CANDIDATE, $platformPlanFile)
     if ($AllPlatformTests) { $platformPlanArguments += '--all-platform-tests' }
+    if ($PlatformFrontendTests) { $platformPlanArguments += '--platform-frontend-tests' }
     node $platformMatrixTool @platformPlanArguments
     if ($LASTEXITCODE -ne 0) { throw 'PlatformRelease candidate binding failed before regression execution.' }
 }
@@ -263,7 +271,9 @@ if (Test-Path -LiteralPath $desktopPackage) {
 # PlatformRelease 只覆盖平台本身；Code/Agent 的独立产品检查仍保留在原 Quick/Full 入口。
 # 双 API、新租户安装及跨产品浏览器验收仅属于显式 Full，不作为平台发布的先决条件。
 # 自动发现平台统一入口、平台内置应用包和 PC 端的 node:test 回归；新增测试不依赖手工清单。
-node (Join-Path $testRoot 'run-node-regressions.mjs') $ResultsDirectory
+$nodeRegressionArguments = @((Join-Path $testRoot 'run-node-regressions.mjs'), $ResultsDirectory)
+if ($Mode -eq 'PlatformRelease' -and -not $AllPlatformTests) { $nodeRegressionArguments += '--regular-platform' }
+node @nodeRegressionArguments
 if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with exit code $LASTEXITCODE." }
 
 $v8Test = Join-Path $testRoot "V8\empty-database-sanitization.test.mjs"
@@ -408,10 +418,26 @@ dotnet test $project `
     -m:1
 if ($LASTEXITCODE -ne 0) { throw "$Mode component regression tests failed with exit code $LASTEXITCODE." }
 
-if ($AllPlatformTests) {
-    $allPlatformBrowserJson = node $allPlatformTool browser $ResultsDirectory
-    if ($LASTEXITCODE -ne 0) { throw 'AllPlatformTests frontend browser gate failed.' }
-    $allPlatformBrowser = $allPlatformBrowserJson | ConvertFrom-Json
+if ($AllPlatformTests -or $PlatformFrontendTests) {
+    try {
+        if ($env:MICROI_PLATFORM_RUNTIME_CONTROL) {
+            $platformRuntimeJson = node $allPlatformTool runtime-prepare $ResultsDirectory $env:ArtifactsPath $env:MICROI_PLATFORM_RUNTIME_CONTROL
+            if ($LASTEXITCODE -ne 0) { throw 'Owned platform runtime did not start from this candidate build.' }
+            $platformRuntime = $platformRuntimeJson | ConvertFrom-Json
+            foreach ($binding in $platformRuntime.environment.PSObject.Properties) {
+                [Environment]::SetEnvironmentVariable($binding.Name, [string]$binding.Value, 'Process')
+            }
+        }
+        $platformBrowserMode = if ($PlatformFrontendTests) { 'frontend-browser' } else { 'browser' }
+        $allPlatformBrowserJson = node $allPlatformTool $platformBrowserMode $ResultsDirectory
+        if ($LASTEXITCODE -ne 0) { throw 'Platform frontend browser gate failed.' }
+        $allPlatformBrowser = $allPlatformBrowserJson | ConvertFrom-Json
+    } finally {
+        if ($env:MICROI_PLATFORM_RUNTIME_CONTROL) {
+            node $allPlatformTool runtime-stop $ResultsDirectory $env:ArtifactsPath $env:MICROI_PLATFORM_RUNTIME_CONTROL | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Owned platform runtime stop failed before artifact cleanup.' }
+        }
+    }
 }
 
 if ($Mode -eq "Full") {
@@ -630,13 +656,14 @@ if ($Mode -eq 'PlatformRelease') {
     $receipt = [ordered]@{
         schemaVersion = 1; scope = 'PlatformRelease'; status = 'Passed'; filter = $(if ($AllPlatformTests) { 'AllPlatformTests' } else { 'Category!=FullStack' })
         allPlatformTests = [bool]$AllPlatformTests
+        platformFrontendTests = [bool]$PlatformFrontendTests
         startedAt = $testStartedAt.ToString('o'); completedAt = $completedAt.ToString('o')
         elapsedSeconds = [Math]::Round(($completedAt - $testStartedAt).TotalSeconds, 3)
         dotnet = [ordered]@{ trxFile = $platformTrx.trxFile; trxSha256 = $platformTrx.trxSha256; tests = [int]$counters.total; passed = [int]$counters.passed; failed = 0; skipped = 0 }
         node = [ordered]@{ reportFile = $nodeReportFile; reportSha256 = (Get-FileHash -LiteralPath $nodeReportFile -Algorithm SHA256).Hash.ToLowerInvariant(); groups = $nodeGroups.Count; tests = $nodeTests; passed = $nodeTests; failed = 0; skipped = 0 }
-        excludedScopes = $(if ($AllPlatformTests) { @('CodeAgentDesktopAndVSIX') } else { @('CodeAgentDesktopAndVSIX', 'NewTenantAdmission', 'FullStackDependencyMatrix', 'NotificationChatInstallationAndBrowser') })
+        excludedScopes = $(if ($AllPlatformTests) { @('CodeAgentDesktopAndVSIX') } elseif ($PlatformFrontendTests) { @('CodeAgentDesktopAndVSIX', 'NewTenantAdmission', 'FullStackDependencyMatrix', 'ChatInstallation', 'RealPaidAI', 'CustomerSpecificAcceptance', 'SqlServerSpecialAcceptance') } else { @('CodeAgentDesktopAndVSIX', 'NewTenantAdmission', 'FullStackDependencyMatrix', 'NotificationChatInstallationAndBrowser') })
     }
-    if ($AllPlatformTests) { $receipt.browser = $allPlatformBrowser }
+    if ($AllPlatformTests -or $PlatformFrontendTests) { $receipt.browser = $allPlatformBrowser }
     $receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $ResultsDirectory 'platform-release-tests.json') -Encoding UTF8
     node $platformMatrixTool verify-platform $platformPlanFile (Join-Path $ResultsDirectory 'platform-release-tests.json') (Join-Path $ResultsDirectory 'platform-release-result.json')
     if ($LASTEXITCODE -ne 0) { throw 'PlatformRelease matrix rejected source drift or inconsistent real test evidence.' }

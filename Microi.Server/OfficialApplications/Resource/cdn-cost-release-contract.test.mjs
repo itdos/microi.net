@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=n=>JSON.parse(readFileSync(new URL(n,import.meta.url),'utf8'));
+test('CDN托管包与已交付源码一致，保留后台权限边界',()=>{const p=read('app.microi.sys-log.json');for(const key of ['mci-cdn-aliyun','mci-cdn-core','mci-cdn-manager']){const engine=p.SysApiEngines.find(x=>x.ApiEngineKey===key);assert.equal(engine.ApiV8Code,readFileSync(new URL('../PlatformService/engines/'+key+'.js',import.meta.url),'utf8'));assert.equal(p.ResourcePolicies.ApiEngines[key].UpgradePolicy,'Managed');if(key!=='mci-cdn-manager')assert.equal(Number(engine.StopHttp),1)}});
+test('CDN预警通知默认只含站内通道且不会覆盖租户收件人',()=>{const p=read('app.microi.message-notification.json'),set=p.DataSets.find(x=>x.Rows.some(r=>r.Key==='cdn_traffic_alert'));assert.equal(set.ConflictPolicy,'InsertIfMissing');assert.deepEqual(set.ConflictFields,['Key']);const row=set.Rows.find(x=>x.Key==='cdn_traffic_alert');assert.deepEqual(JSON.parse(row.Type),['平台内部']);assert.deepEqual(JSON.parse(row.Receivers),[]);assert.deepEqual(JSON.parse(row.ReceiversRoles),[]);assert.deepEqual(JSON.parse(row.ChannelApiEngineMap),{});assert.equal(row.IsEnable,1)});
+test('商城包交付完整缓存修复，安装与详情入口共用实时来源',()=>{const p=read('app.microi.store.json');for(const [key,file] of [['get-microi-store-model','get-microi-store-model.js'],['import-microi-store-package','import-package.js']])assert.equal(p.SysApiEngines.find(x=>x.ApiEngineKey===key).ApiV8Code,readFileSync(new URL(file,import.meta.url),'utf8'))});

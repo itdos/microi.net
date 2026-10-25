@@ -166,14 +166,14 @@ var list = V8.Dbs.OracleDB1.FromSql('SELECT * FROM Table WHERE Id = @p0')
 // 不写入 microi_database：创建仅当前请求使用的临时会话
 var tempDb = V8.Dbs.Open(
   'SqlServer',
-  'Server=127.0.0.1,1433;Database=app;User Id=user;Password=***;TrustServerCertificate=True;'
+  'Server=db.example.com,1433;Database=app;User Id=user;Password=***;Encrypt=True;TrustServerCertificate=False;'
 );
 var tempList = tempDb.FromSql('SELECT Id, Name FROM Customer WHERE Status = @p0')
   .AddInParameter('@p0', 1)
   .ToArray();
 ```
 
-`V8.Dbs.Open` 与保存连接均只支持 Dos.ORM 已认证的 `MySql`、`SqlServer`、`Oracle`、`PostgreSql`、`DaMeng`、`KingBase`。动态连接串只能来自可信服务端密钥或管理员代码，禁止使用 `V8.Param.ConnectionString`，禁止记录或返回。外部 SQL 的表名、列名、排序字段必须来自已校验元数据白名单；动态值继续使用 `AddInParameter`。
+`V8.Dbs.Open` 与保存连接支持 Dos.ORM 当前提供驱动和方言的 `MySql`、`SqlServer`、`Oracle`、`PostgreSql`、`DaMeng`、`KingBase`；具体 CPU、操作系统、数据库版本组合仍需真实验收，不代表第三方适配认证。SQL Server 生产连接启用加密与服务器证书校验，域名必须匹配证书且 API 宿主信任签发 CA，不以跳过校验作为通用修复。动态连接串只能来自可信服务端密钥或管理员代码，禁止使用 `V8.Param.ConnectionString`，禁止记录或返回。外部 SQL 的表名、列名、排序字段必须来自已校验元数据白名单；动态值继续使用 `AddInParameter`。
 
 MCP 结构发现使用 `microi_inspect_external_database`，安全抽样默认使用只读的 `microi_query_external_database`。当用户明确要求数据库管理级能力时，使用独立的 `microi_execute_external_database`：它只允许后端确认的 `Level >= 9999` 当前用户调用，显式确认后可执行目标数据库账号有权执行的任意 DML、DDL、存储过程、数据库原生命令或多语句。输出行数限制只保护 MCP 传输，不限制数据库副作用；审计只记录 SQL 哈希、长度、模式和结果，不得记录 SQL 正文、连接串或密码。
 

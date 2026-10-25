@@ -2,19 +2,21 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
 const password = process.env.PW_LOCAL_PASSWORD || "";
-const base = process.env.PW_BASE_URL || "http://localhost:61500";
-const apiBase = process.env.PW_API_BASE || "";
+const base = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
+const apiBase = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
 
 test.use({ browserName: "chromium", channel: "msedge", viewport: { width: 1600, height: 900 } });
 test.setTimeout(120_000);
 
 test("主题设置切换全局直角并统一顶栏图标", async ({ page }) => {
     test.skip(!password, "PW_LOCAL_PASSWORD is required");
-    await page.goto(`${base}/?OsClient=iTdos${apiBase ? `&ApiBase=${encodeURIComponent(apiBase)}` : ""}`, { waitUntil: "domcontentloaded" });
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    await page.goto(`${base}/?OsClient=${encodeURIComponent(OS_CLIENT)}${apiBase ? `&ApiBase=${encodeURIComponent(apiBase)}` : ""}`, { waitUntil: "domcontentloaded" });
     const account = page.locator('input[placeholder*="user name"], input[placeholder*="用户名"], input[placeholder*="账号"], input[placeholder*="帐号"]').first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(password);
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
     if (await privacy.isVisible().catch(() => false)) {

@@ -1,0 +1,754 @@
+{
+  "name": "系统日志/监控：受管热点公开资源目录（关闭状态的母版准备）",
+  "tables": [
+    {
+      "name": "mci_file_resource",
+      "description": "受管热点公开资源目录",
+      "readPrimary": 1,
+      "v8Limit": false,
+      "tabs": [
+        {
+          "Id": "metadata",
+          "Name": "目录与证据",
+          "Sort": 10
+        }
+      ],
+      "formBanner": {
+        "enabled": true,
+        "titleField": "Name",
+        "subtitleField": "ObjectKey",
+        "imageField": "",
+        "backgroundField": "",
+        "icon": "fas fa-file-shield",
+        "metrics": [],
+        "tagFields": [
+          {
+            "Field": "AuthorityState"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "name": "Tenant",
+          "label": "租户",
+          "type": "varchar(50)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 10,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "ResourceKey",
+          "label": "稳定资源标识",
+          "type": "varchar(120)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 20,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "Name",
+          "label": "资源名称",
+          "type": "varchar(160)",
+          "component": "Text",
+          "tab": "metadata",
+          "sort": 30,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180,
+          "readonly": 1
+        },
+        {
+          "name": "Kind",
+          "label": "资源类型",
+          "type": "varchar(32)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 40,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "AppId",
+          "label": "应用Id",
+          "type": "varchar(36)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 50,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "SourceFileId",
+          "label": "发布文件Id",
+          "type": "varchar(36)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 60,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "SourceTenant",
+          "label": "源租户",
+          "type": "varchar(50)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 70,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "SourceProvider",
+          "label": "主存储提供商",
+          "type": "varchar(20)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 80,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "ObjectKey",
+          "label": "公有对象键",
+          "type": "varchar(1000)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 90,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "ContentHash",
+          "label": "源SHA256",
+          "type": "varchar(64)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 100,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "Size",
+          "label": "源字节数",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 110,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "ContentType",
+          "label": "内容类型",
+          "type": "varchar(128)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 120,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "SourceRevision",
+          "label": "源版本摘要",
+          "type": "varchar(64)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 130,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "AuthorityState",
+          "label": "源声明状态",
+          "type": "varchar(24)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 140,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "Visibility",
+          "label": "可见范围",
+          "type": "varchar(12)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 150,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "Enabled",
+          "label": "纳入目录",
+          "type": "int",
+          "component": "Switch",
+          "defaultValue": "1",
+          "tab": "metadata",
+          "sort": 160,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180,
+          "readonly": 1
+        },
+        {
+          "name": "RowVersion",
+          "label": "并发版本",
+          "type": "int",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 170,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ux_file_resource_key",
+          "columns": [
+            "Tenant",
+            "ResourceKey"
+          ],
+          "unique": true,
+          "purpose": "当前租户资源协议的有序物理索引；必须在生成后按列顺序与唯一性回读。"
+        }
+      ]
+    },
+    {
+      "name": "mci_file_traffic_window",
+      "description": "资源流量证据窗口（采集器待接入）",
+      "readPrimary": 1,
+      "v8Limit": false,
+      "tabs": [
+        {
+          "Id": "metadata",
+          "Name": "目录与证据",
+          "Sort": 10
+        }
+      ],
+      "formBanner": {
+        "enabled": true,
+        "titleField": "ResourceId",
+        "subtitleField": "DataSource",
+        "imageField": "",
+        "backgroundField": "",
+        "icon": "fas fa-file-shield",
+        "metrics": [],
+        "tagFields": [
+          {
+            "Field": "EvidenceState"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "name": "Tenant",
+          "label": "租户",
+          "type": "varchar(50)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 10,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "ResourceId",
+          "label": "资源Id",
+          "type": "varchar(36)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 20,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "VersionHash",
+          "label": "资源版本摘要",
+          "type": "varchar(64)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 30,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "WindowStartUtc",
+          "label": "窗口起点UTC秒",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 40,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 160
+        },
+        {
+          "name": "WindowEndUtc",
+          "label": "窗口终点UTC秒",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 50,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 160
+        },
+        {
+          "name": "Metric",
+          "label": "计量口径",
+          "type": "varchar(32)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 60,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "Bytes",
+          "label": "实际字节（未知为空）",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 70,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "Requests",
+          "label": "请求数（未知为空）",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 80,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "DataSource",
+          "label": "数据来源",
+          "type": "varchar(40)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 90,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "CoverageScope",
+          "label": "覆盖范围",
+          "type": "varchar(80)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 100,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "CoverageComplete",
+          "label": "覆盖完整",
+          "type": "int",
+          "component": "Switch",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 110,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "EvidenceState",
+          "label": "证据状态",
+          "type": "varchar(24)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 120,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "ObservedThroughUtc",
+          "label": "覆盖到UTC秒",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 130,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 160
+        },
+        {
+          "name": "CollectedAtUtc",
+          "label": "采集UTC秒",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 140,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 160
+        },
+        {
+          "name": "FreshUntilUtc",
+          "label": "有效到UTC秒",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 150,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 160
+        },
+        {
+          "name": "EvidenceHash",
+          "label": "证据摘要",
+          "type": "varchar(64)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 160,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "RequestKey",
+          "label": "采集幂等键",
+          "type": "varchar(100)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 170,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ux_file_traffic_request",
+          "columns": [
+            "Tenant",
+            "RequestKey"
+          ],
+          "unique": true,
+          "purpose": "当前租户资源协议的有序物理索引；必须在生成后按列顺序与唯一性回读。"
+        },
+        {
+          "name": "ix_file_traffic_window",
+          "columns": [
+            "Tenant",
+            "ResourceId",
+            "WindowEndUtc"
+          ],
+          "unique": false,
+          "purpose": "当前租户资源协议的有序物理索引；必须在生成后按列顺序与唯一性回读。"
+        }
+      ]
+    },
+    {
+      "name": "mci_file_replica",
+      "description": "热点资源备用副本回执（复制器待接入）",
+      "readPrimary": 1,
+      "v8Limit": false,
+      "tabs": [
+        {
+          "Id": "metadata",
+          "Name": "目录与证据",
+          "Sort": 10
+        }
+      ],
+      "formBanner": {
+        "enabled": true,
+        "titleField": "ResourceId",
+        "subtitleField": "TargetObjectKey",
+        "imageField": "",
+        "backgroundField": "",
+        "icon": "fas fa-file-shield",
+        "metrics": [],
+        "tagFields": [
+          {
+            "Field": "State"
+          }
+        ]
+      },
+      "fields": [
+        {
+          "name": "Tenant",
+          "label": "租户",
+          "type": "varchar(50)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 10,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "ResourceId",
+          "label": "资源Id",
+          "type": "varchar(36)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 20,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "SourceRevision",
+          "label": "源版本摘要",
+          "type": "varchar(64)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 30,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "TargetConfigHash",
+          "label": "目标配置摘要",
+          "type": "varchar(64)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 40,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "TargetObjectKey",
+          "label": "目标对象键",
+          "type": "varchar(1000)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 50,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "State",
+          "label": "副本状态",
+          "type": "varchar(24)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 60,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "VerifiedSize",
+          "label": "回读字节（未知为空）",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 70,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "VerifiedSha256",
+          "label": "回读SHA256",
+          "type": "varchar(64)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 80,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "VerifiedAtUtc",
+          "label": "验证UTC秒",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 90,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 160
+        },
+        {
+          "name": "LastErrorCode",
+          "label": "错误代码",
+          "type": "varchar(80)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 100,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "RequestKey",
+          "label": "复制幂等键",
+          "type": "varchar(100)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 110,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "JobId",
+          "label": "持久任务Id",
+          "type": "varchar(36)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 120,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "LeaseOwner",
+          "label": "租约持有者",
+          "type": "varchar(64)",
+          "component": "Text",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 130,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "FencingToken",
+          "label": "租约栅栏",
+          "type": "bigint",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 140,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        },
+        {
+          "name": "RowVersion",
+          "label": "并发版本",
+          "type": "int",
+          "component": "NumberText",
+          "readonly": 1,
+          "tab": "metadata",
+          "sort": 150,
+          "visible": 1,
+          "appVisible": 1,
+          "tableWidth": 180
+        }
+      ],
+      "indexes": [
+        {
+          "name": "ux_file_replica_request",
+          "columns": [
+            "Tenant",
+            "RequestKey"
+          ],
+          "unique": true,
+          "purpose": "当前租户资源协议的有序物理索引；必须在生成后按列顺序与唯一性回读。"
+        },
+        {
+          "name": "ix_file_replica_resource",
+          "columns": [
+            "Tenant",
+            "ResourceId",
+            "SourceRevision"
+          ],
+          "unique": false,
+          "purpose": "当前租户资源协议的有序物理索引；必须在生成后按列顺序与唯一性回读。"
+        }
+      ]
+    }
+  ],
+  "engines": [
+    {
+      "apiEngineKey": "mci-file-resource-manager",
+      "apiName": "受管热点公开资源管理",
+      "category": "系统日志/监控",
+      "apiAddress": "/apiengine/mci-file-resource-manager",
+      "v8Limit": false,
+      "allowAnonymous": false,
+      "code": "/* OFFICIAL_MANAGED_API_ENGINE_NOTICE_V1\n * 官方应用：系统日志/监控。Managed；ApiEngineKey: mci-file-resource-manager\n */\n\n/*\n * V8 ApiEngine\n * ApiEngineKey: mci-file-resource-manager\n * Version: v1.0.0\n * Function:\n * - 当前租户管理员维护热点公开资源目录，读取系统阈值和明确未接入的流量/副本状态。\n * - 只登记元数据；不读取文件正文、不复制、不签名、不启用分流，不接受调用方伪造Ready或可信计量。\n */\n\nvar tenant = String(V8.OsClient || ''), protocol = 'ManagedFileResource/1';\nvar resourceFields = ['Id', 'Tenant', 'ResourceKey', 'Name', 'Kind', 'AppId', 'SourceFileId', 'SourceTenant', 'SourceProvider', 'ObjectKey', 'ContentHash', 'Size', 'ContentType', 'SourceRevision', 'AuthorityState', 'Visibility', 'Enabled', 'RowVersion'];\n\n// 错误只返回固定代码；数据库异常与请求正文不会进入响应。\nfunction fail(code) { var error = Error(code); error.safeCode = code; throw error; }\nfunction text(value) { return value == null ? '' : String(value).trim(); }\nfunction ok(data) { return { Code: 1, Data: data }; }\nfunction must(result) { if (!result || Number(result.Code) !== 1) fail('RESOURCE_STORE_UNAVAILABLE'); return result.Data; }\nfunction digest(value) { return String(V8.EncryptHelper.Sha256Hex(String(value))).toLowerCase(); }\n\n// 只规范化有界业务参数；身份和租户始终来自服务端上下文。\nfunction parameters() {\n    var encoded = JSON.stringify(V8.Param || {});\n    if (encoded.length > 16384) fail('REQUEST_TOO_LARGE');\n    var value = JSON.parse(encoded), allowed = ['Action', 'Resource', 'Id', 'Name', 'Enabled', 'ExpectedRowVersion', 'PageIndex', 'PageSize'];\n    var transport = ['ApiEngineKey', 'ApiAddress', 'OsClient', '_InvokeType', '_Lang'];\n    Object.keys(value).forEach(function (key) {\n        if (allowed.indexOf(key) >= 0 || transport.indexOf(key) >= 0) return;\n        if (key === 'TestParam1' && (value[key] == null || typeof value[key] === 'boolean' || typeof value[key] === 'number' && isFinite(value[key]) || typeof value[key] === 'string' && value[key].length <= 200)) return;\n        fail('UNSUPPORTED_ARGUMENT');\n    });\n    if (value.OsClient != null && text(value.OsClient).toLowerCase() !== tenant.toLowerCase()) fail('TENANT_MISMATCH');\n    return value;\n}\n\n// 目录仅接受原始对象键，不接受URL、查询参数、编码穿越或私有源码命名空间。\nfunction objectKey(value) {\n    var key = text(value);\n    if (!key || key.length > 1000 || /[\\\\%?#:\\x00-\\x20\\x7f]/.test(key) || key.charAt(0) === '/' || key.charAt(key.length - 1) === '/') fail('INVALID_PUBLIC_OBJECT_KEY');\n    var parts = key.split('/');\n    if (parts.some(function (part) { return !part || part === '.' || part === '..' || /^(?:\\.git|\\.env|private|private-source|privatesource|source|_origin)$/i.test(part); })) fail('INVALID_PUBLIC_OBJECT_KEY');\n    if (!/\\.(?:glb|gltf|bin|hdr|ktx2?|basis|js|mjs|css|wasm|json|png|jpe?g|webp|gif|svg|ico|woff2?|ttf|otf|mp4|webm|zip)$/i.test(key)) fail('UNSUPPORTED_PUBLIC_RESOURCE_TYPE');\n    return key;\n}\n// 仅允许现有平台两种当前租户公有命名空间；管理员身份不是跨租户对象授权。\nfunction tenantObjectKey(value) {\n    var key = objectKey(value), owner = tenant.toLowerCase();\n    if (key.indexOf(owner + '/') !== 0 && key.indexOf('microi/application-assets/v3/tenants/' + owner + '/') !== 0) fail('CURRENT_TENANT_PUBLIC_NAMESPACE_REQUIRED');\n    return key;\n}\nfunction identifier(value) { var id = text(value); if (!/^[a-zA-Z0-9-]{1,36}$/.test(id)) fail('INVALID_RESOURCE_ID'); return id; }\nfunction hash(value) { var result = text(value).toLowerCase(); if (!/^[a-f0-9]{64}$/.test(result)) fail('INVALID_CONTENT_HASH'); return result; }\nfunction integer(value, min, max, fallback) { var n = value == null || value === '' ? fallback : Number(value); if (!isFinite(n) || Math.floor(n) !== n || n < min || n > max) fail('INVALID_NUMBER'); return n; }\nfunction label(value) { var s = text(value); if (!s || s.length > 160 || /[\\x00-\\x1f\\x7f]/.test(s)) fail('INVALID_RESOURCE_NAME'); return s; }\n\n// 当前租户事实查询固定字段和范围；不读取正文或秘密字段。\nfunction one(table, id, fields, tenantColumn) {\n    var where = [['Id', '=', id]];\n    if (tenantColumn) where.push(['Tenant', '=', tenant]);\n    var result = V8.FormEngine.GetFormData(table, { _Where: where, _SelectFields: fields, _ReadPrimary: true }, V8.DbTrans);\n    if (result && Number(result.Code) === 2) return null;\n    var encoded = JSON.stringify(must(result));\n    if (!encoded || encoded.length > 32768) fail('RESOURCE_STORE_UNAVAILABLE');\n    return JSON.parse(encoded);\n}\nfunction resource(id) { var row = one('mci_file_resource', identifier(id), resourceFields, true); if (!row || String(row.Tenant) !== tenant) fail('RESOURCE_NOT_FOUND'); return row; }\n\n// 公开前缀允许域名、可选端口和桶路径；永不接受签名参数或用户信息。\nfunction publicBase(value) {\n    var raw = text(value).replace(/\\/+$/, '');\n    if (!raw) return '';\n    var match = /^https:\\/\\/([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)(?::([0-9]{1,5}))?(\\/[^?#]*)?$/i.exec(raw);\n    if (!match || !match[1].includes('.') || match[1].includes('..') || match[2] && (Number(match[2]) < 1 || Number(match[2]) > 65535) || /[@%\\\\\\x00-\\x20\\x7f]/.test(raw)) fail('INVALID_FILE_SERVER_BASE');\n    if (match[3] && match[3].split('/').slice(1).some(function (part) { return !part || part === '.' || part === '..'; })) fail('INVALID_FILE_SERVER_BASE');\n    return raw;\n}\n\n// GiB配置解析为整数bytes；最多六位小数，不接受指数、本地化数字或隐式零值。\nfunction thresholdBytes(value) {\n    if (value == null || text(value) === '') return null;\n    var raw = text(value);\n    if (!/^\\d{1,7}(?:\\.\\d{1,6})?$/.test(raw)) fail('INVALID_TRAFFIC_THRESHOLD');\n    var split = raw.split('.'), whole = Number(split[0]), fraction = Number((split[1] || '').padEnd(6, '0'));\n    if (whole > 1000000) fail('INVALID_TRAFFIC_THRESHOLD');\n    // 两项分别换算，避免大整数乘一百万越过精确整数范围。\n    var bytes = whole * 1073741824 + Math.ceil(fraction * 1073741824 / 1000000);\n    return bytes > 0 ? bytes : null;\n}\nfunction policy() {\n    var config = V8.SysConfig || {}, blockers = [], base = '', threshold = null, hours = 24;\n    try { base = publicBase(config.FileServerBak); } catch (_) { blockers.push('InvalidBackupBase'); }\n    try { threshold = thresholdBytes(config.FileServerBakThresholdGiB); } catch (_) { blockers.push('InvalidThreshold'); }\n    try { hours = integer(config.FileServerBakWindowHours, 1, 720, 24); } catch (_) { blockers.push('InvalidWindow'); }\n    if (!base) blockers.push('BackupBaseMissing');\n    if (threshold == null) blockers.push('ThresholdMissingOrDisabled');\n    return { FileServerBak: base, ThresholdBytes: threshold, Unit: 'GiB', WindowHours: hours, Configured: blockers.length === 0, Blockers: blockers, RuntimeRoutingEnabled: false, TrustedCollectorsEnabled: false, ReplicaWorkersEnabled: false };\n}\n\n// 应用产物复用权威文件登记；平台静态资源仅登记声明，尚不能作为已验证来源。\nfunction registration(input) {\n    if (!input || typeof input !== 'object' || Array.isArray(input)) fail('INVALID_RESOURCE');\n    var allowed = ['Kind', 'Name', 'SourceFileId', 'ObjectKey', 'ContentHash', 'Size', 'ContentType'];\n    Object.keys(input).forEach(function (key) { if (allowed.indexOf(key) < 0) fail('UNSUPPORTED_RESOURCE_ARGUMENT'); });\n    var kind = text(input.Kind), row = { Tenant: tenant, SourceTenant: tenant, Name: label(input.Name), Kind: kind, Visibility: 'Public', Enabled: 1, RowVersion: 1, AppId: '', SourceFileId: '', ContentType: '' };\n    var provider = text(V8.OsClientModel && V8.OsClientModel.HDFS) || 'Aliyun';\n    if (['Aliyun', 'MinIO', 'S3'].indexOf(provider) < 0) fail('UNSUPPORTED_SOURCE_PROVIDER');\n    row.SourceProvider = provider;\n    if (kind === 'ApplicationPublicBuild') {\n        if (input.ObjectKey != null || input.ContentHash != null || input.Size != null || input.ContentType != null) fail('APPLICATION_METADATA_MUST_BE_AUTHORITATIVE');\n        var file = one('mci_ai_app_file', identifier(input.SourceFileId), ['Id', 'AppId', 'StorageScope', 'HdfsPath', 'ContentHash', 'Size', 'Version'], false);\n        if (!file || ['PublicBuildStream', 'PublicBuildOnly'].indexOf(String(file.StorageScope)) < 0) fail('PUBLIC_BUILD_REQUIRED');\n        row.SourceFileId = identifier(file.Id); row.AppId = identifier(file.AppId); row.ObjectKey = tenantObjectKey(file.HdfsPath);\n        row.ContentHash = hash(file.ContentHash); row.Size = integer(file.Size, 1, 9007199254740991, -1);\n        row.AuthorityState = 'MetadataBound'; row.ResourceKey = 'appfile:' + row.SourceFileId;\n    } else if (kind === 'PlatformStatic') {\n        if (input.SourceFileId != null) fail('UNSUPPORTED_RESOURCE_ARGUMENT');\n        if (!publicBase((V8.SysConfig || {}).FileServer)) fail('PRIMARY_PUBLIC_BASE_MISSING');\n        row.ObjectKey = tenantObjectKey(input.ObjectKey); row.ContentHash = hash(input.ContentHash); row.Size = integer(input.Size, 1, 9007199254740991, -1);\n        row.ContentType = text(input.ContentType);\n        if (!/^[a-z0-9!#$&^_.+-]+\\/[a-z0-9!#$&^_.+-]+(?:;\\s*charset=[a-z0-9-]+)?$/i.test(row.ContentType) || row.ContentType.length > 128) fail('INVALID_CONTENT_TYPE');\n        row.AuthorityState = 'Declared'; row.ResourceKey = 'static:' + digest(row.ObjectKey).slice(0, 48);\n    } else fail('UNSUPPORTED_RESOURCE_KIND');\n    row.SourceRevision = digest([row.SourceTenant, row.SourceProvider, row.ObjectKey, row.ContentHash, row.Size].join('\\n'));\n    row.Id = digest(tenant + '|resource|' + row.ResourceKey).slice(0, 32);\n    return row;\n}\n\n// 相同资源/版本幂等登记；新版本必须显式刷新，不能悄悄复用旧副本状态。\nfunction register(input) {\n    var row = registration(input), old = one('mci_file_resource', row.Id, resourceFields, true);\n    if (old) {\n        if (old.Tenant !== tenant || old.ResourceKey !== row.ResourceKey || old.SourceRevision !== row.SourceRevision) fail('RESOURCE_VERSION_CONFLICT');\n        return { Resource: old, Replayed: true, UseBackup: false };\n    }\n    must(V8.FormEngine.AddFormData('mci_file_resource', row, V8.DbTrans));\n    var saved = resource(row.Id);\n    if (saved.SourceRevision !== row.SourceRevision) fail('RESOURCE_READBACK_MISMATCH');\n    return { Resource: saved, Replayed: false, UseBackup: false };\n}\n\n// 目录显示名/纳入开关采用固定SQL与参数化CAS，禁止修改证据或副本成功状态。\nfunction update(params) {\n    var old = resource(params.Id), version = integer(params.ExpectedRowVersion, 1, 2147483646, -1);\n    var name = params.Name == null ? label(old.Name) : label(params.Name);\n    var enabled = params.Enabled == null ? Number(old.Enabled) : params.Enabled === true || params.Enabled === 1 ? 1 : params.Enabled === false || params.Enabled === 0 ? 0 : -1;\n    if (enabled < 0) fail('INVALID_ENABLED');\n    var changed = V8.DbTrans.FromSql('UPDATE mci_file_resource SET Name=@name, Enabled=@enabled, RowVersion=RowVersion+1 WHERE Id=@id AND Tenant=@tenant AND RowVersion=@version AND (IsDeleted IS NULL OR IsDeleted=0)')\n        .AddInParameter('@name', name).AddInParameter('@enabled', enabled).AddInParameter('@id', old.Id).AddInParameter('@tenant', tenant).AddInParameter('@version', version).ExecuteNonQuery();\n    if (Number(changed) !== 1) fail('RESOURCE_CONFLICT');\n    var saved = resource(old.Id);\n    if (Number(saved.RowVersion) !== version + 1 || saved.Name !== name || Number(saved.Enabled) !== enabled) fail('RESOURCE_READBACK_MISMATCH');\n    return { Resource: saved, UseBackup: false };\n}\n\n// 第一阶段只展示缺口；即使表中有人填Ready，也不能作为可信采集/复制回执。\nfunction evaluate(row) {\n    var settings = policy(), reasons = settings.Blockers.slice();\n    if (Number(row.Enabled) !== 1) reasons.push('ResourceDisabled');\n    if (row.Visibility !== 'Public') reasons.push('PublicResourceRequired');\n    if (row.SourceTenant !== tenant) reasons.push('SourceTenantMismatch');\n    reasons.push('TrustedTrafficCollectorNotConnected', 'VerifiedReplicaWorkerNotConnected', 'RuntimeResolverNotConnected');\n    return { ResourceId: row.Id, SourceRevision: row.SourceRevision, Policy: settings, TrafficState: 'Unknown', WindowBytes: null, ThresholdMet: null, ReplicaState: 'Unverified', UseBackup: false, Blockers: reasons };\n}\n\ntry {\n    var auth = V8.Method.GetSystemObservability({ Action: 'Snapshot', IncludeHost: false, WindowMinutes: 1, Top: 1 });\n    if (!auth || Number(auth.Code) !== 1) return { Code: 0, Msg: 'PLATFORM_ADMIN_REQUIRED' };\n    if (!/^[a-zA-Z0-9_-]{1,50}$/.test(tenant)) fail('TENANT_REQUIRED');\n    var p = parameters(), action = text(p.Action);\n    if (action === 'Capabilities') return ok({ Protocol: protocol, Actions: ['Capabilities', 'Policy', 'List', 'Register', 'Update', 'Evaluate'], Scope: 'CurrentTenantPublicMetadataOnly', DependencyGroupsSupported: false, CrossTenantGovernanceSupported: false, RuntimeRoutingEnabled: false, TrustedCollectorsEnabled: false, ReplicaWorkersEnabled: false, NoFileBodiesRead: true, NoStorageWrites: true, PrivateRoutingSupported: false });\n    if (action === 'Policy') return ok(policy());\n    if (action === 'Register') return ok(register(p.Resource));\n    if (action === 'Update') return ok(update(p));\n    if (action === 'Evaluate') return ok(evaluate(resource(p.Id)));\n    if (action === 'List') {\n        var page = integer(p.PageIndex, 1, 100000, 1), size = integer(p.PageSize, 1, 100, 20);\n        var result = V8.FormEngine.GetTableData('mci_file_resource', { _Where: [['Tenant', '=', tenant]], _SelectFields: resourceFields, _PageIndex: page, _PageSize: size, _OrderBy: 'CreateTime', _OrderByType: 'DESC', _ReadPrimary: true }, V8.DbTrans);\n        var rows = must(result);\n        return ok({ Rows: rows, TotalCount: result.DataCount == null ? null : result.DataCount, PageIndex: page, PageSize: size, TrafficState: 'Unknown', WindowBytes: null, UseBackup: false });\n    }\n    fail('UNSUPPORTED_ACTION');\n} catch (error) { return { Code: 0, Msg: error.safeCode || 'RESOURCE_OPERATION_FAILED' }; }\n"
+    }
+  ],
+  "roles": [],
+  "modules": [],
+  "permissions": [],
+  "events": [],
+  "dataSources": [],
+  "pages": [],
+  "printTemplates": [],
+  "workflows": [],
+  "jobs": []
+}

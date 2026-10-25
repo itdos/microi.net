@@ -8,7 +8,8 @@ const end=source.indexOf('\n    if (dataSets.length > 0)',start);
 const helper=source.slice(start,end);
 const binding={Field:'SysConfigId',TableName:'sys_config',MatchField:'IsEnable',MatchValue:1};
 function run(data,result){
- const calls=[],transaction={};
+ const calls=[];
+ const transaction={id:'installation-transaction'};
  const ctx={isSafeDataTableName:n=>/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(n||'')),V8:{DbTrans:transaction,FormEngine:{GetTableData:(...args)=>{calls.push(args);return result;}}}};
  vm.createContext(ctx);vm.runInContext(helper,ctx);
  return {value:ctx.resolveDataSetParentBinding(data),calls,transaction};

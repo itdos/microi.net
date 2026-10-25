@@ -10,7 +10,7 @@ const server = fileURLToPath(new URL('../../', import.meta.url));
 const powershell = [process.env.MICROI_TEST_POWERSHELL, 'pwsh', 'powershell'].filter(Boolean).find(binary =>
   spawnSync(binary, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], {windowsHide:true}).status === 0);
 
-function runFixture(kind, mode = 'PlatformRelease', inheritedEnvironment = {}, allPlatformTests = false) {
+function runFixture(kind, mode = 'PlatformRelease', inheritedEnvironment = {}, allPlatformTests = false, platformFrontendTests = false) {
   assert.ok(powershell, 'PowerShell is required to execute the actual release runner');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-platform-release-'));
   const fixtureServer = path.join(root, 'Microi.Server'), fixtureTests = path.join(fixtureServer, 'Microi.Tests');
@@ -44,8 +44,8 @@ function node {
   if ($args[1] -eq 'freeze') { '{"fullFilter":"Category=FullStack","requiredEnvironment":[]}' ; return }
   if ($args[0] -like '*platform-all-tests.mjs') {
     if ($env:PLATFORM_FIXTURE_KIND -eq 'all-preflight-fail') { $global:LASTEXITCODE=19; return }
-    if ($args[1] -eq 'preflight') { '{}' ; return }
-    if ($args[1] -eq 'browser') { '{"tests":2,"passed":2,"failed":0,"skipped":0}' ; return }
+    if ($args[1] -in @('preflight','frontend-preflight')) { '{}' ; return }
+    if ($args[1] -in @('browser','frontend-browser')) { '{"tests":2,"passed":2,"failed":0,"skipped":0}' ; return }
   }
   if ($args[0] -like '*run-node-regressions.mjs') {
     $skip=if($env:PLATFORM_FIXTURE_KIND -eq 'node-skip'){1}else{0}
@@ -68,12 +68,12 @@ function dotnet {
     if($env:PLATFORM_FIXTURE_KIND -eq 'test-fail'){$global:LASTEXITCODE=42}
   }
 }
-& (Join-Path $env:PLATFORM_FIXTURE_ROOT 'Microi.Server/Microi.Tests/run-tests.ps1') -Mode $env:PLATFORM_FIXTURE_MODE -AllPlatformTests:($env:PLATFORM_FIXTURE_ALL -eq '1') -ResultsDirectory (Join-Path $env:PLATFORM_FIXTURE_ROOT 'results')
+& (Join-Path $env:PLATFORM_FIXTURE_ROOT 'Microi.Server/Microi.Tests/run-tests.ps1') -Mode $env:PLATFORM_FIXTURE_MODE -AllPlatformTests:($env:PLATFORM_FIXTURE_ALL -eq '1') -PlatformFrontendTests:($env:PLATFORM_FIXTURE_FRONTEND -eq '1') -ResultsDirectory (Join-Path $env:PLATFORM_FIXTURE_ROOT 'results')
 `);
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('MICROI_TEST_') && key !== 'MICROI_DESKTOP_NODE_HOME'));
     const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-File', driver], {cwd:root, env:{...env,
       MICROI_RELEASE_CANDIDATE:path.join(root, 'candidate.json'), PLATFORM_FIXTURE_ROOT:root,
-      PLATFORM_FIXTURE_COMMANDS:commands, PLATFORM_FIXTURE_KIND:kind, PLATFORM_FIXTURE_MODE:mode,PLATFORM_FIXTURE_ALL:allPlatformTests?'1':'0',...inheritedEnvironment},
+      PLATFORM_FIXTURE_COMMANDS:commands, PLATFORM_FIXTURE_KIND:kind, PLATFORM_FIXTURE_MODE:mode,PLATFORM_FIXTURE_ALL:allPlatformTests?'1':'0',PLATFORM_FIXTURE_FRONTEND:platformFrontendTests?'1':'0',...inheritedEnvironment},
       encoding:'utf8', windowsHide:true, timeout:30000});
     assert.ifError(result.error);
     const calls = fs.existsSync(commands) ? fs.readFileSync(commands,'utf8').trim().split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line.replace(/^\uFEFF/,''))) : [];
@@ -94,6 +94,7 @@ test('PlatformRelease executes platform regressions and returns scoped evidence 
   assert.equal(component.args[component.args.indexOf('--logger')+1],'trx;LogFileName=microi-platform.trx');
   assert.equal(calls.some(row=>row.name==='npm' || row.args.some(arg=>/Microi\.(Agent|Code)|admission|notification-center|platform-reminders/.test(String(arg)))),false);
   assert.ok(calls.some(row=>String(row.args[0]).endsWith('run-node-regressions.mjs')));
+  assert.ok(calls.find(row=>String(row.args[0]).endsWith('run-node-regressions.mjs')).args.includes('--regular-platform'));
   assert.ok(calls.some(row=>String(row.args[1]).endsWith('file-cabinet-office.spec.mjs')));
   assert.equal(receipt.scope,'PlatformRelease');assert.equal(receipt.status,'Passed');
   assert.equal(receipt.dotnet.tests,1);assert.equal(receipt.dotnet.passed,1);assert.equal(receipt.node.tests,1);
@@ -125,11 +126,52 @@ test('PlatformRelease ignores inherited desktop runtime and Full signals without
   assert.equal(calls.some(row=>row.name==='npm'||row.args.some(arg=>/Microi\.(Agent|Code)|admission|notification-center|platform-reminders/.test(String(arg)))),false);
 });
 
-test('explicit Full retains its mandatory admission preflight and fails before regression when the fixture rejects it', () => {
+test('explicit Full preserves its own prerequisites before any regression', () => {
   const {result,calls,receipt} = runFixture('success','Full');
   assert.notEqual(result.status,0);assert.equal(receipt,null);
-  assert.equal(calls.length,1);assert.equal(calls[0].name,'node');
-  assert.match(calls[0].args[0],/fixtures[\\/]admission[\\/]runtime\.mjs$/);assert.equal(calls[0].args[1],'preflight');
+  assert.equal(calls.some(row=>row.name==='dotnet'||row.args[1]==='prepare'),false);
+  assert.match(result.stdout+'\n'+result.stderr,/Full (?:requires MICROI_TEST_MATRIX_FILE|admission fixture preflight failed)/);
+});
+
+test('regular platform frontend release runs general browsers and component C# without Full matrix, admission or maintenance authorization',()=>{
+ const {result,calls,receipt}=runFixture('success','PlatformRelease',{MICROI_TEST_ALLOW_WRITES:'YES',MICROI_TEST_RUNTIME_READY_FILE:'stale-unused-full-signal'},false,true);
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const dotnet=calls.find(row=>row.name==='dotnet'&&row.args[0]==='test');
+ assert.equal(dotnet.args[dotnet.args.indexOf('--filter')+1],'Category!=FullStack');
+ assert.ok(calls.some(row=>row.args[1]==='frontend-preflight'));
+ assert.ok(calls.some(row=>row.args[1]==='frontend-browser'));
+ assert.ok(calls.some(row=>row.args.includes('--platform-frontend-tests')));
+ assert.equal(calls.some(row=>row.args[1]==='freeze'||row.name==='npm'||row.args.some(arg=>/admission|notification-center/.test(String(arg)))),false);
+ assert.equal(receipt.allPlatformTests,false);assert.equal(receipt.platformFrontendTests,true);assert.equal(receipt.browser.passed,2);
+ assert.ok(receipt.excludedScopes.includes('RealPaidAI'));
+});
+
+test('platform release rejects inherited Docker fixture selectors before any test or provisioning process',()=>{
+ for(const inherited of [{MICROI_GATE_TEST_MYSQL_AUTO:'1'},{MICROI_GATE_TEST_MYSQL_CONTAINER:'old-container'}]){
+  const {result,calls,receipt}=runFixture('success','PlatformRelease',inherited,false,true);
+  assert.notEqual(result.status,0);assert.equal(receipt,null);assert.deepEqual(calls,[]);
+  assert.match(result.stdout+'\n'+result.stderr,/automatic Docker test provisioning is not allowed/);
+ }
+});
+
+test('all-platform release executes unfiltered C# and every browser responsibility without Code/Agent',()=>{
+ const {result,calls,receipt}=runFixture('success','PlatformRelease',{MICROI_TEST_MATRIX_FILE:'existing.json',MICROI_TEST_ALLOW_WRITES:'YES',MICROI_TEST_ALLOW_APPLICATION_MAINTENANCE:'YES'},true);
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const dotnet=calls.find(row=>row.name==='dotnet'&&row.args[0]==='test');
+ assert.equal(dotnet.args.includes('--filter'),false);
+ assert.ok(calls.some(row=>String(row.args[0]).endsWith('platform-all-tests.mjs')&&row.args[1]==='browser'));
+ assert.ok(calls.some(row=>row.args.includes('--all-platform-tests')));
+ assert.ok(calls.some(row=>row.args[1]==='freeze'&&row.args.includes('--platform-only')));
+ assert.equal(calls.find(row=>String(row.args[0]).endsWith('run-node-regressions.mjs')).args.includes('--regular-platform'),false);
+ assert.equal(calls.some(row=>row.name==='npm'),false);
+ assert.equal(receipt.allPlatformTests,true);assert.equal(receipt.filter,'AllPlatformTests');assert.equal(receipt.browser.passed,2);
+});
+
+test('all-platform missing existing fixture prerequisites stops before any compiler, browser or provisioner',()=>{
+ const {result,calls,receipt}=runFixture('all-preflight-fail','PlatformRelease',{},true);
+ assert.notEqual(result.status,0);assert.equal(receipt,null);
+ assert.equal(calls.some(row=>row.name==='dotnet'||row.name==='npm'),false);
+ assert.equal(calls.some(row=>row.args[1]==='browser'),false);
 });
 test('all-platform release executes unfiltered C# and every browser responsibility without Code/Agent',()=>{
  const {result,calls,receipt}=runFixture('success','PlatformRelease',{MICROI_TEST_MATRIX_FILE:'existing.json',MICROI_TEST_ALLOW_WRITES:'YES'},true);

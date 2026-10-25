@@ -84,7 +84,7 @@ const props = defineProps({
 const route = useRoute()
 const stats = ref({ ...NUGET_FALLBACK_STATS })
 const displayDownloads = ref(NUGET_FALLBACK_STATS.totalDownloads)
-const state = ref('snapshot-loading')
+const state = ref(NUGET_FALLBACK_STATS.stage === 'build' ? 'build' : 'fallback')
 let mounted = false
 let animationFrame = 0
 let animationResolve
@@ -114,34 +114,38 @@ const updateTime = computed(() => {
 const copy = computed(() => isEnglish.value ? {
   ariaLabel: 'Microi NuGet download statistics',
   eyebrow: 'NUGET OFFICIAL SNAPSHOT',
-  title: 'Ranks first by downloads among publicly searchable .NET AI low-code platforms',
-  description: 'Public packages owned by ITdos are collected every 3 hours. This page reads the latest successful snapshot through the official iTdos API Engine.',
+  title: 'Official NuGet package download statistics',
+  description: 'Public ITdos packages are scheduled for collection every 3 hours. Check the collection time below: the initial build snapshot is updated after a successful online read.',
   downloads: 'downloads',
   snapshotLoading: 'Reading latest snapshot',
-  snapshot: 'Updated every 3 hours',
-  updatedAt: 'Updated',
+  snapshot: 'Last successful collection',
+  updatedAt: 'Collected',
   browser: 'Browser last-success snapshot',
-  fallback: 'Embedded snapshot',
+  build: 'Website build snapshot',
+  fallback: 'Historical embedded snapshot',
   snapshotSource: `${stats.value.packageCount} packages · latest successful snapshot`,
   browserSource: `${stats.value.packageCount} packages · browser last-success snapshot`,
-  fallbackSource: 'Built-in snapshot · opening the profile shows the current public data',
-  methodNote: 'Official indexes update asynchronously; the category statement is based on publicly searchable peers, not an official Microsoft ranking.',
+  buildSource: `${stats.value.packageCount} packages · snapshot captured for this website build`,
+  fallbackSource: 'Historical snapshot · opening the profile shows the current public data',
+  methodNote: 'Downloads include repeated restores and CI. They do not measure unique users, paying customers or market rank; official indexes may update at different times.',
   linkTitle: 'Open the official ITdos profile on NuGet'
 } : {
   ariaLabel: 'Microi吾码 NuGet 下载量统计',
   eyebrow: 'NUGET 官方快照数据',
-  title: 'NuGet 可公开检索的 .NET AI 低代码平台中下载量位居首位',
-  description: '定时任务每 3 小时采集一次 ITdos 名下公开包，官网通过 iTdos 官方接口引擎读取最新成功快照。长期、可核验的数据可从侧面反映平台成熟度与开发者采用情况。',
+  title: 'NuGet 官方包下载统计',
+  description: '统计覆盖 ITdos 名下公开包，采集计划为每 3 小时一次，请结合下方采集时间查看。页面初始显示构建快照，联网成功后更新为最近成功快照。',
   downloads: '累计下载',
   snapshotLoading: '正在读取最新快照',
-  snapshot: '每 3 小时更新',
-  updatedAt: '更新于',
+  snapshot: '最近成功采集',
+  updatedAt: '采集于',
   browser: '浏览器最近成功快照',
-  fallback: '官网内置快照',
+  build: '官网构建快照',
+  fallback: '历史内置快照',
   snapshotSource: `${stats.value.packageCount} 个公开包 · 最新成功快照`,
   browserSource: `${stats.value.packageCount} 个公开包 · 浏览器最近成功快照`,
-  fallbackSource: '官网内置快照 · 点击前往 NuGet 官方主页查看公开数据',
-  methodNote: 'NuGet 各官方索引异步同步，数值可能短时略有差异；“位居首位”按可公开检索的同类平台下载量口径，不代表微软 / NuGet 官方评选。',
+  buildSource: `${stats.value.packageCount} 个公开包 · 本次官网构建时读取的快照`,
+  fallbackSource: '历史快照 · 点击前往 NuGet 官方主页查看公开数据',
+  methodNote: '下载量包含重复还原与 CI，不等于独立用户、付费客户或市场排名；NuGet 官方各索引异步更新，数值可能短时不同。',
   linkTitle: '前往 NuGet 官方 ITdos 主页查看全部包与实时下载量'
 })
 
@@ -149,12 +153,14 @@ const statusText = computed(() => {
   if (state.value === 'snapshot-loading') return copy.value.snapshotLoading
   if (state.value === 'snapshot') return copy.value.snapshot
   if (state.value === 'cached') return copy.value.browser
+  if (state.value === 'build') return copy.value.build
   return copy.value.fallback
 })
 
 const sourceText = computed(() => {
   if (state.value === 'snapshot') return copy.value.snapshotSource
   if (stats.value.stage === 'browser') return copy.value.browserSource
+  if (stats.value.stage === 'build') return copy.value.buildSource
   return copy.value.fallbackSource
 })
 
@@ -205,6 +211,7 @@ function animateDownloads(nextValue, duration = 720) {
 
 onMounted(async () => {
   mounted = true
+  state.value = 'snapshot-loading'
   let successfulSnapshotLoaded = false
 
   const local = loadLocalNugetStats()
@@ -226,7 +233,7 @@ onMounted(async () => {
   } catch {
     // 服务端不可达时保留浏览器最后成功快照；首次访问再使用带时间标识的内置快照。
     if (!mounted) return
-    state.value = successfulSnapshotLoaded ? 'cached' : 'fallback'
+    state.value = successfulSnapshotLoaded ? 'cached' : (stats.value.stage === 'build' ? 'build' : 'fallback')
   }
 })
 

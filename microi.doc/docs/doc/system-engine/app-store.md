@@ -48,6 +48,26 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 
 应用详情显示完整业务信息和可安装版本。当前版本与 `mic_data_version` 中仍保留旧包正文或已验证 HDFS 包指针的历史快照都可选择安装；后台任务保存实际选择的版本，允许在新版出现问题时明确重新安装旧版。版本区使用服务端搜索与分页，当前版本固定置顶，默认每页不超过 20 条，不能一次加载全部历史版本再由浏览器过滤。详情弹层使用宿主级固定毛玻璃遮罩，默认居中；标题栏拖动和窗口缩放后都会按弹层真实宽高限制四边，内容不能移出视口。平台官方发布节点仅显示“平台官方应用源”标记，不允许对自身执行安装、更新或重新安装。
 
+## 最低版本与安装预检
+
+应用包可在 `PackageInfo` 声明 `ServerMinVersion` 和 `ClientMinVersion`。使用包含安装器 **v3.1.1** 的应用商城包后，直接上传、商城下载、同版本重装和后台续跑都会先检查最低版本，再写入表结构、资源和安装记录。
+
+```json
+{"PackageInfo":{"AppId":"sample.orders","Version":"v1.0.0","ServerMinVersion":"8.5.10","ClientMinVersion":"8.5.10"}}
+```
+
+版本接受 `8.5.10`、`v8.5.10` 或四段数字版本，按各段数值比较，不接受 `latest`、范围表达式或预发布后缀。缺失、空白或 `null` 声明按历史包兼容处理，结果为 `NotDeclared`，不表示兼容性已经验证。
+
+| 检查对象 | 安装行为 |
+|---|---|
+| 后端最低版本 | 从当前执行节点的 `V8.Method.GetBackendVersion()` 读取可信版本。低于要求时返回 `PACKAGE_RUNTIME_VERSION_TOO_LOW`；有声明却无法读取运行版本时返回 `PACKAGE_RUNTIME_VERSION_UNAVAILABLE`，停止安装。后台每个分片重新检查，不能沿用其它节点的检查结果。 |
+| 前端最低版本 | 服务端不能据请求参数确认浏览器实际部署的前端版本，返回 `PendingClientVerification` 和警告。安装前仍应核对实际前端版本，并完成对应页面验收。 |
+| 声明格式错误 | 返回 `PACKAGE_RUNTIME_VERSION_INVALID`，不会把错误声明当作“没有限制”。 |
+
+通过现有 `import-microi-store-package` 接口传 `ValidateOnly:true`（或 `Action:"validate"`）可做只读预检。结果中的 `Data.Compatibility` 包含后端版本、最低版本、检查状态和警告；预检不执行物理结构引导，不写入应用资源、后台进度或包正文缓存。它不证明依赖、数据库迁移和页面功能已经安装成功，正式安装后仍须核对安装回执与实际功能。
+
+调用方传入的 `BackendVersion`、`ServerVersion`、`ClientVersion` 或跳过检查参数不会替代可信检查。旧部署应先更新应用商城；若后端缺少可信版本读取能力，需要先更新后端，再安装声明了最低后端版本的包。
+
 ## 组合包中的运行应用身份
 
 普通应用包可以用 `ApplicationBundles` 携带独立微服务工作台，公开商品仍保持原来的
@@ -78,7 +98,11 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 | 公开应用 | HDFS 公有桶，`PackageStorageMode=HdfsPublic` | 来源 FileServer/CDN 公有地址；下载后仍校验大小与 SHA-256。 |
 | 私有应用 | HDFS 私有桶，`PackageStorageMode=HdfsPrivate` | 由来源后端验证登录身份后签发短期地址；Token 和签名地址不落浏览器配置或日志。 |
 
-数据库只保留 `PackageId`、`PackageHdfsPath`、`PackageSha256`、`PackageSize`、内容类型、格式版本和校验时间。发布器先上传 UTF-8 JSON，再从 HDFS 回读并核对字节数和 SHA-256，全部一致后才更新商城指针并清空内联正文；安装器会独立下载和校验，不能只相信数据库或 Redis。历史版本继续以不可变 `StoreVersionId` 精确安装，快照保存同一组指针，不会静默换成当前版本。
+数据库只保留 `PackageId`、`PackageHdfsPath`、`PackageSha256`、`PackageSize`、内容类型、格式版本和校验时间。发布器先上传 UTF-8 JSON，再从 HDFS 回读并核对字节数和 SHA-256，全部一致后才更新商城指针并清空内联正文；安装器首次下载与后续缓存命中均核对实际正文大小和 SHA-256，不能只相信数据库或 Redis。历史版本继续以不可变 `StoreVersionId` 精确安装，快照保存同一组指针，不会静默换成当前版本。
+
+详情摘要和安装分片复用经过校验的包正文，减少同一大包的重复下载。每个租户的详情与导入各使用一个固定缓存槽，原文最多 64 MiB、序列化值最多 96 MiB，15 分钟过期且命中不续期；更换版本只替换原槽，不按历史版本无限积累。安装每片仍向当前来源回读权限、版本快照与指针，撤权或指针变化不会因缓存命中而绕过检查。缓存绑定来源、租户、对象路径、快照、大小与摘要，不保存签名地址或凭据；失效、故障或超限时重新下载并完整校验。
+
+详情接口的 `DataAppend.PackageContentRead` 与安装诊断的 `marketplace_package_read` 区分 `VerifiedDownload`、`VerifiedCache` 和 `VerifiedDownloadUncached`，`NetworkBytes` 只计算本次下载包正文的字节数，不代表整个请求或云账单流量。应在相同包的连续读取中核对第二次为 `VerifiedCache` 且下载字节为零；跨节点缓存不可用、并发不同包相互淘汰、超过上限或过期仍可能下载。正式发布源不运行安装器，源码回读与单元测试不能替代目标租户的安装验收。
 
 制包时，全局 v3 运行对象不能通过租户私有 HDFS 代理跨目录读取。发布器从应用当前
 `CommittedPublishVersionId` 精确核对所属应用的 Completed 版本、运行清单哈希与请求指纹，

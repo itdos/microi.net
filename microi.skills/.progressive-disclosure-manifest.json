@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-25T05:49:10.696Z",
+  "generatedAt": "2026-10-25T14:13:11.241Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -534,8 +534,8 @@
       ]
     },
     "microi-mobile-app-quality": {
-      "originalSha256": "64b7711929b8a7610fe0b528302e576a31839297ac7b3b798b62f5788d04c33a",
-      "originalLines": 562,
+      "originalSha256": "1ff50c437e189d1d4aa40e53e716c0356f13cd24c054d4ea7ce2e0227f8c3452",
+      "originalLines": 563,
       "prefixSha256": "a176be940d146b3651c3940757c256cb845941e102102b7adcd35c1f737f8c12",
       "prefixBytes": 1562,
       "entryLines": 204,
@@ -720,8 +720,8 @@
           "id": "microi-mobile-app-quality-022",
           "ordinal": 22,
           "destination": "microi-mobile-app-quality/references/mobile-first-delivery.md",
-          "sha256": "748fc4a802457bab760ae24281c3bb27cb70841fe72b61b86f088439236867aa",
-          "lines": 68,
+          "sha256": "33bf185e007fab2c8316f090b1f608143deca2e3ff4b010e7577c7f88d751008",
+          "lines": 69,
           "heading": "开发前固定事实源和首版范围"
         }
       ],
@@ -763,10 +763,10 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "a050e72abcc7841093d9ca07ffc9e94adfe213302df7f33bc04929c57299402b",
+      "originalSha256": "67ff1ecf98a904a1e532542948e30a02b2466b517d1888907f43151ce94d84ba",
       "originalLines": 716,
-      "prefixSha256": "a55252685fd5dc6c366c717b5c09490c93507880e702d5139f01127428a64f48",
-      "prefixBytes": 6378,
+      "prefixSha256": "4db717b9f9af4f4ceeb7379ee629ef1230a1bd8445a4cdc8f660a66c292a2dda",
+      "prefixBytes": 6613,
       "entryLines": 117,
       "chunks": [
         {
@@ -789,7 +789,7 @@
           "id": "microi-system-delivery-002",
           "ordinal": 3,
           "destination": "microi-system-delivery/references/progressive-03-安全与跨端验收.md",
-          "sha256": "b4cd10b169b54235314d170c8e74f17bf6bcb5f658d0d4d2e10c73dc8aa37ef7",
+          "sha256": "1cf73c1365e3f8245b2069f5f2e24bcbfdc7f6e67c0f13524998b16f7bbf029b",
           "lines": 52,
           "heading": "平台安全与存量兼容验收（强制）"
         },
@@ -797,7 +797,7 @@
           "id": "microi-system-delivery-003",
           "ordinal": 5,
           "destination": "microi-system-delivery/references/progressive-03-安全与跨端验收.md",
-          "sha256": "479ccdb65450c7741b052a30d8e4a11917bc19d80bf9b4ac89ea00092b4aaa73",
+          "sha256": "8e2891f2a149d6828b653b9f0735ea39a4df5ba60178c79f0e5b0065ce72ee84",
           "lines": 13,
           "heading": "前端交付检查清单"
         },
@@ -821,7 +821,7 @@
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "4b4b49faa8cb349197a9da97e7d2082c3891edb3cbc95a68b7b499456400a0c9",
+          "sha256": "4980374a6dd1a9af6c5061bc04f350a06e2f0774b0af2f1a85415d3cf28191f2",
           "lines": 153,
           "heading": "自动化测试必须覆盖的坑"
         },
@@ -837,7 +837,7 @@
           "id": "microi-system-delivery-008",
           "ordinal": 8,
           "destination": "microi-system-delivery/references/context-quality.md",
-          "sha256": "beffc0924e9b36dca7a57da12a4cecb65ab05e938cb776c295c7fc5d7f736553",
+          "sha256": "0e9e14b98ac7ab7ca0bf1c4ef97bad2bf061d0c01b170325ddbaf961a02a0de4",
           "lines": 54,
           "heading": "质量优先的上下文与增量开发"
         }
@@ -1382,11 +1382,11 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "19bfaf779ced81fabca3069774756c3835674e87f2931718d1f7724ea09d58ac",
-      "originalLines": 817,
-      "prefixSha256": "67bf36437cf205f8d5a5e99120964c9da05b65807dba45beb9da1cba967645f2",
-      "prefixBytes": 4223,
-      "entryLines": 209,
+      "originalSha256": "3f38f36f2d0a0f1287276948a9fdc7419c871dc4ab30902c162d2f29828bb22c",
+      "originalLines": 819,
+      "prefixSha256": "7193a78f9c53122f8df47bf1058ea9147741558c9a132eefa51583ecf1f21807",
+      "prefixBytes": 4679,
+      "entryLines": 211,
       "chunks": [
         {
           "id": "playwright-e2e-000",
@@ -3241,11 +3241,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "b7a1eb6ae2965fd41ac12c9fc4b9a90d2c0940412d981bf9b5a6b4ad7bea11de",
-      "originalLines": 722,
-      "prefixSha256": "0b38301c60fa0c5f5525d17d6c8861b3149268e53ff3503b2a79b2511a7a9fb8",
-      "prefixBytes": 16995,
-      "entryLines": 183,
+      "originalSha256": "e89958b44a0fedfa0703a14625b94d213850751e4e31e9e0b1ce68acb9042960",
+      "originalLines": 730,
+      "prefixSha256": "71cff9ce558d08243e2fd44d4bf911e5b34ba10df508ca37d9703c010406fd0d",
+      "prefixBytes": 19330,
+      "entryLines": 191,
       "chunks": [
         {
           "id": "workspace-conventions-000",

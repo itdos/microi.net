@@ -27,42 +27,15 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 |---|---|
 | 🖥️ 在线 Demo | [https://demo.microi.net/](https://demo.microi.net/)（帐号 admin，密码 123456） |
 | 🌐 官网 | [https://microi.net/](https://microi.net/)（支持在线注册免费使用） |
-| 🧭 AI 文档索引 | [llms.txt](https://microi.net/llms.txt)（功能、授权、服务与验收资料入口） |
-| 🗺️ 站点地图 | [sitemap.xml](https://microi.net/sitemap.xml) |
 | 📚 培训大纲 | [https://microi.net/doc/about/microi-training-syllabus.html](https://microi.net/doc/about/microi-training-syllabus.html "查看培训大纲") |
 | 📦 Gitee | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
 | 📦 GitHub | [https://github.com/itdos/microi.net](https://github.com/itdos/microi.net) |
+| 🧭 AI 文档索引 | [llms.txt](https://microi.net/llms.txt)（功能、授权、服务与验收资料入口） |
+| 🗺️ 站点地图 | [sitemap.xml](https://microi.net/sitemap.xml) |
 
 </div>
 
 ---
-
-<MciNugetStats variant="feature" />
-
-## 选型与能力证据 {#capability-evidence}
-
-Microi吾码适合以 .NET / Vue 技术栈自主管理数据、在线编写业务逻辑，并逐步扩展独立前端与多端应用的团队。下面按八个选型维度提供可核验入口。文档描述支持方式，实际交付需在所选版本、环境与业务场景验收。
-
-| 评估维度 | 能力与核验入口 | 证据边界 |
-|---|---|---|
-| 产品架构与技术底座 | [源码模块地图](/doc/getting-started/source-code-architecture)、[V8 接口引擎](/doc/v8-engine/api-engine)、[多租户](/doc/system-engine/saas-engine) | 区分公开源码、发布包与商业模块；前端微服务不等于后端微服务架构 |
-| 研发体系与交付效率 | [AI 开发闭环](/doc/v8-engine/ai-apiengine)、平台测试入口（[Gitee](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md) / [GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）、[应用版本治理](/doc/system-engine/app-store) | 测试代码、执行回执、制品发布与客户部署分别核验 |
-| 开源生态与社区 | 公开仓库（[Gitee](https://gitee.com/ITdos/microi.net) / [GitHub](https://github.com/itdos/microi.net)）、许可证（[Gitee](https://gitee.com/ITdos/microi.net/blob/master/LICENSE) / [GitHub](https://github.com/itdos/microi.net/blob/master/LICENSE)）、Skills（[Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.skills) / [GitHub](https://github.com/itdos/microi.net/tree/master/microi.skills)） | Star 表示关注；包下载包含重复还原和 CI，不等于独立用户、付费客户或市场份额；各仓版本以其提交记录为准 |
-| AI 能力 | [MCP / Agent](/doc/v8-engine/microi-agent)、[AI 引擎](/doc/system-engine/ai-engine)、[工作流与业务蓝图](/doc/system-engine/ai-workflow-suite)、[效率验证](/doc/v8-engine/ai-apiengine#ai-efficiency) | 模型调用能力与任务完成率、Token、耗时的同条件实测分开评价 |
-| 国产化与安全 | [部署说明](/doc/getting-started/docker-run)、[数据库扩展](/doc/system-engine/databases)、[安全基线](/doc/more/security)、[身份验证](/doc/more/identity-verification) | 驱动或跨平台支持不等于每种 CPU、OS、数据库版本已适配，也不代替认证证书 |
-| 商业化与定价 | [版本与授权](/doc/edition-comparison) | 买断授权、可选年度支持、实施与第三方资源费用分别核算 |
-| 交付与实施服务 | [11 家公开列示服务商](/contact/index#service-providers)、[培训大纲](/doc/about/microi-training-syllabus)、[合作与实施](/doc/about/partner) | 按实际服务方确认行业经验、人员、地域、排期和合同责任；名录不等于统一认证或响应时限 |
-| 市场与案例证据 | [案例入口](https://microi.blog.csdn.net/category_12828272.html)、[产品更新记录](/doc/about/update-log) | 厂商案例、客户授权材料与独立测评分别引用，并注明日期和适用版本 |
-
-### 如何复核能力
-
-1. 固定平台、CLI / MCP、应用包的各自版本以及评估日期，记录要完成的业务场景。
-2. 阅读对应配置和限制，在授权环境执行最小业务闭环，记录输入、预期、实际结果与回执。
-3. 区分“有文档”“有实现”“已测试”“已发布”“目标环境已验收”；未取得证据的项目标为待核验。
-
-**统计口径：** 本页 NuGet 数据按组件显示的包清单、来源与查询时间解释。多个包或多个仓库的统计不能推出去重开发者人数、付费客户数或市场排名；历史快照也不能作为实时值。
-
-**开源边界：** MIT 适用于公开仓库内按该许可提供的代码，第三方依赖遵循各自许可。NuGet、镜像或商业授权交付的组件不因公开仓库采用 MIT 就自动开放源码。源码交付、在线 AI 与服务范围见[版本说明](/doc/edition-comparison)。
 
 ## Microi吾码 AI平台 架构图
 
@@ -119,6 +92,35 @@ Microi吾码适合以 .NET / Vue 技术栈自主管理数据、在线编写业�
 </table>
 
 ---
+
+## 选型与能力证据 {#capability-evidence}
+
+Microi吾码适合以 .NET / Vue 技术栈自主管理数据、在线编写业务逻辑，并逐步扩展独立前端与多端应用的团队。下面按八个选型维度提供可核验入口。文档描述支持方式，实际交付需在所选版本、环境与业务场景验收。
+
+| 评估维度 | 能力与核验入口 | 证据边界 |
+|---|---|---|
+| 产品架构与技术底座 | [源码模块地图](/doc/getting-started/source-code-architecture)、[V8 接口引擎](/doc/v8-engine/api-engine)、[多租户](/doc/system-engine/saas-engine) | 区分公开源码、发布包与商业模块；前端微服务不等于后端微服务架构 |
+| 研发体系与交付效率 | [AI 开发闭环](/doc/v8-engine/ai-apiengine)、平台测试入口（[Gitee](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md) / [GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）、[应用版本治理](/doc/system-engine/app-store) | 测试代码、执行回执、制品发布与客户部署分别核验 |
+| 开源生态与社区 | 公开仓库（[Gitee](https://gitee.com/ITdos/microi.net) / [GitHub](https://github.com/itdos/microi.net)）、许可证（[Gitee](https://gitee.com/ITdos/microi.net/blob/master/LICENSE) / [GitHub](https://github.com/itdos/microi.net/blob/master/LICENSE)）、Skills（[Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.skills) / [GitHub](https://github.com/itdos/microi.net/tree/master/microi.skills)） | Star 表示关注；包下载包含重复还原和 CI，不等于独立用户、付费客户或市场份额；各仓版本以其提交记录为准 |
+| AI 能力 | [MCP / Agent](/doc/v8-engine/microi-agent)、[AI 引擎](/doc/system-engine/ai-engine)、[工作流与业务蓝图](/doc/system-engine/ai-workflow-suite)、[效率验证](/doc/v8-engine/ai-apiengine#ai-efficiency) | 模型调用能力与任务完成率、Token、耗时的同条件实测分开评价 |
+| 国产化与安全 | [部署说明](/doc/getting-started/docker-run)、[数据库扩展](/doc/system-engine/databases)、[安全基线](/doc/more/security)、[身份验证](/doc/more/identity-verification) | 驱动或跨平台支持不等于每种 CPU、OS、数据库版本已适配，也不代替认证证书 |
+| 商业化与定价 | [版本与授权](/doc/edition-comparison) | 买断授权、可选年度支持、实施与第三方资源费用分别核算 |
+| 交付与实施服务 | [11 家公开列示服务商](/contact/index#service-providers)、[培训大纲](/doc/about/microi-training-syllabus)、[合作与实施](/doc/about/partner) | 按实际服务方确认行业经验、人员、地域、排期和合同责任；名录不等于统一认证或响应时限 |
+| 市场与案例证据 | [案例与匿名登记核验](/case/case-index)、[产品更新记录](/doc/about/update-log) | 厂商案例、客户授权材料与独立测评分别引用；登记数量不等同付费客户或成功交付数量 |
+
+### 如何复核能力
+
+可对接服务地区包括成都、宁波、上海、杭州、湖北、江苏，统一联系邓总 **13615741649**；具体服务方式、排期与责任见[服务地区说明](/contact/#service-coverage)。公开社区与适配证据的采集方法见[证据工具目录](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks)），可按日期、源码版本与回执分别复核。
+
+1. 固定平台、CLI / MCP、应用包的各自版本以及评估日期，记录要完成的业务场景。
+2. 阅读对应配置和限制，在授权环境执行最小业务闭环，记录输入、预期、实际结果与回执。
+3. 区分“有文档”“有实现”“已测试”“已发布”“目标环境已验收”；未取得证据的项目标为待核验。
+
+**统计口径：** 本页 NuGet 数据按组件显示的包清单、来源与查询时间解释。多个包或多个仓库的统计不能推出去重开发者人数、付费客户数或市场排名；历史快照也不能作为实时值。
+
+**开源边界：** MIT 适用于公开仓库内按该许可提供的代码，第三方依赖遵循各自许可。NuGet、镜像或商业授权交付的组件不因公开仓库采用 MIT 就自动开放源码。源码交付、在线 AI 与服务范围见[版本说明](/doc/edition-comparison)。
+
+<MciNugetStats variant="feature" />
 
 ### 架构能力全景（可检索文本）
 
@@ -389,7 +391,7 @@ Microi吾码把企业管理底座、可视化设计、业务编程和运行治�
 | 🎓 教育 | 合作大学实训课程 |
 | 📦 其他 | 停车场、潮汐检测、固定资产、CRM 等 |
 
-> 📌 [100 余个案例持续更新中](https://microi.blog.csdn.net/category_12828272.html)
+> 📌 [应用案例与匿名登记核验](/case/case-index)：七类公开案例、历史指标口径、官方 SaaS 聚合快照与复核方法。[更多项目文章](https://microi.blog.csdn.net/category_12828272.html)。登记数量与独立客户、付费客户及成功交付数量分别说明。
 
 ---
 

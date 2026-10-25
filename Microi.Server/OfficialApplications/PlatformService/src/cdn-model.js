@@ -19,5 +19,7 @@ export function reportRows(content) {
   return result.slice(0,500)
 }
 export function bytes(value) { const n=Number(value);if(!Number.isFinite(n))return '—';const units=['B','KB','MB','GB','TB'];let x=n,i=0;while(x>=1024&&i<4){x/=1024;i++}return `${x.toLocaleString('zh-CN',{maximumFractionDigits:2})} ${units[i]}` }
+// 只有计费用量API的traf值才是可汇总字节；带宽峰值不代表区间平均带宽。
+export function usageSummary(data) { const values=data?.UsageDataPerInterval?.DataModule;if(data?.Unit!=='bytes'||!Array.isArray(values))throw Error('供应商没有返回可核对的计费流量');const interval=Number(data.DataInterval);if(![300,3600,86400].includes(interval))throw Error('供应商返回未知统计间隔');const seen=new Set();let total=0;for(const row of values){const at=String(row.TimeStamp),value=Number(row.Value);if(seen.has(at)||!Number.isFinite(Date.parse(at))||!Number.isFinite(value)||value<0)throw Error('计费用量采样重复或无效');seen.add(at);total+=value}return {total,points:values.length,interval} }
 export function csv(rows) { const keys=[...new Set(rows.flatMap(Object.keys))];const quote=v=>`"${String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')}"`;return '\uFEFF'+[keys,...rows.map(r=>keys.map(k=>r[k]))].map(row=>row.map(quote).join(',')).join('\r\n') }
-export const statuses={Pending:'排队中',Running:'执行中',Succeeded:'已回读确认',AwaitingVerification:'等待云端确认',Unknown:'结果未知，需回读',Conflict:'配置冲突，未写入',Expired:'已到期解封',Observed:'观察命中'}
+export const statuses={Pending:'排队中',Running:'执行中',Succeeded:'已回读确认',AwaitingVerification:'等待云端确认',Unknown:'结果未知，需回读',Conflict:'配置冲突，未写入',Expired:'已到期解封',Observed:'观察命中',AlertPending:'预警待投递',AlertSent:'预警已投递',AlertFailed:'预警投递失败'}

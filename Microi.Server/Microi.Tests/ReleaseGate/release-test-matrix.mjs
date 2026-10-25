@@ -7,8 +7,8 @@ import {verifyHdfsEvidence} from './staged-full-runtime.mjs';
 import {releaseBrowserWidths} from './release-browser-viewports.mjs';
 import {snapshotDesktopInputs} from '../../tools/release-desktop-inputs.mjs';
 import {snapshotCandidate,changedCandidate} from '../../tools/release-candidate.mjs';
-import {roots as nodeRoots,discoverTests,assertTestSummary,regressionLogFile} from '../run-node-regressions.mjs';
-import {discoverBrowserTests,validateBrowserReport} from './platform-all-tests.mjs';
+import {roots as nodeRoots,discoverNodeScope,assertTestSummary,regressionLogFile} from '../run-node-regressions.mjs';
+import {discoverBrowserTests,validateBrowserReport,platformFrontendScope,browserCaseInventory} from './platform-all-tests.mjs';
 
 const check=(condition,message)=>{if(!condition)throw Error(message);};
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -126,6 +126,8 @@ export const allPlatformTestsFilter='AllPlatformTests';
 const platformExcluded=['FullStack','NewTenantAdmission','ChatInstallation','CodeDesktop','AgentVsix'];
 export function validatePlatformReleaseSummary(receipt,dotnet,groups){
  const all=receipt?.allPlatformTests===true;
+ const frontend=receipt?.platformFrontendTests===true;
+ check(!(all&&frontend),'PlatformRelease regular and full browser scopes cannot be combined');
  check(receipt?.schemaVersion===1&&receipt.scope==='PlatformRelease'&&receipt.filter===(all?allPlatformTestsFilter:platformReleaseFilter),'PlatformRelease scope/filter 无效');
  const names=verifySuite(dotnet,'PlatformRelease');
  check(Array.isArray(groups)&&groups.length===nodeRoots.length,'PlatformRelease Node 责任范围缺失');
@@ -133,9 +135,10 @@ export function validatePlatformReleaseSummary(receipt,dotnet,groups){
  check(groups.every((row,index)=>row.root===nodeRoots[index]&&Number.isSafeInteger(row.tests)&&row.tests>0&&row.tests===row.pass&&['fail','cancelled','skipped','todo'].every(key=>row[key]===0)),'PlatformRelease Node 存在缺失、失败或跳过');
  check(receipt.dotnet?.tests===names.length&&receipt.dotnet.passed===names.length&&receipt.dotnet.failed===0&&receipt.dotnet.skipped===0,'PlatformRelease .NET 回执计数与 TRX 不一致');
  check(receipt.node?.groups===groups.length&&receipt.node.tests===total&&receipt.node.passed===total&&receipt.node.failed===0&&receipt.node.skipped===0,'PlatformRelease Node 回执计数不一致');
- return {scope:'PlatformRelease',filter:receipt.filter,allPlatformTests:all,dotnetPassed:names.length,nodePassed:total,nodeGroups:groups.length,notExecuted:all?['CodeDesktop','AgentVsix']:[...platformExcluded]};
+ return {scope:'PlatformRelease',filter:receipt.filter,allPlatformTests:all,platformFrontendTests:frontend,dotnetPassed:names.length,nodePassed:total,nodeGroups:groups.length,notExecuted:all?['CodeDesktop','AgentVsix']:frontend?[...platformExcluded,'RealPaidAI','CustomerSpecificAcceptance','SqlServerSpecialAcceptance']:[...platformExcluded]};
 }
 async function verifyPlatformPlan(plan){
+ check(!(plan.allPlatformTests&&plan.platformFrontendTests),'PlatformRelease regular and full browser scopes cannot be combined');
  check(plan?.schemaVersion===1&&plan.scope==='PlatformRelease'&&plan.filter===(plan.allPlatformTests?allPlatformTestsFilter:platformReleaseFilter)&&plan.sourceHead===head(),'PlatformRelease 冻结范围或候选 HEAD 漂移');
  const bytes=readFile(plan.candidateManifest?.file);
  check(hash(bytes)===plan.candidateManifest.sha256,'PlatformRelease 候选清单字节漂移');
@@ -154,19 +157,30 @@ export async function readPlatformReleaseTests(receiptFile){
  check(Array.isArray(groups)&&groups.length===nodeRoots.length,'PlatformRelease Node 责任范围缺失');
  for(const [index,row] of groups.entries()){
   check(row.root===nodeRoots[index],'PlatformRelease Node 责任范围或顺序漂移');
-  const actualFiles=discoverTests(path.join(root,row.root)).map(file=>path.relative(root,file));
+  const selection=discoverNodeScope(path.join(root,row.root),{regularPlatform:receipt.allPlatformTests!==true});
+  const actualFiles=selection.files.map(file=>path.relative(root,file));
   check(actualFiles.length>0&&JSON.stringify(actualFiles)===JSON.stringify(row.files),'PlatformRelease Node 文件发现清单漂移');
+  check(row.scope===selection.scope&&JSON.stringify(row.notApplicable)===JSON.stringify(selection.notApplicable),'PlatformRelease Node 专项分类或原始源码摘要漂移');
   const tapFile=regressionLogFile(directory,row.root),tapBytes=readFile(tapFile),counts=assertTestSummary(tapBytes.toString('utf8'));
   check(Object.entries(counts).every(([key,value])=>row[key]===value),'PlatformRelease Node TAP 与报告计数不一致');
-  tapReceipts.push({file:tapFile,sha256:hash(tapBytes)});
+  tapReceipts.push({file:tapFile,sha256:hash(tapBytes),scope:selection.scope,notApplicable:selection.notApplicable});
  }
  let browser;
- if(receipt.allPlatformTests===true){
-  const reportFile=path.join(directory,'all-platform-browser.json'),bytes=readFile(reportFile);
-  check(path.resolve(receipt.browser?.reportFile||'')===reportFile&&hash(bytes)===receipt.browser?.reportSha256,'AllPlatformTests browser report location or hash is invalid');
-  const counts=validateBrowserReport(JSON.parse(bytes),discoverBrowserTests(path.join(root,'Microi.Client/tests')));
+ if(receipt.allPlatformTests===true||receipt.platformFrontendTests===true){
+  const frontend=receipt.platformFrontendTests===true,prefix=frontend?'platform-frontend-browser':'all-platform-browser';
+  const reportFile=path.join(directory,`${prefix}.json`),bytes=readFile(reportFile);
+  check(path.resolve(receipt.browser?.reportFile||'')===reportFile&&hash(bytes)===receipt.browser?.reportSha256,'Platform browser report location or hash is invalid');
+  const selection=frontend?platformFrontendScope(path.join(root,'Microi.Client/tests')):{files:discoverBrowserTests(path.join(root,'Microi.Client/tests')),excluded:[]};
+  let inventory,list;
+  if(frontend){
+   const listFile=path.join(directory,`${prefix}-list.json`),listBytes=readFile(listFile),discovery=JSON.parse(listBytes);
+   check(path.resolve(receipt.browser?.listFile||'')===listFile&&hash(listBytes)===receipt.browser?.listSha256&&!(discovery.errors||[]).length,'Platform frontend case inventory location, hash or discovery is invalid');
+   check(JSON.stringify(receipt.browser.excluded)===JSON.stringify(selection.excluded),'Platform frontend exclusion scope drifted');
+   inventory=browserCaseInventory(discovery);list={file:listFile,sha256:hash(listBytes)};
+  }
+  const counts=validateBrowserReport(JSON.parse(bytes),selection.files,inventory,selection.excluded);
   check(Object.entries(counts).every(([key,value])=>receipt.browser[key]===value),'AllPlatformTests browser report counts do not match');
-  browser={...counts,file:reportFile,sha256:hash(bytes)};
+  browser={...counts,file:reportFile,sha256:hash(bytes),...(frontend?{scope:'PlatformFrontendTests',excluded:selection.excluded,list}:{} )};
  }
  return {...validatePlatformReleaseSummary(receipt,dotnet,groups),...(browser?{browser}:{}),testReceipt:{file:receiptFile,sha256:hash(receiptBytes)},
   dotnet:{file:trxFile,sha256:hash(readFile(trxFile))},node:{file:reportFile,sha256:hash(reportBytes),tapReceipts}};
@@ -174,7 +188,7 @@ export async function readPlatformReleaseTests(receiptFile){
 async function platformEvidence(plan,receiptFile){
  await verifyPlatformPlan(plan);
  const tests=await readPlatformReleaseTests(receiptFile);
- check(tests.filter===plan.filter&&tests.allPlatformTests===Boolean(plan.allPlatformTests),'PlatformRelease test coverage differs from frozen plan');
+ check(tests.filter===plan.filter&&tests.allPlatformTests===Boolean(plan.allPlatformTests)&&tests.platformFrontendTests===Boolean(plan.platformFrontendTests),'PlatformRelease test coverage differs from frozen plan');
  return {schemaVersion:1,accepted:true,sourceHead:plan.sourceHead,candidateManifest:plan.candidateManifest,...tests};
 }
 // 制品捕获/推送前再次验证同一范围和原始测试证据，拒绝把 Full 与 PlatformRelease 回执互换。
@@ -190,7 +204,8 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  const [mode,file,receipt,...extra]=process.argv.slice(2);
  if(mode==='freeze-platform'){
   const all=extra.includes('--all-platform-tests');
-  const bytes=readFile(file),plan={schemaVersion:1,scope:'PlatformRelease',allPlatformTests:all,filter:all?allPlatformTestsFilter:platformReleaseFilter,sourceHead:head(),candidateManifest:{file,sha256:hash(bytes)},frozenAt:new Date().toISOString()};
+  const frontend=extra.includes('--platform-frontend-tests');
+  const bytes=readFile(file),plan={schemaVersion:1,scope:'PlatformRelease',allPlatformTests:all,platformFrontendTests:frontend,filter:all?allPlatformTestsFilter:platformReleaseFilter,sourceHead:head(),candidateManifest:{file,sha256:hash(bytes)},frozenAt:new Date().toISOString()};
   await verifyPlatformPlan(plan);write(receipt,plan);console.log(all?'All Microi.Tests and frontend browser inputs selected; desktop products remain separate.':'PlatformRelease component candidate frozen; FullStack and desktop applications are not selected.');
  }else if(mode==='verify-platform'){
   const planBytes=readFile(file),result=await platformEvidence(JSON.parse(planBytes),receipt);

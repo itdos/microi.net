@@ -15,7 +15,7 @@ export const NUGET_STATS_ENDPOINT = `${buildSiteApiEngineUrl(
   NUGET_STATS_ENGINE_KEY
 )}?OsClient=${encodeURIComponent(OS_CLIENT)}`
 
-export const NUGET_FALLBACK_STATS = Object.freeze({
+const HISTORICAL_NUGET_STATS = Object.freeze({
   owner: NUGET_OWNER,
   packageCount: 38,
   totalDownloads: 9741567,
@@ -32,6 +32,28 @@ export const NUGET_FALLBACK_STATS = Object.freeze({
   isLive: false
 })
 
+// Vite 构建将官方只读快照注入同一份 SSR/客户端源码；开发和离线构建保留有日期的历史值。
+export const NUGET_FALLBACK_STATS = Object.freeze(selectEmbeddedNugetStats(
+  typeof __MICROI_NUGET_BUILD_SNAPSHOT__ === 'undefined' ? null : __MICROI_NUGET_BUILD_SNAPSHOT__
+))
+
+export function selectEmbeddedNugetStats(candidate) {
+  if (!candidate) return { ...HISTORICAL_NUGET_STATS }
+  try {
+    const normalized = normalizeNugetStatsPayload(candidate)
+    const isBuildSnapshot = candidate.cacheState === 'build-snapshot'
+    return {
+      ...normalized,
+      stage: isBuildSnapshot ? 'build' : 'fallback',
+      cacheState: isBuildSnapshot ? 'build-snapshot' : 'embedded',
+      didRefresh: false,
+      isLive: false
+    }
+  } catch {
+    return { ...HISTORICAL_NUGET_STATS }
+  }
+}
+
 let sharedStatsRequest
 
 function asNonNegativeInteger(value, fallback = 0) {
@@ -47,7 +69,9 @@ export function normalizeNugetStatsPayload(value, expectedStage = '') {
   const totalDownloads = asNonNegativeInteger(value.totalDownloads)
   const queriedAt = String(value.queriedAt || '')
   if (owner.toLowerCase() !== NUGET_OWNER.toLowerCase()) throw new Error('Unexpected NuGet owner')
-  if (!packageCount || !totalDownloads) throw new Error('NuGet stats payload is invalid')
+  if (!packageCount || !totalDownloads
+    || !Number.isSafeInteger(Number(value.packageCount))
+    || !Number.isSafeInteger(Number(value.totalDownloads))) throw new Error('NuGet stats payload is invalid')
   if (!queriedAt || !Number.isFinite(new Date(queriedAt).getTime())) {
     throw new Error('NuGet snapshot time is invalid')
   }
@@ -188,12 +212,12 @@ async function requestNugetStats({
   }
 }
 
-export function loadNugetSnapshot({ fetchImpl = globalThis.fetch } = {}) {
+export function loadNugetSnapshot({ fetchImpl = globalThis.fetch, timeoutMs = SNAPSHOT_REQUEST_TIMEOUT_MS } = {}) {
   if (!sharedStatsRequest) {
     // 同页组件仅合并进行中的读取；下一次挂载重新读取，避免 SPA 长期停在旧快照。
     sharedStatsRequest = requestNugetStats({
       fetchImpl,
-      timeoutMs: SNAPSHOT_REQUEST_TIMEOUT_MS
+      timeoutMs: Math.max(1, Math.min(SNAPSHOT_REQUEST_TIMEOUT_MS, Math.floor(timeoutMs) || SNAPSHOT_REQUEST_TIMEOUT_MS))
     }).finally(() => {
       sharedStatsRequest = undefined
     })

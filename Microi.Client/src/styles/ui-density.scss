@@ -57,6 +57,8 @@ html[data-mci-ui-density] body {
         box-sizing: border-box;
     }
     .el-input__inner { height: var(--mci-ui-control-height) !important; line-height: var(--mci-ui-control-height) !important; }
+    // 输入本体已采用完整密度高度，避免 Element Plus 上下各 1px 内边距让文本框比日期框高。
+    .el-input > .el-input__wrapper { padding-block: 0 !important; }
     .el-button { font-size: var(--mci-ui-base-font) !important; }
     .el-button:not(.is-circle):not(.is-text):not(.is-link) { min-height: var(--mci-ui-control-height); }
     .el-tabs__item { height: var(--mci-ui-tab-height) !important; line-height: var(--mci-ui-tab-height) !important; font-size: var(--mci-ui-base-font) !important; }

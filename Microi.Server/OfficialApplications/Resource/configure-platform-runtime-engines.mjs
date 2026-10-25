@@ -13,6 +13,24 @@ function readSource(fileName) {
   return fs.readFileSync(path.join(root, fileName), 'utf8').replace(/\r\n/g, '\n').trimEnd();
 }
 
+// 修复单个已发布托管接口时只投影该接口，避免重放历史生成器改写其它资源与包版本。
+if (process.argv.includes('--schedule-job-only')) {
+  const engine = packageData.SysApiEngines?.find(item => item.ApiEngineKey === 'platform-schedule-job');
+  if (!engine || packageData.ResourcePolicies?.ApiEngines?.['platform-schedule-job']?.UpgradePolicy !== 'Managed') {
+    throw new Error('SaaS 包缺少已有 Managed platform-schedule-job，禁止创建或改变资源所有权。');
+  }
+  const source = readSource('platform-schedule-job.js');
+  const version = source.match(/Version:\s*(v[\d.]+)/)?.[1];
+  if (!version) throw new Error('任务管理源码缺少版本。');
+  engine.ApiV8Code = source;
+  engine.Version = version;
+  engine.ChangeHistory = prependOnce(engine.ChangeHistory,
+    `2026-10-25 ${version} 旧 Job HTTP 保存保留原请求业务接口目标，拒绝缺失目标并保持可信路由与管理员校验。`);
+  fs.writeFileSync(packagePath, `${JSON.stringify(packageData, null, 2)}\n`, 'utf8');
+  console.log(`platform-schedule-job ${version}: exact existing Managed source projection`);
+  process.exit(0);
+}
+
 function prependOnce(existing, line) {
   const value = String(existing || '').replace(/\r\n/g, '\n').trim();
   const block = String(line || '').replace(/\r\n/g, '\n').trim();

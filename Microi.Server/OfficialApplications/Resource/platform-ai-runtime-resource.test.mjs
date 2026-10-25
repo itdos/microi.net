@@ -111,7 +111,7 @@ async function run(action, request = {}) {
 test('platform-ai-runtime is a fixed Managed package resource', () => {
   const engine = packageEngine('platform-ai-runtime');
   assert.ok(engine);
-  assert.equal(packageModel.PackageInfo.Version, 'v7.7.7');
+  assert.equal(packageModel.PackageInfo.Version, 'v7.7.8');
   assert.equal(engine.Version, 'v1.1.3');
   assert.ok(packageModel.PackageInfo.RequiredPlatformCapabilities.includes('ApiEngine:platform-ai-runtime@v1.1.3'));
   assert.equal(engine.ApiAddress, '/apiengine/platform-ai-runtime');
@@ -261,7 +261,16 @@ test('legacy AI JSON routes are centralized while native protocol boundaries rem
     );
   }
   assert.match(source, /PLATFORM_RUNTIME_DISPATCH_MARKER_V1/);
-  assert.match(nativeController, /Task ChatStream[\s\S]{0,1800}_microiAi\.ChatStreamWithContextAsync/);
+  const chatStart = nativeController.indexOf('public async Task ChatStream(');
+  const chatEnd = nativeController.indexOf('public async Task NL2V8Engine(', chatStart);
+  assert.ok(chatStart >= 0 && chatEnd > chatStart, 'native ChatStream boundary must exist');
+  const chatStream = nativeController.slice(chatStart, chatEnd);
+  const enrich = chatStream.indexOf('await EnrichCurrentUserAsync(param);');
+  const dispatch = chatStream.indexOf('var result = _microiAi is IAiCancellableStream cancellable');
+  assert.ok(enrich >= 0 && dispatch > enrich, 'trusted current-user enrichment must precede native dispatch');
+  assert.match(chatStream, /Response\.ContentType = "text\/event-stream; charset=utf-8"/);
+  assert.match(chatStream,
+    /var result = _microiAi is IAiCancellableStream cancellable\s*\? await cancellable\.ChatEventsWithContextAsync\(param, WriteSseEventAsync, HttpContext\.RequestAborted\)\s*: _microiAi is IAiEventStream eventStream\s*\? await eventStream\.ChatEventsWithContextAsync\(param, WriteSseEventAsync\)\s*: await _microiAi\.ChatStreamWithContextAsync\(\s*param,\s*chunk => WriteSseEventAsync\(\s*"message",\s*chunk\)\)/);
   assert.match(nativeController, /Task NL2V8Engine\([\s\S]{0,2200}_microiAi\.NL2V8Engine/);
   assert.match(nativeController, /GetNl2SqlPolicyTableOptions[\s\S]{0,600}_microiAi\.GetNl2SqlPolicyTableOptionsAsync/);
   assert.match(nativeController, /ProxyChatStream[\s\S]{0,1400}_proxyService\.ExecuteAuthenticatedStreamAsync/);

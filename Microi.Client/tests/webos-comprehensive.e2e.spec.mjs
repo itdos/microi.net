@@ -2,13 +2,17 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const FRONTEND = 'http://localhost:61500';
-const API_BASE = 'https://localhost:61501';
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || 'http://localhost:61500';
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || 'https://localhost:61501';
 const PASSWORD = process.env.PW_LOCAL_PASSWORD || '';
 const OUTPUT = path.resolve(process.cwd(), '../.tmp/screenshots/webos-after');
 let pendingPreferenceRestore = null;
 
-const tenantUrl = () => `${FRONTEND}/?OsClient=iTdos&ApiBase=${encodeURIComponent(API_BASE)}`;
+const tenantUrl = () => {
+    expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
+    return `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`;
+};
 
 async function login(page) {
     await page.goto(tenantUrl(), { waitUntil: 'domcontentloaded' });
@@ -20,7 +24,7 @@ async function login(page) {
         'input[placeholder*="user name" i]',
     ].join(', ')).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill('admin');
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(PASSWORD);
     const privacy = page.locator('.privacy-policy-wrapper .el-checkbox').first();
     if (await privacy.isVisible().catch(() => false)) {
@@ -140,7 +144,8 @@ async function ensureThemePanel(page) {
 
 async function setTheme(page, mode, paletteTitle) {
     let panel = await ensureThemePanel(page);
-    const modeButtons = panel.locator('.mci-mode-btn');
+    const modeButtons = panel.getByRole('group', { name: /^(?:显示模式|Display mode)$/i }).locator('.mci-mode-btn');
+    await expect(modeButtons).toHaveCount(2);
     const modeButton = mode === 'dark' ? modeButtons.nth(1) : modeButtons.nth(0);
     if (!await modeButton.evaluate(element => element.classList.contains('active'))) {
         await modeButton.click();
@@ -153,6 +158,19 @@ async function setTheme(page, mode, paletteTitle) {
     await page.waitForTimeout(700);
     panel = await ensureThemePanel(page);
     if (paletteTitle) {
+        if (/^#[0-9a-f]{6}$/i.test(paletteTitle)) {
+            // 自定义颜色没有 active 预设圆点，通过同一产品颜色选择器精确恢复。
+            await panel.locator('.mci-custom-row .el-color-picker__trigger').click();
+            const picker = page.locator('.el-color-picker-panel:visible').last();
+            await expect(picker).toBeVisible({ timeout: 10_000 });
+            const colorInput = picker.getByRole('textbox');
+            await expect(colorInput).toHaveCount(1);
+            await colorInput.fill(paletteTitle, { timeout: 10_000 });
+            await picker.getByRole('button', { name: /^(确定|确认|OK|Confirm)$/i }).click();
+            await expect.poll(() => page.evaluate(async () => (await import('/src/utils/theme-color.js')).getThemeColor().toLowerCase()))
+                .toBe(paletteTitle.toLowerCase());
+            return ensureThemePanel(page);
+        }
         const palette = panel.locator(`.mci-color-dot[title="${paletteTitle}"]`);
         if (await palette.count() && !await palette.evaluate(element => element.classList.contains('active'))) {
             await palette.click();
@@ -170,10 +188,23 @@ async function boxesDoNotOverlap(a, b) {
         || a.y + a.height <= b.y || b.y + b.height <= a.y;
 }
 
+async function expectWindowsTaskbarSeparation(page) {
+    const brand = await page.locator('.webos-toolbar--windows .webos-brand').boundingBox();
+    const dock = await page.locator('.webos-windows-taskbar .microi-windows-dock').boundingBox();
+    const actions = await page.locator('.webos-toolbar--windows .webos-quick-actions').boundingBox();
+    const geometry = { brand, dock, actions, viewportWidth: page.viewportSize().width };
+    for (const box of [brand, dock, actions]) {
+        expect(box, JSON.stringify(geometry)).not.toBeNull();
+        expect(box.x, JSON.stringify(geometry)).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, JSON.stringify(geometry)).toBeLessThanOrEqual(geometry.viewportWidth + 1);
+    }
+    expect(await boxesDoNotOverlap(brand, dock), JSON.stringify(geometry)).toBe(true);
+    expect(await boxesDoNotOverlap(dock, actions), JSON.stringify(geometry)).toBe(true);
+}
+
 test.use({ viewport: { width: 1440, height: 900 } });
 test.afterEach(async ({ page }) => {
     const restore = pendingPreferenceRestore;
-    pendingPreferenceRestore = null;
     if (!restore || page.isClosed()) return;
     try {
         if (restore.mode) {
@@ -181,12 +212,14 @@ test.afterEach(async ({ page }) => {
             await page.keyboard.press('Escape');
         }
         if (restore.style) await switchStyle(page, restore.style);
-    } catch (error) {
-        console.warn(`WebOS 测试偏好恢复失败：${error?.message || error}`);
+    } finally {
+        pendingPreferenceRestore = null;
     }
 });
 
 test('WebOS macOS/Windows 全流程、主题、低视口与截图回归', async ({ page }) => {
+    // 两套桌面、窗口拖拽/缩放、主题和低视口共享一个完整场景，明确总时限。
+    test.setTimeout(180_000);
     test.skip(!PASSWORD, 'PW_LOCAL_PASSWORD is required');
     await fs.mkdir(OUTPUT, { recursive: true });
     const diagnostics = {
@@ -224,14 +257,15 @@ test('WebOS macOS/Windows 全流程、主题、低视口与截图回归', async 
         if (document.querySelector('.webos-platform--macos')) return 'macOS 风格';
         return '经典传统';
     });
-    pendingPreferenceRestore = { style: initialStyle };
+    const preferenceRestore = { style: initialStyle };
+    pendingPreferenceRestore = preferenceRestore;
     await switchStyle(page, 'macOS 风格');
     await expect(page.locator('.microi-macos-desk .microi-desk-griditem').first()).toBeVisible({ timeout: 30_000 });
 
     const runtime = await page.evaluate(() => window.__MICROI_RUNTIME_ENDPOINT__);
     expect(runtime?.protocol).toBe('microi.runtime-endpoint.v1');
     expect(runtime?.apiBase).toBe(API_BASE);
-    expect(runtime?.osClient).toBe('iTdos');
+    expect(runtime?.osClient).toBe(OS_CLIENT);
     expect(runtime?.webBase).toBe(FRONTEND);
     expect(runtime?.source?.apiBase).toBe('url-query');
     expect(runtime?.source?.osClient).toBe('url-query');
@@ -321,10 +355,13 @@ test('WebOS macOS/Windows 全流程、主题、低视口与截图回归', async 
     }
 
     let themePanel = await openThemePanel(page);
-    const initialModeText = (await themePanel.locator('.mci-mode-btn.active').textContent() || '').trim();
-    const initialPalette = await themePanel.locator('.mci-color-dot.active').getAttribute('title').catch(() => '');
-    pendingPreferenceRestore.mode = /深|dark/i.test(initialModeText) ? 'dark' : 'light';
-    pendingPreferenceRestore.palette = initialPalette || null;
+    const initialModeText = (await themePanel.getByRole('group', { name: /^(?:显示模式|Display mode)$/i }).locator('.mci-mode-btn.active').textContent() || '').trim();
+    const activePalette = themePanel.locator('.mci-color-dot.active');
+    const initialPalette = await activePalette.count()
+        ? await activePalette.getAttribute('title')
+        : await page.evaluate(async () => (await import('/src/utils/theme-color.js')).getThemeColor());
+    preferenceRestore.mode = /深|dark/i.test(initialModeText) ? 'dark' : 'light';
+    preferenceRestore.palette = initialPalette || null;
     await page.keyboard.press('Escape');
     themePanel = await setTheme(page, 'dark', '橙色');
     await expect(themePanel.locator('.mci-color-dot[title="橙色"]')).toHaveClass(/active/);
@@ -344,9 +381,7 @@ test('WebOS macOS/Windows 全流程、主题、低视口与截图回归', async 
     expect(winMax.x).toBeLessThan(winClose.x);
     const taskbar = await page.locator('.webos-windows-taskbar').boundingBox();
     expect(Math.abs(taskbar.y + taskbar.height - 900)).toBeLessThanOrEqual(1);
-    const centralDock = await page.locator('.webos-windows-taskbar .microi-windows-dock').boundingBox();
-    const quickActions = await page.locator('.webos-toolbar--windows .webos-quick-actions').boundingBox();
-    expect(await boxesDoNotOverlap(centralDock, quickActions)).toBe(true);
+    await expectWindowsTaskbarSeparation(page);
     await screenshot(page, '05-windows-dark-orange-window-1440x900.png');
     diagnostics.screenshots.push('05-windows-dark-orange-window-1440x900.png');
 
@@ -375,6 +410,7 @@ test('WebOS macOS/Windows 全流程、主题、低视口与截图回归', async 
     expect(lowWindow.y + lowWindow.height).toBeLessThanOrEqual(553);
     const lowTaskbar = await page.locator('.webos-windows-taskbar').boundingBox();
     expect(Math.abs(lowTaskbar.y + lowTaskbar.height - 600)).toBeLessThanOrEqual(1);
+    await expectWindowsTaskbarSeparation(page);
     await screenshot(page, '07-windows-dark-low-1024x600.png');
     diagnostics.screenshots.push('07-windows-dark-low-1024x600.png');
 

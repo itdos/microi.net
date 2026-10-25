@@ -128,11 +128,9 @@ for(const scenario of ['success','digest-mismatch','readback-timeout','push-fail
  const bash=git?path.resolve(git.stdout.trim(),'../../..','bin/bash.exe'):'bash';
  const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:root,encoding:'utf8',timeout:15000,input:`set -e
 MICROI_RELEASE_GATE_DIR="$PWD"; MICROI_RELEASE_CANDIDATE=fixture; PUBLISH_DIR=fixture; MICROI_ENCRYPTION_RECEIPT=fixture
-MICROI_SMOKE_CONFIG_TOOL=Microi.Server/tools/release-smoke-config.mjs
 COMMAND_LOG="$PWD/budget-calls.txt"
 PUBLISH_BACKEND=true; BUILD_CLIENT=false; HAS_ENCRYPT=true; DOCKER_REGISTRY=registry.test; DOCKER_NAMESPACE=team
 print_step(){ :; }; print_info(){ :; }; print_warning(){ :; }; print_fail(){ printf 'FAILED=%s\\n' "$*"; exit 17; }; print_success(){ printf 'COMPLETE=%s\\n' "$*"; }
-validate_publish_artifacts(){ :; } # Configuration lifecycle has independent real-file regression coverage.
 run_release_command(){ printf 'BUDGET=%s\\n' "$*" >> "$COMMAND_LOG"; "$@"; }
 node(){
  if [ "$2" = docker-confirm ]; then
@@ -154,7 +152,7 @@ docker_push_plan 'fixture|api|local|api:{latest},api:{version}' 8.6.4
  if(success){assert.match(run.stdout,/PUSH=.*:latest[\s\S]*CONFIRM=.*:latest[\s\S]*PUSH=.*:v8\.6\.4[\s\S]*CONFIRM=.*:v8\.6\.4[\s\S]*COMPLETE=/);}
  else assert.equal(run.stdout.includes('PUSH=registry.test/team/api:v8.6.4'),false,'Failed first tag prevents the next tag');
  const budgetCalls=fs.readFileSync(path.join(root,'budget-calls.txt'),'utf8');
- for(const command of ['release-artifact.mjs','release-smoke-config.mjs image','release-encryption.mjs image','docker tag','docker image inspect','docker push'])assert.ok(budgetCalls.includes(`BUDGET=${command.startsWith('release-')?'node Microi.Server/tools/':''}${command}`),budgetCalls);
+ for(const command of ['release-artifact.mjs','release-encryption.mjs image','docker tag','docker image inspect','docker push'])assert.ok(budgetCalls.includes(`BUDGET=${command.startsWith('release-')?'node Microi.Server/tools/':''}${command}`),budgetCalls);
  if(scenario!=='push-failed')assert.match(budgetCalls,/BUDGET=node Microi.Server\/tools\/release-remote-collision.mjs docker-confirm/);
 }));
 test('formal shell runs whole-set preflight before first NuGet and Docker baseline before any version/latest push',()=>{

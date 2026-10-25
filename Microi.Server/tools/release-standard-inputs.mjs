@@ -45,7 +45,8 @@ async function snapshotFounderSolution(root) {
 
 // Full 读取的标准产品责任源码按唯一契约冻结，即使它们被根公开仓忽略。
 // 只记录指纹，不把这些私有文件暂存或复制进公开仓。
-export async function snapshotStandardInputs(root, {includeTestInputs = true} = {}) {
+export async function snapshotStandardInputs(root, {includeTestInputs = true, testPolicy = 'Full'} = {}) {
+  if (!['Full', 'PlatformRelease'].includes(testPolicy)) throw Error('Unknown standard-input test policy');
   const founder = await snapshotFounderSolution(root);
   // 同版本免测 Docker 发布仍冻结实际方案；不要求未执行的产品测试私有夹具。
   if (!includeTestInputs) return founder;
@@ -56,7 +57,7 @@ export async function snapshotStandardInputs(root, {includeTestInputs = true} = 
   const contract = JSON.parse(bytes.toString('utf8'));
   if (contract.schemaVersion !== 1 || contract.target?.apiBase !== 'https://api.microi.net'
     || String(contract.target?.osClient).toLowerCase() !== 'itdos'
-    || !Array.isArray(contract.applications) || contract.applications.length !== 6) {
+    || (testPolicy === 'Full' && (!Array.isArray(contract.applications) || contract.applications.length !== 6))) {
     throw Error('Invalid standard product source contract');
   }
   async function inside(value) {
@@ -81,6 +82,12 @@ export async function snapshotStandardInputs(root, {includeTestInputs = true} = 
     return value;
   }
   files[path.relative(root, contractPath).replaceAll('\\', '/')] = hash(bytes);
+  if (testPolicy === 'PlatformRelease') {
+    // README 的平台/独立业务应用边界：只冻结本模式实际消费的平台短信母版，
+    // 不因同步目录存在而把六产品、独立 AI/邮箱/3D/worker/抽奖源码变成发布前置。
+    await addSettingsInput();
+    return files;
+  }
   const keys = new Set();
   const requirementsRoot = await inside(declaredRelative(contract.requirementsRoot));
   for (const app of contract.applications) {
@@ -216,7 +223,7 @@ export async function snapshotStandardInputs(root, {includeTestInputs = true} = 
     ['microi.uniapp/scripts/test-directory-card-config.mjs', ['get-sysUser-list']],
     ['microi.uniapp/scripts/test-task-assignee-search.mjs', ['get-sysUser-list', 'shouhoudd_zhipai']],
   ], engineKeys = new Set();
-  for (const [reader, requiredKeys] of readers) {
+  for (const [reader, requiredKeys] of testPolicy === 'Full' ? readers : []) {
     try { await fs.lstat(path.join(root, reader)); }
     catch (error) { if (error.code === 'ENOENT') continue; throw error; }
     await addInput(reader);
@@ -240,12 +247,16 @@ export async function snapshotStandardInputs(root, {includeTestInputs = true} = 
     }
   }
   // 系统设置回归直接比较主租户短信母版正文；固定该输入，不遍历其它接口或租户。
-  let settingsReaderExists = false;
-  try { await fs.lstat(path.join(root, 'Microi.Server/OfficialApplications/Resource/tenant-system-settings-resource.test.mjs')); settingsReaderExists = true; }
-  catch (error) { if (error.code !== 'ENOENT') throw error; }
-  if (settingsReaderExists) {
-    const tenantSource = path.dirname(await inside(declaredRelative(contract.sourceParent)));
-    await addInput(path.relative(root, path.join(tenantSource, '接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js')));
+  async function addSettingsInput() {
+    let settingsReaderExists = false;
+    try { await fs.lstat(path.join(root, 'Microi.Server/OfficialApplications/Resource/tenant-system-settings-resource.test.mjs')); settingsReaderExists = true; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (settingsReaderExists) {
+      // 母版在租户接口目录；不要求同级独立 AI应用 目录或其中的产品先存在。
+      const tenantSource = await inside(path.dirname(declaredRelative(contract.sourceParent)));
+      await addInput(path.relative(root, path.join(tenantSource, '接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js')));
+    }
   }
+  await addSettingsInput();
   return files;
 }

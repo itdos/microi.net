@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-const FRONTEND = process.env.FRONTEND || 'http://localhost:61500'
-const BACKEND = process.env.BACKEND || 'https://localhost:61501'
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || process.env.FRONTEND || 'http://localhost:61500'
+const BACKEND = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || process.env.BACKEND || 'https://localhost:61501'
 const OS_CLIENT = process.env.MICROI_OSCLIENT || 'iTdos'
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || 'admin'
 const PASSWORD = process.env.PW_TEST_PASSWORD || ''
@@ -75,7 +75,7 @@ test('remote login session persists, reconnects and reports missing target capab
     await route.fulfill({ headers: corsHeaders, json: { Code: 1, Data: {} } })
   })
 
-  await page.goto(`${FRONTEND}/?OsClient=${OS_CLIENT}#/mci-file-manage`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(BACKEND)}#/mci-file-manage`, { waitUntil: 'domcontentloaded' })
   const usernameInput = page.locator('input[placeholder="请输入用户名"], input[placeholder="Please enter user name."]').first()
   const loginVisible = await usernameInput.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)
   if (loginVisible) {

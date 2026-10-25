@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {discoverTests, regressionLogFile, roots} from '../run-node-regressions.mjs';
+import {discoverTests, discoverNodeScope, regularNodeSpecialists, regressionLogFile, roots} from '../run-node-regressions.mjs';
 
 function fixture(t,files){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'microi-regression-discovery-'));
@@ -48,4 +48,20 @@ test('Windows and POSIX responsibility roots write a flat TAP path inside the re
 test('browser module names inside fixture strings do not omit real Node responsibility tests', t=>{
  const root=fixture(t,{'actual.test.mjs':"import test from 'node:test';\nconst fixture = \"import test from '@playwright/test';\";\ntest('actual',()=>{});"});
  assert.deepEqual(discoverTests(root),[path.join(root,'actual.test.mjs')]);
+});
+
+test('regular platform classifies exact independent-application and customer responsibilities while Full preserves their original requirements',t=>{
+ const workspace=fixture(t,{}),directory=path.join(workspace,'Microi.Server/Microi.Tests');
+ fs.mkdirSync(path.join(directory,'V8'),{recursive:true});fs.mkdirSync(path.join(directory,'General'));
+ for(const relative of Object.keys(regularNodeSpecialists)){fs.mkdirSync(path.dirname(path.join(workspace,relative)),{recursive:true});fs.writeFileSync(path.join(workspace,relative),"import './missing-customer-source.mjs';");}
+ const general=path.join(directory,'General','directory-card.test.mjs');fs.writeFileSync(general,"import test from 'node:test';test('general',()=>{});");
+ const selected=discoverNodeScope(workspace,{regularPlatform:true,workspaceRoot:workspace});
+ assert.equal(selected.scope,'RegularPlatform');assert.deepEqual(selected.files,[general]);
+ assert.deepEqual(selected.notApplicable.map(row=>row.file),Object.keys(regularNodeSpecialists));
+ assert.ok(selected.notApplicable.every(row=>row.status==='NotApplicable'&&row.reason.length>0&&/^[a-f0-9]{64}$/.test(row.sha256)));
+ assert.throws(()=>discoverNodeScope(workspace,{workspaceRoot:workspace}),/Missing regression import/);
+ const first=Object.keys(regularNodeSpecialists)[0];fs.appendFileSync(path.join(workspace,first),'\n// changed customer input');
+ assert.notEqual(discoverNodeScope(workspace,{regularPlatform:true,workspaceRoot:workspace}).notApplicable[0].sha256,selected.notApplicable[0].sha256);
+ fs.writeFileSync(path.join(directory,'General','unexpected.test.mjs'),'// no tests');
+ assert.throws(()=>discoverNodeScope(workspace,{regularPlatform:true,workspaceRoot:workspace}),/Unclassified regression test/);
 });

@@ -3,9 +3,38 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawn} from 'node:child_process';
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
-import {runReleaseBudget,runReleaseTarget,recordReleasePhase} from '../../tools/release-budget.mjs';
+import {runReleaseBudget,runReleaseTarget,recordReleasePhase,windowsTreeCleanupScript} from '../../tools/release-budget.mjs';
+
+const execute=promisify(execFile);
+const isAlive=pid=>{try{process.kill(pid,0);return true;}catch(error){if(error.code==='ESRCH')return false;throw error;}};
+async function readyProcess(source){
+ const child=spawn(process.execPath,['-e',source],{stdio:['ignore','pipe','inherit'],windowsHide:true});
+ try{
+  const data=await new Promise((resolve,reject)=>{
+   const timer=setTimeout(()=>reject(Error('Owned test process did not become ready')),5000);
+   child.once('error',error=>{clearTimeout(timer);reject(error);});
+   child.stdout.once('data',chunk=>{clearTimeout(timer);resolve(JSON.parse(String(chunk)));});
+  });
+  return {child,data};
+ }catch(error){child.kill();throw error;}
+}
+async function windowsOwnedFixture(){
+ const unrelated=await readyProcess('console.log(JSON.stringify({pid:process.pid}));setInterval(()=>{},1000)');
+ let root,younger;
+ try{
+  root=await readyProcess(`const {spawn}=require('node:child_process');const child=spawn(process.execPath,['-e','console.log("READY");setInterval(()=>{},1000)'],{stdio:['ignore','pipe','inherit'],windowsHide:true});child.stdout.once('data',()=>console.log(JSON.stringify({pid:process.pid,descendant:child.pid})));setInterval(()=>{},1000);`);
+  younger=await readyProcess('console.log(JSON.stringify({pid:process.pid}));setInterval(()=>{},1000)');
+  const {stdout}=await execute('powershell.exe',['-NoProfile','-NonInteractive','-Command',`(Get-Process -Id ${root.child.pid}).StartTime.ToUniversalTime().Ticks.ToString()`],{windowsHide:true,timeout:15000});
+  return {unrelated,root,younger,ticks:stdout.trim(),close(){
+   for(const item of [unrelated,root,younger])item.child.kill();
+   if(isAlive(root.data.descendant))process.kill(root.data.descendant);
+  }};
+ }catch(error){for(const item of [unrelated,root,younger])item?.child.kill();if(root?.data.descendant&&isAlive(root.data.descendant))process.kill(root.data.descendant);throw error;}
+}
+const cleanupProbe=script=>execute('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{windowsHide:true,timeout:15000,maxBuffer:4096});
 
 test('platform elapsed-time target permits expired starts and preserves failures, timeouts and cancellation',async()=>{
  const target=Date.now()/1000-1;
@@ -72,6 +101,44 @@ test('phase receipts distinguish successful publication from elapsed-time target
   assert.throws(()=>recordReleasePhase(file,101,'other',0,1902),/another run/);
   assert.throws(()=>recordReleasePhase(file,100,'finish',0,150),/another run/);
  }finally{fs.rmSync(directory,{recursive:true});}
+});
+
+test('Windows cleanup rejects stale parent PID links and changed snapshot identities with real processes',{skip:process.platform!=='win32'},async()=>{
+ const owned=await windowsOwnedFixture();
+ try{
+  // 只替换测试中的 CIM 关联数据：进程、启动时间、taskkill 和退出确认均为真实操作。
+  const inventory=`function Get-CimInstance {param([string]$ClassName)
+   CimCmdlets\\Get-CimInstance -ClassName $ClassName
+   [pscustomobject]@{ProcessId=${owned.unrelated.child.pid};ParentProcessId=${owned.root.child.pid};CreationDate=(Get-Process -Id ${owned.unrelated.child.pid}).StartTime}
+   [pscustomobject]@{ProcessId=${owned.younger.child.pid};ParentProcessId=${owned.root.child.pid};CreationDate=(Get-Process -Id ${owned.younger.child.pid}).StartTime.AddSeconds(-1)}
+  }\n`;
+  await cleanupProbe(inventory+windowsTreeCleanupScript(owned.root.child.pid,owned.ticks));
+  assert.equal(isAlive(owned.root.child.pid),false);assert.equal(isAlive(owned.root.data.descendant),false);
+  assert.equal(isAlive(owned.unrelated.child.pid),true);assert.equal(isAlive(owned.younger.child.pid),true);
+ }finally{owned.close();}
+});
+
+test('Windows cleanup confirms actual exit even if taskkill reports a raced-away child',{skip:process.platform!=='win32'},async()=>{
+ const owned=await windowsOwnedFixture();
+ try{
+  const racedError=`$actualTaskkill=(Get-Command taskkill.exe -CommandType Application).Source
+   function taskkill.exe {& $actualTaskkill @args;Write-Error 'The child exited while taskkill traversed the tree'}\n`;
+  await cleanupProbe(racedError+windowsTreeCleanupScript(owned.root.child.pid,owned.ticks));
+  assert.equal(isAlive(owned.root.child.pid),false);assert.equal(isAlive(owned.root.data.descendant),false);
+  assert.equal(isAlive(owned.unrelated.child.pid),true);
+ }finally{owned.close();}
+});
+
+test('Windows cleanup fails closed for wrong identity and for an actually surviving owned tree',{skip:process.platform!=='win32'},async()=>{
+ const owned=await windowsOwnedFixture();
+ try{
+  await assert.rejects(cleanupProbe(windowsTreeCleanupScript(owned.root.child.pid,String(BigInt(owned.ticks)+1n))),error=>error.code===3);
+  assert.equal(isAlive(owned.root.child.pid),true);assert.equal(isAlive(owned.root.data.descendant),true);
+  // 模拟原生命令拒绝终止，真实句柄仍活跃；必须保留失败，不得把 taskkill 的边缘错误一概放行。
+  await assert.rejects(cleanupProbe('function taskkill.exe {$global:LASTEXITCODE=5}\n'+windowsTreeCleanupScript(owned.root.child.pid,owned.ticks)),error=>error.code===4&&/phase=verify taskkill=5 live=\d+:\d+/.test(error.stderr));
+  assert.equal(isAlive(owned.root.child.pid),true);assert.equal(isAlive(owned.root.data.descendant),true);
+  assert.equal(isAlive(owned.unrelated.child.pid),true);
+ }finally{owned.close();}
 });
 
 test('budget executes commands and preserves Windows pwsh after nested tree timeout',async()=>{

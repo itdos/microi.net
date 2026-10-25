@@ -205,6 +205,7 @@ MICROI_ACTIVE_GUARD_PID_FILE=""
 MICROI_RELEASE_LOCK_HELD=false
 MICROI_RELEASE_LOCK_DIR=""
 MICROI_RELEASE_SCRATCH=""
+MICROI_PLATFORM_RUNTIME_OWNED_CONTROL=""
 MICROI_RELEASE_SCRATCH_TOOL="$PWD/Microi.Server/tools/release-scratch.mjs"
 MICROI_SMOKE_CONFIG_STATE=""
 MICROI_SMOKE_CONFIG_PUBLISH=""
@@ -346,6 +347,12 @@ finish_windows_session() {
     local _exit_code=$?
     trap - EXIT
     stop_active_client_build
+    if [ -n "$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL" ]; then
+        if ! node "$MICROI_RELEASE_WORKSPACE/Microi.Server/tools/platform-release-runtime.mjs" stop "$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL"; then
+            echo "本轮原生测试进程或运输桥尚未确认退出；已保留所属回执。" >&2
+            [ "$_exit_code" -ne 0 ] || _exit_code=1
+        fi
+    fi
     # EXIT also runs for INT/TERM/HUP and unexpected command failures. Restore
     # before scratch cleanup, preserving a failed recovery record for diagnosis.
     if [ -n "$MICROI_SMOKE_CONFIG_STATE" ] && ! restore_smoke_config; then
@@ -1134,6 +1141,10 @@ echo -e "  ${BOLD}✅ 选择完毕，即将开始全自动执行${NC}"
 echo -e "  ${BOLD}════════════════════════════════════════════════════════${NC}"
 echo ""
 echo -e "  发布模式: ${BOLD}${_mode_names[$DEPLOY_MODE]}${NC}"
+if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ]; then
+    print_info "默认验收：常规 Microi.Tests + 全部通用前端测试 + 接口检查 + 程序启动运行与冒烟。"
+    print_info "本次不适用：真实付费 AI、JUNCHI/XJY 客户数据、SQL Server 及独立应用源码专项；这些范围保留独立显式入口。"
+fi
 if [ "$BUMP_VERSION" = true ]; then
     if [ "$CURRENT_VERSION" = "$VERSION" ]; then
         echo -e "  版本号:   ${BOLD}${GREEN}${VERSION}${NC}（继续当前未提交版本）"
@@ -1194,6 +1205,21 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CL
 fi
 
 # 合并发布先验证官网已有门禁，避免平台渠道已上传才发现官网源码尚未成为可发布候选。
+if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ] && [ -z "${MICROI_PLATFORM_RUNTIME_CONTROL:-}" ]; then
+    print_phase "加载已授权的本机发布环境"
+    if ! MICROI_PLATFORM_RUNTIME_OWNED_CONTROL=$(run_release_command node Microi.Server/tools/platform-release-runtime.mjs start \
+        "$PWD" "$MICROI_RELEASE_GATE_DIR" "${MICROI_PLATFORM_RELEASE_PROFILE:-}" "$MICROI_RELEASE_OWNER_PID"); then
+        print_fail "已授权本机发布环境的校验或启动失败；请查看本轮私有回执，不会自动创建租户或容器。"
+    fi
+    export MICROI_PLATFORM_RUNTIME_CONTROL="$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL"
+    MICROI_RELEASE_SMOKE_CONFIG=$(node Microi.Server/tools/platform-release-runtime.mjs info "$MICROI_PLATFORM_RUNTIME_CONTROL" smokeConfig)
+    SMOKE_PORT=$(node Microi.Server/tools/platform-release-runtime.mjs info "$MICROI_PLATFORM_RUNTIME_CONTROL" smokePort)
+    _runtime_node_home=$(node Microi.Server/tools/platform-release-runtime.mjs info "$MICROI_PLATFORM_RUNTIME_CONTROL" nodeHome)
+    if is_windows_shell; then _runtime_node_home=$(cygpath -u "$_runtime_node_home"); fi
+    export MICROI_RELEASE_SMOKE_CONFIG SMOKE_PORT
+    export PATH="$_runtime_node_home:$PATH"
+fi
+
 if [ "$PUBLISH_DOC" = true ]; then
     print_step "预检官方网站候选..."
     run_release_command node microi.doc/scripts/check-account-portal.mjs --require-committed
@@ -1276,8 +1302,18 @@ if [ "$BUILD_CLIENT" = true ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then
     print_info "前端发行版本: ${CLIENT_VERSION}；后端发行版本: ${VERSION}（各自保持源码声明）"
 fi
 
+# 先把官网三方合并和包版本推进完成，再冻结并测试最终正文；否则测试后自动
+# 升版会使已验收候选失效。此阶段只准备本地文件，不写官网或共同基线。
+if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ] && [ "$MICROI_FULL_ONLY" != true ]; then
+    print_phase "准备官方应用资源发布候选（仅本地合并）"
+    if ! run_release_command node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --prepare-candidate --allow-verified-offline; then
+        print_fail "官方应用资源候选准备失败；尚未开始整套测试或写入官网，请先解决资源合并问题。"
+    fi
+fi
+
 # 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行平台自动化回归。
-# 常规发行不新建租户、不安装聊天应用、不运行独立 Code/Agent 产品测试。
+# 常规发行验证 Microi.Tests、全部通用前端、接口及启动运行；不新建租户、不安装聊天应用、不运行独立 Code/Agent 产品测试。
+# 真实付费 AI、JUNCHI/XJY 客户数据、SQL Server 及独立应用源码验收属于独立专项，不进入默认平台发布。
 # 显式 Full 保留真实业务深度验收；两种范围分别冻结和验证，失败均停止发布。
 if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "${PLATFORM_DOCKER_SELECTED:-false}" = true ]; then
     # bin/Release/Dockerfile 是已跟踪的 Docker 构建配方投影。必须在冻结候选前
@@ -1287,6 +1323,11 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
             cp "Microi.Server/Microi.net.Api/Dockerfile.runtime" "Microi.Server/Microi.net.Api/bin/Release/Dockerfile"
             print_info "已在冻结候选前同步后端 Docker 构建配方。"
         fi
+    fi
+    # 干净 worktree 没有被忽略的 dist；只恢复已嵌入且与当前源码清单一致的内置平台服务产物。
+    # 必须先于候选冻结和测试，不能拷贝其它工作区的旧 dist 或在验收后改写候选。
+    if ! run_release_command node Microi.Server/OfficialApplications/Resource/prepare-platform-service-dist.mjs; then
+        print_fail "内置平台服务产物与当前源码不一致；请完成其构建及内嵌更新后重新发布。"
     fi
     print_phase "发布前 ${MICROI_RELEASE_TEST_POLICY} 自动化测试（失败即停止）"
     MICROI_RELEASE_CANDIDATE="$MICROI_RELEASE_GATE_DIR/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
@@ -1304,14 +1345,18 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
     fi
     _full_test_results="$MICROI_RELEASE_GATE_DIR/$(date +%Y%m%d-%H%M%S)-$$"
     # 使用本轮所选测试策略的实际回执；历史跳过例外不能作为发布入口。
-    if [ -n "${MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:-}${MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:-}" ]; then
+    if [ "$MICROI_FULL_ONLY" = true ] && [ -n "${MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:-}${MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:-}" ]; then
         print_fail "SQL Server 跳过例外已停用；请使用冻结依赖矩阵及零跳过 Full。"
     fi
     _release_test_scope_args=()
-    if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ]; then _release_test_scope_args+=(-AllPlatformTests); fi
-    if ! run_release_command "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
+    if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ]; then _release_test_scope_args+=(-PlatformFrontendTests); fi
+    _platform_test_command=("$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
         -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode "$MICROI_RELEASE_TEST_POLICY" -Configuration Release -SolutionPath "$SLN_FILE" \
-        -ResultsDirectory "$_full_test_results" "${_release_test_scope_args[@]}"; then
+        -ResultsDirectory "$_full_test_results" "${_release_test_scope_args[@]}")
+    if [ -n "$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL" ]; then
+        _platform_test_command=(node Microi.Server/tools/platform-release-runtime.mjs run-tests "$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL" -- "${_platform_test_command[@]}")
+    fi
+    if ! run_release_command "${_platform_test_command[@]}"; then
         print_fail "${MICROI_RELEASE_TEST_POLICY} 测试未通过；已停止官方应用资源写入和平台发布，禁止跳过失败用例。"
     fi
     if [ "$MICROI_FULL_ONLY" = true ]; then
@@ -2191,10 +2236,11 @@ if [ "$PUBLISH_DOC" = true ]; then
     print_info "使用包管理器: pnpm@$DOC_PNPM_VERSION"
 
     print_step "按锁文件安装依赖..."
-    (cd microi.doc && run_release_command "${DOC_PKG_CMD[@]}" install --frozen-lockfile)
+    # 原生 Node 不能直接 spawn Windows 的 pnpm/npx shell shim；Bash 只执行逐项 argv，不拼接命令文本。
+    (cd microi.doc && run_release_command "$BASH" -c 'exec "$@"' microi-doc-package "${DOC_PKG_CMD[@]}" install --frozen-lockfile)
 
     print_step "构建 VitePress 文档..."
-    (cd microi.doc && run_release_command "${DOC_PKG_CMD[@]}" run docs:build)
+    (cd microi.doc && run_release_command "$BASH" -c 'exec "$@"' microi-doc-package "${DOC_PKG_CMD[@]}" run docs:build)
     run_release_command node microi.doc/scripts/check-account-portal.mjs --dist --require-committed
     print_success "VitePress 构建完成"
 

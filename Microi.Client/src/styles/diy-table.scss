@@ -2694,7 +2694,7 @@
     min-width: 0;
     margin: 0;
     overflow: hidden;
-    color: var(--mci-text-tertiary, var(--el-text-color-secondary, #909399));
+    color: var(--mci-text-secondary, var(--el-text-color-regular, #334155));
     font-size: 10px;
     line-height: 13px;
     text-overflow: ellipsis;

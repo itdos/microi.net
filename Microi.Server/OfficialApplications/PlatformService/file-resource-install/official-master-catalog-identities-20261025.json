@@ -1,0 +1,435 @@
+{
+  "recordedAtUtc": "2026-10-25T13:32:23.413Z",
+  "profile": "microi_itdos_api_itdos_com",
+  "apiBase": "https://api.itdos.com",
+  "osClient": "iTdos",
+  "tableIds": {
+    "mci_file_replica": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+    "mci_file_traffic_window": "01M5SKVSF4AVWQZXP5C8PF7T76",
+    "mci_file_resource": "01M5SKVQRBMA7GTSAA2T0RP3ZT"
+  },
+  "fields": {
+    "mci_file_resource": [
+      {
+        "Name": "Id",
+        "Id": "01M5SKVR1F5W2PC02P3PDZRB6M",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "CreateTime",
+        "Id": "01M5SKVR4YMH3AXR8Z9CBHEMTF",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "datetime"
+      },
+      {
+        "Name": "UpdateTime",
+        "Id": "01M5SKVR9Y53S5P2DBS10AJM9Q",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "datetime"
+      },
+      {
+        "Name": "UserId",
+        "Id": "01M5SKVRDFGDHN490VHD2TT7Q5",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "UserName",
+        "Id": "01M5SKVRHFKREBFVYMR2D0SG7Y",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(255)"
+      },
+      {
+        "Name": "IsDeleted",
+        "Id": "01M5SKVRN387B3MTFVTNSF975J",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "int"
+      },
+      {
+        "Name": "Tenant",
+        "Id": "01M5SKVWPD2E3H95A99F8T1RDD",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(50)"
+      },
+      {
+        "Name": "ResourceKey",
+        "Id": "01M5SKVXJ1JR4BFQCEA8VTJYCP",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(120)"
+      },
+      {
+        "Name": "Name",
+        "Id": "01M5SKVYC7S11HQFPQRHPCJFFP",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(160)"
+      },
+      {
+        "Name": "Kind",
+        "Id": "01M5SKVZ5T5PHKE63SSH9SMN6W",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(32)"
+      },
+      {
+        "Name": "AppId",
+        "Id": "01M5SKVZZHZWFGZEVWYJD0P8NH",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "SourceFileId",
+        "Id": "01M5SKW0S9GGWZJBMA19FMXCGQ",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "SourceTenant",
+        "Id": "01M5SKW1MS03KF779YMXBPCQP4",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(50)"
+      },
+      {
+        "Name": "SourceProvider",
+        "Id": "01M5SKW2HXDT6B6XVHSG3YTFSB",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(20)"
+      },
+      {
+        "Name": "ObjectKey",
+        "Id": "01M5SKW3B82FTJVBMKS4CX9JTA",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(1000)"
+      },
+      {
+        "Name": "ContentHash",
+        "Id": "01M5SKW43904PXEPW81MQCJHWX",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(64)"
+      },
+      {
+        "Name": "Size",
+        "Id": "01M5SKW4WD2T351HG3V3GT2C61",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "bigint"
+      },
+      {
+        "Name": "ContentType",
+        "Id": "01M5SKW5N809HQ783ZQ1TZ4EZW",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(128)"
+      },
+      {
+        "Name": "SourceRevision",
+        "Id": "01M5SKW6EV9Q73JJZYR6RKMTWS",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(64)"
+      },
+      {
+        "Name": "AuthorityState",
+        "Id": "01M5SKW795FQW1WSRW0WZRY882",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(24)"
+      },
+      {
+        "Name": "Visibility",
+        "Id": "01M5SKW84HDRT6ZVNWH7MZMS18",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "varchar(12)"
+      },
+      {
+        "Name": "Enabled",
+        "Id": "01M5SKW8YFGY16EP9QQR7EEEWE",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "int"
+      },
+      {
+        "Name": "RowVersion",
+        "Id": "01M5SKW9WKG6W7V081VKF54PD0",
+        "TableId": "01M5SKVQRBMA7GTSAA2T0RP3ZT",
+        "Type": "int"
+      }
+    ],
+    "mci_file_traffic_window": [
+      {
+        "Name": "Id",
+        "Id": "01M5SKVSNGABQQ3A213GWPTVPS",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "CreateTime",
+        "Id": "01M5SKVSRWEVF884E4Z1APS504",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "datetime"
+      },
+      {
+        "Name": "UpdateTime",
+        "Id": "01M5SKVSW3D1EHSGKDSQ8ZAT1V",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "datetime"
+      },
+      {
+        "Name": "UserId",
+        "Id": "01M5SKVSZBHZHDVK0Q1W67VMJC",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "UserName",
+        "Id": "01M5SKVT2T9DKJMD6GPZ78G34C",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(255)"
+      },
+      {
+        "Name": "IsDeleted",
+        "Id": "01M5SKVT6TDTYYQ1XNP685B619",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "int"
+      },
+      {
+        "Name": "Tenant",
+        "Id": "01M5SKWBABM6BG4NY6FQJ0GY7E",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(50)"
+      },
+      {
+        "Name": "ResourceId",
+        "Id": "01M5SKWC525DP1FQ0YR9V31DME",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "VersionHash",
+        "Id": "01M5SKWD0Z1MJXS4QWPECW139D",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(64)"
+      },
+      {
+        "Name": "WindowStartUtc",
+        "Id": "01M5SKWDTRXBZYYGM06ZWSJDXG",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "bigint"
+      },
+      {
+        "Name": "WindowEndUtc",
+        "Id": "01M5SKWF2EVP0YNRCD821JRN0S",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "bigint"
+      },
+      {
+        "Name": "Metric",
+        "Id": "01M5SKWG9WZ9KKFN0YY44GDEJV",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(32)"
+      },
+      {
+        "Name": "Bytes",
+        "Id": "01M5SKWH8P3R69YMPBRG3C8GF3",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "bigint"
+      },
+      {
+        "Name": "Requests",
+        "Id": "01M5SKWJ4ZDD6HEMF85HBGNPCS",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "bigint"
+      },
+      {
+        "Name": "DataSource",
+        "Id": "01M5SKWJZ94WEP11W33935JS1M",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(40)"
+      },
+      {
+        "Name": "CoverageScope",
+        "Id": "01M5SKWKSS0XS3Y48V2QNWM2KV",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(80)"
+      },
+      {
+        "Name": "CoverageComplete",
+        "Id": "01M5SKWMJWGPEEN0VT768S78HY",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "int"
+      },
+      {
+        "Name": "EvidenceState",
+        "Id": "01M5SKWND92NQAEVVJVV737V07",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(24)"
+      },
+      {
+        "Name": "ObservedThroughUtc",
+        "Id": "01M5SKWPACXBZPYEJQ09396AED",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "bigint"
+      },
+      {
+        "Name": "CollectedAtUtc",
+        "Id": "01M5SKWQ6N3N5BZ6YTF1X8MMJ9",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "bigint"
+      },
+      {
+        "Name": "FreshUntilUtc",
+        "Id": "01M5SKWQZ7822N56PB56YBSXYQ",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "bigint"
+      },
+      {
+        "Name": "EvidenceHash",
+        "Id": "01M5SKWRSERT437616K5A8DC30",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(64)"
+      },
+      {
+        "Name": "RequestKey",
+        "Id": "01M5SKWSHQETV31F22KJVA2CMN",
+        "TableId": "01M5SKVSF4AVWQZXP5C8PF7T76",
+        "Type": "varchar(100)"
+      }
+    ],
+    "mci_file_replica": [
+      {
+        "Name": "Id",
+        "Id": "01M5SKVV9PPW2XHHWQJQ54TFE3",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "CreateTime",
+        "Id": "01M5SKVVD12KKT461CRCTCWVWX",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "datetime"
+      },
+      {
+        "Name": "UpdateTime",
+        "Id": "01M5SKVVGKVMNVZG937TJ9HF4R",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "datetime"
+      },
+      {
+        "Name": "UserId",
+        "Id": "01M5SKVVMQP8P8HTWNMCHJCBPK",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "UserName",
+        "Id": "01M5SKVVR7EHSD08GWKPSKB9QT",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(255)"
+      },
+      {
+        "Name": "IsDeleted",
+        "Id": "01M5SKVVVEXR5S0QS6Y722S242",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "int"
+      },
+      {
+        "Name": "Tenant",
+        "Id": "01M5SKWV9VXFR2JQG5XTDZ1V2Z",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(50)"
+      },
+      {
+        "Name": "ResourceId",
+        "Id": "01M5SKWW46EC8TEN4S4X3S6T73",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "SourceRevision",
+        "Id": "01M5SKWWYD2JQ4CS3BJ90VJ0XG",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(64)"
+      },
+      {
+        "Name": "TargetConfigHash",
+        "Id": "01M5SKWXRX5ZRHSG10V9MHZTZK",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(64)"
+      },
+      {
+        "Name": "TargetObjectKey",
+        "Id": "01M5SKWYJJSG0FZK5DVVRWGX4V",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(1000)"
+      },
+      {
+        "Name": "State",
+        "Id": "01M5SKWZBJX3XPYW6ER0292800",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(24)"
+      },
+      {
+        "Name": "VerifiedSize",
+        "Id": "01M5SKX05RPC9XCD2NC1FY6SX3",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "bigint"
+      },
+      {
+        "Name": "VerifiedSha256",
+        "Id": "01M5SKX0ZGVTJ3PZB5MMB5J1WZ",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(64)"
+      },
+      {
+        "Name": "VerifiedAtUtc",
+        "Id": "01M5SKX1T40GVXX7W0DSX5G4YS",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "bigint"
+      },
+      {
+        "Name": "LastErrorCode",
+        "Id": "01M5SKX2JSGERKPXB527ZZTZ82",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(80)"
+      },
+      {
+        "Name": "RequestKey",
+        "Id": "01M5SKX3BKRVY0K96FXENSWWBX",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(100)"
+      },
+      {
+        "Name": "JobId",
+        "Id": "01M5SKX44KNKRFZHXG15TCR4B5",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(36)"
+      },
+      {
+        "Name": "LeaseOwner",
+        "Id": "01M5SKX4WTPGG0KGCGYGH2R383",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "varchar(64)"
+      },
+      {
+        "Name": "FencingToken",
+        "Id": "01M5SKX5PQY85RQVGBTT7BZRTC",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "bigint"
+      },
+      {
+        "Name": "RowVersion",
+        "Id": "01M5SKX6FGTXJS0E0KP7N64D3H",
+        "TableId": "01M5SKVV0WRAWPWGGCKDP6G3JA",
+        "Type": "int"
+      }
+    ]
+  },
+  "engine": {
+    "Id": "01M5SKXCV3NX5Y3J0MRAZDHGMT",
+    "ApiEngineKey": "mci-file-resource-manager",
+    "ApiAddress": "/apiengine/mci-file-resource-manager",
+    "Version": "v1.0.0",
+    "IsEnable": 1,
+    "StopHttp": 0,
+    "AllowAnonymous": 0,
+    "V8Limit": 0,
+    "V8Unlimited": 1,
+    "EnableLog": 0,
+    "ApiRole": "[]",
+    "Timeout": 600
+  }
+}

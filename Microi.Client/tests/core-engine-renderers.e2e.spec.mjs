@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const baseUrl = process.env.MICROI_CORE_E2E_BASE_URL || 'http://127.0.0.1:41739'
+const baseUrl = process.env.MICROI_CORE_E2E_BASE_URL || process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || 'http://127.0.0.1:41739'
 
 const captureErrors = (page) => {
   const pageErrors = []
