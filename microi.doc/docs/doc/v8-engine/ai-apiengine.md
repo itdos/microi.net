@@ -172,6 +172,26 @@ node --max-old-space-size=512 --import tsx --test --test-concurrency=1 src/manif
 同一模型下的 Token 总量之比和同口径验收时长之比分别计算，不能用字符数、传输字节、
 功能数量或一个演示视频替代。该方法供第三方复测，未执行的实验不填写预期成绩。
 
+### 可复现的结构化任务实测
+
+源码目录 `microi.benchmarks/ai-quality/` 提供独立协议、固定合成任务、运行器和测试，使用 Node.js 20.20 或更新版本，无第三方依赖。运行 `node microi.benchmarks/ai-quality/run.mjs plan MODEL_ID` 先检查计划，`node --test microi.benchmarks/ai-quality/run.test.mjs` 验证工具。
+
+协议 1.0.0 在相同模型下，比较无平台上下文与固定平台上下文两种条件，覆盖查询计划、身份边界、事务计划三个 JSON 任务。单轮最多 6 次、每次请求最多 1024 输出 token、120 秒、零重试；真实调用只走官方中转入口，平台 ApiKey 从标准输入传入。模型支持与账户授权需先核对；供应商是否遵守上限以实际回执为准，取消不撤销已经发生的用量。
+
+产物记录任务/工具源码哈希、实际返回模型、输入输出哈希、完成态、首文本/总耗时、供应商 usage、逐项正确性和全部失败。用量缺失记未知，缓存/推理用量只抄录供应商返回值，未核验价格时不计算费用。模拟服务只用于运行器回归测试，必须标为 `harness-test`，不能充当 `real-provider` 成绩。
+
+2026-10-25 本轮已完成离线运行器验证；官方账户可用额度不足，尚未执行这组真实供应商调用，暂不公布通过率、模型 token 或费用成绩。恢复足够额度后按原计划执行，保留失败与完整计量回执。
+
+这组探索任务不建库、不执行模型代码、不验收界面，不能推出端到端开发效率、稳定成功率或外部总评分。完整系统评测仍须按上一节执行真实业务与权限验收；强结论需提前固定重复次数、缓存条件与失败处理规则，保留全部记录。
+
+### 流式完成态与内容留存边界
+
+本轮源码为普通聊天和 NL2V8 增加兼容的取消入口：HTTP 断连信号联结模型超时后传入 SDK，关键词扩词也接收取消；旧二参数 API 保留。Core、AI 和 API 需配套交付，旧 AI 模块的兼容回退不能视为已具备此能力。数据库和可选向量查询仍按原有超时执行，查询前后检查取消，不能承诺这些查询即时停止。
+
+`DataAppend.CompletionStatus` 返回 `Completed`、`Cancelled`、`TimedOut`、`Truncated`、`Filtered`、`Incomplete` 或 `Failed`。仅正常结束且非空输出返回 `Code=1`；部分文本保留供用户核对。SSE 的 `done` 表示传输结束，不能当作业务成功。普通聊天空流不再隐式追加第二次模型请求；取消不能回滚已执行工具或撤销供应商费用。
+
+新增中转计量记录只保存用量与关联信息，兼容字段 `PromptPreview/Question/Answer` 写入空字符串，用量接口不返回历史正文预览。原有会话历史与历史账本不会自动删除。普通聊天/NL2V8 诊断与异常响应已按各自源码路径去除正文；其它分支、历史记录及供应商留存仍需分别核查。流式 `UsageSource=Provider` 仅表示供应商实际用量，缺失记为 `Unavailable`；旧计量估算另标 `RelayUsageSource=Estimated`。上述为源码行为，正式可用需对应版本发布与运行读回，不能用本地测试替代上线证明。
+
 这种模式带来的不只是速度：
 
 - **更省 Token**：实时 Schema 和 Skills 代替重复粘贴文档，AI 聚焦当前业务差异；
@@ -464,7 +484,7 @@ AI：（参考 v8-crud-api Skill）
 完整工具分类、安装方式、写入确认与回读规则参见 [MCP Server 专题](/doc/v8-engine/mcp-server)。
 
 ::: warning 当前实现边界
-本节的“AI 可以调用 MCP”指 Codex、GitHub Copilot、Cursor、Claude Code 等已经实现 MCP Host/Agent Loop 的外部客户端。平台普通 `Chat/ChatStream` 使用服务端会话上下文和固定核心规范 Prompt，不检索完整知识库；`NL2SQL` 默认使用当前租户 Schema 关键词检索与准确字段回读；`NL2V8` 默认使用 Skill 镜像与当前租户 Schema 关键词检索。只有 `mic_ai.EnableVectorDatabase=1` 时，两条检索链路才增加 Ollama/Embedding/Qdrant 向量融合；向量服务异常会回退到关键词结果。当前 `Microi.Server/Microi.AI` 没有向模型注册 MCP Tools，也没有执行 `tool_calls` 循环，因此不会自动调用 MCP。仅在 Prompt 中写“使用 MCP”并不等于已经接入工具。
+外部客户端通过 MCP Host/Agent Loop 调用工具。平台普通 `Chat/ChatStream` 使用服务端会话上下文和固定核心规范 Prompt，不检索完整知识库；`NL2SQL` 默认使用当前租户 Schema 关键词检索与准确字段回读；`NL2V8` 默认使用 Skill 镜像与当前租户 Schema 关键词检索。只有 `mic_ai.EnableVectorDatabase=1` 时，两条检索链路才增加向量融合，向量服务异常回退到关键词结果。平台在线低代码建模模式另由 `OnlineMcpAgent` 建立当前用户与租户绑定的同版 MCP 会话，注册工具并执行工具循环；进入及调用前重新校验管理员权限，写入状态与实际回读分别记录。普通对话不会因此自动执行工具，仅在 Prompt 中写“使用 MCP”也不能作为执行证据。
 
 NL2SQL 当前由服务端生成不可被 JSON 伪造的授权上下文：白名单仅包含当前租户非受保护业务表；普通角色的 AI 角色策略还会与缓存的 FormEngine 列表读取权限取交集，关键词候选和可选向量候选都会在进入 Prompt 前再次过滤。执行层要求精确非空白名单，逐个校验每个 `FROM`/`JOIN` 表，拒绝注释、多语句、CTE、`UNION`、写操作和危险函数，并按数据库施加 `MaxRows + 1` 行限制与 30 秒超时。
 
@@ -702,7 +722,7 @@ AI：（调用 microi_run_engine）返回了 20 条订单数据...
 | **AI 开发工具（VS Code + CLI）** | 连接登录、Skills/typings、MCP、实时 Schema、V8 同步；插件补充资源树/Diff/断点调试，CLI 支持无 IDE 工作流 | 外部 AI 日常开发与完整交付 |
 | **MCP Server** | 为具备 MCP Host 的客户端提供实时查询、保存和执行工具 | AI 受控操作平台 |
 | **Skills** | 具体场景的编码最佳实践和代码模板 | 编码规范，深度指导 |
-| **平台在线 AI** | 普通会话上下文、NL2SQL Schema 双模式检索、NL2V8 Skill + Schema 双模式检索 | 默认关键词检索，可选向量融合；当前不自动调用 MCP |
+| **平台在线 AI** | 普通会话上下文、NL2SQL Schema 双模式检索、NL2V8 Skill + Schema 双模式检索；低代码建模模式接入受控 MCP | NL2SQL/NL2V8 默认关键词检索、可选向量融合；低代码建模由可信宿主以当前用户权限调用同版 MCP |
 
 ::: tip 推荐组合
 外部开发场景由 VS Code 插件或 CLI 建立工作区，Skills 提供规范，MCP 提供最新事实和受控执行；平台在线 AI 在 NL2SQL/NL2V8 等明确入口默认使用大模型关键词扩展与权限感知 Schema/Skill 检索，只有管理员显式开启向量数据库后才增加向量召回。MCP 是工具协议，关键词/向量索引都是检索手段，三者不能互相替代。

@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { resolve, relative } from 'node:path'
 import { SITE_URL, canonicalPath, isIndexablePage } from '../docs/.vitepress/config/seo-policy.mjs'
+import { sourceIsIndexable } from '../docs/.vitepress/config/seo-source.mjs'
 import { htmlFiles, headTags, decodeHtml as decode } from './seo-discovery.mjs'
+import { auditServiceNetworkHtml } from './service-network-audit.mjs'
 
 const distDir = resolve(process.cwd(), 'docs/.vitepress/dist')
 
@@ -24,7 +26,10 @@ for (const file of files) {
   const title = decode(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1])
   const expectedCanonical = `${SITE_URL}${canonicalPath(name)}`
   const robots = getMeta('name', 'robots')
-  const indexable = isIndexablePage(name)
+  const indexable = isIndexablePage(name) && sourceIsIndexable(name, resolve(process.cwd(), 'docs'))
+  if (['contact/index.html', 'doc/about/partner.html'].includes(name)) {
+    failures.push(...auditServiceNetworkHtml(html, { structured: name === 'contact/index.html' }).map(message => `${name}: ${message}`))
+  }
 
   if (name === '404.html' && (!html.includes('id="mci-not-found-static"') || !html.includes('mci-not-found-card'))) failures.push('404.html: friendly content must be readable before JavaScript loads')
 
@@ -71,7 +76,9 @@ const robotsText = await readFile(resolve(distDir, 'robots.txt'), 'utf8')
 if (/Disallow:\s*\/assets\//i.test(robotsText)) failures.push('robots: public rendering assets are blocked')
 if (!robotsText.includes(`Sitemap: ${SITE_URL}/sitemap.xml`)) failures.push('robots: sitemap uses a different canonical host')
 const discovery = await readFile(resolve(distDir, 'llms.txt'), 'utf8')
+if (!discovery.includes('## 按问题查找资料')) failures.push('llms.txt: missing question-based discovery')
 for (const url of indexableUrls) if (/\/(doc|case|contact)\//.test(url) && !discovery.includes(`](${url})`)) failures.push(`llms.txt: missing ${url}`)
+for (const [, url] of discovery.matchAll(/\]\((https:\/\/microi\.net\/[^)]+)\)/g)) if (!indexableUrls.has(url)) failures.push(`llms.txt: unpublished or non-indexable target ${url}`)
 
 if (failures.length) {
   console.error(`SEO audit failed with ${failures.length} issue(s):`)

@@ -9,20 +9,23 @@
       <label>{{ labels.apiKey }}</label><code>{{ apiKey || labels.generating }}</code>
     </div>
     <div class="token-grid">
-      <article><span>{{ labels.total }}</span><strong>{{ format(total) }}</strong></article>
+      <article><span>{{ labels.total }}</span><strong>{{ isUnlimitedQuota(isUnlimited) ? labels.unlimited : format(total) }}</strong></article>
       <article><span>{{ labels.used }}</span><strong>{{ format(used) }}</strong></article>
-      <article><span>{{ labels.remaining }}</span><strong>{{ format(remaining) }}</strong></article>
+      <article><span>{{ labels.remaining }}</span><strong>{{ isUnlimitedQuota(isUnlimited) ? labels.unlimited : format(remaining) }}</strong></article>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { isUnlimitedQuota } from '../profile-relay-quota.mjs'
+
 const props = defineProps<{
   apiKey: string
   endpoint: string
   total: number
   used: number
   remaining: number
+  isUnlimited?: boolean | number | string
   locale: string
   labels: Record<string, string>
   compact?: boolean

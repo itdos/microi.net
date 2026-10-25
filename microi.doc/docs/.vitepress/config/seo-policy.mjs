@@ -33,9 +33,9 @@ export function breadcrumbsFor(input, title) {
   return crumbs
 }
 
-export function filterSitemapItems(items) {
-  return items.filter(item => isIndexablePage(item.url)).map(item => ({
+export function filterSitemapItems(items, sourceIndexable = () => true) {
+  return items.filter(item => isIndexablePage(item.url) && sourceIndexable(item.url)).map(item => ({
     ...item,
-    links: item.links?.filter(link => isIndexablePage(link.url)).map(link => ({ ...link, lang: link.lang?.replace('_', '-') }))
+    links: item.links?.filter(link => isIndexablePage(link.url) && sourceIndexable(link.url)).map(link => ({ ...link, lang: link.lang?.replace('_', '-') }))
   }))
 }

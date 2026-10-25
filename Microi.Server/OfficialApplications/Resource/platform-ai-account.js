@@ -43,7 +43,7 @@ if(aiAccountActions[aiAccountRoute]){
 
 
 // Microi官方接口引擎：platform-ai-account
-// Version: v1.1.0
+// Version: v1.1.1
 // 普通套餐、订阅和订单由 V8 编排；密钥、额度原子、供应商协议、任务句柄和媒体落盘进入受信插件原子。
 // PAYMENT_COMPLETE_MANAGED_V1：支付协议由 C# 验签，订单/订阅/分配在本接口同一事务内完成。
 var param = V8.Param || {};
@@ -57,6 +57,8 @@ var supportedActions = {
   ResetUserAiApiKey: true,
   GetRelayTokenSummary: true,
   GetRelayTokenUsage: true,
+  GetRelayTokenAccount: true,
+  SetRelayTokenLimit: true,
   CreateOrder: true,
   CreateAlipay: true,
   GetOrders: true,
@@ -98,6 +100,22 @@ if (!anonymousActions[action]) {
   });
   if (!authorizationResult || Number(authorizationResult.Code) !== 1) {
     return authorizationResult || { Code: 0, Msg: 'AI 平台动作授权失败。' };
+  }
+  // RELAY_TOKEN_LIMIT_ADMIN_V1：权益管理只进入可信原子，不经租户 Hook。
+  // 后端复核主租户、活动目标账号、实时管理员身份和 CAS；不信任请求中的身份或余额。
+  if (action === 'GetRelayTokenAccount' || action === 'SetRelayTokenLimit') {
+    if (typeof param.TargetUserId !== 'string' || !text(param.TargetUserId)) {
+      return { Code: 0, Msg: '必须指定目标账号 TargetUserId。' };
+    }
+    var limitRequest = { Action: action, TargetUserId: text(param.TargetUserId) };
+    if (action === 'SetRelayTokenLimit') {
+      if (typeof param.IsUnlimited !== 'boolean' || typeof param.ExpectedUnlimited !== 'boolean') {
+        return { Code: 0, Msg: 'IsUnlimited 和 ExpectedUnlimited 必须为布尔值。' };
+      }
+      limitRequest.IsUnlimited = param.IsUnlimited;
+      limitRequest.ExpectedUnlimited = param.ExpectedUnlimited;
+    }
+    return V8.Method.ManageAiPlatform(limitRequest);
   }
   var hookResult = runTenantHook(action, param);
   if (!hookResult || Number(hookResult.Code) !== 1) {

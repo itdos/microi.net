@@ -1,0 +1,421 @@
+{
+  "schemaVersion": 1,
+  "inspectedAt": "2026-10-25T14:06:48.039Z",
+  "checkoutHead": "ceb42411f23081ef061ea62902d53345366c004e",
+  "scope": "本地源码依赖盘点；读取文件，不启动服务、不连接数据库、不写业务数据；工作树可能有未提交修改，以逐文件 SHA-256 为准",
+  "inspectorHost": {
+    "os": "win32",
+    "osRelease": "10.0.26200",
+    "architecture": "x64",
+    "node": "v20.20.1",
+    "meaning": "仅为本盘点工具运行环境，不是平台跨操作系统认证"
+  },
+  "sources": [
+    {
+      "path": "Microi.Server/Dos.ORM/Dos.ORM.csproj",
+      "sha256": "b1d217e034d962aae0a92835c3c9c39925129719a8a960593b71670dca4c5aa7",
+      "targetFramework": "netstandard2.1",
+      "version": "8.6.9",
+      "dependencies": [
+        {
+          "name": "lcpi.data.oledb",
+          "version": "1.30.0.4837"
+        },
+        {
+          "name": "FastExpressionCompiler",
+          "version": "5.4.1"
+        },
+        {
+          "name": "Microsoft.CSharp",
+          "version": "4.7.0"
+        },
+        {
+          "name": "Microsoft.Extensions.Caching.Memory",
+          "version": "10.0.10"
+        },
+        {
+          "name": "System.Data.SqlClient",
+          "version": "4.9.1"
+        },
+        {
+          "name": "System.Reflection",
+          "version": "4.3.0"
+        },
+        {
+          "name": "System.Reflection.Emit.ILGeneration",
+          "version": "4.7.0"
+        },
+        {
+          "name": "System.Reflection.Primitives",
+          "version": "4.3.0"
+        },
+        {
+          "name": "MySql.Data",
+          "version": "9.7.0"
+        },
+        {
+          "name": "System.Security.Cryptography.Pkcs",
+          "version": "8.0.2"
+        },
+        {
+          "name": "Oracle.ManagedDataAccess.Core",
+          "version": "23.26.300"
+        },
+        {
+          "name": "Oracle.ManagedDataAccess.Azure",
+          "version": "23.26.300"
+        },
+        {
+          "name": "Oracle.ManagedDataAccess.Kerberos",
+          "version": "23.26.300"
+        },
+        {
+          "name": "Oracle.ManagedDataAccess.Oci",
+          "version": "23.26.300"
+        },
+        {
+          "name": "Oracle.ManagedDataAccess.ConfigFile",
+          "version": "23.26.300"
+        },
+        {
+          "name": "Oracle.ManagedDataAccess.Aws",
+          "version": "23.26.300"
+        },
+        {
+          "name": "AWSSDK.SQS",
+          "version": "4.0.100.15"
+        },
+        {
+          "name": "Oracle.ManagedDataAccess.Gcp",
+          "version": "23.26.300"
+        },
+        {
+          "name": "Npgsql",
+          "version": "8.0.9"
+        },
+        {
+          "name": "DM.DmProvider",
+          "version": "8.3.1.47463"
+        },
+        {
+          "name": "Kdbndp_V9",
+          "version": "10.0.1.703"
+        }
+      ]
+    },
+    {
+      "path": "Microi.Server/Microi.Core/Microi.Core.csproj",
+      "sha256": "40d55e7c8ef3284c7540062ad4af20fd4384bede761ad88b9803ace4920751b5",
+      "targetFramework": "netstandard2.1",
+      "version": "8.6.9",
+      "dependencies": [
+        {
+          "name": "Jint",
+          "version": "4.14.0"
+        },
+        {
+          "name": "Microsoft.AspNetCore.Http",
+          "version": "2.3.11"
+        },
+        {
+          "name": "Microsoft.Extensions.ObjectPool",
+          "version": "10.0.10"
+        },
+        {
+          "name": "RestSharp",
+          "version": "114.0.0"
+        },
+        {
+          "name": "Microsoft.IdentityModel.Tokens",
+          "version": "8.21.0"
+        },
+        {
+          "name": "System.Diagnostics.DiagnosticSource",
+          "version": "10.0.10"
+        },
+        {
+          "name": "System.IdentityModel.Tokens.Jwt",
+          "version": "8.21.0"
+        },
+        {
+          "name": "MongoDB.Bson",
+          "version": "3.11.2"
+        },
+        {
+          "name": "System.Security.Cryptography.Xml",
+          "version": "10.0.13"
+        },
+        {
+          "name": "MQTTnet",
+          "version": "4.3.7.1207"
+        },
+        {
+          "name": "StackExchange.Redis",
+          "version": "3.0.17"
+        },
+        {
+          "name": "Ulid",
+          "version": "1.4.1"
+        },
+        {
+          "name": "AlibabaCloud.SDK.Alimt20181012",
+          "version": "2.4.2"
+        },
+        {
+          "name": "AlibabaCloud.SDK.Dysmsapi20170525",
+          "version": "4.4.0"
+        }
+      ]
+    },
+    {
+      "path": "Microi.Server/Microi.net.Api/Microi.net.Api.csproj",
+      "sha256": "f57a314828d4b500ae794671fec56c8754a0b820508d33e206c8d391c8dd79cc",
+      "targetFramework": "net10.0",
+      "version": null,
+      "dependencies": [
+        {
+          "name": "Fido2",
+          "version": "4.0.1"
+        },
+        {
+          "name": "System.Security.Cryptography.Pkcs",
+          "version": "10.0.13"
+        },
+        {
+          "name": "Microsoft.AspNetCore.Authentication.JwtBearer",
+          "version": "10.0.10"
+        },
+        {
+          "name": "Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation",
+          "version": "10.0.10"
+        },
+        {
+          "name": "Microsoft.IdentityModel.Tokens",
+          "version": "8.21.0"
+        },
+        {
+          "name": "Microsoft.IdentityModel.JsonWebTokens",
+          "version": "8.21.0"
+        },
+        {
+          "name": "Microsoft.IdentityModel.Protocols.OpenIdConnect",
+          "version": "8.21.0"
+        },
+        {
+          "name": "System.IdentityModel.Tokens.Jwt",
+          "version": "8.21.0"
+        },
+        {
+          "name": "Swashbuckle.AspNetCore",
+          "version": "10.2.3"
+        },
+        {
+          "name": "Swashbuckle.AspNetCore.Annotations",
+          "version": "10.2.3"
+        },
+        {
+          "name": "Microsoft.AspNetCore.Mvc.NewtonsoftJson",
+          "version": "10.0.10"
+        },
+        {
+          "name": "Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson",
+          "version": "10.0.10"
+        },
+        {
+          "name": "Microsoft.AspNetCore.SignalR.Protocols.MessagePack",
+          "version": "10.0.13"
+        },
+        {
+          "name": "Microsoft.AspNetCore.SignalR.StackExchangeRedis",
+          "version": "10.0.10"
+        },
+        {
+          "name": "Microsoft.Extensions.Caching.StackExchangeRedis",
+          "version": "10.0.10"
+        },
+        {
+          "name": "ModelContextProtocol",
+          "version": "1.4.1"
+        },
+        {
+          "name": "ModelContextProtocol.AspNetCore",
+          "version": "1.4.1"
+        },
+        {
+          "name": "SkiaSharp.NativeAssets.Linux.NoDependencies",
+          "version": "4.150.1"
+        },
+        {
+          "name": "Newtonsoft.Json",
+          "version": "13.0.4"
+        },
+        {
+          "name": "Microi.AI",
+          "version": "$(MicroiNetVersion)"
+        },
+        {
+          "name": "Microi.MCP",
+          "version": "$(MicroiNetVersion)"
+        },
+        {
+          "name": "Microi.SSO",
+          "version": "$(MicroiNetVersion)"
+        },
+        {
+          "name": "Microi.WorkFlow",
+          "version": "$(MicroiNetVersion)"
+        },
+        {
+          "name": "Microi.Vision",
+          "version": "$(MicroiNetVersion)"
+        },
+        {
+          "name": "Microi.net",
+          "version": "$(MicroiNetVersion)"
+        }
+      ]
+    }
+  ],
+  "databases": [
+    {
+      "type": "MySql",
+      "driver": "MySql.Data",
+      "declaredDriverVersion": "9.7.0",
+      "verifiedDatabaseServerVersion": null,
+      "verifiedOperatingSystem": null,
+      "verifiedCpu": null,
+      "runtimeAcceptance": "not-verified-by-this-inspection",
+      "thirdPartyCertification": "not-provided"
+    },
+    {
+      "type": "SqlServer",
+      "driver": "System.Data.SqlClient",
+      "declaredDriverVersion": "4.9.1",
+      "verifiedDatabaseServerVersion": null,
+      "verifiedOperatingSystem": null,
+      "verifiedCpu": null,
+      "runtimeAcceptance": "not-verified-by-this-inspection",
+      "thirdPartyCertification": "not-provided"
+    },
+    {
+      "type": "Oracle",
+      "driver": "Oracle.ManagedDataAccess.Core",
+      "declaredDriverVersion": "23.26.300",
+      "verifiedDatabaseServerVersion": null,
+      "verifiedOperatingSystem": null,
+      "verifiedCpu": null,
+      "runtimeAcceptance": "not-verified-by-this-inspection",
+      "thirdPartyCertification": "not-provided"
+    },
+    {
+      "type": "PostgreSql",
+      "driver": "Npgsql",
+      "declaredDriverVersion": "8.0.9",
+      "verifiedDatabaseServerVersion": null,
+      "verifiedOperatingSystem": null,
+      "verifiedCpu": null,
+      "runtimeAcceptance": "not-verified-by-this-inspection",
+      "thirdPartyCertification": "not-provided"
+    },
+    {
+      "type": "DaMeng",
+      "driver": "DM.DmProvider",
+      "declaredDriverVersion": "8.3.1.47463",
+      "verifiedDatabaseServerVersion": null,
+      "verifiedOperatingSystem": null,
+      "verifiedCpu": null,
+      "runtimeAcceptance": "not-verified-by-this-inspection",
+      "thirdPartyCertification": "not-provided"
+    },
+    {
+      "type": "KingBase",
+      "driver": "Kdbndp_V9",
+      "declaredDriverVersion": "10.0.1.703",
+      "verifiedDatabaseServerVersion": null,
+      "verifiedOperatingSystem": null,
+      "verifiedCpu": null,
+      "runtimeAcceptance": "not-verified-by-this-inspection",
+      "thirdPartyCertification": "not-provided"
+    }
+  ],
+  "historicalReceipt": {
+    "testedPlatformVersion": "8.6.8",
+    "sourceCommit": "f1e12ec023579501261a0106c2e629d669156fcd",
+    "attribution": "原归档摘要中的来源声明；TRX 摘要另行核验，不把当前源码版本附会到历史测试",
+    "sha256": "f77bc63acaa0b557208d2182f6164114f39f5a9dbd984a70758a5d5b152aa905",
+    "finishedAt": "2026-10-25T05:00:12.9470783+08:00",
+    "counts": {
+      "total": 5524,
+      "passed": 5524,
+      "failed": 0,
+      "notPassed": 0
+    },
+    "groups": {
+      "databaseContracts": [
+        {
+          "testClass": "DatabaseCapabilitiesTests",
+          "total": 10,
+          "passed": 10,
+          "notPassed": 0
+        },
+        {
+          "testClass": "DatabasePlatformRegistryTests",
+          "total": 11,
+          "passed": 11,
+          "notPassed": 0
+        },
+        {
+          "testClass": "DatabaseConfigurationResolverTests",
+          "total": 25,
+          "passed": 25,
+          "notPassed": 0
+        },
+        {
+          "testClass": "ExternalDatabaseCatalogTests",
+          "total": 25,
+          "passed": 25,
+          "notPassed": 0
+        },
+        {
+          "testClass": "DatabaseAdministrationCompatibilityTests",
+          "total": 7,
+          "passed": 7,
+          "notPassed": 0
+        }
+      ],
+      "securityContracts": [
+        {
+          "testClass": "DiyHttpSsrfCompatibilityTests",
+          "total": 3,
+          "passed": 3,
+          "notPassed": 0
+        },
+        {
+          "testClass": "TenantConfigurationSecurityTests",
+          "total": 56,
+          "passed": 56,
+          "notPassed": 0
+        },
+        {
+          "testClass": "UserAccessKeySecurityTests",
+          "total": 42,
+          "passed": 42,
+          "notPassed": 0
+        },
+        {
+          "testClass": "TokenRotationSecurityTests",
+          "total": 22,
+          "passed": 22,
+          "notPassed": 0
+        },
+        {
+          "testClass": "FormEngineTenantBoundaryTests",
+          "total": 164,
+          "passed": 164,
+          "notPassed": 0
+        }
+      ]
+    },
+    "scope": "历史测试回执核验；不证明当前候选、真实数据库组合或第三方认证通过"
+  }
+}

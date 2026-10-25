@@ -3,6 +3,8 @@ import { groupIconMdPlugin, groupIconVitePlugin, localIconLoader } from "vitepre
 import mdItCustomAttrs from "markdown-it-custom-attrs";
 import { createSeoHead, transformSeoHtml, transformSeoPageData } from './seo'
 import { SITE_URL, filterSitemapItems } from './seo-policy.mjs'
+import { sourceIsIndexable } from './seo-source.mjs'
+import { fileURLToPath } from 'node:url'
 import { writeDiscoveryIndex } from '../../../scripts/seo-discovery.mjs'
 import { fancyboxUrls, fancyboxDevPlugin, writeFancyboxAssets } from '../../../scripts/fancybox-assets.mjs'
 import { nugetBuildSnapshotPlugin } from '../../../scripts/nuget-build-snapshot.mjs'
@@ -13,7 +15,7 @@ export const shared = defineConfig({
 	lastUpdated: true,
 	sitemap: {
 		hostname: SITE_URL,
-		transformItems: filterSitemapItems,
+		transformItems: (items) => filterSitemapItems(items, (url) => sourceIsIndexable(url, fileURLToPath(new URL('../../', import.meta.url)))),
 	},
 	markdown: {
 		theme: "github-dark",

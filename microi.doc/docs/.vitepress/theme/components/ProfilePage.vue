@@ -186,6 +186,7 @@
             :total="relayToken.GiftTokens"
             :used="relayToken.UsedTokens"
             :remaining="relayToken.RemainingTokens"
+            :is-unlimited="relayToken.IsUnlimited"
             :locale="locale"
             :labels="aiSummaryLabels"
             @copy="copyAiApiKey"
@@ -322,6 +323,7 @@
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import ProfileAiChat from './ProfileAiChat.vue'
 import ProfileAiSummary from './ProfileAiSummary.vue'
+import { normalizeRelayQuota } from '../profile-relay-quota.mjs'
 import InvitationTree from './InvitationTree.vue'
 import ProfileStarGiftRecords from './ProfileStarGiftRecords.vue'
 import { buildSiteSessionHeaders, getOrCreateSiteDid } from '../utils/site-session.js'
@@ -373,11 +375,7 @@ const createSubmitButton = ref(null)
 const starContinueButton = ref(null)
 const tenantSteps = ref([])
 const tenantProgressTick = ref(Date.now())
-const relayToken = ref({
-  GiftTokens: 100000,
-  UsedTokens: 0,
-  RemainingTokens: 100000
-})
+const relayToken = ref(normalizeRelayQuota())
 const aiApiKey = ref('')
 const aiApiEndpoint = ref('https://api.microi.net/v1')
 const relayUsageLogs = ref([])
@@ -441,11 +439,6 @@ const tenantStepMessages = {
 }
 
 const isAuthed = computed(() => !!authToken.value && !!currentUser.value)
-const tokenUsagePercent = computed(() => {
-  const total = Math.max(0, Number(relayToken.value.GiftTokens || 0))
-  const used = Math.max(0, Number(relayToken.value.UsedTokens || 0))
-  return total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
-})
 const tenantDatabaseQuota = computed(() => Math.max(1, Number(tenantCenter.value.TenantDatabaseQuota ?? tenantCenter.value.FreeQuota ?? 1)))
 const tenantUsedQuota = computed(() => Math.max(0, Number(tenantCenter.value.UsedQuota ?? tenants.value.length)))
 const canCreateFreeTenant = computed(() => tenantUsedQuota.value < tenantDatabaseQuota.value)
@@ -502,7 +495,7 @@ const pageDesc = computed(() => {
   const descriptions = { overview: '你的系统、授权与邀请，一个清晰的工作空间。', systems: '管理你已创建的云端系统。', licenses: '查看这个帐号的全部系统授权和申请进度。', invitations: '分享吾码，查看你的多级邀请关系。', ai: '专注对话和创作，按需查看使用记录。', account: '管理公开资料与账户设置。' }
   return descriptions[activeMenu.value] || t('pageDesc', { name: profileName.value })
 })
-const aiSummaryLabels = computed(() => ({ title: t('aiTitle'), desc: t('aiDesc'), copy: t('copyApiKey'), apiBase: t('apiBase'), apiKey: t('apiKey'), generating: t('generating'), total: t('totalToken'), used: t('usedToken'), remaining: t('remainingToken') }))
+const aiSummaryLabels = computed(() => ({ title: t('aiTitle'), desc: t('aiDesc'), copy: t('copyApiKey'), apiBase: t('apiBase'), apiKey: t('apiKey'), generating: t('generating'), total: t('totalToken'), used: t('usedToken'), remaining: t('remainingToken'), unlimited: t('unlimitedToken') }))
 const tenantStepSummary = computed(() => {
   const errorStep = tenantSteps.value.find(step => step.Status === 'error')
   if (errorStep) return t('failedStep', { title: errorStep.Title, detail: errorStep.Detail })
@@ -1233,11 +1226,7 @@ async function refreshRelayTokenSummary() {
       return
     }
     if (result.Code === 1 && result.Data) {
-      relayToken.value = {
-        GiftTokens: Number(result.Data.GiftTokens || 100000),
-        UsedTokens: Number(result.Data.UsedTokens || 0),
-        RemainingTokens: Number(result.Data.RemainingTokens || 0)
-      }
+      relayToken.value = normalizeRelayQuota(result.Data)
       openClawAuthBridge?.notify()
     }
   } catch {
@@ -1278,12 +1267,8 @@ async function refreshAiUsage(pageIndex = aiUsagePageIndex.value) {
       return
     }
     if (result.Code === 1 && result.Data) {
-      relayToken.value = {
-        GiftTokens: Number(result.Data.GiftTokens || 100000),
-        UsedTokens: Number(result.Data.UsedTokens || 0),
-        RemainingTokens: Number(result.Data.RemainingTokens || 0)
-      }
-      openClawAuthBridge?.notify()
+      // The legacy usage engine does not return entitlement flags. The summary
+      // endpoint owns quota state so parallel log loads cannot reset unlimited.
       relayUsageLogs.value = Array.isArray(result.Data.Logs) ? result.Data.Logs : []
       aiUsagePageIndex.value = Number(result.Data.PageIndex || pageIndex || 1)
       aiUsagePageSize.value = Number(result.Data.PageSize || aiUsagePageSize.value)

@@ -1,4 +1,4 @@
-﻿using Dos.Common;
+using Dos.Common;
 using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -154,7 +154,9 @@ namespace Microi.net.Api
 
             try
             {
-                var result = _microiAi is IAiEventStream eventStream
+                var result = _microiAi is IAiCancellableStream cancellable
+                    ? await cancellable.ChatEventsWithContextAsync(param, WriteSseEventAsync, HttpContext.RequestAborted)
+                    : _microiAi is IAiEventStream eventStream
                     ? await eventStream.ChatEventsWithContextAsync(param, WriteSseEventAsync)
                     : await _microiAi.ChatStreamWithContextAsync(
                         param,
@@ -225,7 +227,11 @@ namespace Microi.net.Api
                     await WriteSseEventAsync("message", chunk);
                 };
 
-                var result = await _microiAi.NL2V8Engine(param, onChunkReceived);
+                var result = _microiAi is IAiCancellableStream cancellable
+                    ? await cancellable.NL2V8Engine(param, onChunkReceived, HttpContext.RequestAborted)
+                    : await _microiAi.NL2V8Engine(param, onChunkReceived);
+                if (result.DataAppend != null)
+                    await WriteSseEventAsync("receipt", JsonConvert.SerializeObject(result.DataAppend));
 
                 if (result.Code == 1 && result.Data != null)
                 {
@@ -244,7 +250,7 @@ namespace Microi.net.Api
             {
                 try
                 {
-                    await WriteSseEventAsync("error", $"服务异常：{ex.Message}");
+                    await WriteSseEventAsync("error", "AI 服务执行中断，请核对已收到的部分结果。");
                     await WriteSseEventAsync("done", "[DONE]");
                 }
                 catch { }
@@ -811,8 +817,8 @@ namespace Microi.net.Api
             var safeData = data?.Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "\ndata: ");
             var sseMessage = $"event: {eventType}\ndata: {safeData}\n\n";
             var bytes = Encoding.UTF8.GetBytes(sseMessage);
-            await Response.Body.WriteAsync(bytes, 0, bytes.Length);
-            await Response.Body.FlushAsync();
+            await Response.Body.WriteAsync(bytes, 0, bytes.Length, HttpContext.RequestAborted);
+            await Response.Body.FlushAsync(HttpContext.RequestAborted);
         }
 
         /// <summary>
@@ -821,15 +827,15 @@ namespace Microi.net.Api
         private async Task WriteSseDataAsync(string data)
         {
             var bytes = Encoding.UTF8.GetBytes($"data: {data}\n\n");
-            await Response.Body.WriteAsync(bytes, 0, bytes.Length);
-            await Response.Body.FlushAsync();
+            await Response.Body.WriteAsync(bytes, 0, bytes.Length, HttpContext.RequestAborted);
+            await Response.Body.FlushAsync(HttpContext.RequestAborted);
         }
 
         private async Task WriteSseDoneAsync()
         {
             var bytes = Encoding.UTF8.GetBytes("data: [DONE]\n\n");
-            await Response.Body.WriteAsync(bytes, 0, bytes.Length);
-            await Response.Body.FlushAsync();
+            await Response.Body.WriteAsync(bytes, 0, bytes.Length, HttpContext.RequestAborted);
+            await Response.Body.FlushAsync(HttpContext.RequestAborted);
         }
 
         /// <summary>

@@ -1,3 +1,12 @@
+---
+title: 生态合作与项目实施服务
+description: Microi吾码生态合作、行业方案、应用扩展与实施交付说明。查看已确认的服务地区与统一联系方式，按项目确认团队、排期、费用和验收责任。
+---
+
+<script setup>
+import ServiceCoverage from '../../.vitepress/theme/components/ServiceCoverage.vue'
+</script>
+
 # 🤝 成为合伙人
 
 > **加入 Microi吾码生态，共同推动低代码平台发展**
@@ -17,6 +26,8 @@
 - **合作申请地址**：[https://microi.net/partner](https://microi.net/partner)
 - **寻找实施与技术服务**：[吾码服务商名录（11 家公开列示）](/contact/index#service-providers)，或通过同页商务与渠道联系人对接
 - 开源合作模块低代码平台实现代码：[CSDN 文章](https://microi.blog.csdn.net/article/details/143995349)
+
+<ServiceCoverage />
 
 ### 按合作内容准备申请
 

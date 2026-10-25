@@ -53,9 +53,12 @@
 | 前端 HTTP 工具示例 | `npm --prefix Microi.Client run test:v8-http`；其它模块选择 [package.json](Microi.Client/package.json) 中对应脚本 |
 | MCP 工具 | `npm --prefix microi.mcp run typecheck`，再执行 `npm --prefix microi.mcp test` |
 | 官网文档 | `npm --prefix microi.doc run check:content`，最终执行 `npm --prefix microi.doc run docs:build` |
+| 公开生态、适配与案例证据工具 | 运行 [公开证据 CI](.github/workflows/public-evidence.yml) 中的 Node 离线回归；无密钥、无数据库、无付费模型调用 |
 | 独立应用、移动端 | 使用该工程自身测试；移动端另见[协作指南](microi.uniapp/CONTRIBUTING.md) |
 
 公共仓和完整源码环境的测试范围可能不同。缺少私有源码或外部依赖时记录具体未覆盖项，不删除断言或将跳过记为通过。界面行为还要验证实际浏览器、桌面/移动及明暗主题；数据操作检查权限、异常和写后回读。
+
+公开维护活动可使用[生态采集工具与已保存快照](microi.benchmarks/ecosystem/README.md)复核；工具匿名读取两站公开 API，区分完整、截断和不可用数据，不公开邮箱，也不把维护者或未知作者计为第三方贡献者。适配与安全证据使用[依赖及回执核验工具](microi.benchmarks/compatibility/README.md)，分别记录源码版本、历史测试和真实环境验收。欢迎贡献缺失的最小复现和已脱敏证据；stars、forks、提交数和一次测试通过都不能替代用户验收或认证。
 
 ## 贡献与交付的完成记录
 
