@@ -152,6 +152,18 @@ FormEngine、ApiEngine、安全与多租户边界测试。
 
 吾码完整正式发布默认执行 `Microi一键编译发布.sh --platform-release`（菜单默认完整选项）：版本号按原规则 +1 一次，发布 NuGet、API Docker、PC Docker 和官方网站文档/Docker。完整入口通过 `PlatformRelease + PlatformFrontendTests` 执行常规 Microi.Tests（平台单元/组件，不自动追加 Full 专项）、吾码前端全部通用 Node/Playwright 测试、真实接口检查与最终加密产物启动/运行冒烟。真实付费 AI、鸿地/JUNCHI、XJY 等指定客户数据专项和 SQL Server 等独立提供商专项默认不纳入，不再逐次询问；只有用户另行明确要求专项时才执行，回执逐项列为“不适用/未执行”，不能冒充通过。常规门禁通过后完成 Release 编译、闭源 DLL 加密、最终产物冒烟与各渠道回读。默认从 `.microi-local` 选择项目配置并复用已有 MySQL、Redis、MongoDB、MinIO/OSS，使用本机程序验证，不另建 Docker 测试依赖或临时官网运行容器；既有测试授权保护仍有效，缺前置条件不能静默跳过。整体以 30 分钟为耗时目标，超出时记录瓶颈并继续推进至成功，真实错误、取消及单操作超时仍保留。不混入 Microi Code/Agent 独立产品测试，不新建租户、不安装聊天应用。源码拉取、合并、冲突解决和提交推送按需补齐；仅明确要求局部发布时才缩小渠道。
 
+完整入口自动复用本机持久的已授权测试配置，默认位置为工作区 `.microi-e2e/platform-release/profile.json`。该目录必须被 Git 忽略，并限制为当前用户和系统可读写；首次准备只从 `.microi-local` 对应的既有项目配置和明确的测试授权范围保存配置、归属及端口，不复制旧 Token，不创建租户、数据库、容器或应用。凭据只留私有文件，不写命令参数、源码或日志。隔离候选可通过发行进程变量 `MICROI_PLATFORM_RELEASE_PROFILE` 指向同一份稳定配置，不依赖历史 `.tmp`。
+
+脚本在同一轮计时内管理原生转发和本轮实际构建的 API/Vite，测试子进程自动读取私有环境。浏览器测试结束后停止自有 API/Vite，依赖转发继续供最终加密产物冒烟使用，完整脚本退出时再收尾；已有外部监督进程通过 `MICROI_PLATFORM_RUNTIME_CONTROL` 显式复用，局部前端/仅官网入口不会因此要求写库凭据或启动 API。
+
+可先只读验证持久配置与既有测试归属，不启动服务或写入测试数据：
+
+```sh
+node Microi.Server/tools/platform-release-runtime.mjs dry-preflight <工作区绝对路径> [profile绝对路径]
+```
+
+新完整发布仍默认递增版本一次；确认续发同一候选时显式传 `--release-version=x.y.z`，不能仅凭版本文件未提交推断续发。配置或归属缺失按实际错误修复，不能把启动配置自动解释为业务写入授权。
+
 只有明确选择 Full 深度测试时，才对**隔离测试租户和专用测试表**运行下列独立入口；它不属于普通发布前置条件：
 
 ```powershell
@@ -189,7 +201,7 @@ macOS 可使用 `bash Microi一键编译发布.sh` 的选项 6 发布官网。Do
 
 搜索标签的真实浏览器验收默认覆盖 1366px 和 1920px 常规桌面。只有测试进程显式设置 `MICROI_TEST_BROWSER_4K=1` 时才追加 3840px；所选宽度冻结进显式 Full 或浏览器专项回执，所有所选用例均须通过且不得跳过。该变量仅控制测试，不是生产 API 配置。正式发布和同版本 Docker 热修复都拒绝历史 `--skip-tests` / `SmokeOnly` 路径，最终产物冒烟仍是 PlatformRelease 编译与平台自动化之后的独立必需检查。
 
-后端 DLL 加密在 macOS/Linux 使用原生绝对路径；仅 Git Bash、MSYS 或 Cygwin 转换 Windows 路径，优先使用 `cygpath`，避免把 `/Users`、`/usr` 误识别为盘符。路径修复应先在隔离构建副本上验证五个 DLL 的实际加密和指纹，然后重新执行一键脚本的 Full、加密及最终产物冒烟。
+后端 DLL 加密在 macOS/Linux 使用原生绝对路径；仅 Git Bash、MSYS 或 Cygwin 转换 Windows 路径，优先使用 `cygpath`，避免把 `/Users`、`/usr` 误识别为盘符。路径修复应先在隔离构建副本上验证五个 DLL 的实际加密和指纹，然后重新执行一键脚本的 PlatformRelease、加密及最终产物冒烟。
 
 加密脚本被 `source` 引入以测试路径函数时不执行发行入口。SQLite 回归使用真实解释器及隔离标准库：Windows 选择 `python`，避免 `python3` 命中商店占位程序；其它系统使用 `python3`。包投影和 Manifest 内联源码使用 Git 指定的 LF 字节；官方资源目录中全部 JavaScript 接口、表事件和 Hook 模板也按 LF 检出，保持与包正文及声明摘要完全一致，不修改断言来忽略换行差异。缺少已发布的运行产物时，可以从相同版本的包正文按大小与 SHA-256 恢复制品，但恢复记录不能替代源码构建证据。
 

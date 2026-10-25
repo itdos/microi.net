@@ -24,7 +24,7 @@ test("approval workflow designer renders distinct node positions after real admi
         'input[placeholder*="用户名"], input[placeholder*="账号"], input[placeholder*="帐号"], input[placeholder*="user name" i]'
     ).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(password);
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
     if (await privacy.isVisible().catch(() => false)) {

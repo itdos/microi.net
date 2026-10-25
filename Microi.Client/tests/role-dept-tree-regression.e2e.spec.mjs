@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import path from "node:path";
+import { prepareFormUiFixture } from "./helpers/form-ui-fixture.mjs";
 
 const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
 const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
@@ -20,7 +22,7 @@ test.use({
     ignoreHTTPSErrors: true,
     ...(BROWSER_CHANNEL ? { channel: BROWSER_CHANNEL } : {})
 });
-test.describe.configure({ mode: "serial" });
+test.describe.configure({ mode: "default" });
 test.setTimeout(180_000);
 
 function tenantUrl(osClient, apiBase = API_BASE, hash = "") {
@@ -30,7 +32,7 @@ function tenantUrl(osClient, apiBase = API_BASE, hash = "") {
     return `${FRONTEND}/?${query.toString()}${hash}`;
 }
 
-async function login(page, { osClient, password, apiBase = API_BASE, account = "admin" }) {
+async function login(page, { osClient, password, apiBase = API_BASE, account = process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin" }) {
     await page.goto(tenantUrl(osClient, apiBase), { waitUntil: "domcontentloaded" });
     const accountInput = page.locator([
         'input[placeholder*="用户名"]',
@@ -59,14 +61,7 @@ async function login(page, { osClient, password, apiBase = API_BASE, account = "
     await page.getByRole("button", { name: "登录", exact: true }).click();
     const result = await (await responsePromise).json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    const currentUser = result?.Data?.CurrentUser || result?.Data?.User || result?.Data || {};
-    const displayName = String(currentUser.Name || currentUser.Account || account)
-        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const accountName = String(account).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const identityName = account.toLowerCase() === "admin"
-        ? /管理员|admin/i
-        : new RegExp(`${accountName}|${displayName}`, "i");
-    await expect(page.getByRole("button", { name: identityName }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 function requestBody(request) {
@@ -111,7 +106,7 @@ async function closeFormIfOpen(dialog) {
     await dialog.getByRole("button", { name: /^(?:Close|关闭)$/i }).first().click();
     const confirm = dialog.page().locator(".el-message-box:visible").last();
     if (await confirm.waitFor({ state: "visible", timeout: 1_500 }).then(() => true).catch(() => false)) {
-        await confirm.getByRole("button", { name: /^(?:OK|Confirm|确定)$/i }).last().click();
+        await confirm.getByRole("button", { name: /^(?:OK|Confirm|确定|确认)$/i }).last().click();
     }
     await expect(dialog).toBeHidden({ timeout: 15_000 });
 }
@@ -146,15 +141,16 @@ async function openRowAction(page, row, action) {
 }
 
 async function deleteRow(page, row, name) {
-    const responsePromise = page.waitForResponse(
-        (response) => isFormWriteResponse(response, "DelFormData"),
-        { timeout: 30_000 }
-    );
     await openRowAction(page, row, /^(?:Delete|删除)$/i);
     const confirm = page.locator(".el-message-box:visible").last();
     await expect(confirm).toBeVisible({ timeout: 10_000 });
-    await confirm.getByRole("button", { name: /^(?:OK|Confirm|确定)$/i }).last().click();
-    const response = await responsePromise;
+    const [response] = await Promise.all([
+        page.waitForResponse(
+            (response) => isFormWriteResponse(response, "DelFormData"),
+            { timeout: 30_000 }
+        ),
+        confirm.getByRole("button", { name: /^(?:OK|Confirm|确定|确认)$/i }).last().click()
+    ]);
     const result = await response.json();
     expect(Number(result.Code), result.Msg || "delete failed: " + name).toBe(1);
     await expect(page.locator(".right-table-col .el-table__row").filter({ hasText: name })).toHaveCount(0, { timeout: 30_000 });
@@ -201,10 +197,17 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
     const addRole = rolePage.getByRole("button", { name: /^(?:新增(?:记录)?|Add)$/i }).first();
     await expect(addRole).toBeVisible({ timeout: 45_000 });
     const directTablePolicyResponse = page.waitForResponse(
-        (response) => /\/api\/SysRole\/GetDirectTableGrantPolicies(?:\?|$)/i.test(response.url()),
+        (response) => {
+            const url = new URL(response.url());
+            return /\/api\/SysRole\/GetDirectTableGrantPolicies$/i.test(url.pathname)
+                || (/\/apiengine\/platform-sys-role$/i.test(url.pathname)
+                    && url.searchParams.get("Action") === "GetDirectTableGrantPolicies");
+        },
         { timeout: 30_000 }
     );
-    await addRole.click();
+    // 立即消费策略响应，避免中途 UI 断言失败后遗留未处理的 response 等待。
+    const [, directTablePolicyResponseValue] = await Promise.all([addRole.click(), directTablePolicyResponse]);
+    const directTablePolicyResult = await directTablePolicyResponseValue.json();
 
     const permissionTree = page.locator(".mci-role-permission-field__tree:visible").last();
     await expect(permissionTree).toBeVisible({ timeout: 60_000 });
@@ -223,7 +226,12 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
         "xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' el-form-item ')][1]"
     );
     await expect(permissionFormItem.locator(":scope > .el-form-item__label")).toHaveCount(1);
-    await expect(roleDialog).toContainText("接口引擎等平台控制面仍要求 9999 级管理员");
+    await expect(permissionField.locator(".mci-role-permission-field__notice"))
+        .toContainText("菜单权限决定业务访问；MCP AI 开发权限在下方单独授权，默认关闭。");
+    const mcpAuthorization = permissionField.getByRole("region", { name: "MCP AI 开发角色授权", exact: true });
+    await expect(mcpAuthorization).toBeVisible();
+    await expect(mcpAuthorization.locator(".mcp-role-boundary"))
+        .toHaveText("受限范围保留模块、表单、行与字段权限。完整范围及两个写入开关同时启用后可开发服务端脚本，具备高权限执行能力，只应授予可信开发者。角色授权入口仅限超级管理员。");
     await expect(permissionField.getByText(/无详情|无搜索/)).toHaveCount(0);
 
     const compactTreeGeometry = await permissionTree.locator(".role-menu-row").first().evaluate((row) => {
@@ -262,7 +270,8 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
             ?.getBoundingClientRect();
         return {
             searchWidth: search?.width || 0,
-            gap: search && more ? more.left - search.right : -1,
+            // 当前正式工具栏按“更多 → 搜索字段”排列，验证真实顺序及紧凑间距。
+            gap: search && more ? search.left - more.right : -1,
             centerDelta: search && more
                 ? Math.abs((search.top + search.height / 2) - (more.top + more.height / 2))
                 : 999
@@ -289,7 +298,10 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
         return item?.querySelectorAll("svg").length || 0;
     });
     expect(refreshIconCount).toBeGreaterThan(0);
-    await page.keyboard.press("Escape");
+    // Toggle only this click-triggered menu: Escape also closes the parent form overlay.
+    await moreButton.click();
+    await expect(formMoreMenu).toBeHidden();
+    await expect(roleDialog).toBeVisible();
 
     const basePermissionItem = formItem(roleDialog, /基础权限|Basic Permissions/i);
     await expect(basePermissionItem).toBeVisible();
@@ -318,7 +330,6 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
     expect(tooltipArrow.clipPath, JSON.stringify(tooltipArrow)).toContain("polygon");
     expect(tooltipArrow.borderRadius, JSON.stringify(tooltipArrow)).toBe("0px");
 
-    const directTablePolicyResult = await (await directTablePolicyResponse).json();
     expect(Number(directTablePolicyResult.Code), directTablePolicyResult.Msg || "direct-table policy failed").toBe(1);
     expect(Array.isArray(directTablePolicyResult.Data)).toBe(true);
     const directTableSection = permissionField.locator(".mci-role-permission-field__direct-table");
@@ -365,8 +376,8 @@ test("角色和部门菜单使用低代码左右树表，角色表单加载权�
 test("移动端表单保留即时字段搜索，并在浮动更多中提供刷新", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await page.setViewportSize({ width: 390, height: 844 });
     await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD });
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/system/role"), { waitUntil: "domcontentloaded" });
 
     const rolePage = page.locator(".left-right-page").first();
@@ -437,7 +448,7 @@ test("角色和部门低代码表单完成事务新增、修改、删除", async
 
         const permissionField = dialog.locator(".mci-role-permission-field");
         await expect(permissionField.locator(".mci-role-permission-field__tree")).toBeVisible({ timeout: 30_000 });
-        await permissionField.locator('input[placeholder="筛选菜单名称"]').fill("API Engine");
+        await permissionField.locator('input[placeholder="筛选菜单名称"]').fill("接口引擎");
         const systemEngineRow = permissionField.locator(".role-menu-row").filter({ hasText: /System Engine|系统引擎/ }).first();
         await expect(systemEngineRow).toBeVisible({ timeout: 15_000 });
         await systemEngineRow.locator(".role-menu-expand").click();
@@ -593,7 +604,12 @@ test("接口引擎默认关闭 V8 运行限制并在打开后显示限制项", a
 
     const dialog = page.locator(".diy-form-container.el-dialog:visible, .diy-form-container.el-drawer:visible").last();
     await expect(dialog).toBeVisible({ timeout: 30_000 });
-    await dialog.getByRole("tab", { name: /^(?:详细配置|Detailed Configuration)$/i }).click();
+    const detailedConfiguration = dialog.locator(".diy-form-section-nav__item:visible")
+        .filter({ hasText: /详细配置|Detailed Configuration/i })
+        .or(dialog.getByRole("tab", { name: /^(?:详细配置|Detailed Configuration)$/i }))
+        .first();
+    await expect(detailedConfiguration).toBeVisible({ timeout: 30_000 });
+    await detailedConfiguration.click();
     const limitItem = formItem(dialog, /^(?:V8运行限制|V8 Runtime Limit)/i);
     await expect(limitItem).toBeVisible({ timeout: 30_000 });
     await expect(dialog.getByText(/V8无运行限制|V8 Unlimited/i, { exact: false })).toBeHidden();
@@ -670,28 +686,32 @@ test("500 级接口引擎专员可见菜单但服务端拒绝 sys_apiengine 控�
     });
 });
 
-test("全量测试表单的二维码字段按 DataAppend.Code 生成可下载 PNG", async ({ page }) => {
+test("全量测试表单的二维码字段按 DataAppend.Code 生成可下载 PNG", async ({ page, request }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
-    await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD });
-    await page.goto(tenantUrl(OS_CLIENT, API_BASE, "#/mci-full-test"), { waitUntil: "domcontentloaded" });
-    const addButton = page.getByRole("button", { name: /^(?:新增(?:记录)?|Add)$/i }).first();
-    await expect(addButton).toBeVisible({ timeout: 45_000 });
-    await addButton.click();
-    const dialog = page.locator(".diy-form-container.el-dialog:visible, .diy-form-container.el-drawer:visible").last();
-    await expect(dialog).toBeVisible({ timeout: 30_000 });
-    const image = dialog.locator(".diy-qrcode__card").first();
-    await expect(image).toHaveAttribute("src", /^data:image\/png;base64,/, { timeout: 45_000 });
-    const imageState = await image.evaluate((element) => ({
-        complete: element.complete,
-        naturalWidth: element.naturalWidth,
-        naturalHeight: element.naturalHeight
-    }));
-    expect(imageState.complete).toBe(true);
-    expect(imageState.naturalWidth).toBeGreaterThan(0);
-    expect(imageState.naturalHeight).toBeGreaterThan(0);
-    await image.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03-qrcode-dataappend.png"), fullPage: false });
+    const fixture = await prepareFormUiFixture(request, { apiBase: API_BASE, osClient: OS_CLIENT,
+        account: process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin", password: LOCAL_PASSWORD }, "qrcode");
+    try {
+        await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
+        await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD });
+        await page.goto(tenantUrl(OS_CLIENT, API_BASE, `#${fixture.route}`), { waitUntil: "domcontentloaded" });
+        const addButton = page.getByRole("button", { name: /^(?:新增(?:记录)?|Add)$/i }).first();
+        await expect(addButton).toBeVisible({ timeout: 45_000 });
+        await addButton.click();
+        const dialog = page.locator(".diy-form-container.el-dialog:visible, .diy-form-container.el-drawer:visible").last();
+        await expect(dialog).toBeVisible({ timeout: 30_000 });
+        const image = dialog.locator(".diy-qrcode__card").first();
+        await expect(image).toHaveAttribute("src", /^data:image\/png;base64,/, { timeout: 45_000 });
+        const imageState = await image.evaluate((element) => ({
+            complete: element.complete,
+            naturalWidth: element.naturalWidth,
+            naturalHeight: element.naturalHeight
+        }));
+        expect(imageState.complete).toBe(true);
+        expect(imageState.naturalWidth).toBeGreaterThan(0);
+        expect(imageState.naturalHeight).toBeGreaterThan(0);
+        await image.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(SCREENSHOT_DIR, "03-qrcode-dataappend.png"), fullPage: false });
+    } finally { await fixture.cleanup(); }
 });
 
 test("君驰左右树表只发 _Where，空树显示全部且单击树节点不重复初始化", async ({ page }) => {

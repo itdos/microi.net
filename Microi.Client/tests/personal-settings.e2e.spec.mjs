@@ -3,8 +3,8 @@ import { expect, test } from "@playwright/test";
 const WEB_BASE = process.env.PW_PERSONAL_SETTINGS_WEB_BASE || "http://127.0.0.1:5180";
 const API_BASE = process.env.PW_PERSONAL_SETTINGS_API_BASE || "https://api.chongstech.com";
 const OS_CLIENT = process.env.PW_PERSONAL_SETTINGS_OSCLIENT || "junchi";
-const ACCOUNT = process.env.PW_PERSONAL_SETTINGS_ACCOUNT || "admin";
-const PASSWORD = process.env.PW_PERSONAL_SETTINGS_PASSWORD || "";
+const ACCOUNT = process.env.PW_PERSONAL_SETTINGS_ACCOUNT || process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin";
+const PASSWORD = process.env.PW_PERSONAL_SETTINGS_PASSWORD || process.env.PW_TEST_PASSWORD || process.env.MICROI_TEST_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_PERSONAL_SETTINGS_BROWSER_CHANNEL || "";
 
 test.use({

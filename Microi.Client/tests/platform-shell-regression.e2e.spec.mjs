@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -38,7 +39,7 @@ async function login(page) {
         'input[placeholder*="user name" i]'
     ].join(", ")).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(LOCAL_PASSWORD);
 
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
@@ -58,7 +59,7 @@ async function login(page) {
     const response = await responsePromise;
     const result = await response.json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 async function openRoute(page, hash) {
@@ -187,7 +188,7 @@ test("接口引擎自动添加索引：只使用 sys_apiengine 真实物理字�
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "04b-api-engine-auto-index.png"), fullPage: false });
 });
 
-test("首次进入系统设置：路由内容不整页闪烁且负向毛玻璃配置可见", async ({ page }) => {
+test("首次进入系统设置：路由内容不整页闪烁且正向毛玻璃配置可见", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await openRoute(page, "#/api-engine");
     await expect(page.locator(".app-main-microi, .mci-route-view-host").first()).toBeVisible({ timeout: 45_000 });
@@ -248,9 +249,18 @@ test("首次进入系统设置：路由内容不整页闪烁且负向毛玻璃�
         .filter({ hasText: /界面风格|Interface Style/i })
         .first()
         .click();
-    await expect(page.locator(".el-form-item")
-        .filter({ hasText: /关闭表单遮罩毛玻璃|Disable\s*(?:the\s*)?form\s*mask\s*blur/i })
-        .first()).toBeVisible({ timeout: 30_000 });
+    const formMaskBlur = page.locator(".el-form-item")
+        .filter({ hasText: /开启遮罩毛玻璃|Enable\s*(?:the\s*)?(?:form\s*)?mask\s*blur/i })
+        .first();
+    await expect(formMaskBlur).toBeVisible({ timeout: 30_000 });
+    // Element Plus 的原生 input 隐藏在可见开关外壳内，验证真实可操作外壳及语义控件。
+    await expect(formMaskBlur.locator(".el-switch")).toBeVisible();
+    await expect(formMaskBlur.getByRole("switch")).toBeAttached();
+    await expect(formMaskBlur.getByRole("switch")).toBeEnabled();
+    // 正向 FormMaskBlur 是正式设置；旧负向字段仅兼容读取，不能重复展示两个开关。
+    await expect(page.locator(".el-form-item:visible")
+        .filter({ hasText: /关闭表单遮罩毛玻璃|Disable\s*(?:the\s*)?form\s*mask\s*blur/i }))
+        .toHaveCount(0);
 });
 
 test("统一 Tabs：工作区、表格和表单右侧关系面板使用同一视觉语言与数字角标", async ({ page }) => {
@@ -529,8 +539,24 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
     const firstCard = store.locator(".app-card").first();
     await expect(firstCard).toBeVisible({ timeout: 45_000 });
     await expect(firstCard.locator(".preview-wrap img, .preview-fallback")).toBeVisible();
-    await expect(firstCard.locator(".official-source-badge")).toContainText("平台官方源");
-    await expect(firstCard.locator("button.install")).toHaveCount(0);
+    const isOfficialPlatform = await page.evaluate(() => {
+        const root = window.__VUE_APP__?._instance?.proxy;
+        const pinia = root?.$pinia?.state?.value || {};
+        const state = root?.diyStore?.$state || pinia.DiyStore || pinia.diy;
+        return state?.SysConfig?.IsOfficialPlatform;
+    });
+    expect(typeof isOfficialPlatform, "服务端系统设置必须明确返回官方平台身份").toBe("boolean");
+    if (isOfficialPlatform) {
+        await expect(firstCard.locator(".official-source-badge")).toContainText("平台官方源");
+        await expect(firstCard.locator("button.install")).toHaveCount(0);
+    } else {
+        await expect(firstCard.locator(".official-source-badge")).toHaveCount(0);
+        await expect(store.locator(".market-toolbar__source-context")).not.toContainText("只读展示");
+        const installEntry = firstCard.locator("button.install");
+        await expect(installEntry).toBeVisible();
+        await expect(installEntry).toHaveText(/^(安装|更新|重新安装)$/);
+        // 常规租户可展示合法安装入口；本用例只验证 UI，不提交安装任务。
+    }
     const pager = store.locator('.pager[aria-label="分页"]');
     await expect(pager).toBeVisible();
     await expect(pager.locator('select')).toBeVisible();
@@ -679,19 +705,33 @@ test("应用商城：官方源、同页工作区、分类分页、完整详情�
         { timeout: 30_000 }
     );
     await versionToolbar.getByRole("button", { name: "清空", exact: true }).click();
-    await clearResponsePromise;
+    const clearResult = await (await clearResponsePromise).json();
+    expect(Number(clearResult.Code), clearResult.Msg || "version filter reset failed").toBe(1);
+    expect(Number(clearResult.DataAppend?.PaginationVersion)).toBeGreaterThanOrEqual(1);
+    expect(typeof clearResult.DataCount, "已完成的版本响应必须返回明确历史总数").toBe("number");
+    expect(Number.isInteger(clearResult.DataCount)).toBe(true);
+    expect(clearResult.DataCount).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray(clearResult.Data)).toBe(true);
+    expect(clearResult.Data).toHaveLength(Math.min(5, clearResult.DataCount));
+    const visibleCurrent = clearResult.DataAppend?.CurrentMatches !== false && Boolean(clearResult.DataAppend?.CurrentVersion);
+    await expect(detail.locator(".version-list label")).toHaveCount(clearResult.Data.length + Number(visibleCurrent));
     const versionPager = detail.locator('.version-pager[aria-label="历史版本分页"]');
-    await expect(versionPager).toBeVisible();
-    const nextVersionResponsePromise = page.waitForResponse(
-        (response) => isVersionsQuery(response, { pageSize: 5, pageIndex: 2, keyword: "" }),
-        { timeout: 30_000 }
-    );
-    await versionPager.getByRole("button", { name: "下一页", exact: true }).click();
-    const nextVersionResponse = await nextVersionResponsePromise;
-    const nextVersionResult = await nextVersionResponse.json();
-    expect(Number(nextVersionResult.Code), nextVersionResult.Msg || "version next page failed").toBe(1);
-    expect(Array.isArray(nextVersionResult.Data) ? nextVersionResult.Data.length : 0).toBeLessThanOrEqual(5);
-    await expect(versionPager).toContainText("第 2 /");
+    if (clearResult.DataCount > 5) {
+        await expect(versionPager).toBeVisible();
+        const nextVersionResponsePromise = page.waitForResponse(
+            (response) => isVersionsQuery(response, { pageSize: 5, pageIndex: 2, keyword: "" }),
+            { timeout: 30_000 }
+        );
+        await versionPager.getByRole("button", { name: "下一页", exact: true }).click();
+        const nextVersionResponse = await nextVersionResponsePromise;
+        const nextVersionResult = await nextVersionResponse.json();
+        expect(Number(nextVersionResult.Code), nextVersionResult.Msg || "version next page failed").toBe(1);
+        expect(Array.isArray(nextVersionResult.Data)).toBe(true);
+        expect(nextVersionResult.Data).toHaveLength(Math.min(5, clearResult.DataCount - 5));
+        await expect(versionPager).toContainText("第 2 /");
+    } else {
+        await expect(versionPager).toHaveCount(0);
+    }
 
     const detailHeader = detail.locator(".modal-header.draggable");
     const dragTo = async (clientX, clientY) => {

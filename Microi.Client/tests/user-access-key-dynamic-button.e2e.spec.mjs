@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -22,7 +23,7 @@ test.use({
 test.setTimeout(150_000);
 
 async function loginThroughUi(page) {
-    await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`, {
+    await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`, {
         waitUntil: "domcontentloaded"
     });
 
@@ -54,11 +55,11 @@ async function loginThroughUi(page) {
         (response) => /\/api\/SysUser\/Login(?:\?|$)/i.test(response.url()),
         { timeout: 30_000 }
     );
-    await page.getByRole("button", { name: /登\s*录/ }).click();
+    await page.getByRole("button", { name: "登录", exact: true }).click();
     const response = await responsePromise;
     const result = await response.json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({
         timeout: 30_000
     });
     // 登录响应早于路由回首页的回调完成，需等该回调稳定后再切换目标模块。
@@ -67,7 +68,7 @@ async function loginThroughUi(page) {
 
 async function gotoModule(page, route) {
     await page.goto(
-        `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}#${route}`,
+        `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}#${route}`,
         { waitUntil: "domcontentloaded" }
     );
     await expect(page).toHaveURL(new RegExp(`#${route.replaceAll("/", "\\/")}(?:[?&]|$)`), {
@@ -133,9 +134,13 @@ test("系统账号访问密钥由模块 MoreBtns 配置驱动，并在 PC/移动
     await expect(editAction).toBeVisible();
     await editAction.click();
 
-    const moduleEditor = page.getByRole("dialog").filter({ hasText: /Edit\s*-\s*Module Engine|编辑.*模块引擎/i }).first();
+    // 表单标题使用当前记录名；模块引擎中的目标仍由唯一 /mic-sys-user 行确定。
+    const moduleEditor = page.getByRole("dialog").filter({ hasText: /Edit\s*-\s*System Accounts|编辑\s*-\s*系统账号/i }).first();
     await expect(moduleEditor).toBeVisible({ timeout: 40_000 });
-    await moduleEditor.getByRole("tab", { name: /^(button|按钮)$/i }).click();
+    const buttonGroup = moduleEditor.getByRole("complementary", { name: "表单分组导航", exact: true })
+        .getByRole("button", { name: /^按钮(?:\s|$)/ });
+    if (await buttonGroup.isVisible()) await buttonGroup.click();
+    else await moduleEditor.getByRole("tab", { name: /^(button|按钮)$/i }).click();
     // 按钮名称是 input 的 value，不属于 tr.textContent，需先按表单值定位再回溯配置行。
     const editorInputs = moduleEditor.locator("input");
     await expect.poll(
@@ -161,10 +166,15 @@ test("系统账号访问密钥由模块 MoreBtns 配置驱动，并在 PC/移动
         await expect(leaveConfirm).toBeHidden();
     }
 
-    // 3. 390x844 移动端：同一 MoreBtns 配置由卡片动作区渲染，并打开同一弹窗。
+    // 3. 390x844 移动端：同一 MoreBtns 配置收进卡片“更多”，打开同一弹窗。
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoModule(page, "/mic-sys-user");
-    const mobileButton = await waitForAccessKeyRowButton(page);
+    await page.getByRole("button", { name: "更多操作", exact: true }).first().click();
+    const mobileActions = page.locator(".global-more-menu.is-mobile-card-menu:visible");
+    await expect(mobileActions).toBeVisible();
+    const mobileButton = mobileActions.locator(".global-more-menu-item").filter({ hasText: /^\s*访问密钥\s*$/ });
+    await expect(mobileButton).toHaveCount(1);
+    await expect(mobileButton).toBeVisible();
     await page.screenshot({
         path: path.join(SCREENSHOT_DIR, "system-account-mobile-dynamic-button-390x844.png"),
         fullPage: false

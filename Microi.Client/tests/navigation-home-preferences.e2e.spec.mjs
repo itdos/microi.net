@@ -14,7 +14,7 @@ async function login(page) {
   expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
   if (!password) throw new Error('A protected local test credential is required.');
   await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`);
-  await page.locator('input[placeholder*="账号"],input[placeholder*="帐号"],input[placeholder*="用户名"],input[placeholder*="user name" i],input[placeholder*="username" i]').first().fill('admin',{timeout:45000});
+  await page.locator('input[placeholder*="账号"],input[placeholder*="帐号"],input[placeholder*="用户名"],input[placeholder*="user name" i],input[placeholder*="username" i]').first().fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin",{timeout:45000});
   await page.locator('input[type="password"]').first().fill(password);
   const privacy=page.locator('.privacy-policy-wrapper .el-checkbox');
   if(await privacy.isVisible() && !(await privacy.getAttribute('class')).includes('is-checked')) await privacy.click();
@@ -47,8 +47,9 @@ test('global inheritance, personal persistence, top navigation and compact home 
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   page.on('console',message=>{if(message.type()==='error' && /TypeError|ReferenceError|Unhandled/.test(message.text()))errors.push(message.text().split('\n')[0]);});
   await login(page);
-  const baseline=JSON.parse(await fs.readFile(path.join(output,'ui-preferences-before.json'),'utf8'));
-  const original=baseline.user;
+  // 恢复基线必须来自本轮实际登录用户，不能依赖其它任务遗留的临时快照。
+  const original=await current(page);
+  await fs.writeFile(path.join(output,'ui-preferences-before.json'),JSON.stringify({user:original},null,2));
   try {
     await choose(page,'边角风格','直角');
     await expect(page.locator('html')).toHaveAttribute('data-mci-corner-style','square');

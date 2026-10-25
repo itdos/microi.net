@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -54,7 +55,7 @@ async function login(page) {
   await page.getByRole('button', { name: '登录', exact: true }).click()
   const payload = await (await responsePromise).json()
   expect(Number(payload.Code), payload.Msg || 'UI login failed').toBe(1)
-  await expect(page.getByRole('button', { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: getLoginIdentityName(payload), exact: true }).first()).toBeVisible({ timeout: 30_000 })
 }
 
 async function openRoute(page, route) {
@@ -126,6 +127,9 @@ test('AI 助手首屏以对话框和完整分类能力目录为核心', async ({
 
   await assistant.getByTestId('unified-ai-history-toggle').click()
   await expect(assistant.getByTestId('unified-ai-history')).toBeVisible()
+  await expect(assistant.getByTestId('unified-ai-new-conversation')).toBeVisible()
+  await expect(assistant.getByTestId('unified-ai-history-active')).toBeVisible()
+  await expect(assistant.getByTestId('unified-ai-history-archived')).toBeVisible()
   await assistant.getByTestId('unified-ai-history-toggle').click()
   await expect(assistant.getByTestId('unified-ai-history')).toHaveCount(0)
 

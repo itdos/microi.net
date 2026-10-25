@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -31,7 +32,7 @@ async function login(page) {
         'input[placeholder*="user name" i]'
     ].join(", ")).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(password);
 
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
@@ -50,7 +51,7 @@ async function login(page) {
     await page.getByRole("button", { name: "登录", exact: true }).click();
     const result = await (await responsePromise).json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first())
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first())
         .toBeVisible({ timeout: 30_000 });
     if (apiBase) {
         const runtimeEndpoint = await page.evaluate(() => window.__MICROI_RUNTIME_ENDPOINT__);
@@ -86,7 +87,7 @@ test("聊天联系人和历史对象始终显示 Name 或 Account", async ({ pag
     await panel.screenshot({ path: path.join(screenshotDir, "chat-name-account-fallback.png") });
 });
 
-test("SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事件驱动", async ({ page }, testInfo) => {
+async function verifyRealtimeAndBackgroundTasks(page, testInfo, runPaidAi) {
     test.skip(!password, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(screenshotDir, { recursive: true });
 
@@ -119,8 +120,9 @@ test("SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事
         fullPage: true
     });
 
-    const systemMessage = `系统消息已统一由AI助手发送 ${Date.now()}`;
-    const systemResult = await page.evaluate(async content => {
+    const systemRequestId = `platform-browser-system-${Date.now()}`;
+    const systemMessage = `系统消息已统一由AI助手发送 ${systemRequestId}`;
+    const systemResult = await page.evaluate(async ({ content, requestId }) => {
         const app = window.__VUE_APP__;
         const proxy = app?._instance?.proxy;
         const common = proxy?.DiyCommon || app?.config?.globalProperties?.DiyCommon;
@@ -131,12 +133,12 @@ test("SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事
         return await new Promise(resolve => {
             common.Post(
                 "/api/DiyChat/SendSystemMessage",
-                { Content: content, ToUserId: currentUser.Id },
+                { Content: content, ToUserId: currentUser.Id, RequestId: requestId },
                 resolve,
                 error => resolve({ Code: 0, Msg: String(error || "request failed") })
             );
         });
-    }, systemMessage);
+    }, { content: systemMessage, requestId: systemRequestId });
     expect(Number(systemResult?.Code), systemResult?.Msg || "system message failed").toBe(1);
 
     const editor = page.locator("#J__wcEditor");
@@ -144,6 +146,8 @@ test("SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事
     await expect(page.locator(".vChat__header .barTit")).toHaveText("AI助手");
     await expect(editor).toHaveAttribute("contenteditable", "true");
     await expect(page.locator("#J__chatMsgList")).toContainText(systemMessage, { timeout: 30_000 });
+    let aiReplyText = null;
+    if (runPaidAi) {
     await page.waitForTimeout(1500);
     const beforeAiCount = await page.locator("#J__chatMsgList li.others").count();
     const prompt = `请只回复“SignalR正常” ${Date.now()}`;
@@ -156,7 +160,7 @@ test("SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事
     const aiReply = page.locator("#J__chatMsgList li.others").last();
     await expect(aiReply.locator(".msg")).toContainText("SignalR正常", { timeout: 120_000 });
     await expect(aiReply.locator(".typing-cursor")).toHaveCount(0, { timeout: 120_000 });
-    const aiReplyText = (await aiReply.locator(".msg").innerText()).trim();
+    aiReplyText = (await aiReply.locator(".msg").innerText()).trim();
     expect(aiReplyText).toContain("SignalR正常");
     expect(aiReplyText).not.toMatch(/AI回复失败|暂时无法回复|数据查询失败/);
     await expect(aiReply.locator(".msg.ai-error")).toHaveCount(0);
@@ -166,6 +170,8 @@ test("SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事
         path: path.join(screenshotDir, "chat-ai-result.png"),
         fullPage: true
     });
+
+    }
 
     await realtime.click();
     const beforeOpen = taskRequests.length;
@@ -200,4 +206,13 @@ test("SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事
         }, null, 2),
         contentType: "application/json"
     });
+}
+
+test("SignalR状态、系统消息持久化与后台任务事件驱动（无付费AI）", async ({ page }, testInfo) => {
+    await verifyRealtimeAndBackgroundTasks(page, testInfo, false);
+});
+
+test("SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事件驱动", async ({ page }, testInfo) => {
+    test.skip(process.env.PW_RUN_PAID_AI_CHAT !== "1", "Explicit paid AI chat acceptance is required.");
+    await verifyRealtimeAndBackgroundTasks(page, testInfo, true);
 });

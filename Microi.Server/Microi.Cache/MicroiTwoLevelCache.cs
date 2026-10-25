@@ -205,6 +205,12 @@ namespace Microi.net
             if (!MicroiTwoLevelCacheConfig.Enabled || string.IsNullOrEmpty(key))
                 return false;
 
+            // 在线连接投影会被 HTTP 与 SignalR 生命周期并发修改。L1 直接返回对象引用，
+            // 会共享 ClientInfo.Terminals/ConnectionIds；始终从 Redis 反序列化独立快照。
+            // 同时覆盖普通与运行范围隔离的 ChatOnline 键，不能由启用模式重新放开。
+            if (key.Contains(":ChatOnline:", StringComparison.OrdinalIgnoreCase))
+                return false;
+
             // 1. 优先检查黑名单（禁用模式）- 不区分大小写
             foreach (var pattern in MicroiTwoLevelCacheConfig.DisabledPatterns)
             {

@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -63,16 +64,16 @@ async function loginThroughUi(page) {
     || result.DataAppend?.Token;
   const token = String(rawAuthorization || '').replace(/^Bearer\s+/i, '');
   expect(token).toBeTruthy();
-  await expect(page.getByRole('button', { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
   return token;
 }
 
-async function postLegacy(page, token, action, form, expectedCode = 1) {
+async function postLegacy(page, token, action, form, expectedCode = 1, encoding = 'form') {
   const response = await page.request.post(
     `${API_BASE}/api/Job/${action}?OsClient=${encodeURIComponent(OS_CLIENT)}`,
     {
       headers: { authorization: `Bearer ${token}`, OsClient: OS_CLIENT },
-      form,
+      ...(encoding === 'json' ? { data: form } : { form }),
       ignoreHTTPSErrors: true
     }
   );
@@ -106,7 +107,8 @@ async function visibleJobRow(page, jobName) {
 async function confirmMessageBox(page) {
   const box = page.locator('.el-message-box:visible').last();
   await expect(box).toBeVisible({ timeout: 10_000 });
-  await box.getByRole('button', { name: /^(确定|OK|Confirm)$/i }).last().click();
+  await box.getByRole('button', { name: /^(确定|确认|OK|Confirm)$/i }).last().click();
+  await expect(box).toBeHidden({ timeout: 10_000 });
 }
 
 async function assertReadableText(page) {
@@ -162,15 +164,28 @@ async function assertReadableText(page) {
       const backgroundLum = lum(background);
       return (Math.max(foregroundLum, backgroundLum) + 0.05) / (Math.min(foregroundLum, backgroundLum) + 0.05);
     };
-    const findBackground = (element) => {
+    const findBackgrounds = (element) => {
       const layers = [];
       let current = element;
       while (current) {
-        const color = parseColor(getComputedStyle(current).backgroundColor);
-        if (color && color.alpha > 0) layers.push(color);
+        const style = getComputedStyle(current);
+        const color = parseColor(style.backgroundColor);
+        const gradient = /gradient\(/.test(style.backgroundImage)
+          ? (style.backgroundImage.match(/rgba?\([^)]*\)|color\(srgb[^)]*\)|\btransparent\b/g) || []).map(parseColor).filter(Boolean)
+          : [];
+        layers.push({ color, gradient });
         current = current.parentElement;
       }
-      return layers.reverse().reduce((background, layer) => composite(layer, background), [255, 255, 255]);
+      return layers.reverse().reduce((backgrounds, layer) => {
+        const base = layer.color && layer.color.alpha > 0
+          ? backgrounds.map(background => composite(layer.color, background)) : backgrounds;
+        if (!layer.gradient.length) return base;
+        // Test every rendered gradient stop; using only backgroundColor treats
+        // opaque gradient buttons as white, while averaging can hide a low-contrast stop.
+        return layer.gradient.every(color => color.alpha === 1)
+          ? layer.gradient.map(color => color.rgb)
+          : base.flatMap(background => layer.gradient.map(color => composite(color, background)));
+      }, [[255, 255, 255]]);
     };
     const issues = [];
     document.querySelectorAll('.diy-table-page *, .diy-table *').forEach((element) => {
@@ -180,11 +195,12 @@ async function assertReadableText(page) {
       if (style.visibility === 'hidden' || style.display === 'none' || parseFloat(style.opacity) < 0.5) return;
       const fontSize = parseFloat(style.fontSize);
       if (fontSize < 9) return;
-      const background = findBackground(element);
+      const backgrounds = findBackgrounds(element);
       const foregroundColor = parseColor(style.color);
       if (!foregroundColor || foregroundColor.alpha < 0.01) return;
-      const foreground = composite(foregroundColor, background);
-      const contrast = ratio(foreground, background);
+      const { background, contrast } = backgrounds.map(background => ({
+        background, contrast: ratio(composite(foregroundColor, background), background)
+      })).sort((left, right) => left.contrast - right.contrast)[0];
       if (contrast < 4.5) {
         issues.push({
           text: text.slice(0, 40),
@@ -229,6 +245,7 @@ test('任务调度七条旧接口与页面暂停恢复全流程可用', async ({
     TimeZoneId: 'Asia/Shanghai',
     JobType: '1',
     ApiEngineKey: 'platform-service-health',
+    _RequestApiEngineKey: 'platform-schedule-job',
     Action: 'Delete'
   };
   const updatedJob = {
@@ -259,11 +276,22 @@ test('任务调度七条旧接口与页面暂停恢复全流程可用', async ({
     });
     expect(detail.Data.JobName).toBe(job.JobName);
     expect(detail.Data.CronExpression).toBe(job.CronExpression);
+    expect(detail.Data.ApiEngineKey).toBe('platform-service-health');
 
     await postLegacy(page, token, 'UpdateJob', updatedJob);
     const updatedDetail = await postLegacy(page, token, 'GetJobDetail', { Id: job.Id });
     expect(updatedDetail.Data.JobDesc).toBe(updatedJob.JobDesc);
     expect(updatedDetail.Data.CronExpression).toBe(updatedJob.CronExpression);
+    expect(updatedDetail.Data.ApiEngineKey).toBe('platform-service-health');
+
+    // JSON 与旧 form 入口都保留业务目标；客户端不能伪造宿主快照或把路由变成删除。
+    await postLegacy(page, token, 'UpdateJob', {
+      ...updatedJob, _RequestApiEngineKey: 'platform-schedule-job',
+      _RequestPath: '/api/Job/DeleteJob', _HttpMethod: 'GET'
+    }, 1, 'json');
+    const jsonDetail = await postLegacy(page, token, 'GetJobDetail', { Id: job.Id });
+    expect(jsonDetail.Data.ApiEngineKey).toBe('platform-service-health');
+    expect(jsonDetail.Data.CronExpression).toBe(updatedJob.CronExpression);
 
     await postLegacy(page, token, 'PauseJob', {
       Id: job.Id,
@@ -313,9 +341,11 @@ test('任务调度七条旧接口与页面暂停恢复全流程可用', async ({
       (response) => /\/api\/Job\/PauseJob(?:\?|$)/i.test(response.url()),
       { timeout: 30_000 }
     );
-    await row.getByRole('button', { name: /^(暂停|Pause)$/i }).first().click();
-    await confirmMessageBox(page);
-    const pauseResult = await (await pauseResponse).json();
+    const [pausedResponse] = await Promise.all([pauseResponse, (async () => {
+      await row.getByRole('button', { name: /^(暂停|Pause)$/i }).first().click();
+      await confirmMessageBox(page);
+    })()]);
+    const pauseResult = await pausedResponse.json();
     expect(Number(pauseResult.Code), pauseResult.Msg || 'UI pause failed').toBe(1);
     row = await visibleJobRow(page, job.JobName);
     await expect(row).toContainText(/暂停|Paused|Pause/i);
@@ -324,9 +354,11 @@ test('任务调度七条旧接口与页面暂停恢复全流程可用', async ({
       (response) => /\/api\/Job\/ResumeJob(?:\?|$)/i.test(response.url()),
       { timeout: 30_000 }
     );
-    await row.getByRole('button', { name: /^(恢复|Resume|Restore)$/i }).first().click();
-    await confirmMessageBox(page);
-    const resumeResult = await (await resumeResponse).json();
+    const [resumedResponse] = await Promise.all([resumeResponse, (async () => {
+      await row.getByRole('button', { name: /^(恢复|Resume|Restore)$/i }).first().click();
+      await confirmMessageBox(page);
+    })()]);
+    const resumeResult = await resumedResponse.json();
     expect(Number(resumeResult.Code), resumeResult.Msg || 'UI resume failed').toBe(1);
     row = await visibleJobRow(page, job.JobName);
     await expect(row).toContainText(/正常|Normal/i);

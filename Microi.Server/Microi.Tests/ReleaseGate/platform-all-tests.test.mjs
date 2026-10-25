@@ -6,6 +6,73 @@ import path from 'node:path';
 import {createRequire} from 'node:module';
 import {discoverBrowserTests,readLocalTestDefaults,allPlatformPreflight,validateBrowserReport,runAllBrowserTests,platformFrontendScope,frontendSpecialCases,browserCaseInventory,validatePlatformRuntimeReady} from './platform-all-tests.mjs';
 import {createHash} from 'node:crypto';
+import {runInNewContext} from 'node:vm';
+
+test('live browser endpoint and login variables have actual lexical declarations',()=>{
+ const root=path.resolve(import.meta.dirname,'../../..'),client=path.join(root,'Microi.Client');
+ const require=createRequire(path.join(client,'package.json'));
+ const parser=require('@babel/parser'),traverse=require('@babel/traverse').default;
+ const missing=[];
+ for(const file of discoverBrowserTests(path.join(client,'tests'))){
+  const ast=parser.parse(fs.readFileSync(file,'utf8'),{sourceType:'unambiguous'});
+  traverse(ast,{ReferencedIdentifier(reference){
+   const name=reference.node.name;
+   if(['FRONTEND','BACKEND','API_BASE','OS_CLIENT','ACCOUNT','PASSWORD'].includes(name)&&!reference.scope.hasBinding(name))missing.push(`${path.basename(file)}:${reference.node.loc.start.line}:${name}`);
+  }});
+ }
+ assert.deepEqual(missing,[],'URL interpolation must use real source declarations, not only variables injected by a test harness.');
+});
+
+test('general live browser navigation carries the selected API before bootstrap and legacy endpoint aliases reuse the same fixture',()=>{
+ const root=path.resolve(import.meta.dirname,'../../..'),client=path.join(root,'Microi.Client');
+ const parser=createRequire(path.join(client,'package.json'))('@babel/parser');
+ const frontend='http://127.0.0.1:63970',backend='http://127.0.0.1:63971';
+ const files=['ai-content-operations.e2e.spec.mjs','ai-platform-studio.e2e.spec.mjs','ai-workflow-v102.e2e.spec.mjs','mobile-ai-assistant.e2e.spec.mjs','user-access-key-dynamic-button.e2e.spec.mjs','file-sync-remote-connection.spec.mjs','form-engine-freeze-trace.spec.mjs','system-observability.e2e.spec.mjs','core-engine-renderers.e2e.spec.mjs'];
+ for(const name of files){
+  const source=fs.readFileSync(path.join(client,'tests',name),'utf8'),nodes=[];
+  function visit(node){if(!node||typeof node!=='object')return;nodes.push(node);for(const value of Object.values(node)){if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')visit(value);}}
+  visit(parser.parse(source,{sourceType:'module'}).program);
+  const urls=nodes.filter(node=>node.type==='TemplateLiteral').map(node=>source.slice(node.start,node.end)).filter(text=>text.includes('${FRONTEND}')&&(text.includes('OsClient=')||text.includes('new URLSearchParams')));
+  if(files.indexOf(name)<7)assert.ok(urls.length>0,`${name}: live navigation not found`);
+  for(const expression of urls){const value=runInNewContext(expression,{FRONTEND:frontend,API_BASE:backend,BACKEND:backend,OS_CLIENT:'fixture',route:'/probe',path:'/#/diy/design?PageType=',hash:'#/probe',URLSearchParams,separator:'&',token:'test-token',toHash:value=>value.slice(1)});const url=new URL(value);assert.equal(url.origin,frontend);assert.equal(url.searchParams.get('OsClient'),'fixture');assert.deepEqual(url.searchParams.getAll('ApiBase'),[backend],name);}
+  for(const binding of ['FRONTEND','BACKEND','baseUrl']){
+   const declaration=nodes.find(node=>node.type==='VariableDeclarator'&&node.id?.name===binding);
+   if(!declaration||!source.slice(declaration.init.start,declaration.init.end).includes('process.env'))continue;
+   const expression=source.slice(declaration.init.start,declaration.init.end);
+   if(['file-sync-remote-connection.spec.mjs','form-engine-freeze-trace.spec.mjs','system-observability.e2e.spec.mjs','core-engine-renderers.e2e.spec.mjs'].includes(name)){
+    const env={MICROI_TEST_FRONTEND_BASE:frontend,MICROI_TEST_API_BASE:backend};assert.equal(runInNewContext(expression,{process:{env}}),binding==='BACKEND'?backend:frontend,`${name}/${binding}`);
+   }
+  }
+ }
+});
+
+test('general browser logins honor the existing fixture account and credential fallback without changing assertions',()=>{
+ const root=path.resolve(import.meta.dirname,'../../..'),client=path.join(root,'Microi.Client');
+ const parser=createRequire(path.join(client,'package.json'))('@babel/parser');
+ const names=['form-ui-regression','latest-form-experience','menu-bottom-content','menu-child-expand-mode','module-theme-header','navigation-home-preferences','not-show-fields-corrupt-menu','page-tab-cross-module','platform-shell-regression','realtime-notification-chat','render-source-neutral','richtext-upload-policy','role-dept-tree-regression','role-permission-load-save','webos-comprehensive','webos-four-issues','workflow-engine-live','personal-settings'];
+ for(const name of names){
+  const source=fs.readFileSync(path.join(client,'tests',`${name}.e2e.spec.mjs`),'utf8');
+  const nodes=[];function visit(node){if(!node||typeof node!=='object')return;nodes.push(node);for(const value of Object.values(node)){if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')visit(value);}}
+  visit(parser.parse(source,{sourceType:'module'}).program);
+  const candidates=nodes.flatMap(node=>node.type==='CallExpression'&&node.callee?.property?.name==='fill'?[node.arguments[0]]:node.type==='AssignmentPattern'&&node.left?.name==='account'?[node.right]:node.type==='VariableDeclarator'&&node.id?.name==='ACCOUNT'?[node.init]:[]).filter(Boolean);
+  const expression=candidates.map(node=>source.slice(node.start,node.end)).find(text=>text.includes('process.env.PW_TEST_ACCOUNT'));
+  assert.ok(expression,`${name}: login must consume the selected account`);
+  const evaluate=env=>runInNewContext(expression,{process:{env}});
+  assert.equal(evaluate({MICROI_TEST_ACCOUNT:'existing-fixture-user'}),'existing-fixture-user',name);
+  assert.equal(evaluate({PW_TEST_ACCOUNT:'explicit-user',MICROI_TEST_ACCOUNT:'existing-fixture-user'}),'explicit-user',name);
+  assert.equal(evaluate({}),'admin',`${name}: standalone compatibility`);
+  if(name==='personal-settings')assert.equal(evaluate({PW_PERSONAL_SETTINGS_ACCOUNT:'specific-user',PW_TEST_ACCOUNT:'explicit-user'}),'specific-user');
+  if(['personal-settings','menu-bottom-content'].includes(name)){
+   const node=nodes.find(node=>node.type==='VariableDeclarator'&&node.id?.name==='PASSWORD');
+   const password=env=>runInNewContext(source.slice(node.init.start,node.init.end),{process:{env}});
+   assert.equal(password({MICROI_TEST_PASSWORD:'fixture-secret'}),'fixture-secret');
+   assert.equal(password({PW_TEST_PASSWORD:'explicit-secret',MICROI_TEST_PASSWORD:'fixture-secret'}),'explicit-secret');
+   const specific=name==='personal-settings'?'PW_PERSONAL_SETTINGS_PASSWORD':'PW_MENU_BOTTOM_PASSWORD';
+   assert.equal(password({[specific]:'specific-secret',PW_TEST_PASSWORD:'explicit-secret'}),'specific-secret');
+   assert.equal(password({}),'');
+  }
+ }
+});
 
 function fixture(){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'microi-all-platform-'));
@@ -21,6 +88,78 @@ function fixture(){
 const regularEnvironment={MICROI_TEST_ALLOW_WRITES:'YES',MICROI_TEST_OSCLIENT:'fixture',MICROI_TEST_API_BASE:'http://127.0.0.1:61501',MICROI_TEST_FRONTEND_BASE:'http://127.0.0.1:61500'};
 const environment={MICROI_TEST_MATRIX_FILE:'existing-matrix.json',MICROI_TEST_ALLOW_WRITES:'YES',MICROI_TEST_ALLOW_APPLICATION_MAINTENANCE:'YES',PW_TEST_PASSWORD:'fixture-password'};
 function report(files){return {config:{rootDir:path.dirname(files[0])},stats:{expected:files.length,unexpected:0,skipped:0,flaky:0},errors:[],suites:files.map(file=>({file,specs:[{file,title:'general case',line:1,column:1,ok:true,tests:[{status:'expected',results:[{status:'passed'}]}]}]}))};}
+
+test('content-operation business fixtures remain explicit while the real-login MiniMax parameter contract stays in regular and Full scopes',()=>{
+ const f=fixture();try{
+  const name='ai-content-operations.e2e.spec.mjs';
+  fs.copyFileSync(new URL(`../../../Microi.Client/tests/${name}`,import.meta.url),path.join(f.tests,name));
+  const regular=platformFrontendScope(f.tests);
+  assert.ok(regular.files.some(file=>file.endsWith(name)));
+  assert.deepEqual(regular.excluded.map(row=>[row.title,row.reason]),[['AI 内容运营菜单、定时入口与 MiniMax 受保护 API 在共享服务中可用','IndependentApplicationAcceptance']]);
+  const all=allPlatformPreflight(f.root,environment);
+  assert.equal(all.passed,true);assert.ok(all.files.some(row=>row.path.endsWith(name)));assert.deepEqual(all.excluded,[]);
+ }finally{f.cleanup();}
+});
+
+test('installed governance application acceptance remains explicit without excluding platform governance contracts',()=>{
+ const f=fixture();try{
+ const name='ai-platform-studio.e2e.spec.mjs';
+ fs.copyFileSync(new URL(`../../../Microi.Client/tests/${name}`,import.meta.url),path.join(f.tests,name));
+ const regular=platformFrontendScope(f.tests),full=allPlatformPreflight(f.root,environment);
+ assert.deepEqual(regular.excluded.map(row=>[row.title,row.reason]),[
+  ['AI 平台治理中心 10 路由在 PC 与 390px 视口真实可见','IndependentApplicationAcceptance'],
+  ['AI 平台治理新建门户使用统一大圆角居中可拖动弹层','IndependentApplicationAcceptance']
+ ]);
+ assert.equal(full.excluded.length,0);
+ assert.ok(full.files.some(row=>row.path.endsWith(name)));
+ assert.ok(!regular.files.some(file=>file.endsWith(name)));
+ assert.equal(frontendSpecialCases['ai-platform-studio.e2e.spec.mjs'].wholeFile,undefined);
+ fs.appendFileSync(path.join(f.tests,name),"\ntest('new general governance contract',()=>{});\n");
+ const extended=platformFrontendScope(f.tests);
+ assert.ok(extended.files.some(file=>file.endsWith(name)));
+ assert.equal(extended.excluded.length,2);
+ }finally{f.cleanup();}
+});
+
+test('real-model chat is explicit while contacts and non-paid SignalR persistence stay in the ordinary scope',()=>{
+ const f=fixture();try{
+  const name='realtime-notification-chat.e2e.spec.mjs';
+  const source=fs.readFileSync(new URL(`../../../Microi.Client/tests/${name}`,import.meta.url),'utf8');
+  fs.writeFileSync(path.join(f.tests,name),source);
+  const regular=platformFrontendScope(f.tests);
+  assert.ok(regular.files.some(file=>file.endsWith(name)));
+  assert.deepEqual(regular.excluded.map(row=>[row.title,row.reason]),[['SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事件驱动','RealPaidAI']]);
+  for(const title of ['聊天联系人和历史对象始终显示 Name 或 Account','SignalR状态、系统消息持久化与后台任务事件驱动（无付费AI）']){
+   assert.ok(source.includes(`test(${JSON.stringify(title)}`));assert.ok(!regular.excluded.some(row=>row.title===title));
+  }
+  assert.deepEqual(allPlatformPreflight(f.root,environment).excluded,[]);
+ }finally{f.cleanup();}
+});
+
+test('independent Vision camera UI is classified separately from paid/customer cases and keeps explicit Full coverage',()=>{
+ const f=fixture();try{
+  const name='vision-engine.e2e.spec.mjs',title='真实 61500 页面：摄像头连续识别支持暂停、继续和强制再次识别';
+  fs.copyFileSync(new URL(`../../../Microi.Client/tests/${name}`,import.meta.url),path.join(f.tests,name));
+  const scope=platformFrontendScope(f.tests);
+  assert.equal(scope.excluded.find(row=>row.title===title)?.reason,'IndependentApplicationAcceptance');
+  assert.equal(scope.excluded.filter(row=>row.reason==='RealAIOrCustomerVisionAcceptance').length,3);
+  assert.ok(!scope.files.some(file=>file.endsWith(name)));
+  assert.deepEqual(allPlatformPreflight(f.root,environment).excluded,[]);
+ }finally{f.cleanup();}
+});
+
+test('customer framework fixtures stay explicit while common platform source badges remain selected',()=>{
+ const f=fixture();try{
+  const name='framework-presentation.e2e.spec.mjs';
+  const source=fs.readFileSync(new URL(`../../../Microi.Client/tests/${name}`,import.meta.url),'utf8');
+  fs.writeFileSync(path.join(f.tests,name),source);
+  const selection=platformFrontendScope(f.tests);
+  assert.ok(selection.files.some(file=>file.endsWith(name)));
+  assert.deepEqual(selection.excluded.map(row=>[row.title,row.reason]),[['real Junchi pages render permanent inspectable source badges and a non-blocking watermark','CustomerSpecificAcceptance']]);
+  assert.ok(source.includes('test("platform pages render inspectable source badges and a non-blocking watermark"'));
+  assert.deepEqual(allPlatformPreflight(f.root,environment).excluded,[]);
+ }finally{f.cleanup();}
+});
 
 test('regular frontend scope keeps general cases in mixed files and explicitly classifies paid/customer cases without Full matrix or application maintenance',()=>{
  const f=fixture();try{
@@ -46,6 +185,13 @@ test('regular frontend freezes all selected case identities and rejects omitted 
   const files=discoverBrowserTests(f.tests),data=report(files);
   const proof=runAllBrowserTests(f.root,f.results,regularEnvironment,(exe,args,options)=>{
    assert.equal(options.cwd,path.join(f.root,'Microi.Client'));
+   const generated=fs.readFileSync(args[args.indexOf('--config')+1],'utf8');
+   const config=runInNewContext(generated.split('\n')[0]+';config;');
+   assert.equal(config.use.locale,'zh-CN');
+   assert.equal(config.use.actionTimeout,15000);
+   assert.equal(config.use.navigationTimeout,30000);
+   assert.equal(config.maxFailures,1);
+   assert.equal(config.retries,0);
    assert.equal(args.includes('--list'),calls++===0);
    return {status:0,stdout:JSON.stringify(data)};
   },true);
@@ -73,6 +219,8 @@ test('all-platform discovery separates all Playwright files from Node tests and 
   const plan=allPlatformPreflight(f.root,environment);
   assert.equal(plan.passed,true);assert.equal(plan.files.length,2);
   assert.equal(plan.environment.PW_SPECIAL_API_BASE,'http://127.0.0.1:61501');
+  const trailing=allPlatformPreflight(f.root,{...environment,MICROI_TEST_API_BASE:'http://127.0.0.1:61501/',MICROI_TEST_FRONTEND_BASE:'http://127.0.0.1:61500/',PW_SPECIAL_API_BASE:'http://127.0.0.1:61501/'});
+  assert.equal(trailing.passed,true);assert.equal(trailing.environment.PW_BASE_URL,'http://127.0.0.1:61500');assert.equal(trailing.environment.PW_SPECIAL_API_BASE,'http://127.0.0.1:61501');
  }finally{f.cleanup();}
 });
 

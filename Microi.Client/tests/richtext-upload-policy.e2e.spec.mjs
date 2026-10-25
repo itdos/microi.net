@@ -1,25 +1,50 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { prepareRichTextFixture } from "./helpers/richtext-fixture.mjs";
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 
 const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || "http://localhost:61500";
 const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
 const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
 const LOCAL_PASSWORD = process.env.PW_LOCAL_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || "";
-const TABLE_ID = "4232ebac-abb7-4981-b0de-a8bdad5dc53a";
-const RECORD_ID = "37c709bf-d597-46ea-80d1-99b97ea10ac4";
-const RECORD_TITLE = "Codex富文本私有回读验收";
+let fixture;
+let fixtureRequest;
+let TABLE_ID;
+let RECORD_ID;
+let RECORD_TITLE;
 const TEST_IMAGE = path.resolve(process.cwd(), "public/static/img/more.png");
-const SCREENSHOT_DIR = path.resolve(process.cwd(), "../.tmp/richtext-upload-acceptance");
+const SCREENSHOT_DIR = path.resolve(process.env.PW_SCREENSHOT_DIR || path.resolve(process.cwd(), "../.tmp/richtext-upload-acceptance"));
 
 test.use({
     viewport: { width: 1920, height: 1080 },
     ignoreHTTPSErrors: true,
+    locale: "zh-CN",
     ...(BROWSER_CHANNEL ? { channel: BROWSER_CHANNEL } : {})
 });
 test.describe.configure({ mode: "serial" });
 test.setTimeout(300_000);
+
+test.beforeAll(async ({ playwright }) => {
+    fixtureRequest = await playwright.request.newContext({ ignoreHTTPSErrors: true });
+    fixture = await prepareRichTextFixture(fixtureRequest, {
+        apiBase: API_BASE, osClient: OS_CLIENT,
+        account: process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin",
+        password: LOCAL_PASSWORD, bindApiBase: true
+    });
+    TABLE_ID = fixture.tableId;
+    RECORD_ID = fixture.recordId;
+    RECORD_TITLE = fixture.recordTitle;
+});
+
+test.afterAll(async () => {
+    try {
+        if (fixture) await fixture.cleanup();
+    } finally {
+        await fixtureRequest?.dispose();
+    }
+});
 
 function tenantUrl(hash = "") {
     expect(OS_CLIENT, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
@@ -38,7 +63,7 @@ async function login(page) {
         'input[placeholder*="username" i]'
     ].join(", ")).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(LOCAL_PASSWORD);
     const responsePromise = page.waitForResponse(
         (response) => /\/api\/SysUser\/Login(?:\?|$)/i.test(response.url()),
@@ -48,7 +73,7 @@ async function login(page) {
     const response = await responsePromise;
     const result = await response.json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 60_000 });
     const rawToken = response.headers()["authorization"]
         || result.Data?.Token
         || result.Token
@@ -87,7 +112,9 @@ async function callFormEngine(page, token, action, data) {
 }
 
 async function openPrivateRichTextRecord(page, { edit = true } = {}) {
-    await page.goto(tenantUrl("#/notepad?ViewMode=Table"), { waitUntil: "domcontentloaded" });
+    await page.goto(tenantUrl(`#${fixture.route}?ViewMode=Table`), { waitUntil: "domcontentloaded" });
+    // A hash-only transition keeps the unsaved upload drawer alive; reload to prove persisted readback.
+    await page.reload({ waitUntil: "domcontentloaded" });
     const row = page.locator(".el-table__body-wrapper tbody tr")
         .filter({ hasText: RECORD_TITLE })
         .first();
@@ -116,11 +143,13 @@ async function openPrivateRichTextRecord(page, { edit = true } = {}) {
 }
 
 async function chooseRichTextImage(page, form) {
+    await form.locator('.richtext-wysiwyg [contenteditable="true"]').first().click();
     const imageMenu = form.locator('[data-menu-key="group-image"]').first();
     await expect(imageMenu).toBeVisible({ timeout: 30_000 });
     await imageMenu.click();
     const uploadButton = page.locator('[data-menu-key="uploadImage"]:visible').first();
     await expect(uploadButton).toBeVisible({ timeout: 30_000 });
+    await expect(uploadButton).not.toHaveClass(/(?:^|\s)disabled(?:\s|$)/u);
     const uploadResponsePromise = page.waitForResponse(
         (response) => /\/api\/HDFS\/Upload(?:\?|$)/i.test(response.url()),
         { timeout: 60_000 }
@@ -128,11 +157,12 @@ async function chooseRichTextImage(page, form) {
     const chooserPromise = page.waitForEvent("filechooser", { timeout: 30_000 });
     await uploadButton.click();
     const chooser = await chooserPromise;
-    await chooser.setFiles(TEST_IMAGE);
+    await chooser.setFiles({ name: `richtext-${fixture.nonce}-${fixture.uploads.length}.png`, mimeType: "image/png", buffer: await fs.readFile(TEST_IMAGE) });
     const uploadResponse = await uploadResponsePromise;
     const uploadResult = await uploadResponse.json();
     expect(Number(uploadResult.Code), uploadResult.Msg || "rich-text image upload failed").toBe(1);
     const uploaded = Array.isArray(uploadResult.Data) ? uploadResult.Data[0] : uploadResult.Data;
+    fixture.uploads.push(String(uploaded?.Path || uploaded?.FilePathName || ""));
     expect(String(uploaded?.Path || uploaded?.FilePathName || "")).not.toBe("");
     expect([true, 1, "true"].includes(uploaded?.Limit)).toBe(true);
     return uploaded;
@@ -178,7 +208,7 @@ test("富文本私有图片上传后编辑值自动还原为稳定标识且不�
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await login(page);
-    await page.goto(tenantUrl("#/mci-full-test"), { waitUntil: "domcontentloaded" });
+    await page.goto(tenantUrl(`#${fixture.route}`), { waitUntil: "domcontentloaded" });
     const addButton = page.getByRole("button", { name: /^(?:新增(?:记录)?|Add)$/i }).first();
     await expect(addButton).toBeVisible({ timeout: 45_000 });
     await addButton.click();
@@ -193,11 +223,13 @@ test("富文本私有图片上传后编辑值自动还原为稳定标识且不�
     await expect(policy).toContainText("视频 200M");
     await expect(policy).toContainText("文件 100M");
 
+    await form.locator('.richtext-wysiwyg [contenteditable="true"]').first().click();
     const imageMenu = form.locator('[data-menu-key="group-image"]').first();
     await expect(imageMenu).toBeVisible({ timeout: 30_000 });
     await imageMenu.click();
     const uploadButton = page.locator('[data-menu-key="uploadImage"]:visible, button[title*="上传图片"]:visible, button[title*="Upload image"]:visible').first();
     await expect(uploadButton).toBeVisible({ timeout: 30_000 });
+    await expect(uploadButton).not.toHaveClass(/(?:^|\s)disabled(?:\s|$)/u);
     const uploadResponsePromise = page.waitForResponse(
         (response) => /\/api\/HDFS\/Upload(?:\?|$)/i.test(response.url()),
         { timeout: 60_000 }
@@ -205,11 +237,12 @@ test("富文本私有图片上传后编辑值自动还原为稳定标识且不�
     const chooserPromise = page.waitForEvent("filechooser", { timeout: 30_000 });
     await uploadButton.click();
     const chooser = await chooserPromise;
-    await chooser.setFiles(TEST_IMAGE);
+    await chooser.setFiles({ name: `richtext-${fixture.nonce}-${fixture.uploads.length}.png`, mimeType: "image/png", buffer: await fs.readFile(TEST_IMAGE) });
     const uploadResponse = await uploadResponsePromise;
     const uploadResult = await uploadResponse.json();
     expect(Number(uploadResult.Code), uploadResult.Msg || "rich-text image upload failed").toBe(1);
     const uploaded = Array.isArray(uploadResult.Data) ? uploadResult.Data[0] : uploadResult.Data;
+    fixture.uploads.push(String(uploaded?.Path || uploaded?.FilePathName || ""));
     expect(String(uploaded?.Path || uploaded?.FilePathName || "")).not.toBe("");
     expect([true, 1, "true"].includes(uploaded?.Limit)).toBe(true);
 
@@ -237,7 +270,7 @@ test("富文本私有图片保存并重新打开后按权限刷新预览地址",
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     const token = await login(page);
     const originalResult = await callFormEngine(page, token, "GetFormData", {
-        FormEngineKey: "diy_notepad",
+        FormEngineKey: fixture.tableName,
         Id: RECORD_ID
     });
     expect(Number(originalResult.Code), originalResult.Msg || "read acceptance record failed").toBe(1);
@@ -245,7 +278,7 @@ test("富文本私有图片保存并重新打开后按权限刷新预览地址",
     let recordPrepared = false;
 
     try {
-        await page.goto(tenantUrl("#/mci-full-test"), { waitUntil: "domcontentloaded" });
+        await page.goto(tenantUrl(`#${fixture.route}`), { waitUntil: "domcontentloaded" });
         const addButton = page.getByRole("button", { name: /^(?:新增(?:记录)?|Add)$/i }).first();
         await expect(addButton).toBeVisible({ timeout: 45_000 });
         await addButton.click();
@@ -264,7 +297,7 @@ test("富文本私有图片保存并重新打开后按权限刷新预览地址",
         expect(canonicalBeforeSave).not.toMatch(/(?:Token|Ticket)=/i);
 
         const saveResult = await callFormEngine(page, token, "UptFormData", {
-            FormEngineKey: "diy_notepad",
+            FormEngineKey: fixture.tableName,
             Id: RECORD_ID,
             _FormData: {
                 Biaoti: RECORD_TITLE,
@@ -277,11 +310,7 @@ test("富文本私有图片保存并重新打开后按权限刷新预览地址",
         ({ form: activeForm } = await openPrivateRichTextRecord(page, { edit: false }));
         const reopenedImage = activeForm.locator(".richtext-view-content img").first();
         await expect(reopenedImage).toBeVisible({ timeout: 30_000 });
-        await expect.poll(async () => reopenedImage.evaluate((image) => ({
-            complete: image.complete,
-            naturalWidth: image.naturalWidth,
-            src: image.currentSrc || image.src
-        })), { timeout: 30_000 }).toMatchObject({ complete: true });
+        await expect.poll(async () => reopenedImage.evaluate((image) => image.complete && image.naturalWidth > 0), { timeout: 30_000 }).toBe(true);
         const reopenedState = await reopenedImage.evaluate((image) => ({
             naturalWidth: image.naturalWidth,
             src: image.currentSrc || image.src
@@ -292,7 +321,7 @@ test("富文本私有图片保存并重新打开后按权限刷新预览地址",
         await activeForm.screenshot({ path: path.join(SCREENSHOT_DIR, "richtext-private-reopened.png") });
 
         const storedResult = await callFormEngine(page, token, "GetFormData", {
-            FormEngineKey: "diy_notepad",
+            FormEngineKey: fixture.tableName,
             Id: RECORD_ID
         });
         expect(Number(storedResult.Code), storedResult.Msg || "read persisted marker failed").toBe(1);
@@ -302,7 +331,7 @@ test("富文本私有图片保存并重新打开后按权限刷新预览地址",
     } finally {
         if (recordPrepared) {
             const restoreResult = await callFormEngine(page, token, "UptFormData", {
-                FormEngineKey: "diy_notepad",
+                FormEngineKey: fixture.tableName,
                 Id: RECORD_ID,
                 _FormData: {
                     Biaoti: original.Biaoti ?? "",

@@ -147,6 +147,16 @@ html[data-mci-palette="yellow"] .el-button--primary:not(.is-link):not(.is-text) 
     color: var(--mci-text-on-primary, #3a2500) !important;
 }
 
+// 实心主按钮使用已校验的主题主色。历史亮端渐变及白色高光会降低文字对比度；
+// hover/active 保留阴影、位移和焦点反馈，plain/link/text/disabled 仍沿用各自语义。
+html .el-button--primary:not(.is-link):not(.is-text):not(.is-plain):not(.is-disabled) {
+    background: var(--el-color-primary) !important;
+
+    &::before {
+        display: none;
+    }
+}
+
 html[data-theme="dark"] .el-button:not(.el-button--primary):not(.el-button--success):not(.el-button--warning):not(.el-button--danger):not(.el-button--info):not(.is-link):not(.is-text) {
     background-color: var(--el-bg-color-overlay) !important;
     border-color: var(--el-border-color) !important;

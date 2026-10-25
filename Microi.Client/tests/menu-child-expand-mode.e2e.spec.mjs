@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -36,7 +37,7 @@ async function login(page) {
         'input[placeholder*="user name" i]'
     ].join(", ")).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(LOCAL_PASSWORD);
 
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
@@ -56,7 +57,7 @@ async function login(page) {
     const response = await responsePromise;
     const result = await response.json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 async function waitForFrame(page, selector) {
@@ -76,6 +77,8 @@ test("系统设置展示子菜单展开方式，并按配置向下或逐级向�
 
     const sidebar = page.locator("[data-menu-child-expand-mode]").first();
     await expect(sidebar).toBeVisible({ timeout: 30_000 });
+    const actualMode = await sidebar.getAttribute("data-menu-child-expand-mode");
+    expect(["Down", "Right"]).toContain(actualMode);
     if (EXPECTED_MODE) {
         await expect(sidebar).toHaveAttribute("data-menu-child-expand-mode", EXPECTED_MODE);
     }
@@ -104,17 +107,21 @@ test("系统设置展示子菜单展开方式，并按配置向下或逐级向�
         fullPage: false
     });
 
-    if (EXPECTED_MODE !== "Right") {
+    if (actualMode !== "Right") {
         await expect(page.locator(".sidebar-flyout-root-item:visible")).toHaveCount(0);
         const downwardSubMenu = page.locator(
-            '.sidebar-menu-node[data-menu-level="0"] > .el-sub-menu:not(.is-opened)'
+            '.sidebar-menu-node[data-menu-level="0"] > .el-sub-menu'
         ).first();
         const downwardTitle = downwardSubMenu.locator(":scope > .el-sub-menu__title");
         await expect(downwardTitle).toBeVisible();
+        // 当前路由所在的父菜单会自动展开；先把同一个目标收起，再验证点击展开。
+        if (await downwardSubMenu.evaluate(element => element.classList.contains("is-opened"))) {
+            await downwardTitle.click();
+            await expect(downwardSubMenu).not.toHaveClass(/is-opened/);
+        }
         await downwardTitle.click();
-        const openedSubMenu = page.locator(
-            '.sidebar-menu-node[data-menu-level="0"] > .el-sub-menu.is-opened'
-        ).first();
+        const openedSubMenu = downwardSubMenu;
+        await expect(openedSubMenu).toHaveClass(/is-opened/);
         const openedTitle = openedSubMenu.locator(":scope > .el-sub-menu__title");
         const inlineChildren = openedSubMenu.locator(":scope > .el-menu");
         await expect(inlineChildren).toBeVisible();

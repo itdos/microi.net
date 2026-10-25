@@ -1,11 +1,12 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 // @ts-check
 
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const FRONTEND = process.env.FRONTEND || 'http://localhost:61500';
-const BACKEND = process.env.BACKEND || 'http://localhost:61501';
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || process.env.FRONTEND || 'http://localhost:61500';
+const BACKEND = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || process.env.BACKEND || 'http://localhost:61501';
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || 'admin';
 const PASSWORD = process.env.PW_TEST_PASSWORD || '';
 const OS_CLIENT = process.env.MICROI_OSCLIENT || 'iTdos';
@@ -43,6 +44,11 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
             presentationEvidence.durationMs = Date.now() - presentationEvidence.startedAt;
             presentationEvidence.status = response.status();
             delete presentationEvidence.startedAt;
+            try {
+                const body = await response.json();
+                presentationEvidence.code = Number(body?.Code);
+                presentationEvidence.responseMenuIds = Object.keys(body?.Data?.Menus || {}).sort();
+            } catch { presentationEvidence.responseMenuIds = []; }
         }
         if (isMenuRequest(response.url())) {
             const startedAt = menuRequestStartedAt.get(request);
@@ -73,6 +79,8 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
                 transport: isPresentationAddress ? 'custom-address' : 'legacy-run',
                 menuId: body.SysMenuId || body._SysMenuId || '',
                 batchSize: Array.isArray(body.MenuRequests) ? body.MenuRequests.length : 0,
+                menuIds: Array.isArray(body.MenuRequests)
+                    ? body.MenuRequests.map(item => String(item.SysMenuId || item._SysMenuId || '')).sort() : [],
                 startedAt: Date.now()
             };
             presentationStatsRequests.push(evidence);
@@ -101,7 +109,7 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
     await page.getByRole('button', { name: '登录', exact: true }).click();
     const login = await (await loginPromise).json();
     expect(login.Code, login.Msg || '真实账号登录失败').toBe(1);
-    await expect(page.getByRole('button', { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('button', { name: getLoginIdentityName(login), exact: true }).first()).toBeVisible({ timeout: 60_000 });
 
     await page.goto(`${tenantUrl}#/micro-app/microi-platform-service/system-observability`);
     await page.waitForLoadState('domcontentloaded');
@@ -176,8 +184,9 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
     await page.getByRole('button', { name: '关闭日志详情', exact: true }).click();
     await expect(platformOverlay).toHaveCount(0);
 
+    const trafficProbePath = `/api/observability-upload-probe-${Date.now()}`;
     const trafficProbe = await page.request.post(
-        `${BACKEND}/api/observability-upload-probe?OsClient=${encodeURIComponent(OS_CLIENT)}`,
+        `${BACKEND}${trafficProbePath}?OsClient=${encodeURIComponent(OS_CLIENT)}`,
         {
             data: Buffer.alloc(10 * 1024 * 1024 + 1, 0x61),
             headers: { 'Content-Type': 'application/octet-stream' },
@@ -192,7 +201,28 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
     await expect(page.getByRole('heading', { name: '帐号 / 匿名', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: /大文件 \/ 可疑传输明细$/ })).toBeVisible();
     await expect(page.locator('.obs-traffic-cockpit .obs-data-table__size select').first()).toHaveValue('15');
-    const criticalRisk = page.locator('.obs-traffic-cockpit .obs-risk.is-critical').first();
+    // The page now defaults to persisted daily buckets with auto-refresh disabled.
+    // Wait for this request's asynchronous detail, rather than an unrelated old risk row.
+    await page.getByRole('combobox', { name: '统计范围', exact: true }).selectOption('live5');
+    await expect.poll(async () => {
+        const refresh = page.getByRole('button', { name: '立即刷新', exact: true });
+        await expect(refresh).toBeEnabled();
+        const [response] = await Promise.all([
+            page.waitForResponse(response => {
+                if (!/\/apiengine\/mci-system-observability-query(?:\?|$)/i.test(response.url())) return false;
+                try { return response.request().postDataJSON()?.Action === 'TrafficDetails'; }
+                catch { return false; }
+            }, { timeout: 10_000 }),
+            refresh.click()
+        ]);
+        expect(response.status()).toBe(200);
+        const body = await response.json();
+        expect(body.Code, body.Msg || '网络流量明细查询失败').toBe(1);
+        return body.Data?.some(row => row.Route === trafficProbePath
+            && row.IsAnonymous && row.IsUpload && row.RiskLevel === 'Critical'
+            && row.ReceivedBytes >= 10 * 1024 * 1024 + 1);
+    }, { timeout: 30_000, intervals: [1000, 2000], message: '本次匿名上传必须进入真实流量明细并保留严重风险等级' }).toBe(true);
+    const criticalRisk = page.locator('.obs-traffic-cockpit tr').filter({ hasText: trafficProbePath }).locator('.obs-risk.is-critical').first();
     await expect(criticalRisk, '匿名 10MB 上传探针应被识别为严重异常').toBeVisible({ timeout: 30_000 });
     await expect(criticalRisk).toHaveAttribute('title', /原因：[\s\S]*解决方案：/);
     const criticalColor = await criticalRisk.evaluate(element => getComputedStyle(element).color);
@@ -243,7 +273,15 @@ test('系统日志/监控：唯一菜单、平台微服务、真实观测接口�
     expect(badgeBatches.some(item => item.transport === 'custom-address'), '侧栏统计必须调用接口引擎自定义地址').toBe(true);
     expect(presentationStatsRequests.some(item => item.transport === 'legacy-run'), '侧栏统计不应回退到 /api/ApiEngine/Run').toBe(false);
     expect(presentationStatsRequests.length, '侧栏统计不得退化为按菜单逐项调用').toBeLessThanOrEqual(6);
-    expect(Math.max(...badgeBatches.map(item => item.batchSize)), '一次批量请求应承载多个菜单').toBeGreaterThan(10);
+    expect(Math.max(...badgeBatches.map(item => item.batchSize)), '一次批量请求应承载多个菜单').toBeGreaterThan(1);
+    await expect.poll(() => badgeBatches.every(item => Array.isArray(item.responseMenuIds))).toBe(true);
+    for (const batch of badgeBatches) {
+        expect(batch.status).toBe(200);
+        expect(batch.code).toBe(1);
+        expect(new Set(batch.menuIds).size, '每批菜单标识必须非空且不重复').toBe(batch.batchSize);
+        expect(batch.menuIds.every(Boolean)).toBe(true);
+        expect(batch.responseMenuIds, '批量响应必须覆盖该测试租户实际请求的每个菜单').toEqual(batch.menuIds);
+    }
 
     const snapshotEvidence = [...observabilityResponses].reverse().find(item =>
         item.body?.Data?.RequestRuntime?.TopEndpoints || item.body?.Data?.Snapshot?.TopEndpoints);

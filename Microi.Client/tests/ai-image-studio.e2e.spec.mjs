@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -66,7 +67,7 @@ async function login(page) {
     await page.getByRole("button", { name: "登录", exact: true }).click();
     const payload = await (await responsePromise).json();
     expect(Number(payload.Code), payload.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: getLoginIdentityName(payload), exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 test("AI 助手首屏可发现全部工作台，29 个图片工具可用且精确处理真实落盘", async ({ page }) => {
@@ -151,8 +152,21 @@ test("音乐工作台首屏可发现，预设、提交和音轨结果形成完�
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     const pageErrors = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
+    // 此案例只验 UI 闭环；媒体目录与生成均使用同一无付费测试服务。
+    const fixtureEngineId = "music-ui-fixture";
+    let generatedRequests = 0;
+    await page.route(/\/api\/Ai\/GetMediaModels(?:\?|$)/i, async (route) => {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+            Code: 1,
+            Data: [{ AiModelId: fixtureEngineId, Name: "音乐 UI 测试引擎", Models: [
+                { Id: "music-3.0", Name: "Music 3.0", Capability: "music", Supported: true }
+            ] }]
+        }) });
+    });
     await page.route(/\/api\/Ai\/GenerateMiniMaxMusic(?:\?|$)/i, async (route) => {
         const body = route.request().postDataJSON();
+        generatedRequests += 1;
+        expect(body.AiModelId).toBe(fixtureEngineId);
         expect(body.Model).toBe("music-3.0");
         expect(body.IsInstrumental).toBe(true);
         expect(body.Prompt).toContain("科技");
@@ -181,11 +195,14 @@ test("音乐工作台首屏可发现，预设、提交和音轨结果形成完�
     const music = page.locator('[data-testid="ai-music-studio"]:visible').last();
     await expect(music).toBeVisible({ timeout: 45_000 });
     await expect(music.getByRole("heading", { name: "一句灵感，生成可直接试听的配乐" })).toBeVisible();
-    await expect(music.getByText("公开算力可能排队或限额", { exact: false })).toBeVisible();
+    await expect(music.getByText("选择 AI 引擎与音乐模型", { exact: false })).toBeVisible();
+    await expect(music.getByTestId("ai-music-model-picker")).toContainText("音乐 UI 测试引擎");
+    await expect(music.getByTestId("ai-music-run")).toBeEnabled();
     await music.getByRole("button", { name: /品牌科技/ }).click();
     await expect(music.locator('textarea[data-testid="ai-music-prompt"], [data-testid="ai-music-prompt"] textarea').first()).toHaveValue(/科技品牌配乐/);
     await music.locator('[data-testid="ai-music-run"]').click();
     await expect(music.locator("audio")).toBeVisible({ timeout: 30_000 });
+    expect(generatedRequests).toBe(1);
     await expect(music.getByText("MiniMaxAI/MiniMax-Music3", { exact: false }).first()).toBeVisible();
     await page.screenshot({
         path: path.join(SCREENSHOT_DIR, "05-music-workbench-ui.png"),

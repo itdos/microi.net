@@ -205,6 +205,7 @@ MICROI_ACTIVE_GUARD_PID_FILE=""
 MICROI_RELEASE_LOCK_HELD=false
 MICROI_RELEASE_LOCK_DIR=""
 MICROI_RELEASE_SCRATCH=""
+MICROI_PLATFORM_RUNTIME_OWNED_CONTROL=""
 MICROI_RELEASE_SCRATCH_TOOL="$PWD/Microi.Server/tools/release-scratch.mjs"
 
 # 只清理本进程新建并登记的 scratch；不扫描共享 .tmp，也不清空发布报告。
@@ -334,6 +335,12 @@ finish_windows_session() {
     local _exit_code=$?
     trap - EXIT
     stop_active_client_build
+    if [ -n "$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL" ]; then
+        if ! node "$MICROI_RELEASE_WORKSPACE/Microi.Server/tools/platform-release-runtime.mjs" stop "$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL"; then
+            echo "本轮原生测试进程或运输桥尚未确认退出；已保留所属回执。" >&2
+            [ "$_exit_code" -ne 0 ] || _exit_code=1
+        fi
+    fi
     if ! cleanup_release_scratch; then
         echo "临时文件清理未完成，已保留路径及错误回执：$MICROI_RELEASE_SCRATCH" >&2
         [ "$_exit_code" -ne 0 ] || _exit_code=1
@@ -1175,6 +1182,21 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CL
 fi
 
 # 合并发布先验证官网已有门禁，避免平台渠道已上传才发现官网源码尚未成为可发布候选。
+if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ] && [ -z "${MICROI_PLATFORM_RUNTIME_CONTROL:-}" ]; then
+    print_phase "加载已授权的本机发布环境"
+    if ! MICROI_PLATFORM_RUNTIME_OWNED_CONTROL=$(run_release_command node Microi.Server/tools/platform-release-runtime.mjs start \
+        "$PWD" "$MICROI_RELEASE_GATE_DIR" "${MICROI_PLATFORM_RELEASE_PROFILE:-}" "$MICROI_RELEASE_OWNER_PID"); then
+        print_fail "完整平台发布需要已有授权的私有 profile；不会自动创建租户或容器。"
+    fi
+    export MICROI_PLATFORM_RUNTIME_CONTROL="$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL"
+    MICROI_RELEASE_SMOKE_CONFIG=$(node Microi.Server/tools/platform-release-runtime.mjs info "$MICROI_PLATFORM_RUNTIME_CONTROL" smokeConfig)
+    SMOKE_PORT=$(node Microi.Server/tools/platform-release-runtime.mjs info "$MICROI_PLATFORM_RUNTIME_CONTROL" smokePort)
+    _runtime_node_home=$(node Microi.Server/tools/platform-release-runtime.mjs info "$MICROI_PLATFORM_RUNTIME_CONTROL" nodeHome)
+    if is_windows_shell; then _runtime_node_home=$(cygpath -u "$_runtime_node_home"); fi
+    export MICROI_RELEASE_SMOKE_CONFIG SMOKE_PORT
+    export PATH="$_runtime_node_home:$PATH"
+fi
+
 if [ "$PUBLISH_DOC" = true ]; then
     print_step "预检官方网站候选..."
     run_release_command node microi.doc/scripts/check-account-portal.mjs --require-committed
@@ -1296,9 +1318,13 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
     fi
     _release_test_scope_args=()
     if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ]; then _release_test_scope_args+=(-PlatformFrontendTests); fi
-    if ! run_release_command "$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
+    _platform_test_command=("$_test_powershell" -NoProfile -ExecutionPolicy Bypass \
         -File Microi.Server/Microi.Tests/run-tests.ps1 -Mode "$MICROI_RELEASE_TEST_POLICY" -Configuration Release -SolutionPath "$SLN_FILE" \
-        -ResultsDirectory "$_full_test_results" "${_release_test_scope_args[@]}"; then
+        -ResultsDirectory "$_full_test_results" "${_release_test_scope_args[@]}")
+    if [ -n "$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL" ]; then
+        _platform_test_command=(node Microi.Server/tools/platform-release-runtime.mjs run-tests "$MICROI_PLATFORM_RUNTIME_OWNED_CONTROL" -- "${_platform_test_command[@]}")
+    fi
+    if ! run_release_command "${_platform_test_command[@]}"; then
         print_fail "${MICROI_RELEASE_TEST_POLICY} 测试未通过；已停止官方应用资源写入和平台发布，禁止跳过失败用例。"
     fi
     if [ "$MICROI_FULL_ONLY" = true ]; then

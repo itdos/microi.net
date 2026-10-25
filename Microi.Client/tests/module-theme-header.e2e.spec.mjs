@@ -16,7 +16,7 @@ test("主题设置切换全局直角并统一顶栏图标", async ({ page }) => 
     await page.goto(`${base}/?OsClient=${encodeURIComponent(OS_CLIENT)}${apiBase ? `&ApiBase=${encodeURIComponent(apiBase)}` : ""}`, { waitUntil: "domcontentloaded" });
     const account = page.locator('input[placeholder*="user name"], input[placeholder*="用户名"], input[placeholder*="账号"], input[placeholder*="帐号"]').first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(password);
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
     if (await privacy.isVisible().catch(() => false)) {

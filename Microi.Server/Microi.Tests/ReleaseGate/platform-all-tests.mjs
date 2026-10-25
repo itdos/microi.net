@@ -5,6 +5,7 @@ import {spawnSync,execFileSync} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import {prepareBrowserFixtureConfig} from './prepare-browser-fixture.mjs';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 let parser;
@@ -16,6 +17,8 @@ function parseTest(source,file){
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const json=file=>JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));
 const check=(ok,message)=>{if(!ok)throw Error(message);};
+// 测试 URL 会追加 /src 或 /api；统一去掉基址尾斜杠，避免 // 被 Vite 当作 SPA 路由。
+const baseUrl=value=>String(value).replace(/\/+$/,'');
 
 // 只盘点真实 Playwright 责任文件；Node 单元用例继续由原自动发现入口完整执行。
 export function discoverBrowserTests(directory){
@@ -50,8 +53,8 @@ export function readLocalTestDefaults(project,environment={}){
  check(typeof settings.OsClient==='string'&&settings.OsClient.length>0,'The selected local configuration has no OsClient.');
  // 连接串和密码不复制到报告；测试仅获取已有配置文件路径，写权限仍由独立前置校验决定。
  return {PW_APPSETTINGS_PATH:selected,ASPNETCORE_ENVIRONMENT:name,
-  PW_API_BASE:environment.MICROI_TEST_API_BASE||'http://127.0.0.1:61501',
-  PW_BASE_URL:environment.MICROI_TEST_FRONTEND_BASE||'http://127.0.0.1:61500',
+  PW_API_BASE:baseUrl(environment.MICROI_TEST_API_BASE||'http://127.0.0.1:61501'),
+  PW_BASE_URL:baseUrl(environment.MICROI_TEST_FRONTEND_BASE||'http://127.0.0.1:61500'),
   PW_OS_CLIENT:environment.MICROI_TEST_OSCLIENT||settings.OsClient,
   MICROI_OSCLIENT:environment.MICROI_TEST_OSCLIENT||settings.OsClient};
 }
@@ -59,14 +62,18 @@ export function readLocalTestDefaults(project,environment={}){
 // 普通发行只排除有明确专项前提的案例；同一文件的通用 UI 案例仍自动发现并执行。
 // 修改/新增专项必须维护此清单，不能通过 Playwright skip 把未执行案例算作通过。
 export const frontendSpecialCases={
+ 'realtime-notification-chat.e2e.spec.mjs':{reason:'RealPaidAI',prerequisite:'The original complete conversation acceptance sends a real model prompt; ordinary SignalR, system-message persistence and background-task assertions remain separate general cases',titles:['SignalR状态、AI与平台消息合并会话、AI闭环和后台任务事件驱动']},
+ 'ai-content-operations.e2e.spec.mjs':{reason:'IndependentApplicationAcceptance',prerequisite:'The official tenant internal AI content operations application has its own build/test entry; its README owns /mci-ai-content-plan, /mci-ai-content-asset and the fixed seed as an independent application, not a public platform application',titles:['AI 内容运营菜单、定时入口与 MiniMax 受保护 API 在共享服务中可用']},
+ 'ai-platform-studio.e2e.spec.mjs':{reason:'IndependentApplicationAcceptance',prerequisite:'Independently installed ai-platform-studio marketplace application: its README owns a separate Manifest with 40 tables, 64 engines, 10 microservice routes, tests and npm build; platform AI governance SDK and protocol tests remain in scope',titles:['AI 平台治理中心 10 路由在 PC 与 390px 视口真实可见','AI 平台治理新建门户使用统一大圆角居中可拖动弹层']},
  'three-engine-microservice.e2e.spec.mjs':{reason:'IndependentApplicationAcceptance',prerequisite:'Independently published microi-3d-engine application; README test ownership keeps its release separate',wholeFile:true},
  'ai-image-studio.e2e.spec.mjs':{reason:'RealPaidAI',titles:['MiniMax 文生图和私有参考图图生图均返回持久 HDFS 资产','音乐工作台通过托管接口或官方开源 Music3 回退返回持久 HDFS 音轨']},
  'form-ui-regression.e2e.spec.mjs':{reason:'CustomerJunchi',titles:['君驰项目表单：必填内联提示、数字步进无断层、紧凑分组随主题','君驰托码表单：折叠分组保留装饰短线、无外框且字段间隙为纯白','君驰设计器：双击折叠分组保留图标与视觉风格专项配置']},
  'latest-form-experience.e2e.spec.mjs':{reason:'CustomerXjy',titles:['xjy 订单使用标准表单 Banner、只读业务值和单一纵向滚动容器']},
+ 'framework-presentation.e2e.spec.mjs':{reason:'CustomerSpecificAcceptance',prerequisite:'The original Junchi acceptance requires its customer extension fields and chemical-bid-management microservice; generic platform source badges and watermark remain a separate ordinary case',titles:['real Junchi pages render permanent inspectable source badges and a non-blocking watermark']},
  'role-dept-tree-regression.e2e.spec.mjs':{reason:'CustomerOrPreconfiguredAccountAcceptance',prerequisite:'JUNCHI customer data or a manually prepared anderson account with level-500 role and a fixed model ID',titles:['君驰左右树表只发 _Where，空树显示全部且单击树节点不重复初始化','500 级接口引擎专员可见菜单但服务端拒绝 sys_apiengine 控制面模型']},
  'menu-child-expand-mode.e2e.spec.mjs':{reason:'OfficialApplicationVersionAcceptance',prerequisite:'Explicit PW_EXPECT_SYS_CONFIG_STORE_VERSION for an independently published official application',titles:['官方商城回读系统设置应用版本']},
  'platform-shell-regression.e2e.spec.mjs':{reason:'OfficialTenantSpecificAcceptance',prerequisite:'Official main-tenant identity, not a general isolated fixture tenant',titles:['通知中心：吾码官方主租户不检查或展示应用安装提醒']},
- 'vision-engine.e2e.spec.mjs':{reason:'RealAIOrCustomerVisionAcceptance',titles:['真实 61501 链路：样本库优先、AI 异步回退及人脸同意门禁','真实 61500 页面：视觉引擎工作台跟随平台主题、可识别且人脸同意前禁用提交','真实目标租户 v1.4.13：PC 全宽、移动横竖屏、历史画面与纠错入口完整可用']},
+ 'vision-engine.e2e.spec.mjs':{reason:'RealAIOrCustomerVisionAcceptance',titleMetadata:{'真实 61500 页面：摄像头连续识别支持暂停、继续和强制再次识别':{reason:'IndependentApplicationAcceptance',prerequisite:'The separately versioned microi-vision MicroService owns this camera workbench and its package test/build entry; platform Microi.Vision and V8.Vision unit/protocol tests remain in scope'}},titles:['真实 61501 链路：样本库优先、AI 异步回退及人脸同意门禁','真实 61500 页面：视觉引擎工作台跟随平台主题、可识别且人脸同意前禁用提交','真实目标租户 v1.4.13：PC 全宽、移动横竖屏、历史画面与纠错入口完整可用','真实 61500 页面：摄像头连续识别支持暂停、继续和强制再次识别']},
  'system-settings-microservice-production.e2e.spec.mjs':{reason:'CustomerJunchiProduction',wholeFile:true},
  'tenant-logo-isolation.e2e.spec.mjs':{reason:'CustomerLsgProduction',wholeFile:true}
 };
@@ -85,9 +92,10 @@ export function platformFrontendScope(directory){
   const rule=frontendSpecialCases[path.basename(file)],titles=rule?declaredTitles(file):[];
   if(rule){
    for(const title of rule.titles||[])check(titles.includes(title),`Frontend special-case classification drifted: ${path.basename(file)} / ${title}`);
-   excluded.push(...(rule.wholeFile?titles:rule.titles).map(title=>({file:path.relative(directory,file).replaceAll('\\','/'),title,reason:rule.reason,...(rule.prerequisite?{prerequisite:rule.prerequisite}:{}),status:'NotApplicable'})));
+   excluded.push(...(rule.wholeFile?titles:rule.titles).map(title=>({file:path.relative(directory,file).replaceAll('\\','/'),title,reason:rule.reason,...(rule.prerequisite?{prerequisite:rule.prerequisite}:{}),...rule.titleMetadata?.[title],status:'NotApplicable'})));
   }
-  if(!rule?.wholeFile)files.push(file);
+  // 精确分类覆盖当前文件全部案例时不要求执行零案例文件；新增通用案例会自动重新纳入。
+  if(!rule?.wholeFile&&(!rule?.titles||titles.some(title=>!rule.titles.includes(title))))files.push(file);
  }
  return {files,excluded,discoveredFiles:discovered.length};
 }
@@ -118,7 +126,7 @@ export function allPlatformPreflight(workspaceRoot,environment={},frontendOnly=f
    if(name==='PW_API_BASE'||/^PW_.*_API_BASE$/.test(name))expected=defaults.PW_API_BASE;
    else if(name==='PW_BASE_URL'||/^PW_.*_(?:WEB_BASE|BASE_URL)$/.test(name))expected=defaults.PW_BASE_URL;
    else if(name==='PW_OS_CLIENT'||/^PW_.*_OSCLIENT$/.test(name))expected=defaults.PW_OS_CLIENT;
-   if(expected){if(environment[name]&&environment[name]!==expected)missing.push(`${relative}: ${name} does not match the existing local fixture`);bindings[name]=expected;}
+   if(expected){const actual=/^https?:\/\//.test(expected)?baseUrl(environment[name]||''):environment[name];if(actual&&actual!==expected)missing.push(`${relative}: ${name} does not match the existing local fixture`);bindings[name]=expected;}
   }
  }
  return {schemaVersion:1,scope:frontendOnly?'PlatformFrontendTests':'AllPlatformTests',passed:missing.length===0,missing:[...new Set(missing)],excluded:selection.excluded,
@@ -167,7 +175,7 @@ export function runAllBrowserTests(workspaceRoot,results,environment=process.env
  check(!fs.existsSync(config)&&!fs.existsSync(reportFile),'AllPlatformTests requires fresh browser output.');
  // 不调用 webServer / docker / 安装器；复用现有 frontend/API 和配置对应的依赖。
  const escaped=plan.excluded.map(row=>row.title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
- fs.writeFileSync(config,`const config=${JSON.stringify({testDir:directory,testMatch:files.map(file=>path.relative(directory,file).replaceAll('\\','/')),workers:1,fullyParallel:false,maxFailures:1,timeout:90000,retries:0,outputDir:output,use:{headless:true,trace:'retain-on-failure',...(environment.PW_BROWSER_CHANNEL?{channel:environment.PW_BROWSER_CHANNEL}:{})}})};\n${escaped.length?`config.grepInvert=new RegExp(${JSON.stringify(`(?:${escaped.join('|')})$`)});\n`:''}export default config;\n`,{flag:'wx'});
+ fs.writeFileSync(config,`const config=${JSON.stringify({testDir:directory,testMatch:files.map(file=>path.relative(directory,file).replaceAll('\\','/')),workers:1,fullyParallel:false,maxFailures:1,timeout:90000,retries:0,outputDir:output,use:{headless:true,locale:'zh-CN',...(frontendOnly?{actionTimeout:15000,navigationTimeout:30000}:{}),trace:'retain-on-failure',...(environment.PW_BROWSER_CHANNEL?{channel:environment.PW_BROWSER_CHANNEL}:{})}})};\n${escaped.length?`config.grepInvert=new RegExp(${JSON.stringify(`(?:${escaped.join('|')})$`)});\n`:''}export default config;\n`,{flag:'wx'});
  try{
   const args=[path.join(client,'node_modules/@playwright/test/cli.js'),'test','--config',config,'--reporter=json'];
   const options={cwd:client,env:{...environment,...plan.environment},encoding:'utf8',windowsHide:true,maxBuffer:64*1024*1024};
@@ -233,6 +241,11 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
    const plan=allPlatformPreflight(workspace,process.env,mode==='frontend-preflight');fs.mkdirSync(results,{recursive:true});
    fs.writeFileSync(path.join(results,mode==='frontend-preflight'?'platform-frontend-preflight.json':'all-platform-preflight.json'),JSON.stringify({...plan,environment:undefined},null,2)+'\n',{flag:'wx'});
    check(plan.passed,'AllPlatformTests prerequisites missing:\n'+plan.missing.join('\n'));
+   if(mode==='frontend-preflight'){
+    const fixture=prepareBrowserFixtureConfig(workspace,results,{...process.env,...plan.environment});
+    Object.assign(plan.environment,fixture.environment);
+    fs.writeFileSync(path.join(results,'platform-browser-fixture.json'),JSON.stringify(fixture.receipt,null,2)+'\n',{flag:'wx'});
+   }
    console.log(JSON.stringify(plan.environment));
   }else if(mode==='browser'||mode==='frontend-browser')console.log(JSON.stringify(runAllBrowserTests(workspace,results,process.env,spawnSync,mode==='frontend-browser')));
   else if(mode==='runtime-prepare'||mode==='runtime-stop')console.log(JSON.stringify(await platformRuntime(mode,results,artifacts,control)));

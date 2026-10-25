@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { buildUiDensityVariables } from "../src/utils/ui-density.js";
 
 const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
 const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
@@ -35,7 +36,7 @@ async function login(page, { osClient, password, apiBase = API_BASE }, captureSt
         'input[placeholder*="user name" i]'
     ].join(", ")).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(password);
 
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
@@ -85,7 +86,7 @@ async function openTenantRoute(page, tenant, hash) {
     await page.goto(`${tenantUrl(tenant.osClient, tenant.apiBase)}${hash}`, { waitUntil: "domcontentloaded" });
 }
 
-test("登录完成态保持到工作台接管，退出确认统一为大圆角弹窗", async ({ page }) => {
+test("登录完成态保持到工作台接管，退出确认遵循统一弹窗与界面密度", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     const states = await login(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, true);
@@ -103,24 +104,53 @@ test("登录完成态保持到工作台接管，退出确认统一为大圆角�
     await expect(confirm).toBeVisible({ timeout: 10_000 });
     const metrics = await confirm.evaluate((element) => {
         const style = getComputedStyle(element);
+        const root = document.documentElement;
+        const rootStyle = getComputedStyle(root);
         const header = element.querySelector(".el-message-box__header");
         const buttons = [...element.querySelectorAll(".el-message-box__btns .el-button")];
         return {
+            density: Number(root.dataset.mciUiDensity),
+            scale: Number.parseFloat(rootStyle.getPropertyValue("--mci-ui-scale")),
+            controlHeight: Number.parseFloat(rootStyle.getPropertyValue("--mci-ui-control-height")),
+            cornerStyle: root.dataset.mciCornerStyle,
+            viewportWidth: root.clientWidth,
             borderRadius: Number.parseFloat(style.borderRadius),
             width: element.getBoundingClientRect().width,
             headerHeight: header?.getBoundingClientRect().height || 0,
+            headerMinHeight: header ? Number.parseFloat(getComputedStyle(header).minHeight) : 0,
+            headerClientHeight: header?.clientHeight || 0,
+            headerScrollHeight: header?.scrollHeight || 0,
             iconContent: header ? getComputedStyle(header, "::before").content : "",
             buttonHeights: buttons.map((button) => button.getBoundingClientRect().height)
         };
     });
-    expect(metrics.borderRadius, JSON.stringify(metrics)).toBeGreaterThanOrEqual(20);
-    expect(metrics.width, JSON.stringify(metrics)).toBeGreaterThanOrEqual(480);
-    expect(metrics.headerHeight, JSON.stringify(metrics)).toBeGreaterThanOrEqual(78);
+    const detail = JSON.stringify(metrics);
+    // 统一弹窗当前采用 440px * 密度、58px * 密度标题最小高度及普通控件 token。
+    // 默认 100% 控件固定为 28px，不能用旧的 480/78/42px 下界覆盖用户密度偏好。
+    expect(buildUiDensityVariables(100)["--mci-ui-control-height"]).toBe("28px");
+    expect([90, 95, 100, 105, 110], detail).toContain(metrics.density);
+    const expectedVariables = buildUiDensityVariables(metrics.density);
+    expect(metrics.scale, detail).toBe(Number(expectedVariables["--mci-ui-scale"]));
+    expect(metrics.controlHeight, detail).toBe(Number.parseFloat(expectedVariables["--mci-ui-control-height"]));
+    expect(Math.abs(metrics.borderRadius - (metrics.cornerStyle === "square" ? 0 : 24)), detail).toBeLessThanOrEqual(1);
+    expect(Math.abs(metrics.width - Math.min(440 * metrics.scale, metrics.viewportWidth - 32)), detail).toBeLessThanOrEqual(1);
+    expect(Math.abs(metrics.headerMinHeight - 58 * metrics.scale), detail).toBeLessThanOrEqual(1);
+    expect(metrics.headerHeight, detail).toBeGreaterThanOrEqual(metrics.headerMinHeight - 1);
+    expect(metrics.headerScrollHeight, detail).toBeLessThanOrEqual(metrics.headerClientHeight + 1);
     expect(metrics.iconContent, JSON.stringify(metrics)).not.toBe("none");
-    expect(metrics.buttonHeights.length, JSON.stringify(metrics)).toBeGreaterThanOrEqual(2);
-    expect(Math.min(...metrics.buttonHeights), JSON.stringify(metrics)).toBeGreaterThanOrEqual(42);
+    expect(metrics.buttonHeights, detail).toHaveLength(2);
+    for (const height of metrics.buttonHeights) {
+        expect(Math.abs(height - metrics.controlHeight), detail).toBeLessThanOrEqual(1);
+    }
     await confirm.screenshot({ path: path.join(SCREENSHOT_DIR, "01-unified-confirm.png") });
     await confirm.getByRole("button", { name: /^(取消|Cancel)$/i }).click();
+    await expect(confirm).toBeHidden();
+    await expect(page.locator(".avatar-container").first()).toBeVisible();
+    await page.locator(".avatar-container").first().hover();
+    await logout.click();
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole("button", { name: /^(确认|确定|OK|Confirm)$/i }).click();
+    await expect(page.getByRole("button", { name: "登录", exact: true })).toBeVisible({ timeout: 30_000 });
 });
 
 test("表单设计器切到 left 后主区域宽度保持稳定", async ({ page }) => {

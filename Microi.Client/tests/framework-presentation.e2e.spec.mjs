@@ -50,10 +50,17 @@ async function login(page) {
     await expect(page.locator("#divLogin")).toHaveCount(0, { timeout: 30000 });
 }
 
-test("real Junchi pages render permanent inspectable source badges and a non-blocking watermark", async ({ page }, testInfo) => {
+async function verifyFrameworkPresentation(page, testInfo, customerSpecific) {
     test.skip(!PASSWORD, "PW_PRESENTATION_PASSWORD is required for the real UI login.");
     test.setTimeout(120000);
     await page.setViewportSize({ width: 1440, height: 960 });
+
+    // 官方欢迎提醒可能在任意一次路由加载后到达；通过真实确认入口关闭，不能强制点击遮罩后的控件。
+    const welcomeReminder = page.getByRole("dialog", { name: "欢迎使用 Microi吾码，了解适合你的版本", exact: true });
+    await page.addLocatorHandler(welcomeReminder, async dialog => {
+        await dialog.getByRole("button", { name: "我知道了", exact: true }).click();
+        await expect(dialog).toBeHidden();
+    });
 
     let patchedSysConfigResponses = 0;
     await page.route(`${API_BASE}/**`, async route => {
@@ -143,7 +150,7 @@ test("real Junchi pages render permanent inspectable source badges and a non-blo
         interceptsCenter: false
     });
 
-    const interfaceStyleSection = page.getByRole("button", { name: /^(界面风格|Interface Style)\b/i }).first();
+    const interfaceStyleSection = page.getByRole("button", { name: /^(?:界面风格(?:\s|$)|Interface Style\b)/i }).first();
     await expect(interfaceStyleSection).toBeVisible({ timeout: 30000 });
     await expect.poll(async () => {
         const counts = ((await interfaceStyleSection.textContent()) || "").match(/\d+/g) || [];
@@ -154,12 +161,28 @@ test("real Junchi pages render permanent inspectable source badges and a non-blo
         "InterfaceThemeNavigationGroup",
         "InterfaceLoginExperienceGroup",
         "FrameworkPresentationGroup",
-        "InterfaceTenantExtensionGroup"
+        ...(customerSpecific ? ["InterfaceTenantExtensionGroup"] : [])
     ]) {
-        await expect(page.locator(`.field_${groupFieldName} .diy-collapse-group`).first()).toBeVisible();
+        const group = page.locator(`.field_${groupFieldName} .diy-collapse-group`).first();
+        await expect(group).toBeVisible();
+        // 各租户可配置折叠组的默认展开状态；先通过真实入口收起，再验证水印组不会联动其它组。
+        if (await group.getAttribute("aria-expanded") === "true") await group.click();
+        await expect(group).toHaveAttribute("aria-expanded", "false");
     }
     const presentationGroup = page.locator(".field_FrameworkPresentationGroup .diy-collapse-group").first();
     await expect(presentationGroup).toHaveAttribute("aria-expanded", "false");
+    const outsideGroupFields = ["MenuWidth", "DisableLoginGitee", "DisableLoginWeChat", "DisableLoginGitHub", "LoginGiteeDisplay", "LoginWeChatDisplay", "LoginGitHubDisplay"];
+    const outsideGroupVisibility = new Map();
+    for (const name of outsideGroupFields) {
+        const fields = page.locator(`.field_${name}`);
+        if (!customerSpecific) await expect(fields, `通用系统设置必须有唯一 ${name} 字段`).toHaveCount(1);
+        const field = fields.first();
+        if (!customerSpecific && (name === "MenuWidth" || name.startsWith("Login"))) {
+            await expect(field, `${name} 必须随所属主题或登录组收起`).toBeHidden();
+        }
+        if (await field.count()) outsideGroupVisibility.set(name, await field.isVisible());
+    }
+    expect(outsideGroupVisibility.size, "组外字段检查不能空跑").toBeGreaterThan(0);
     await presentationGroup.click();
     await expect(presentationGroup).toHaveAttribute("aria-expanded", "true");
     for (const fieldName of [
@@ -172,19 +195,13 @@ test("real Junchi pages render permanent inspectable source badges and a non-blo
     ]) {
         await expect(page.locator(`.field_${fieldName}`).first()).toBeVisible();
     }
-    for (const fieldName of [
-        "MenuWidth",
-        "DisableLoginGitee",
-        "DisableLoginWeChat",
-        "DisableLoginGitHub"
-    ]) {
+    for (const [fieldName, wasVisible] of outsideGroupVisibility) {
         const field = page.locator(`.field_${fieldName}`).first();
-        if (await field.count()) {
-            await expect(field, `${fieldName} 必须留在自己的折叠组，不能被框架水印组误吞`).toBeHidden();
-        }
+        // 兼容字段可能位于组外；打开水印组必须保持其它字段原有可见性，不能将它们误吞或联动。
+        await expect(field, `${fieldName} 不能被框架水印组误吞或联动`).toBeVisible({ visible: wasVisible });
     }
     const tenantTrailingField = page.locator(".field_FileUpload145").first();
-    if (await tenantTrailingField.count()) {
+    if (customerSpecific && await tenantTrailingField.count()) {
         const tenantExtensionGroup = page.locator(".field_InterfaceTenantExtensionGroup .diy-collapse-group").first();
         await expect(tenantExtensionGroup).toHaveAttribute("aria-expanded", "false");
         await expect(tenantTrailingField).toBeHidden();
@@ -280,7 +297,9 @@ test("real Junchi pages render permanent inspectable source badges and a non-blo
     });
 
     if (await closeButton.count()) await closeButton.click();
-    await page.goto(runtimeUrl("/micro-app/chemical-bid-management/manager-dashboard"), {
+    const menuAppKey = customerSpecific ? "chemical-bid-management" : "microi-platform-service";
+    const menuRoute = customerSpecific ? "/manager-dashboard" : "/system-observability";
+    await page.goto(runtimeUrl(`/micro-app/${menuAppKey}${menuRoute}`), {
         waitUntil: "domcontentloaded"
     });
     const menuBadge = page.locator('.micro-app-host [data-render-source="microservice"]').first();
@@ -292,12 +311,15 @@ test("real Junchi pages render permanent inspectable source badges and a non-blo
     await menuBadge.locator("[data-render-source-trigger]").click();
     const menuDetails = page.locator(".mci-render-source-dialog:visible").last();
     await expect(menuDetails).toBeVisible();
-    await expect(menuDetails.getByText("chemical-bid-management", { exact: true })).toBeVisible();
-    await expect(menuDetails.getByText("/manager-dashboard", { exact: true })).toBeVisible();
-    await expect(menuDetails.getByText(
-        "AI应用/chemical-bid-management",
-        { exact: true }
-    ).first(), "菜单微服务详情应至少显示可用于 AI 定位的在线应用源码根路径").toBeVisible();
+    await expect(menuDetails.getByText(menuAppKey, { exact: true })).toBeVisible();
+    await expect(menuDetails.getByText(menuRoute, { exact: true })).toBeVisible();
+    if (customerSpecific) {
+        await expect(menuDetails.getByText("AI应用/chemical-bid-management", { exact: true }).first(),
+            "客户微服务详情应显示在线应用源码根路径").toBeVisible();
+    } else {
+        await expect(menuDetails.getByText(/^(?:AI应用\/microi-platform-service|Microi\.Server\/OfficialApplications\/PlatformService)(?:\/.*)?$/).first(),
+            "内置微服务详情应显示属于平台服务的源码路径").toBeVisible();
+    }
     await page.screenshot({
         path: testInfo.outputPath("menu-microservice-source-details.png"),
         fullPage: false
@@ -315,4 +337,13 @@ test("real Junchi pages render permanent inspectable source badges and a non-blo
         path: testInfo.outputPath("junchi-menu-microservice-source-badge-dismissed.png"),
         fullPage: false
     });
+}
+
+test("platform pages render inspectable source badges and a non-blocking watermark", async ({ page }, testInfo) => {
+    await verifyFrameworkPresentation(page, testInfo, false);
+});
+
+// 保留客户自定义扩展字段及 chemical-bid-management 的完整原验收，仅由客户专项执行。
+test("real Junchi pages render permanent inspectable source badges and a non-blocking watermark", async ({ page }, testInfo) => {
+    await verifyFrameworkPresentation(page, testInfo, true);
 });

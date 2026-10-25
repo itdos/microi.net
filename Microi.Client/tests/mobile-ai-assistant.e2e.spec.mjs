@@ -50,7 +50,7 @@ async function fulfillWithDefaultVisibleAi(route) {
 }
 
 function isAiActionResponse(response, action) {
-    if (!/\/api\/ApiEngine\/Run(?:\?|$)/i.test(response.url())) return false;
+    if (!/\/(?:api\/ApiEngine\/Run|apiengine\/mci_ai_data_assistant)(?:\?|$)/i.test(response.url())) return false;
     try {
         const data = response.request().postDataJSON();
         return (
@@ -116,7 +116,7 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
     await page.route(/\/apiengine\/platform-sys-config(?:\?|$)/i, fulfillWithDefaultVisibleAi);
     await page.route(/\/api\/SysUser\/Login(?:\?|$)/i, fulfillWithDefaultVisibleAi);
 
-    await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`, {
+    await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`, {
         waitUntil: "domcontentloaded"
     });
 
@@ -180,10 +180,12 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
     const bootstrapResponsePromise = bootstrapResponseSeen
         ? Promise.resolve(bootstrapResponseSeen)
         : page.waitForResponse(isAiBootstrapResponse, { timeout: 30_000 });
+    // 后续UI断言提前失败时也处理挂起的等待；下方仍await原Promise并严格校验结果。
+    bootstrapResponsePromise.catch(() => {});
     await aiEntry.click();
     await expect(page).toHaveURL(/\/mobile\/ai-assistant(?:\?|$)/, { timeout: 20_000 });
     await expect(page.getByTestId("mobile-ai-assistant")).toBeVisible();
-    await expect(page.getByText(/^(?:AI助手|AI Assistant)$/i)).toBeVisible();
+    await expect(page.getByTestId("mobile-ai-assistant").getByText(/^(?:AI\s*助手|AI Assistant)$/i)).toBeVisible();
     const mobileAiAvatar = page.getByTestId("mobile-ai-avatar");
     await expect(mobileAiAvatar).toBeVisible();
     expect(await mobileAiAvatar.evaluate((image) => ({
@@ -211,7 +213,7 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
     await page.getByTestId("mobile-ai-history").click();
     const historyResponse = await historyResponsePromise;
     expect(historyResponse.status()).toBe(200);
-    const historyPanel = page.getByRole("complementary", { name: /AI对话记录|Conversation history/i });
+    const historyPanel = page.getByRole("complementary", { name: /^(?:对话记录|Conversation history)$/i });
     await expect(historyPanel).toBeVisible();
     await page.getByRole("button", { name: /关闭对话记录|Close (?:conversation )?history/i }).click();
     await expect(historyPanel).toBeHidden();
@@ -266,7 +268,7 @@ test("PC 顶栏机器人打开并拖动完整 AI 助手弹窗", async ({ page },
 
     await page.route(/\/apiengine\/platform-sys-config(?:\?|$)/i, fulfillWithDefaultVisibleAi);
     await page.route(/\/api\/SysUser\/Login(?:\?|$)/i, fulfillWithDefaultVisibleAi);
-    await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`, {
+    await page.goto(`${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`, {
         waitUntil: "domcontentloaded"
     });
 
@@ -311,11 +313,12 @@ test("PC 顶栏机器人打开并拖动完整 AI 助手弹窗", async ({ page },
     expect(entryBox).not.toBeNull();
     expect(entryBox.x).toBeGreaterThan(1000);
     expect(entryBox.y).toBeLessThan(60);
-    const robotSize = await desktopEntry.locator("img").evaluate((image) => ({
-        width: image.naturalWidth,
-        height: image.naturalHeight
-    }));
-    expect(robotSize).toEqual({ width: 256, height: 256 });
+    const icon = desktopEntry.locator("svg.mci-ai-icon");
+    await expect(icon).toBeVisible();
+    await expect(icon).toHaveAttribute("viewBox", "0 0 24 24");
+    const iconSize = await icon.boundingBox();
+    expect(iconSize.width).toBeGreaterThanOrEqual(20);
+    expect(iconSize.height).toBeGreaterThanOrEqual(20);
 
     await page.screenshot({
         path: path.join(SCREENSHOT_DIR, "desktop-ai-navbar-entry-1440x900.png"),
@@ -327,20 +330,21 @@ test("PC 顶栏机器人打开并拖动完整 AI 助手弹窗", async ({ page },
     const dialog = page.locator(".desktop-ai-dialog");
     const unifiedAssistant = dialog.getByTestId("unified-ai-assistant");
     await expect(dialog).toBeVisible();
-    await expect(page.getByText("AI助手", { exact: true }).first()).toBeVisible();
+    await expect(dialog.getByText(/^(?:AI\s*助手|AI Assistant)$/i)).toBeVisible();
     await expect(unifiedAssistant).toBeVisible();
-    await expect(unifiedAssistant.getByTestId("unified-ai-history")).toBeVisible();
-    await expect(unifiedAssistant.getByTestId("unified-ai-new-conversation")).toBeVisible();
-    await expect(unifiedAssistant.getByTestId("unified-ai-history-active")).toBeVisible();
-    await expect(unifiedAssistant.getByTestId("unified-ai-history-archived")).toBeVisible();
+    // 内嵌对话首页显示能力目录；完整历史侧栏在独立AI页面验收。
+    await expect(unifiedAssistant.getByTestId("unified-ai-history")).toHaveCount(0);
+    await expect(unifiedAssistant.getByRole("button", { name: "完整AI助手" })).toBeVisible();
+    await expect(unifiedAssistant.getByTestId("ai-capability-directory")).toBeVisible();
     await unifiedAssistant.getByTestId("unified-ai-settings").click();
     const visibleSettings = page.locator(".ai-composer-settings-popper:visible");
     await expect(visibleSettings.getByTestId("unified-ai-model")).toBeVisible({ timeout: 30_000 });
     await expect(visibleSettings.getByTestId("unified-ai-mode")).toBeVisible();
     await expect(unifiedAssistant.getByTestId("unified-ai-input")).toBeVisible();
     await expect(unifiedAssistant.getByTestId("unified-ai-send")).toBeVisible();
-    await expect(unifiedAssistant.locator(".secure-scope-tag")).toBeVisible();
+    await expect(unifiedAssistant.getByTestId("ai-capability-data")).toBeVisible();
     const quickPrompts = unifiedAssistant.locator(".quick-prompts");
+    await expect(quickPrompts).toBeHidden();
     await expect(quickPrompts).toContainText("本月新增了多少张表单？");
     await expect(quickPrompts).toContainText("当前表单引擎建设情况？");
     await expect(quickPrompts).not.toContainText("安全数据分析1");

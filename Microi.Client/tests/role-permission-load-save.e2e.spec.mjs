@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 
 const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
@@ -29,7 +30,7 @@ async function login(page) {
         'input[placeholder*="user name" i]'
     ].join(", ")).first();
     await expect(accountInput).toBeVisible({ timeout: 30_000 });
-    await accountInput.fill("admin");
+    await accountInput.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(LOCAL_PASSWORD);
 
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
@@ -48,7 +49,7 @@ async function login(page) {
     await page.getByRole("button", { name: "登录", exact: true }).click();
     const result = await (await responsePromise).json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first())
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first())
         .toBeVisible({ timeout: 30_000 });
 }
 

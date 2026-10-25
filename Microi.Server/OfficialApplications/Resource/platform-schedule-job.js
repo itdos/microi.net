@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-schedule-job
- * Version: v1.1.1
+ * Version: v1.1.2
  * Function:
- * - 管理当前租户任务列表、运行态、保存、暂停、恢复和删除；兼容旧Job路由，表单保存先检查RuntimeOnly能力后只同步Quartz。
+ * - 旧Job保存从宿主保留的原请求读取业务接口Key，避免可信管理路由覆盖任务目标；保留租户管理员与RuntimeOnly能力检查。
  */
 
 // Microi官方接口引擎：platform-schedule-job
@@ -151,6 +151,17 @@ if (action === 'detail') {
 }
 
 if (action === 'save') {
+  var saveParam = param;
+  if (legacyAction === 'save') {
+    // ApiEngineKey 已由 HTTP 宿主固定为管理路由，不能再把它保存为任务目标。
+    // 仅旧 HTTP 兼容路由消费宿主快照；缺失目标必须失败，不能退回管理 Key。
+    if (typeof param._RequestApiEngineKey !== 'string' || !param._RequestApiEngineKey.trim()) {
+      return { Code: 0, Msg: 'ApiEngineKey不能为空，请在请求中指定任务调用的接口。' };
+    }
+    saveParam = JSON.parse(JSON.stringify(param));
+    saveParam.ApiEngineKey = param._RequestApiEngineKey.trim();
+    delete saveParam._RequestApiEngineKey;
+  }
   // 旧节点可能忽略新增参数；先确认能力，禁止回退到会重复写当前表的旧保存路径。
   if (param.RuntimeOnly === true) {
     var capability = V8.Method.ManageScheduleJob({ Action: 'Capabilities' });
@@ -158,7 +169,7 @@ if (action === 'save') {
       return { Code: 0, Msg: '当前平台后端不支持任务表单事务保存，请先更新平台后端，再更新SaaS引擎应用。' };
     }
   }
-  var saveResult = V8.Method.SaveScheduleJob(param);
+  var saveResult = V8.Method.SaveScheduleJob(saveParam);
   if (!saveResult || saveResult.Code !== 1 || !saveResult.Data) return saveResult;
   return {
     Code: saveResult.Code,

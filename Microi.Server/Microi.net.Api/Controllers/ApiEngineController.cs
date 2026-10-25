@@ -184,6 +184,14 @@ namespace Microi.net.Api
             catch (Exception ex) { }
             // HTTP 调用者不得伪造表单引擎内部可信调用标记。
             param.Remove("_TrustedServerInvocation");
+            // 保留请求中的业务目标，不能与随后由可信路由确定的执行 Key 混用。
+            // 同名宿主字段一律覆盖，客户端不能伪造它来选择执行路由。
+            var requestApiEngineKey = param["ApiEngineKey"]?.DeepClone();
+            param.Remove("_RequestApiEngineKey");
+            if (requestApiEngineKey != null)
+            {
+                param["_RequestApiEngineKey"] = requestApiEngineKey;
+            }
             // DynamicRoute resolved the concrete row before controller execution.
             // It is authoritative for this URL and must override any body value;
             // this also prevents duplicate historical ApiAddress rows from making

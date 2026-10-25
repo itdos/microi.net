@@ -68,7 +68,7 @@ test('SaaS 官方包包含 Managed 定时任务接口引擎', () => {
   const engine = packageData.SysApiEngines.find(item => item.ApiEngineKey === 'platform-schedule-job');
   assert.ok(engine);
   assert.equal(engine.ApiV8Code.replace(/\r\n/g, '\n').trim(), engineCode.replace(/\r\n/g, '\n'));
-  assert.equal(engine.Version, 'v1.1.1');
+  assert.equal(engine.Version, 'v1.1.2');
   assert.equal(engine.ApiRoutes, legacyRoutes.join(';'));
   assert.deepEqual(packageData.ResourcePolicies.ApiEngines['platform-schedule-job'], {
     Ownership: 'Platform',
@@ -93,12 +93,14 @@ test('七条旧 Job 路由按可信请求路径映射动作且请求体不能改
       Action: 'Delete',
       Id: 'compat-id',
       JobName: 'CompatJob',
-      ApiEngineKey: 'platform-service-health',
+      ApiEngineKey: 'platform-schedule-job',
+      _RequestApiEngineKey: 'platform-service-health',
       CronExpression: '0 0 0 1 1 ? 2099'
     });
     assert.equal(result.Code, 1, requestPath);
     if (expected === 'list' || expected === 'detail' || expected === 'save') {
       assert.ok(calls.some(item => item.type === expected), `${requestPath} 应执行 ${expected}`);
+      if (expected === 'save') assert.equal(calls.find(item => item.type === 'save').request.ApiEngineKey, 'platform-service-health');
     } else {
       assert.ok(calls.some(item => item.type === 'manage' && item.request.Action === expected), `${requestPath} 应执行 ${expected}`);
     }
@@ -131,6 +133,30 @@ test('旧 Job 路由兼容路径租户后缀、拒绝非 POST，规范入口动�
     JobName: 'CompatJob'
   });
   assert.ok(canonicalResult.calls.some(item => item.type === 'manage' && item.request.Action === 'Pause'));
+});
+
+test('旧 HTTP 保存只消费原请求目标，缺失或空目标不能保存管理接口自身', () => {
+  for (const target of [undefined, null, '', ' ', {}, []]) {
+    const { calls, result } = runEngine({
+      _RequestPath: '/api/Job/UpdateJob', _HttpMethod: 'POST',
+      ApiEngineKey: 'platform-schedule-job', _RequestApiEngineKey: target,
+      JobName: 'CompatJob', CronExpression: '0 0 0 1 1 ? 2099'
+    });
+    assert.equal(result.Code, 0);
+    assert.equal(calls.filter(item => item.type === 'save').length, 0);
+  }
+  const param = {
+    _RequestPath: '/api/Job/AddJob', _HttpMethod: 'POST', ApiEngineKey: 'platform-schedule-job',
+    _RequestApiEngineKey: 'platform-service-health', JobName: 'CompatJob',
+    CronExpression: '0 0 0 1 1 ? 2099'
+  };
+  const result = runEngine(param);
+  assert.equal(result.result.Code, 1);
+  assert.equal(result.calls.find(item => item.type === 'save').request.ApiEngineKey, 'platform-service-health');
+  assert.equal(param.ApiEngineKey, 'platform-schedule-job');
+  assert.equal(result.calls.find(item => item.type === 'save').request._RequestApiEngineKey, undefined);
+  const direct = runEngine({ Action: 'Save', ApiEngineKey: 'business-engine', _RequestApiEngineKey: 'ignored' });
+  assert.equal(direct.calls.find(item => item.type === 'save').request.ApiEngineKey, 'business-engine');
 });
 
 test('diy_schedule_job 通过调度原子保留业务接口Key且不回调 HTTP', () => {

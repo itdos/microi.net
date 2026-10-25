@@ -1,12 +1,13 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from '@playwright/test';
 import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const FRONTEND = process.env.PW_BASE_URL || 'http://localhost:61500';
-const API_BASE = process.env.PW_API_BASE || 'https://localhost:61501';
-const OS_CLIENT = process.env.PW_OS_CLIENT || 'iTdos';
-const ACCOUNT = process.env.PW_TEST_ACCOUNT || 'admin';
+const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || 'http://localhost:61500';
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || 'https://localhost:61501';
+const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || '';
+const ACCOUNT = process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || 'admin';
 const BROWSER_CHANNEL = process.env.PW_BROWSER_CHANNEL || '';
 const TARGET_IMAGE = process.env.PW_VISION_TARGET_IMAGE || '';
 const RESULT_DIR = path.resolve(process.cwd(), '../.tmp/screenshots/vision');
@@ -22,7 +23,7 @@ test.describe.configure({ mode: 'serial' });
 test.setTimeout(240_000);
 
 async function testCredential() {
-  if (process.env.PW_TEST_PASSWORD) return { account: ACCOUNT, password: process.env.PW_TEST_PASSWORD };
+  if (process.env.PW_TEST_PASSWORD || process.env.MICROI_TEST_PASSWORD) return { account: ACCOUNT, password: process.env.PW_TEST_PASSWORD || process.env.MICROI_TEST_PASSWORD };
   const source = await fs.readFile(CREDENTIAL_FILE, 'utf8');
   const lines = source.split(/\r?\n/);
   let hostname = '';
@@ -41,6 +42,7 @@ async function testCredential() {
 }
 
 function tenantUrl(hash = '') {
+  expect(OS_CLIENT, 'An explicit test tenant is required').not.toBe('');
   const query = new URLSearchParams({ OsClient: OS_CLIENT, ApiBase: API_BASE });
   return `${FRONTEND}/?${query.toString()}${hash}`;
 }
@@ -84,7 +86,20 @@ async function loginThroughUi(page) {
     || result.DataAppend?.Token || result.Data?.Token || '';
   const token = String(rawAuthorization).replace(/^Bearer\s+/i, '');
   expect(token, '登录响应必须返回 DiyToken').not.toBe('');
-  await expect(page.getByRole('button', { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+  const identityName = getLoginIdentityName(result);
+  if ((page.viewportSize()?.width || 1920) < 768) {
+    // 手机布局隐藏桌面用户名按钮；仍核对本次登录的精确身份与已登录导航。
+    const user = result.Data?.CurrentUser || result.Data?.User || result.Data;
+    expect(user.Id, 'Login identity must include its immutable user Id').toBeTruthy();
+    await expect.poll(() => page.evaluate(async () => {
+      const { useDiyStore } = await import('/src/pinia/modules/diy.js');
+      const current = useDiyStore().GetCurrentUser;
+      return { Id: current?.Id, Name: current?.Name || current?.Account };
+    }), { timeout: 30_000 }).toEqual({ Id: user.Id, Name: identityName });
+    await expect(page.getByRole('button', { name: '我的', exact: true })).toBeVisible();
+  } else {
+    await expect(page.getByRole('button', { name: identityName, exact: true }).first()).toBeVisible({ timeout: 30_000 });
+  }
   return token;
 }
 

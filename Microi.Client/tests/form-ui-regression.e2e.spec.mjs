@@ -1,7 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, request as playwrightRequest } from "@playwright/test";
 import fs from "node:fs/promises";
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { prepareFormUiFixture, cleanupFormUiFixtures } from "./helpers/form-ui-fixture.mjs";
+import { isFormMaskBlurEnabled } from "../src/utils/form-mask-blur.js";
+import { buildUiDensityVariables } from "../src/utils/ui-density.js";
 
 const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
 const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
@@ -26,6 +30,30 @@ test.use({
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
+const ownedUiFixtures = [];
+let designerFixture, employeeFixture, contactFixture, apiFixtureRecordId, fixtureRequest;
+test.beforeAll(async () => {
+    if (!LOCAL_PASSWORD) return; // The standalone source contract does not require live tenant fixtures.
+    fixtureRequest = await playwrightRequest.newContext({ ignoreHTTPSErrors: true });
+    const options = { apiBase: API_BASE, osClient: OS_CLIENT,
+        account: process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin", password: LOCAL_PASSWORD };
+    for (const kind of ["designer", "employee", "contact"]) {
+        const fixture = await prepareFormUiFixture(fixtureRequest, options, kind);
+        ownedUiFixtures.push(fixture);
+    }
+    [designerFixture, employeeFixture, contactFixture] = ownedUiFixtures;
+    const engines = await contactFixture.call("FormEngine/GetTableData", {
+        FormEngineKey: "sys_apiengine", _SelectFields: ["Id", "ApiV8Code"], _PageSize: 20,
+        _Where: [["ApiV8Code", "<>", null]]
+    });
+    apiFixtureRecordId = engines.find(row => String(row.ApiV8Code || "").length > 20)?.Id;
+    expect(apiFixtureRecordId, "An authorized existing API record with printable V8 source is required").toBeTruthy();
+});
+test.afterAll(async () => {
+    try { await cleanupFormUiFixtures(ownedUiFixtures); }
+    finally { await fixtureRequest?.dispose(); }
+});
+
 function tenantUrl(osClient, apiBase = API_BASE) {
     expect(osClient, "PW_OS_CLIENT or MICROI_TEST_OSCLIENT is required").not.toBe("");
     const query = new URLSearchParams({ OsClient: osClient });
@@ -43,7 +71,7 @@ async function login(page, { osClient, password, apiBase = API_BASE }) {
         'input[placeholder*="user name" i]'
     ].join(", ")).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(password);
 
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();
@@ -63,7 +91,7 @@ async function login(page, { osClient, password, apiBase = API_BASE }) {
     const response = await responsePromise;
     const result = await response.json();
     expect(Number(result.Code), result.Msg || "UI login failed").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 async function openTenantRoute(page, tenant, hash) {
@@ -375,13 +403,14 @@ test("本地接口引擎表单：字段说明以紧凑灰字直显，不再使�
 
 test("本地员工表单：日期与普通文本输入等高", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
-    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/diy-employee");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, `#${employeeFixture.route}`);
     const firstRow = page.locator(".el-table__body-wrapper tbody tr").first();
     await expect(firstRow).toBeVisible({ timeout: 45_000 });
     await firstRow.dblclick();
 
     const overlay = page.locator(".diy-form-container.el-dialog, .diy-form-container.el-drawer").last();
     await expect(overlay).toBeVisible({ timeout: 30_000 });
+    await overlay.getByRole("button", { name: /^(?:编辑|Edit)$/i }).click();
     const form = overlay.locator(".itdos-diy-form:visible").first();
     await expect(form).toBeVisible();
 
@@ -448,6 +477,8 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
             description: description?.textContent?.trim() || "",
             buttonCount: buttons.length,
             buttonHeights: buttons.map((element) => element.getBoundingClientRect().height),
+            densityScale: Number(getComputedStyle(document.documentElement).getPropertyValue("--mci-ui-scale")),
+            controlHeight: Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--mci-ui-control-height")),
             primaryContrast: primaryStyle ? contrast(primaryStyle.color, primaryStyle.backgroundColor) : 0
         };
     });
@@ -456,7 +487,14 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
     expect(headerGeometry.iconClass, JSON.stringify(headerGeometry)).not.toBe("");
     expect(headerGeometry.description).toContain("原有字段事件、表单事件与权限规则保持不变");
     expect(headerGeometry.buttonCount).toBeGreaterThan(0);
-    expect(Math.min(...headerGeometry.buttonHeights), JSON.stringify(headerGeometry)).toBeGreaterThanOrEqual(39);
+    expect(buildUiDensityVariables(100)["--mci-ui-control-height"]).toBe("28px");
+    expect([0.9, 0.95, 1, 1.05, 1.1]).toContain(headerGeometry.densityScale);
+    expect(Number.isFinite(headerGeometry.controlHeight)).toBe(true);
+    expect(headerGeometry.controlHeight).toBeGreaterThan(0);
+    expect(headerGeometry.controlHeight).toBe(Number.parseFloat(buildUiDensityVariables(headerGeometry.densityScale * 100)["--mci-ui-control-height"]));
+    for (const height of headerGeometry.buttonHeights) {
+        expect(Math.abs(height - headerGeometry.controlHeight), JSON.stringify(headerGeometry)).toBeLessThanOrEqual(1);
+    }
     expect(headerGeometry.primaryContrast, JSON.stringify(headerGeometry)).toBeGreaterThanOrEqual(4.5);
 
     const activeSection = page.locator(".diy-form-section-nav__item.active").first();
@@ -565,7 +603,7 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
     else await page.keyboard.press("Escape");
     await expect(modernForm).toBeHidden({ timeout: 15_000 });
 
-    const apiRecordId = "01M0E5HKF6E2XQ32P8X1QMH4X5";
+    const apiRecordId = apiFixtureRecordId;
     await page.goto(`${tenantUrl(OS_CLIENT)}#/api-engine?RecordId=${apiRecordId}`, { waitUntil: "domcontentloaded" });
     const apiWorkbench = page.locator(".module-form-workbench:visible").last();
     await expect(apiWorkbench).toBeVisible({ timeout: 45_000 });
@@ -577,7 +615,7 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
     await expectRecordSearch(apiHeader);
     const apiSignature = await readPresentationVisualSignature(apiWorkbench);
     expect(apiSignature).toEqual(directSignature);
-    await expect(apiWorkbench.locator(".diy-form-dialog-title__heading")).not.toContainText(/^记录\s+01M0E5HK/i, {
+    await expect(apiWorkbench.locator(".diy-form-dialog-title__heading")).not.toContainText(new RegExp(`^记录\\s+${apiRecordId.slice(0, 8)}`, "i"), {
         timeout: 15_000
     });
     await expect.poll(() => page.evaluate(() => (
@@ -677,7 +715,7 @@ test("记录工作台：合并头部、表格弹层同构、跨模块通用、�
 test("联系人弹层：单分组满宽、紧凑记录工具、原地切换与通用打印", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
-    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/contact");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, `#${contactFixture.route}`);
 
     const table = page.locator(".el-table__body-wrapper").first();
     const firstRow = table.locator("tbody tr").first();
@@ -917,13 +955,14 @@ test("本地员工详情：通用搜索工具栏与日期、单选对齐", async
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
     await fs.mkdir(SCREENSHOT_DIR, { recursive: true });
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, "#/diy-employee");
+    await openTenantRoute(page, { osClient: OS_CLIENT, password: LOCAL_PASSWORD }, `#${employeeFixture.route}`);
     const firstRow = page.locator(".el-table__body-wrapper tbody tr").first();
     await expect(firstRow).toBeVisible({ timeout: 45_000 });
     await firstRow.dblclick();
 
     const overlay = page.locator(".diy-form-container.el-dialog, .diy-form-container.el-drawer").last();
     await expect(overlay).toBeVisible({ timeout: 30_000 });
+    await overlay.getByRole("button", { name: /^(?:编辑|Edit)$/i }).click();
     const mask = page.locator(".diy-form-modern-overlay.mci-unified-overlay:visible").last();
     await expect(mask).toBeVisible();
     const maskStyle = await mask.evaluate((element) => ({
@@ -931,9 +970,22 @@ test("本地员工详情：通用搜索工具栏与日期、单选对齐", async
         filter: getComputedStyle(element).backdropFilter || getComputedStyle(element).webkitBackdropFilter,
         background: getComputedStyle(element).backgroundColor
     }));
-    expect(maskStyle.classes).not.toContain("--plain");
-    expect(maskStyle.filter, JSON.stringify(maskStyle)).toMatch(/blur\(/i);
-    expect(maskStyle.filter).not.toBe("none");
+    const maskConfig = await page.evaluate(() => {
+        const proxy = window.__VUE_APP__?._instance?.proxy;
+        const piniaState = proxy?.$pinia?.state?.value || {};
+        const state = proxy?.diyStore?.$state || piniaState.DiyStore || piniaState.diy;
+        if (!state?.SysConfig) throw new Error("The active UI SysConfig is required for mask verification.");
+        return { FormMaskBlur: state.SysConfig.FormMaskBlur, DisableFormMaskBlur: state.SysConfig.DisableFormMaskBlur };
+    });
+    if (isFormMaskBlurEnabled(maskConfig)) {
+        expect(maskStyle.classes).not.toContain("--plain");
+        expect(maskStyle.filter, JSON.stringify(maskStyle)).toMatch(/blur\(/i);
+        expect(maskStyle.filter).not.toBe("none");
+    } else {
+        expect(maskStyle.classes).toContain("diy-form-modern-overlay--plain");
+        expect(maskStyle.classes).toContain("mci-unified-overlay--plain");
+        expect(maskStyle.filter, JSON.stringify(maskStyle)).toBe("none");
+    }
     const leftTabs = overlay.locator(".field-form-tabs.mci-tabs.el-tabs--left").first();
     await expect(leftTabs).toBeVisible();
     const leftTabStyle = await leftTabs.locator(".el-tabs__item.is-active").first().evaluate((element) => {
@@ -951,7 +1003,7 @@ test("本地员工详情：通用搜索工具栏与日期、单选对齐", async
     expect(leftTabStyle.markerRadius).toBeGreaterThan(0);
     expect(["transparent", "rgba(0, 0, 0, 0)"]).not.toContain(leftTabStyle.activeBackground);
     expect(["transparent", "rgba(0, 0, 0, 0)"]).not.toContain(leftTabStyle.navBackground);
-    const toolbar = overlay.locator(".diy-form-field-search-toolbar");
+    const toolbar = overlay.locator(".diy-form-header-search:visible");
     await expect(toolbar).toBeVisible();
     const birthField = overlay.locator(".el-form-item").filter({ hasText: /出生日期|Date of birth/i }).first();
     const regularField = overlay.locator(".el-form-item").filter({ hasText: /是否转正|Changed/i }).first();
@@ -959,8 +1011,8 @@ test("本地员工详情：通用搜索工具栏与日期、单选对齐", async
     await expect(regularField).toBeVisible();
     const searchKeyword = (await birthField.locator(".el-form-item__label").innerText()).trim();
     await toolbar.locator("input").fill(searchKeyword);
-    await expect(toolbar.locator(".diy-form-field-search-count")).toContainText("项匹配");
-    await expect(toolbar.locator(".diy-form-field-search-count")).not.toContainText(/^0\s*项匹配$/);
+    await expect(toolbar.locator(".diy-form-field-search-count")).toHaveText(/^\d+\s*项$/);
+    await expect(toolbar.locator(".diy-form-field-search-count")).not.toHaveText(/^0\s*项$/);
     await toolbar.locator("input").clear();
     await expect(birthField).toBeVisible();
 
@@ -1066,13 +1118,15 @@ test("指定表单设计器：单行文本、Tabs276 与 FileUpload20 拖动后�
     await openTenantRoute(
         page,
         { osClient: OS_CLIENT, password: LOCAL_PASSWORD },
-        "#/diy/diy-design/4232ebac-abb7-4981-b0de-a8bdad5dc53a?PageType="
+        `#/diy/diy-design/${designerFixture.tableId}?PageType=`
     );
 
     const checkDialog = async (fieldName, revealTabName = "") => {
         const field = await chooseDesignerField(page, fieldName);
         if (revealTabName) {
-            await page.getByRole("tab", { name: revealTabName, exact: false }).last().click();
+            const tab = page.getByRole("tab", { name: revealTabName, exact: false }).last();
+            await expect(tab).toBeVisible({ timeout: 15_000 });
+            await tab.click({ timeout: 15_000 });
         }
         await expect(field, `designer field ${fieldName}`).toBeVisible({ timeout: 45_000 });
         await field.scrollIntoViewIfNeeded();
@@ -1166,7 +1220,7 @@ test("指定表单设计器：单行文本、Tabs276 与 FileUpload20 拖动后�
 
 test("指定表单设计器：Autocomplete43 值变更事件保存后刷新仍可回读", async ({ page }) => {
     test.skip(!LOCAL_PASSWORD, "PW_LOCAL_PASSWORD is required");
-    const routeHash = "#/diy/diy-design/4232ebac-abb7-4981-b0de-a8bdad5dc53a?PageType=";
+    const routeHash = `#/diy/diy-design/${designerFixture.tableId}?PageType=`;
     const sentinel = `// E2E field V8 round-trip ${Date.now()}\nV8.Form.Autocomplete43Verified = V8.ThisValue;`;
     let originalCode = "";
     let sentinelSaved = false;
@@ -1174,7 +1228,7 @@ test("指定表单设计器：Autocomplete43 值变更事件保存后刷新仍�
     const isTargetFieldListResponse = (response) => {
         if (!/\/api\/FormEngine\/GetDiyFieldList(?:\?|$)/i.test(response.url())) return false;
         try {
-            return response.request().postDataJSON()?.TableId === "4232ebac-abb7-4981-b0de-a8bdad5dc53a";
+            return response.request().postDataJSON()?.TableId === designerFixture.tableId;
         } catch (error) {
             return false;
         }
@@ -1234,14 +1288,12 @@ test("指定表单设计器：Autocomplete43 值变更事件保存后刷新仍�
         expect(Number(result.Code), result.Msg || "UptDiyFieldList failed").toBe(1);
     };
     const reloadAndReadEditor = async () => {
-        // Parse the body as soon as the response completes. Chromium may release
-        // the DevTools response resource immediately after a full navigation.
-        const resultPromise = page
-            .waitForResponse(isTargetFieldListResponse, { timeout: 45_000 })
-            .then((response) => response.json());
+        // Save also refreshes the field list. Its in-flight response belongs to
+        // the old document, so verify persistence independently after reload.
         await page.reload({ waitUntil: "domcontentloaded" });
-        const result = await resultPromise;
-        const field = result.Data.find((item) => item.Name === "Autocomplete43");
+        await expect(page.getByTestId("designer-field-search").first()).toBeVisible({ timeout: 45_000 });
+        const fields = await designerFixture.call("FormEngine/GetDiyFieldList", { TableId: designerFixture.tableId });
+        const field = fields.find((item) => item.Name === "Autocomplete43");
         expect(field, "Autocomplete43 backend readback").toBeTruthy();
         const config = typeof field.Config === "string" ? JSON.parse(field.Config || "{}") : (field.Config || {});
         await selectField();
@@ -1345,7 +1397,7 @@ test("平台通用 Dialog：代码编辑器具备统一标题、圆角与拖动�
     await openTenantRoute(
         page,
         { osClient: OS_CLIENT, password: LOCAL_PASSWORD },
-        "#/diy/diy-design/4232ebac-abb7-4981-b0de-a8bdad5dc53a?PageType="
+        `#/diy/diy-design/${designerFixture.tableId}?PageType=`
     );
     await chooseDesignerField(page, "Autocomplete43");
     const eventItem = page.locator(".el-form-item").filter({ hasText: "值变更V8事件" }).last();
@@ -1402,7 +1454,7 @@ test("指定表单设计器：复制字段发送完整且字符串化的新增�
     await openTenantRoute(
         page,
         { osClient: OS_CLIENT, password: LOCAL_PASSWORD },
-        "#/diy/diy-design/4232ebac-abb7-4981-b0de-a8bdad5dc53a?PageType="
+        `#/diy/diy-design/${designerFixture.tableId}?PageType=`
     );
 
     const field = page.locator(".field-drag-handle").filter({ visible: true }).first();
@@ -1413,7 +1465,7 @@ test("指定表单设计器：复制字段发送完整且字符串化的新增�
     await duplicate.click();
     await expect.poll(() => capturedPayload, { timeout: 15_000 }).not.toBeNull();
 
-    expect(capturedPayload.TableId).toBe("4232ebac-abb7-4981-b0de-a8bdad5dc53a");
+    expect(capturedPayload.TableId).toBe(designerFixture.tableId);
     expect(capturedPayload.Id).toBeUndefined();
     expect(capturedPayload.Name).toMatch(/_Copy\d*$/);
     expect(typeof capturedPayload.Config).toBe("string");

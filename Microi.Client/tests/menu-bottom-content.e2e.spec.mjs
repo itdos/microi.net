@@ -5,7 +5,7 @@ import path from "node:path";
 const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
 const FRONTEND = process.env.PW_BASE_URL || process.env.MICROI_TEST_FRONTEND_BASE || process.env.PW_MENU_BOTTOM_WEB_BASE || "http://localhost:61500";
 const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || process.env.PW_MENU_BOTTOM_API_BASE || "https://localhost:61501";
-const PASSWORD = process.env.PW_MENU_BOTTOM_PASSWORD || "";
+const PASSWORD = process.env.PW_MENU_BOTTOM_PASSWORD || process.env.PW_TEST_PASSWORD || process.env.MICROI_TEST_PASSWORD || "";
 const BROWSER_CHANNEL = process.env.PW_MENU_BOTTOM_BROWSER_CHANNEL || "";
 const SCREENSHOT_DIR = path.resolve(
     process.cwd(),
@@ -44,7 +44,7 @@ async function loginThroughUi(page) {
         'input[placeholder*="user name" i]'
     ].join(", ")).first();
     await expect(account).toBeVisible({ timeout: 30_000 });
-    await account.fill("admin");
+    await account.fill(process.env.PW_TEST_ACCOUNT || process.env.MICROI_TEST_ACCOUNT || "admin");
     await page.locator('input[type="password"]').first().fill(PASSWORD);
 
     const privacy = page.locator(".privacy-policy-wrapper .el-checkbox").first();

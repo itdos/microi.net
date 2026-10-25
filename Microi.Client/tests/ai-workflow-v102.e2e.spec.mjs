@@ -1,13 +1,15 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 const FRONTEND = process.env.PW_BASE_URL || "http://localhost:61500";
+const API_BASE = process.env.PW_API_BASE || process.env.MICROI_TEST_API_BASE || "https://localhost:61501";
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || "";
 const PASSWORD = process.env.PW_TEST_PASSWORD || "";
 const OS_CLIENT = process.env.PW_OS_CLIENT || "iTdos";
 const STANDALONE = process.env.PW_AI_WORKFLOW_STANDALONE === "1";
-const TENANT_URL = `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}`;
+const TENANT_URL = `${FRONTEND}/?OsClient=${encodeURIComponent(OS_CLIENT)}&ApiBase=${encodeURIComponent(API_BASE)}`;
 const ROUTE_PREFIX = STANDALONE ? "" : "/micro-app/microi-ai-workflow";
 const ARTIFACT_DIR = path.resolve(process.cwd(), process.env.PW_SCREENSHOT_DIR || "../.tmp/ai-workflow-v103-acceptance");
 
@@ -49,7 +51,7 @@ async function login(page) {
     const rawAuthorization = response.headers().authorization
         || result.DataAppend?.Token || result.Data?.Token || "";
     expect(String(rawAuthorization).replace(/^Bearer\s+/i, ""), "登录响应必须返回 DiyToken").not.toBe("");
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: getLoginIdentityName(result), exact: true }).first()).toBeVisible({ timeout: 30_000 });
     await page.evaluate(targetHash => { window.location.hash = targetHash; }, `#${ROUTE_PREFIX}/relationship`);
     await expect(page.getByTestId("ai-workflow-relationship-studio")).toBeVisible({ timeout: 45_000 });
 }

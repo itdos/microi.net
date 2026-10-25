@@ -1,3 +1,4 @@
+import { getLoginIdentityName } from "./helpers/login-identity.mjs";
 import { expect, test } from "@playwright/test";
 
 const OS_CLIENT = process.env.PW_OS_CLIENT || process.env.MICROI_TEST_OSCLIENT || "";
@@ -44,7 +45,7 @@ async function login(page) {
     await page.getByRole("button", { name: "登录", exact: true }).click();
     const payload = await (await responsePromise).json();
     expect(Number(payload.Code), payload.Msg || "真实 UI 登录失败").toBe(1);
-    await expect(page.getByRole("button", { name: /管理员|admin/i }).first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByRole("button", { name: getLoginIdentityName(payload), exact: true }).first()).toBeVisible({ timeout: 45_000 });
 }
 
 async function readSafeSessionState(page) {
