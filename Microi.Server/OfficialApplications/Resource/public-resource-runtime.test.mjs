@@ -21,6 +21,20 @@ test('public selector never forwards URL signatures, traversal encoding or crede
   run('mci-file-resource-public-url', { FilePathName: 'tenant/micro-app/app/index.html', Ready: true }, method);
   assert.deepEqual(Object.keys(calls[0]), ['FilePathName']);
 });
+test('real MCP and HTTP host fields do not block management or become trusted business input', () => {
+  const calls=[], method={ManagePublicResourceOffload:p=>{calls.push(JSON.parse(JSON.stringify(p)));return {Code:1}}};
+  const actor={ClientKey:'host-user',ActorKey:'host-user',UserId:'host-user',UserName:'host-name',_CurrentUser:{Id:'ignored-host-user',Level:99999},TestParam1:'legacy-placeholder'};
+  const http={_DeviceId:'MCP:fixture',_RequestApiEngineKey:'other',_RouteValues:{SourceTenant:'wrong'},_HttpMethod:'POST',_RequestPath:'/apiengine/mci-file-resource-runtime',_RequestScheme:'https',_RequestHost:'api.itdos.com',_RequestPathBase:'',_RawBody:'{"Ready":true}',_ContentType:'application/json'};
+  for(const host of [actor,{...actor,...http}]){
+    assert.equal(run('mci-file-resource-runtime',{Action:'PinHistoricalHotspot',SourceTenant:'tenant',AppKey:'app',OsClient:'iTdos',ApiEngineKey:'mci-file-resource-runtime',_InvokeType:'Server',...host},method).Code,1);
+    assert.deepEqual(calls.at(-1),{Action:'PinHistoricalHotspot',SourceTenant:'tenant',AppKey:'app'});
+  }
+  const rejected=run('mci-file-resource-runtime',{Action:'Prepare',SourceTenant:'tenant',AppKey:'app',...actor,Ready:true},method);
+  assert.equal(rejected.Code,0);assert.deepEqual(Array.from(rejected.Data.RejectedArgumentNames),['Ready']);
+  assert.equal(calls.length,2);
+  for(const TestParam1 of [{Ready:true},'x'.repeat(201)]) assert.equal(run('mci-file-resource-runtime',{Action:'Prepare',TestParam1},method).Code,0);
+  assert.equal(calls.length,2);
+});
 test('runtime belongs to monitoring package, with anonymous reads separate from administrator writes', () => {
   const input = JSON.parse(fs.readFileSync(new URL('system-observability-package-source.json', import.meta.url), 'utf8'));
   const projected = configurePublicResourceRuntime(input);

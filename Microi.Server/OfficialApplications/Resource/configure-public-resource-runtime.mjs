@@ -14,7 +14,7 @@ export function configurePublicResourceRuntime(input) {
     const prior = index >= 0 ? pkg.SysApiEngines[index] : null;
     const engine = { Id: prior?.Id || crypto.createHash('sha256').update('public-resource-offload/2|' + key).digest('hex').slice(0, 32),
       ApiEngineKey: key, ApiName: anonymous ? '公开热点下载地址选择' : '热点公开资源采集复制与分流', ApiAddress: '/apiengine/' + key,
-      ApiV8Code: code, Version: 'v1.0.0', IsEnable: 1, StopHttp: 0, AllowAnonymous: anonymous ? 1 : 0,
+      ApiV8Code: code, Version: code.match(/Version:\s*(v\d+\.\d+\.\d+)/)?.[1] || 'v1.0.0', IsEnable: 1, StopHttp: 0, AllowAnonymous: anonymous ? 1 : 0,
       V8Unlimited: 1, V8Limit: 0, EnableLog: 0, IsDeleted: 0, ResponseType: 'JSON', Category: '系统日志/监控/CDN', ApiRole: '[]',
       Lock: 0, Timeout: anonymous ? 15 : 60, LimitRecursion: 200, LimitMemory: 128, MaxStatements: 5000000 };
     if (index >= 0) pkg.SysApiEngines[index] = engine; else pkg.SysApiEngines.push(engine);
