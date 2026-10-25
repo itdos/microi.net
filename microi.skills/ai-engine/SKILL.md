@@ -86,6 +86,9 @@ MCP 可信写前校验分支确认未执行时标记 `notExecuted`，保留安�
 
 ## 代码分层
 
+- OpenAI 兼容代理按完整 SSE 事件判断模型终态；只在全部请求候选都有显式已知 `finish_reason`、有文本/工具调用载荷且无错误时，给正常 EOF 补单个 `[DONE]`。已有终止帧即为传输边界，忽略其后数据；纯 EOF、取消、空答案、错误和冲突终态不能变成功。`length/content_filter` 保留原值，传输结束不等于业务答案完整；原有计量来源与记录继续生效。正常及错误 body 读取须传取消信号，并沿用代理总超时。需部署包含该修复的新 AI 后端，不能以商城/MCP 更新冒充上线。
+- 固定 JSON 基准须显式记录思考设置。`microi.benchmarks/ai-quality` 协议 1.1.0 对 MiniMax-M3 的两个条件同样固定 `reasoning_split:true`、`thinking:{type:'disabled'}`；其它模型不发送未经确认的参数。保留 1.0.0 失败结果；不剥离任意回答或取消终止帧验收来制造通过，不把不同思考配置比较成效率收益。供应商能力以官方文档和当前实际回执为准。
+
 AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.Api` 只是 HTTP、SSE 与 SignalR 传输层，可以做路由、请求绑定、读取认证中间件产生的可信用户/租户、传递取消信号和写响应，但不能承载模型选择、Schema/Skill 检索、NL2SQL 授权与执行、提示词编排、代理路由、供应商密钥、额度计量、订阅支付状态或 AI 工作流。
 
 - Controller、Hub 只调用 `IMicroiAI`、`AiProxyService`、`SubscriptionService`、`AiWorkflowService` 等 `Microi.AI` 门面，不直接查询 `mic_ai` / `mic_sub_order`，不接触上游密钥和向量基础设施。

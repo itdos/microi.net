@@ -101,6 +101,10 @@ MCP 可用 `microi_run_engine` 调用同一动作。返回包含 `AccountExists`
 
 ### 参数与安全规则
 
+OpenAI 兼容中转的 SSE 需区分模型终态与传输终止：上游明确返回各候选的 `finish_reason`、存在文本或工具调用载荷且没有错误时，若其正常关闭却缺少 `[DONE]`，代理补齐一个终止帧。已有终止帧不重复发送；纯 EOF、空结果、错误、取消与终态冲突均不能补成成功。`length/content_filter` 原值保留，仍属于截断/过滤，客户端不能因收到 `[DONE]` 就按正常答案保存。正常与错误响应体的读取都接收请求取消，并受既有代理超时约束；取消不能撤销供应商已发生的用量。这一修复需要部署包含该实现的新后端，应用包或 MCP 更新不能替换运行二进制。
+
+固定 JSON 实测需显式记录模型思考设置。`MiniMax-M3` 的公开复核工具协议 `1.1.0` 固定两组 `reasoning_split:true` 与 `thinking:{type:'disabled'}`，避免默认推理文本混入答案及占满同一输出预算；其它模型不照搬其专属参数。按[供应商文档](https://platform.minimax.io/docs/api-reference/text-openai-api)选择参数，不靠删除任意回答内容通过 JSON 校验。旧协议的失败回执保留，新旧设置不能当作同一实验或宣称效率提升。
+
 - `Chat` 和 `ChatStream` 同时声明了 GET/POST，但业务代码默认使用 POST。问题、系统提示、附件和会话信息不应放进 URL、代理日志或浏览器历史。
 - 常用请求字段为 `UserChatMsg`、`AiModel`、`AiModelId`、`RelayModel`、`ConversationId`、`Mode`、`ReasoningEffort` 和 `Attachments`。模型 Endpoint 与供应商 ApiKey 由服务端读取；Controller 和 `V8.AI` 会清除客户端提交的 `ApiKey/Endpoint`。HTTP 来源由 Controller 归一为 `http-ai`，后端 V8 来源固定为 `v8-ai`；不能通过伪造 `Source=ai-intent-router` 绕过中转计量。
 - 当前用户、用户名称和 `OsClient` 以服务端 Token 恢复结果为准。客户端提交同名字段不能切换租户或冒充用户。

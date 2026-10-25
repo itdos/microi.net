@@ -1,5 +1,5 @@
 // Synthetic tasks only. No tenant data or executable model output.
-export const protocolVersion = '1.0.0';
+export const protocolVersion = '1.1.0';
 export const platformContext = `Microi 开发事实：FormEngine._Where 使用条件数组并参数化查询；用户和租户由可信宿主身份确定，不能采用请求体用户或租户。接口引擎返回 Code=1 自动提交，非1回滚，不手动提交。客户端校验不能代替服务端校验。普通业务复用表单/接口引擎，应用资源通过应用商城升级。`;
 export const cases = [
   {

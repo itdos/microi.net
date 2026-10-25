@@ -1,5 +1,10 @@
 name: 公开证据工具离线回归
 on:
+  push:
+    branches: [master]
+    paths:
+      - 'microi.benchmarks/**'
+      - '.github/workflows/public-evidence.yml'
   workflow_dispatch:
   pull_request:
     paths:
