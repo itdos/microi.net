@@ -1270,6 +1270,11 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
             print_info "已在冻结候选前同步后端 Docker 构建配方。"
         fi
     fi
+    # 干净 worktree 没有被忽略的 dist；只恢复已嵌入且与当前源码清单一致的内置平台服务产物。
+    # 必须先于候选冻结和测试，不能拷贝其它工作区的旧 dist 或在验收后改写候选。
+    if ! run_release_command node Microi.Server/OfficialApplications/Resource/prepare-platform-service-dist.mjs; then
+        print_fail "内置平台服务产物与当前源码不一致；请完成其构建及内嵌更新后重新发布。"
+    fi
     print_phase "发布前 ${MICROI_RELEASE_TEST_POLICY} 自动化测试（失败即停止）"
     MICROI_RELEASE_CANDIDATE="$MICROI_RELEASE_GATE_DIR/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
     if is_windows_shell; then MICROI_RELEASE_CANDIDATE=$(cygpath -m "$MICROI_RELEASE_CANDIDATE"); fi
