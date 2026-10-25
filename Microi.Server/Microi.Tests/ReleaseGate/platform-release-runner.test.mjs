@@ -26,6 +26,18 @@ function runFixture(kind, mode = 'PlatformRelease', inheritedEnvironment = {}, a
     fs.writeFileSync(path.join(root, 'Microi.Agent/scripts/test-vsix-package.test.cjs'), '');
     fs.writeFileSync(path.join(root, 'Microi.Client/tests/file-cabinet-office.spec.mjs'), '');
     fs.writeFileSync(path.join(root, 'candidate.json'), '{}');
+    if (kind === 'partial-v8') {
+      // 只有平台短信等局部引擎；六业务应用没有被拉取或选入当前发行。
+      fs.mkdirSync(path.join(root, 'Microi-V8-Engine'));
+      fs.mkdirSync(path.join(fixtureTests, 'V8'));
+      fs.writeFileSync(path.join(fixtureTests, 'V8/empty-database-sanitization.test.mjs'), '');
+      const sourceRoot = 'Microi.Server/OfficialApplications/PlatformService';
+      fs.mkdirSync(path.join(root, sourceRoot, 'test'), {recursive:true});
+      fs.writeFileSync(path.join(root, sourceRoot, 'test/cdn-security.test.mjs'), '');
+      const contractRoot = path.join(fixtureServer, 'OfficialApplications/Resource');
+      fs.mkdirSync(contractRoot, {recursive:true});
+      fs.writeFileSync(path.join(contractRoot, 'platform-service-release.json'), JSON.stringify({SchemaVersion:1, AppKey:'microi-platform-service', SourceRoot:sourceRoot}));
+    }
     if (kind === 'stale') fs.writeFileSync(path.join(results, 'platform-release-tests.json'), '{"old":true}');
     const driver = path.join(root, 'driver.ps1');
     // 执行原入口和真实 TRX/清理实现，仅替换外部编译器及产品测试进程，禁止测试启动服务或构建。
@@ -101,6 +113,23 @@ test('PlatformRelease executes platform regressions and returns scoped evidence 
   assert.match(receipt.dotnet.trxSha256,/^[a-f0-9]{64}$/);assert.match(receipt.node.reportSha256,/^[a-f0-9]{64}$/);
   assert.equal(matrix.scope,'PlatformRelease');assert.equal(cleanup.cleaned,true);assert.equal(artifactExists,false);
   assert.deepEqual(calls.filter(row=>row.args[1]==='freeze-platform'||row.args[1]==='verify-platform').map(row=>row.args[1]),['freeze-platform','verify-platform']);
+});
+
+test('局部 V8 目录不引入六业务应用前置，平台 Managed V8 与 CDN 安全回归仍执行', () => {
+  const {result,calls,receipt} = runFixture('partial-v8');
+  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+  assert.equal(receipt.scope,'PlatformRelease');
+  for (const name of ['official-v8-source.mjs','empty-database-sanitization.test.mjs','cdn-security.test.mjs'])
+    assert.ok(calls.some(row=>row.args.some(arg=>String(arg).endsWith(name))), name+' remains selected');
+  assert.ok(calls.some(row=>row.name==='dotnet'&&row.args[0]==='test'));
+});
+
+test('显式全平台范围仍拒绝缺少标准业务应用契约', () => {
+  const {result,calls,receipt} = runFixture('partial-v8','PlatformRelease',{MICROI_TEST_MATRIX_FILE:'existing.json',MICROI_TEST_ALLOW_WRITES:'YES'},true);
+  assert.notEqual(result.status,0);
+  assert.match(result.stdout+'\n'+result.stderr,/unique standard-suite source contract is missing/);
+  assert.equal(receipt,null);
+  assert.equal(calls.some(row=>row.name==='dotnet'),false);
 });
 
 for (const kind of ['test-fail','trx-skip','node-skip','cleanup-fail']) test(`PlatformRelease rejects ${kind} without accepted scope evidence`, () => {
