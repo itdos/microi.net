@@ -103,7 +103,7 @@ export async function startRuntime(workspace,gate,profileFile,ownerPid){
  regular(path.resolve(gate),{directory:true});fs.mkdirSync(control);createPrivate(path.join(control,'private'),profile.paths.pythonExecutable);
  fs.writeFileSync(path.join(control,'owner.json'),JSON.stringify({schemaVersion:1,workspace:profile.workspace,profile:profile.filename,sourceHashes:profile.sourceHashes,ownerPid:Number(ownerPid)||null,createdAt:new Date().toISOString()},null,2)+'\n',{flag:'wx'});
  const fd=fs.openSync(path.join(control,'private/supervisor.log'),'a');
- const child=spawn(profile.paths.nodeExecutable,[self,'supervise',control],{cwd:profile.workspace,windowsHide:true,stdio:['ignore',fd,fd]});fs.closeSync(fd);child.unref();
+ const child=spawn(profile.paths.nodeExecutable,[self,'supervise',control],{cwd:profile.workspace,windowsHide:true,detached:true,stdio:['ignore',fd,fd]});fs.closeSync(fd);child.unref();
  fs.writeFileSync(path.join(control,'supervisor.json'),JSON.stringify({pid:child.pid,exe:profile.paths.nodeExecutable,control})+'\n',{flag:'wx'});
  try{await waitForRuntime(control,'transport-ready.json',60000);return control;}
  catch(error){fs.writeFileSync(path.join(control,'shutdown.json'),'{}\n');throw error;}

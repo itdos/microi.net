@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync,spawnSync} from 'node:child_process';
+import {setTimeout as delay} from 'node:timers/promises';
 import {validateProfile,profileEnvironment,runProfileCommand,waitForRuntime,stopRuntime} from '../../tools/platform-release-runtime.mjs';
 import {validateCommand,rewriteScopedCommand,readRequest} from '../../tools/platform-release-bridges.mjs';
 const root=path.resolve(import.meta.dirname,'../../..');
@@ -103,4 +104,27 @@ test('bootstrap stays after the release clock and lock, before version mutation,
  assert.ok(source.indexOf(activation)<source.indexOf('# ─── 阶段（条件）: 更新版本号'));
  assert.doesNotMatch(activation,/exec .*Microi一键|--platform-release|START_TIME=/);
  assert.match(source,/_platform_test_command=\(node Microi\.Server\/tools\/platform-release-runtime\.mjs run-tests/);
+});
+test('supervisor launch survives the creator Node exit and honors its explicit stop marker',async()=>{
+ const f=scratch();let pid;
+ try{
+  const runtime=fs.readFileSync(path.join(root,'Microi.Server/tools/platform-release-runtime.mjs'),'utf8');
+  const statement=runtime.split('\n').find(line=>line.includes("const child=spawn(profile.paths.nodeExecutable,[self,'supervise',control]"));
+  assert.ok(statement);assert.match(statement,/detached:true/);assert.match(statement,/windowsHide:true/);
+  const stub=path.join(f.directory,'supervisor.mjs'),heartbeat=path.join(f.directory,'heartbeat'),stop=path.join(f.directory,'stop'),stopped=path.join(f.directory,'stopped');
+  fs.writeFileSync(stub,"import fs from 'node:fs';import path from 'node:path';import {setTimeout as delay} from 'node:timers/promises';const control=process.argv[3];let count=0;while(!fs.existsSync(path.join(control,'stop'))){fs.writeFileSync(path.join(control,'heartbeat'),String(++count));await delay(25);}fs.writeFileSync(path.join(control,'stopped'),'true');");
+  const parent=path.join(f.directory,'creator.mjs');
+  fs.writeFileSync(parent,"import fs from 'node:fs';import {spawn} from 'node:child_process';const control=process.argv[2],self=process.argv[3],profile={paths:{nodeExecutable:process.execPath},workspace:control};const fd=fs.openSync(control+'/private.log','a');\n"+statement+"\nconsole.log(child.pid);\n");
+  const result=spawnSync(process.execPath,[parent,f.directory,stub],{encoding:'utf8',windowsHide:true,timeout:5000});
+  assert.equal(result.status,0,result.stderr);pid=Number(result.stdout.trim());assert.ok(Number.isSafeInteger(pid)&&pid>0);
+  const deadline=Date.now()+5000;while(!fs.existsSync(heartbeat)&&Date.now()<deadline)await delay(25);
+  assert.ok(fs.existsSync(heartbeat),'Detached supervisor did not remain alive after creator exited');
+  const before=Number(fs.readFileSync(heartbeat,'utf8'));await delay(100);assert.ok(Number(fs.readFileSync(heartbeat,'utf8'))>before);
+  fs.writeFileSync(stop,'{}');while(!fs.existsSync(stopped)&&Date.now()<deadline)await delay(25);
+  assert.equal(fs.readFileSync(stopped,'utf8'),'true');
+ }finally{
+  fs.writeFileSync(path.join(f.directory,'stop'),'{}');
+  if(pid){for(let count=0;count<40;count++){try{process.kill(pid,0);}catch{break;}await delay(25);}}
+  f.cleanup();
+ }
 });
