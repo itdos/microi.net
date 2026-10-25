@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-25T18:28:54.966Z",
+  "generatedAt": "2026-10-25T19:19:33.973Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2259,11 +2259,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "b85e129836a43fe001c56b154644f82d3477dc16f51d6344dd86c6f76e2d0a2d",
-      "originalLines": 691,
+      "originalSha256": "82c72e59c8049a90da70452b14f628a159dfb5c97016e31f575732f8f2699f8c",
+      "originalLines": 698,
       "prefixSha256": "5b42e3b11954bc1de401574a135c2fee80ef12201bdbaa0271377fb06843baf4",
       "prefixBytes": 19947,
-      "entryLines": 270,
+      "entryLines": 277,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -2293,8 +2293,8 @@
           "id": "v8-file-upload-003",
           "ordinal": 5,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "d02dfde4abd2349cd92de1daee129bc08ba42142b5f6229736588cb3e0dbf43c",
-          "lines": 13,
+          "sha256": "9d8f1e54ec058d9624a051cc55270019fa1b4a88dadc20f03b2cfa1b856a5bc3",
+          "lines": 20,
           "heading": "跨平台文件同步登录会话"
         },
         {

@@ -247,7 +247,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 生产 H5 不能只依赖 `uni.uploadFile`。页面从 `uni.chooseImage` 得到的 `tempFiles[0].file`、`tempFiles[0]`、`blob:` / `data:` 临时路径都要传给 `V8.uploadFile`，并设置 `preferFetch:true`；SDK 必须能用 `fetch + FormData` 兜底，否则线上可能报 `未找到 MicroiV8 上传适配器。`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=d02dfde4abd2349cd92de1daee129bc08ba42142b5f6229736588cb3e0dbf43c -->
+<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=9d8f1e54ec058d9624a051cc55270019fa1b4a88dadc20f03b2cfa1b856a5bc3 -->
 ## 跨平台文件同步登录会话
 
 文件柜、文件同步等需要连接另一套 Microi API 的工具，必须把远程平台视为独立登录会话：
@@ -259,6 +259,13 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 历史连接列表只返回脱敏元数据；一键重连时再按记录 Id 和当前用户读取凭据。删除连接必须同时清除保存的密码和 Token。
 - 远程目标登录后必须调用文件柜能力探针 `mci_file_sync_capability` 检查同步协议版本，并使用其 `Data.FileManagerSysMenuId` 作为目标租户权威文件柜菜单；禁止硬编码发布端菜单 Id。接口不存在、未返回菜单 Id、返回 404/非标准结果或协议版本过低时，提示目标平台更新【文件柜】应用，不得继续同步。
 - 验收至少覆盖：登录成功显示身份、退出后 Token 清空、历史连接一键重连、删除连接、密文落库、服务重启后仍可解密、目标平台缺少能力接口时的升级提示。
+
+### 热点公开资源的可信分流
+
+- `PublicResourceOffload/2` 与旧目录/路由第一版分别验收。系统日志应用拥有 `mci-file-resource-runtime`（管理员控制面）与 `mci-file-resource-public-url`（匿名只读公开选择）；目录的 Ready、流量和副本行不作为运行授权，不能通过普通 CRUD 制造成功。
+- 从当前 SaaS 引擎读取 MinIO 凭据，第二版 FileServerBak 使用 HTTPS origin 加后端绑定的公有桶。主 HDFS 保留 Aliyun；不全桶迁移、不删源文件、不把私有桶改公开。只复制当前已发布公开运行清单，JS/CSS/模型依赖完整成组；复制、签名回读与匿名 SHA/MIME/Range/CORS 全部成功后才允许消费者采用 NAS。
+- 完整北京时间自然日的 CDN 运营报表及已接入 SDK 的实际响应字节可证明超过阈值的正向下界；榜单缺行、计量缺失和空报表不是零。迁移验证单独排除；历史人工指定单独记录，不能伪造当前24小时阈值通过。阈值触发后的同版本副本持续保留，避免源流量下降反复切回。
+- HTTP/MCP只登记复制意图；共享签名状态、租约栅栏、逐文件回读恢复与退避负责副作用。未知上传先对账，异内容不覆盖。当前版本/完整清单或配置变化、撤为私有、NAS健康失效均回退原地址；先确认真正消费路径，再分别验收实际下载下降与完整日账单节省。主壳预配置 JS、旧绝对 CDN 书签和非受管资源须明确列出未接入范围，不能声称所有资源自动切换。
 
 <!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）

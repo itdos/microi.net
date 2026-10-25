@@ -3051,6 +3051,12 @@ HTTP/MCP 使用专用 `/api/HDFS/DeleteEmptyDirectoryMarker` 路由，旧后端 
 
 ## 执行上下文与资源限制
 
+### 公开热点资源的备用地址
+
+`V8.Method.GetPublicResourceBackupUrl({FilePathName:'tenant/micro-app/app/index.html'})` 是只读选择原子，返回 `{Code:1,Data:{UseBackup,Url}}`。只有当前公开应用、完整版本清单、签名副本与 NAS 健康同时匹配才返回地址；不接受 URL、Ready、SHA、流量或凭据，不读取私有文件。旧后端或未晋级时继续原公开地址，不能把 `FileServerBak` 非空当作副本存在。
+
+管理员控制面由系统日志应用的 Managed 接口 `mci-file-resource-runtime` 调用 `ManagePublicResourceOffload`；普通引擎不能调用管理原子。支持 `Capabilities/Status/List/ProbeBackup/Collect/Prepare/PinHistoricalHotspot/Disable/Enable`，除动作外只接受 `SourceTenant/AppKey`。复制请求入队后由共享后台工作器继续，不通过 MCP/HTTP 长时间传文件；`Queued` 不代表已复制或分流。实际策略及验收见[分布式存储](../more/hdfs)。
+
 常见上下文包括 `V8.Param`、`V8.Header`、`V8.CurrentUser`、`V8.OsClient`、`V8.Form`、`V8.OldForm`、`V8.TableModel`、`V8.TableData`、`V8.FormSubmitAction`、`V8.EventName`、`V8.InvokeType`、`V8.RowIndex`、`V8.CacheData`、`V8.NotSaveField`、`V8.LineValue`、`V8.NextNodeId`、`V8.FilesByteBase64` 和 `V8.WF`。`Engine`、`HttpContext`、执行租约等宿主对象属于内部实现，不要保存到静态变量、缓存或延迟回调。
 
 平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同保护单次脚本和单节点资源。V8 的默认/最大超时、语句数、单层累计分配、调用树累计分配、JavaScript 递归、接口嵌套深度和并发等待可在 `sys_config` 的开发配置中查看；接口引擎与表后端事件分别默认 `sys_apiengine.V8Limit=0`、`diy_table.V8Limit=0`，不设置 Jint 单次预算，只有打开 `V8运行限制` 后才应用 `Timeout/MaxStatements/LimitMemory/LimitRecursion`。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
