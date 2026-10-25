@@ -97,6 +97,82 @@ public sealed class StartupPhysicalContractTests
         }
     }
 
+    [Theory]
+    [InlineData("MySql")]
+    [InlineData("SqlServer")]
+    public void StartupContract_PreservesPackagedDecimalThresholdForBothProviders(string dbType)
+    {
+        var columnType = ReadContracts()["sys_config"]["FileServerBakThresholdGiB"];
+        Assert.Equal("decimal(18,6)", columnType);
+        var normalize = typeof(MicroiUpgrade).GetMethod("NormalizeRuntimePhysicalColumnType",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        var client = new OsClientSecret { OsClientModel = new JObject { ["DbType"] = dbType } };
+        Assert.Equal(columnType, normalize.Invoke(null, new object[] { client, columnType }));
+    }
+
+    [Theory]
+    [InlineData("decimal(1,0)")]
+    [InlineData("decimal(1,1)")]
+    [InlineData("decimal(18,6)")]
+    [InlineData("DECIMAL(18,6)")]
+    [InlineData("decimal(30,30)")]
+    [InlineData("decimal(38,0)")]
+    [InlineData("decimal(38,30)")]
+    [InlineData("bit")]
+    [InlineData("bit(1)")]
+    [InlineData("int")]
+    [InlineData("int(11)")]
+    [InlineData("datetime")]
+    [InlineData("mediumtext")]
+    [InlineData("varchar(255)")]
+    public void StartupContract_AcceptsPortableDecimalAndExistingTypes(string columnType)
+    {
+        Assert.True(IsSafeColumnType(columnType));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("decimal")]
+    [InlineData("decimal(18)")]
+    [InlineData("decimal(18,)")]
+    [InlineData("decimal(,6)")]
+    [InlineData("decimal(0,0)")]
+    [InlineData("decimal(39,6)")]
+    [InlineData("decimal(65,30)")]
+    [InlineData("decimal(38,31)")]
+    [InlineData("decimal(18,19)")]
+    [InlineData("decimal(-18,6)")]
+    [InlineData("decimal(18,-6)")]
+    [InlineData("decimal(+18,6)")]
+    [InlineData("decimal(99999999999999999999,6)")]
+    [InlineData("decimal(18,99999999999999999999)")]
+    [InlineData("decimal(１８,６)")]
+    [InlineData("decimal(18,6); DROP TABLE sys_config")]
+    [InlineData("decimal(18,6)--")]
+    [InlineData("decimal(18,6)/*comment*/")]
+    [InlineData("decimal(18,6) NOT NULL")]
+    [InlineData("decimal(18,6) unsigned")]
+    [InlineData("decimal(18,6) ")]
+    [InlineData(" decimal(18,6)")]
+    [InlineData("decimal(18,6)\n")]
+    [InlineData("decimal(18,6)\r\n")]
+    [InlineData("decimal(18,6)\0")]
+    [InlineData("decimal(18, 6)")]
+    [InlineData("decimal(1e1,6)")]
+    [InlineData("varchar(255)\n")]
+    [InlineData("varchar(255); DROP TABLE sys_config")]
+    public void StartupContract_RejectsUnsafeOrNonPortableColumnTypes(string columnType)
+    {
+        Assert.False(IsSafeColumnType(columnType));
+    }
+
+    private static bool IsSafeColumnType(string columnType)
+    {
+        var validator = typeof(MicroiUpgrade).GetMethod("IsSafeRuntimePhysicalColumnType",
+            BindingFlags.NonPublic | BindingFlags.Static)!;
+        return (bool)validator.Invoke(null, new object[] { columnType })!;
+    }
+
     private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ReadContracts()
     {
         var loader = typeof(MicroiUpgrade).GetMethod("LoadRuntimePhysicalColumnContracts",
