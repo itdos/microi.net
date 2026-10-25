@@ -26,7 +26,7 @@ test('regular frontend scope keeps general cases in mixed files and explicitly c
  const f=fixture();try{
   for(const [name,rule]of Object.entries(frontendSpecialCases))fs.writeFileSync(path.join(f.tests,name),`import {test} from '@playwright/test';\n${(rule.titles||['customer-only case']).map(title=>`test(${JSON.stringify(title)},()=>{});`).join('\n')}\ntest('general case',()=>{});`);
   const selection=platformFrontendScope(f.tests);
-  assert.equal(selection.files.length,Object.keys(frontendSpecialCases).length);assert.equal(selection.discoveredFiles,Object.keys(frontendSpecialCases).length+2);
+  assert.equal(selection.files.length,Object.keys(frontendSpecialCases).length+2-Object.values(frontendSpecialCases).filter(rule=>rule.wholeFile).length);assert.equal(selection.discoveredFiles,Object.keys(frontendSpecialCases).length+2);
   assert.ok(selection.files.some(file=>file.endsWith('ai-image-studio.e2e.spec.mjs')));
   assert.ok(!selection.files.some(file=>file.endsWith('tenant-logo-isolation.e2e.spec.mjs')));
   assert.ok(selection.excluded.every(row=>row.status==='NotApplicable'&&row.reason));

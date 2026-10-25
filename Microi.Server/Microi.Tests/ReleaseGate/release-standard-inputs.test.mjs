@@ -277,15 +277,17 @@ test('regular candidate omits only unselected XJY customer inputs while Full ret
  const {root}=await fixture(t);
  for(const reader of xjyReaders){await fs.mkdir(path.dirname(path.join(root,reader)),{recursive:true});await fs.writeFile(path.join(root,reader),'customer-specific test reader');}
  const regular=await snapshotStandardInputs(root,{testPolicy:'PlatformRelease'});
- assert.ok(regular['private-products/app-0/tests/fixture.mjs']);
+ assert.equal(regular['private-products/app-0/tests/fixture.mjs'],undefined);
+ assert.ok(regular['AI-Project/标准产品套件/source-contract.json']);
  assert.ok(!Object.keys(regular).some(name=>name.startsWith('Microi-V8-Engine/')||xjyReaders.includes(name)));
  await assert.rejects(snapshotStandardInputs(root),/ENOENT/);
- await fs.writeFile(path.join(root,'.gitignore'),'Microi-V8-Engine/\nmicroi.uniapp/\n');
+ await fs.writeFile(path.join(root,'.gitignore'),'Microi-V8-Engine/\nmicroi.uniapp/\nprivate-products/\nprivate-requirements/\n');
+ await fs.mkdir(path.join(root,'Microi.Client/src'),{recursive:true});await fs.writeFile(path.join(root,'Microi.Client/src/platform.js'),'generic platform input');
  execFileSync('git',['init','--quiet'],{cwd:root});execFileSync('git',['add','.gitignore'],{cwd:root});execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@local.invalid','commit','--quiet','-m','fixture'],{cwd:root});
  const candidate=await snapshotCandidate(root,['.'],{testPolicy:'PlatformRelease'});
  assert.ok(!Object.keys(candidate.files).some(name=>name.startsWith('Microi-V8-Engine/')||xjyReaders.includes(name)));
- await fs.writeFile(path.join(root,'private-products/app-0/tests/fixture.mjs'),'generic input changed');
- assert.ok(changedCandidate(candidate,await snapshotCandidate(root,['.'],{testPolicy:'PlatformRelease'})).includes('private-products/app-0/tests/fixture.mjs'));
+ await fs.writeFile(path.join(root,'Microi.Client/src/platform.js'),'generic input changed');
+ assert.ok(changedCandidate(candidate,await snapshotCandidate(root,['.'],{testPolicy:'PlatformRelease'})).includes('Microi.Client/src/platform.js'));
  await assert.rejects(snapshotCandidate(root,['.'],{testPolicy:'Full'}),/ENOENT/);
 });
 async function syncedXjyInputs(root, profile = xjyProfile) {
@@ -342,6 +344,20 @@ async function smsFixture(t) {
   // a Windows directory-handle race without exercising a candidate invariant.
   return fixture(t, {sourceParent: 'Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用'});
 }
+
+test('regular inputs preserve the platform SMS master without requiring independent application sources',async t=>{
+ const {root,contract}=await smsFixture(t);
+ await fs.mkdir(path.dirname(path.join(root,settingsReader)),{recursive:true});await fs.writeFile(path.join(root,settingsReader),'platform reader');
+ await fs.mkdir(path.dirname(path.join(root,tenantSmsSource)),{recursive:true});await fs.writeFile(path.join(root,tenantSmsSource),'canonical SMS source');
+ // The independent product directory can be absent; no source copy or network recovery is required.
+ await fs.rm(path.join(root,contract.sourceParent),{recursive:true});
+ const selected=await snapshotStandardInputs(root,{testPolicy:'PlatformRelease'});
+ assert.deepEqual(Object.keys(selected).sort(),['AI-Project/标准产品套件/source-contract.json',tenantSmsSource].sort());
+ await assert.rejects(snapshotStandardInputs(root),/ENOENT/);
+ await fs.appendFile(path.join(root,tenantSmsSource),' changed');
+ assert.notEqual((await snapshotStandardInputs(root,{testPolicy:'PlatformRelease'}))[tenantSmsSource],selected[tenantSmsSource]);
+ await fs.rm(path.join(root,tenantSmsSource));await assert.rejects(snapshotStandardInputs(root,{testPolicy:'PlatformRelease'}),/ENOENT/);
+});
 
 test('系统设置实际reader只追加固定主租户短信正文，真实候选拒绝忽略源码漂移', async t => {
   const {root} = await smsFixture(t), absent = await snapshotStandardInputs(root);

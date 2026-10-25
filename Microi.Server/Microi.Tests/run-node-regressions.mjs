@@ -21,6 +21,15 @@ roots.push(path.relative(workspace,path.join(platformRoot,'test')).replaceAll('\
 // 该应用自己的 npm test 入口执行。不要把它误交给 node --test，也不要因为旧的
 // 空 tests/ 目录存在就把零用例当作一个有效回归根。
 export const regularNodeSpecialists={
+ 'Microi.Server/Microi.Tests/V8/ai-employee-worker.test.mjs':'Independent microi.openclaw worker release tests (README: test ownership)',
+ 'Microi.Server/Microi.Tests/V8/ai-employee-center.test.mjs':'Independent AI employee application release tests (README: test ownership)',
+ 'Microi.Server/Microi.Tests/V8/ai-cad.test.mjs':'Independent AI CAD application release tests (README: test ownership)',
+ 'Microi.Server/Microi.Tests/V8/email-sync-package.test.mjs':'Independent email application release tests (README: test ownership)',
+ 'Microi.Server/Microi.Tests/V8/event-lottery-regressions.test.mjs':'Independent lottery application and delivery tests (README: test ownership)',
+ 'Microi.Server/Microi.Tests/V8/standard-products.test.mjs':'Six independent business-product application suites (README: test ownership)',
+ 'Microi.Server/Microi.Tests/V8/standard-cms-package-integration.test.mjs':'Independent CMS package and requirements integration (README: test ownership)',
+ 'Microi.Server/Microi.Tests/V8/oa-standard-source-integration.test.mjs':'Independent OA manifest integration; generic workflow assertions remain in sql-transaction-guide.test.mjs (README: test ownership)',
+ 'Microi.Client/tests/three-engine-transform-controls.spec.mjs':'Independent 3D application source acceptance (README: test ownership)',
  'Microi.Server/Microi.Tests/V8/directory-card.test.mjs':'XJY customer directory API source and customer-specific UniApp acceptance',
  'Microi.Server/Microi.Tests/V8/xjy-service-assignment.test.mjs':'XJY customer service-assignment API source and customer-specific business rules'
 };

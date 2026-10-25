@@ -59,6 +59,7 @@ export function readLocalTestDefaults(project,environment={}){
 // 普通发行只排除有明确专项前提的案例；同一文件的通用 UI 案例仍自动发现并执行。
 // 修改/新增专项必须维护此清单，不能通过 Playwright skip 把未执行案例算作通过。
 export const frontendSpecialCases={
+ 'three-engine-microservice.e2e.spec.mjs':{reason:'IndependentApplicationAcceptance',prerequisite:'Independently published microi-3d-engine application; README test ownership keeps its release separate',wholeFile:true},
  'ai-image-studio.e2e.spec.mjs':{reason:'RealPaidAI',titles:['MiniMax 文生图和私有参考图图生图均返回持久 HDFS 资产','音乐工作台通过托管接口或官方开源 Music3 回退返回持久 HDFS 音轨']},
  'form-ui-regression.e2e.spec.mjs':{reason:'CustomerJunchi',titles:['君驰项目表单：必填内联提示、数字步进无断层、紧凑分组随主题','君驰托码表单：折叠分组保留装饰短线、无外框且字段间隙为纯白','君驰设计器：双击折叠分组保留图标与视觉风格专项配置']},
  'latest-form-experience.e2e.spec.mjs':{reason:'CustomerXjy',titles:['xjy 订单使用标准表单 Banner、只读业务值和单一纵向滚动容器']},

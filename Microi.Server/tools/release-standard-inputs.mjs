@@ -57,7 +57,7 @@ export async function snapshotStandardInputs(root, {includeTestInputs = true, te
   const contract = JSON.parse(bytes.toString('utf8'));
   if (contract.schemaVersion !== 1 || contract.target?.apiBase !== 'https://api.microi.net'
     || String(contract.target?.osClient).toLowerCase() !== 'itdos'
-    || !Array.isArray(contract.applications) || contract.applications.length !== 6) {
+    || (testPolicy === 'Full' && (!Array.isArray(contract.applications) || contract.applications.length !== 6))) {
     throw Error('Invalid standard product source contract');
   }
   async function inside(value) {
@@ -82,6 +82,12 @@ export async function snapshotStandardInputs(root, {includeTestInputs = true, te
     return value;
   }
   files[path.relative(root, contractPath).replaceAll('\\', '/')] = hash(bytes);
+  if (testPolicy === 'PlatformRelease') {
+    // README 的平台/独立业务应用边界：只冻结本模式实际消费的平台短信母版，
+    // 不因同步目录存在而把六产品、独立 AI/邮箱/3D/worker/抽奖源码变成发布前置。
+    await addSettingsInput();
+    return files;
+  }
   const keys = new Set();
   const requirementsRoot = await inside(declaredRelative(contract.requirementsRoot));
   for (const app of contract.applications) {
@@ -241,12 +247,16 @@ export async function snapshotStandardInputs(root, {includeTestInputs = true, te
     }
   }
   // 系统设置回归直接比较主租户短信母版正文；固定该输入，不遍历其它接口或租户。
-  let settingsReaderExists = false;
-  try { await fs.lstat(path.join(root, 'Microi.Server/OfficialApplications/Resource/tenant-system-settings-resource.test.mjs')); settingsReaderExists = true; }
-  catch (error) { if (error.code !== 'ENOENT') throw error; }
-  if (settingsReaderExists) {
-    const tenantSource = path.dirname(await inside(declaredRelative(contract.sourceParent)));
-    await addInput(path.relative(root, path.join(tenantSource, '接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js')));
+  async function addSettingsInput() {
+    let settingsReaderExists = false;
+    try { await fs.lstat(path.join(root, 'Microi.Server/OfficialApplications/Resource/tenant-system-settings-resource.test.mjs')); settingsReaderExists = true; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (settingsReaderExists) {
+      // 母版在租户接口目录；不要求同级独立 AI应用 目录或其中的产品先存在。
+      const tenantSource = await inside(path.dirname(declaredRelative(contract.sourceParent)));
+      await addInput(path.relative(root, path.join(tenantSource, '接口引擎/未分类/[系统]发送阿里云短信(send_sms_reg).js')));
+    }
   }
+  await addSettingsInput();
   return files;
 }

@@ -5,7 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {createMatrixPlan, validateMatrixResults,validateStagedStorageProof,verifyMatrixDesktopInputs,validatePlatformReleaseSummary,readPlatformReleaseTests} from './release-test-matrix.mjs';
-import {roots as nodeRoots,discoverNodeScope,regressionLogFile} from '../run-node-regressions.mjs';
+import {roots as nodeRoots,discoverNodeScope,regularNodeSpecialists,regressionLogFile} from '../run-node-regressions.mjs';
 import {snapshotDesktopInputs} from '../../tools/release-desktop-inputs.mjs';
 import {createHash} from 'node:crypto';
 import {preserveHdfsEvidence} from './staged-full-runtime.mjs';
@@ -68,7 +68,7 @@ test('PlatformRelease rereads raw TRX and each Node TAP and rejects hashes, omit
   const receipt={schemaVersion:1,scope:'PlatformRelease',filter:'Category!=FullStack',dotnet:{trxFile,trxSha256:sha(xml),tests:1,passed:1,failed:0,skipped:0},node:{reportFile,reportSha256:sha(fs.readFileSync(reportFile)),groups:groups.length,tests:groups.length*2,passed:groups.length*2,failed:0,skipped:0}};
   const save=()=>fs.writeFileSync(receiptFile,'\uFEFF'+JSON.stringify(receipt));save();
   const actual=await readPlatformReleaseTests(receiptFile);assert.equal(actual.node.tapReceipts.length,nodeRoots.length);
-  assert.equal(actual.node.tapReceipts.flatMap(row=>row.notApplicable).length,2);
+  assert.equal(actual.node.tapReceipts.flatMap(row=>row.notApplicable).length,Object.keys(regularNodeSpecialists).length);
   const classification=groups[0].notApplicable;groups[0].notApplicable=[];fs.writeFileSync(reportFile,JSON.stringify(groups));receipt.node.reportSha256=sha(fs.readFileSync(reportFile));save();await assert.rejects(readPlatformReleaseTests(receiptFile),/专项分类/u);
   groups[0].notApplicable=classification;fs.writeFileSync(reportFile,JSON.stringify(groups));receipt.node.reportSha256=sha(fs.readFileSync(reportFile));save();
   const selected=platformFrontendScope(path.join(workspace,'Microi.Client/tests'));
