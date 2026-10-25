@@ -78,11 +78,14 @@ export async function reverseGeocode(longitude, latitude, options = {}) {
 export function normalizeChosenLocation(location = {}, geocode = null) {
   const longitude = Number(location.longitude ?? geocode?.longitude)
   const latitude = Number(location.latitude ?? geocode?.latitude)
-  const pickedAddress = [textValue(location.address), textValue(location.name)]
+  // 手动选点的地址与点位名称是用户确认的结果，不能被坐标逆解析的园区/道路地址覆盖。
+  // 仅缺少选点地址时使用逆解析补齐；自动定位只有坐标时也沿用此兜底。
+  const pickedAddress = String(textValue(location.address) || '').trim()
+  const fallbackAddress = String(textValue(geocode?.address) || '').trim()
+  const address = [pickedAddress || fallbackAddress, textValue(location.name)]
     .map((item) => String(item || '').trim())
     .filter((item, index, values) => item && !values.slice(0, index).some((other) => other.includes(item)))
     .join('')
-  const address = String(geocode?.address || pickedAddress || '').trim()
   return {
     address,
     region: geocode?.region?.length ? geocode.region : inferRegionFromAddress(address),

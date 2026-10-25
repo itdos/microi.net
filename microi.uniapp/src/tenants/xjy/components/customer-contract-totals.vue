@@ -28,7 +28,6 @@
           <text>{{ state.message }}</text>
           <view class="contract-totals__retry"><view class="contract-totals__retry-icon" aria-hidden="true"></view><text>重试</text></view>
         </view>
-        <text v-if="!compact && scopeNote" class="contract-totals__scope">{{ scopeNote }}</text>
       </template>
     </template>
   </view>
@@ -47,8 +46,7 @@ export default {
   emits: ['retry'],
   data() { return { expanded: !this.collapsible } },
   computed: {
-    groups() { return buildCustomerContractGroups(this.state) },
-    scopeNote() { return [...new Set([this.state.explanation, this.state.scope].filter(Boolean))].join('；') }
+    groups() { return buildCustomerContractGroups(this.state) }
   }
 }
 </script>
@@ -62,7 +60,7 @@ export default {
 .contract-totals__toggle--pressed { opacity: .65; }
 .contract-totals__arrow { font-size: 36rpx; line-height: 1; transform: rotate(90deg); transition: transform .18s ease; }
 .contract-totals__arrow.expanded { transform: rotate(-90deg); }
-.contract-totals__hint, .contract-totals__label, .contract-totals__scope { color: var(--mci-text-secondary, #647c87); font-size: 24rpx; line-height: 1.5; }
+.contract-totals__hint, .contract-totals__label { color: var(--mci-text-secondary, #647c87); font-size: 24rpx; line-height: 1.5; }
 .contract-totals__hint { display: block; padding-bottom: 10rpx; }
 .contract-totals__group { display: grid; grid-template-columns: 152rpx minmax(0, 1fr); gap: 12rpx; align-items: center; padding: 16rpx 0; border-top: 1rpx solid var(--mci-border-color, #e3edf1); }
 .contract-totals__group-title { color: var(--mci-text-primary, #18313d); font-size: 24rpx; font-weight: 600; line-height: 1.6; }
@@ -74,7 +72,6 @@ export default {
 .contract-totals__retry { display: flex; gap: 8rpx; align-items: center; flex: 0 0 auto; min-height: 64rpx; padding: 8rpx 12rpx; color: var(--mci-color-primary, #087fba); }
 .contract-totals__retry-icon { position: relative; width: 17rpx; height: 17rpx; border: 3rpx solid currentColor; border-right-color: transparent; border-radius: 50%; }
 .contract-totals__retry-icon::after { position: absolute; top: -5rpx; right: -4rpx; content: ''; width: 0; height: 0; border-left: 7rpx solid currentColor; border-top: 5rpx solid transparent; border-bottom: 5rpx solid transparent; }
-.contract-totals__scope { display: block; padding-top: 6rpx; }
 .contract-totals__loading { display: flex; flex-direction: column; gap: 18rpx; padding: 14rpx 0; }
 .contract-totals__loading view { height: 66rpx; border-radius: 6rpx; background: linear-gradient(90deg, var(--mci-skeleton-base, #edf2f5) 25%, var(--mci-skeleton-highlight, #f7fafb) 50%, var(--mci-skeleton-base, #edf2f5) 75%); background-size: 200% 100%; animation: contract-shimmer 1.5s ease-in-out infinite; }
 .contract-totals--compact { margin: 0; padding: 16rpx 0 0; border: 0; border-top: 1rpx solid var(--mci-border-color, #e3edf1); border-radius: 0; }

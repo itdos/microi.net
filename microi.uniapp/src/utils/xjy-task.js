@@ -174,7 +174,8 @@ export async function loadTasks(options = {}) {
     _OrderByType: options.orderType || 'ASC',
     _Where: where
   }
-  payload._SelectFields = options.includeCoordinates === true ? TASK_MAP_SELECT_FIELDS : TASK_CARD_SELECT_FIELDS
+  payload._SelectFields = options.countOnly === true ? ['Id']
+    : options.includeCoordinates === true ? TASK_MAP_SELECT_FIELDS : TASK_CARD_SELECT_FIELDS
   const menuId = await taskMenuId(options.refresh === true)
   if (menuId) payload._SysMenuId = menuId
   const key = `task:list:${taskIdentity()}:${JSON.stringify(payload)}`
@@ -188,7 +189,7 @@ export async function loadTasks(options = {}) {
   })
   const result = ensureSuccess(cached.data, '任务加载失败')
   return {
-    rows: options.includeCoordinates === true ? (result.Data || []).map(normalizeTask)
+    rows: options.countOnly === true ? [] : options.includeCoordinates === true ? (result.Data || []).map(normalizeTask)
       : await hydrateTaskCardRows((result.Data || []).map(normalizeTask), options.refresh === true, menuId),
     count: Number(result.DataCount || 0),
     append: result.DataAppend || {},
@@ -264,19 +265,21 @@ export async function loadTaskCounts(filters = {}) {
 
 export async function loadTaskStateCounts(filters = {}) {
   try {
-    const range = buildPeriodRange(filters.period || 'all', filters.customRange)
-    const payload = {
-      KehuId: filters.customerId || '',
-      city: filters.city || '',
-      keyword: filters.keyword || '',
-      type: filters.type || '',
-      isClicked: normalizeTaskScope(filters.scope, filters.mineOnly) !== 'all',
-      taskScope: normalizeTaskScope(filters.scope, filters.mineOnly)
+    // 状态角标必须与卡片共用菜单授权、关键词和完整筛选，旧统计接口的普通账号分支会把查询失败当零。
+    // 仅查询固定八个状态的总数，不读取卡片明细；并发限制为三，避免快速切换筛选时挤占列表请求。
+    const keys = { 1: 'pending', 2: 'TodoCount', 11: 'acceptance', 12: 'cacceptance', 3: 'evaluated', 10: 'suspend', 9: 'FinishCount', 5: 'cancel' }
+    const states = TASK_STATES.filter((item) => item.value)
+    const counts = {}
+    let next = 0
+    async function worker() {
+      while (next < states.length) {
+        const item = states[next++]
+        const result = await loadTasks({ ...filters, state: item.value, pageIndex: 1, pageSize: 1, countOnly: true })
+        counts[keys[item.code]] = result.count
+      }
     }
-    TASK_DATE_FIELDS.forEach((item) => { payload[item.value] = [] })
-    if (range) payload[filters.dateField || 'YujiSHSJ'] = range
-    const result = ensureSuccess(await callApiEngine('service_statusStatistics', payload), '任务状态统计加载失败')
-    return result.Data || {}
+    await Promise.all(Array.from({ length: 3 }, worker))
+    return counts
   } catch (error) {
     return {}
   }
