@@ -17,6 +17,8 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 
 公开入口覆盖 `V8.uploadFile`、多文件 `V8.uploadFiles` 与 MCP `microi_upload_file_base64`。多文件上传必须限制并发、逐文件返回结果；Base64 工具只接受明确文件名、大小和租户内目标范围，写后回读路径、大小与哈希。
 
+公开运行资源的备用地址只通过 `V8.Method.GetPublicResourceBackupUrl({FilePathName:'tenant/micro-app/app/index.html'})` 只读选择，返回 `{Code:1,Data:{UseBackup,Url}}`。只允许 `FilePathName`，不能传 URL、Ready、SHA、流量、凭据或用户身份；当前公开应用、完整版本清单、签名副本与 NAS 健康必须同时匹配。`UseBackup=false`、异常或旧后端缺少该能力时继续原公开地址，不把 `FileServerBak` 非空或目录存在当作可用副本；该方法不复制对象、不读取私有文件，也不授予管理权限。管理和迁移仍走已有受信任应用接口，并分别回读副本完整性与真实消费结果。
+
 ## MCP stdio 与完整包的传输边界
 
 - 标准 MCP 服务的 stdio 使用固定 `128 MiB`（`134217728` 字节）未解析 JSON-RPC 缓冲，超过边界立即拒绝并关闭连接；不读取动态环境变量放大。SDK 调用端若仍使用

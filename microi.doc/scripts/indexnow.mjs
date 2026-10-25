@@ -11,16 +11,29 @@ const endpoint = 'https://api.indexnow.org/indexnow'
 const hash = value => createHash('sha256').update(value).digest('hex')
 export const changedPaths = ['/', '/doc/', '/contact/', '/case/case-index.html', '/doc/about/partner.html', '/doc/about/update-log.html', '/doc/more/security.html', '/doc/system-engine/databases.html', '/doc/system-engine/ai-engine.html', '/doc/v8-engine/ai-apiengine.html']
 
-export function payload(key, urls) {
-  assert.match(key, /^[a-f0-9]{64}$/, 'Invalid private site-verification configuration')
+function publicUrls(urls) {
   assert.ok(Array.isArray(urls) && urls.length > 0 && urls.length <= 10000, 'A bounded public URL list is required')
-  const urlList = [...new Set(urls.map(value => {
+  return [...new Set(urls.map(value => {
     const url = new URL(value)
     assert.ok(url.origin === SITE_URL && !url.username && !url.password && !url.search && !url.hash, 'Only canonical public site URLs are accepted')
     assert.ok(url.pathname === canonicalPath(url.pathname) && isIndexablePage(url.pathname), 'Utility or noncanonical pages cannot be submitted')
     return url.href
   }))]
-  return { host: new URL(SITE_URL).hostname, key, keyLocation: `${SITE_URL}/${key}.indexnow.txt`, urlList }
+}
+
+export function urlsForPaths(paths) {
+  assert.ok(Array.isArray(paths) && paths.length > 0 && paths.length <= 100, 'Provide 1..100 explicitly changed public paths')
+  return publicUrls(paths.map(value => {
+    assert.ok(typeof value === 'string' && value.startsWith('/') && !value.startsWith('//'), 'Changed paths must be site-relative')
+    const url = new URL(value, SITE_URL)
+    assert.ok(url.pathname === value && !url.search && !url.hash, 'Changed paths cannot contain normalization, query or fragment ambiguity')
+    return url.href
+  }))
+}
+
+export function payload(key, urls) {
+  assert.match(key, /^[a-f0-9]{64}$/, 'Invalid private site-verification configuration')
+  return { host: new URL(SITE_URL).hostname, key, keyLocation: `${SITE_URL}/${key}.indexnow.txt`, urlList: publicUrls(urls) }
 }
 
 async function boundedText(response, limit) {
@@ -79,8 +92,17 @@ async function privateConfig(filename) {
 
 async function main() {
   const [action, ...args] = process.argv.slice(2); const options = {}
-  for (let i = 0; i < args.length; i += 2) { assert.ok(['--config', '--out'].includes(args[i]) && args[i + 1], 'Use prepare[-if-configured] or submit, --config PATH and --out NEW_RECEIPT.json'); options[args[i]] = args[i + 1] }
+  for (let i = 0; i < args.length; i += 2) { assert.ok(['--config', '--out', '--paths-file'].includes(args[i]) && args[i + 1] && !Object.hasOwn(options, args[i]), 'Use prepare[-if-configured] or submit, --config PATH, --out NEW_RECEIPT.json and optional --paths-file JSON'); options[args[i]] = args[i + 1] }
   assert.ok(['prepare', 'prepare-if-configured', 'submit'].includes(action), 'An explicit prepare or submit action is required')
+  assert.ok(action === 'submit' || !options['--paths-file'], 'Changed paths apply only to explicit submit')
+  let selectedPaths = changedPaths
+  if (options['--paths-file']) {
+    // 只消费少量公开路径，不允许把本地文件内容变成任意外站请求或整站重复投递。
+    const stat = await lstat(options['--paths-file'])
+    assert.ok(stat.isFile() && !stat.isSymbolicLink() && stat.size <= 16384, 'Changed paths must be a small regular JSON file')
+    selectedPaths = JSON.parse((await readFile(options['--paths-file'], 'utf8')).replace(/^\uFEFF/, ''))
+  }
+  const urls = urlsForPaths(selectedPaths)
   const filename = options['--config'] || process.env.MICROI_DOC_INDEXNOW_CONFIG || path.resolve(root, '../.microi-seo/indexnow.json')
   try { await lstat(filename) } catch (error) { if (error.code === 'ENOENT' && action === 'prepare-if-configured') { console.log('IndexNow: no private site configuration; no verification file or network request created.'); return } throw error }
   const { key } = await privateConfig(filename)
@@ -95,7 +117,7 @@ async function main() {
   }
   assert.ok(options['--out'], 'Submission requires a new receipt path; unknown requests are never automatically replayed')
   await writeFile(options['--out'], JSON.stringify({ status: 'Prepared', indexingConfirmed: false }), { flag: 'wx' })
-  const report = await notify({ key, urls: changedPaths.map(value => SITE_URL + value), onRecord: value => writeFile(options['--out'], JSON.stringify(value, null, 2) + '\n') })
+  const report = await notify({ key, urls, onRecord: value => writeFile(options['--out'], JSON.stringify(value, null, 2) + '\n') })
   console.log(JSON.stringify({ status: report.status, httpStatus: report.httpStatus ?? null, urlCount: report.urlCount, indexingConfirmed: false }))
   if (!report.accepted) process.exitCode = 1
 }

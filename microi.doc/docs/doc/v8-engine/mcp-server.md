@@ -141,6 +141,29 @@ action=microi_get_db_schema, params={...}
 
 Manifest 支持角色、表、索引、数据源、接口引擎、事件、菜单、权限、页面、打印模板、工作流和任务。常规表单字段不要默认写 `FormWidth=24`；整行控件才使用整行宽度。绑定表的菜单应同时补齐 PC/移动列、搜索列、隐藏列、排序、统计与卡片字段。
 
+### 原始声明的整体写前检查
+
+AI 生成的 JSON 能解析，不代表能够安全落地。新增的声明预检先检查原始资源，
+再做关系、字段和工作流等领域检查；计划、dry-run、生成与独立验收共用同一入口。
+
+| 情况 | 处理 |
+|---|---|
+| 把 `engines` 等资源集合写成对象、字符串或 `null` | 整体拒绝；不需要该集合时省略属性 |
+| 数组夹有 `null`、字符串、数组或空资源对象 | 返回原始项的位置，不静默忽略 |
+| 同时传 `tables/Tables` 等别名且内容不同 | 拒绝歧义；相同声明继续兼容 |
+| 同一声明重复表名、接口 Key、数据源 Key | 按大小写不敏感检测，拒绝后写覆盖 |
+| 同一张表重复字段名或显式索引名 | 写入前拒绝；不同表的同名字段合法 |
+
+例如 `engines:[{"apiEngineKey":"biz-check"},null]` 会明确指出 `engines[1]`，
+不会先保存合法的第一项。错误只返回路径与固定原因，不回显原始代码或数据。
+合法的局部更新和省略可选集合继续支持。
+
+该能力由 MCP 工具实现，需使用包含 `declarationPreflight.version=1` 的新版工具；
+可从 `microi_get_manifest_schema` 发现。已经运行的旧 MCP 进程不会因官网更新而自动获得能力。
+它不代替服务端权限、跨资源事务或写后回读；执行阶段失败仍须核对实际状态。
+可复现源码与检查入口见[声明交付证据](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/manifest-delivery)
+（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/manifest-delivery)）。
+
 ### 精确读取与完整性
 
 新版读取工具先返回可遍历的摘要，减少无关信息。首次完整开发必须盘点全部相关资源，并读取字段/关系详情；摘要不等于完整结构，不能因为没有在第一页看到资源就重复创建。

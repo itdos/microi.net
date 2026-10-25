@@ -6,6 +6,12 @@
 
 上线需逐项核对 HTTPS 与数据库证书、代理信任范围、CORS 来源、是否启用严格 SSRF、角色/租户隔离和敏感日志留存。保留具体平台版本、部署组合、失败与未执行项；没有第三方报告或真实环境回执时，应标注“未核验”。安全问题按[贡献指南的私下报告入口](https://gitee.com/ITdos/microi.net/blob/master/CONTRIBUTING.md#私下报告安全问题)（[GitHub](https://github.com/itdos/microi.net/blob/master/CONTRIBUTING.md#私下报告安全问题)）联系，公开 Issue 不上传凭据或客户数据。
 
+公开仓的[安全报告流程](https://gitee.com/ITdos/microi.net/blob/master/SECURITY.md)
+（[GitHub](https://github.com/itdos/microi.net/blob/master/SECURITY.md)）列出了受影响版本、匿名复现、
+权限前提、影响范围及披露要求。AI 建模还需通过[Manifest 原始声明预检](/doc/v8-engine/mcp-server.html#原始声明的整体写前检查)：
+无效资源、冲突别名和重复 Key 在资源调用前整体拒绝，不把模型输出可解析当作可安全执行。
+公开 MCP 合约 CI 与真实部署、独立渗透和认证分别验收。
+
 ---
 
 ## 一、先区分身份、授权与可信执行
