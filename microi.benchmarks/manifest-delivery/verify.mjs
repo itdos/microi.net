@@ -29,9 +29,18 @@ async function hashes() {
   }
   return result;
 }
+async function dependencyHashes() {
+  const result = {};
+  for (const name of ['package.json', 'package-lock.json']) {
+    const bytes = await readFile(path.join(root, 'microi.mcp', name));
+    result[name] = { bytes: bytes.length, rawSha256: sha256(bytes), lfSha256: sha256(bytes.toString('utf8').replaceAll('\r\n', '\n')) };
+  }
+  return result;
+}
 export async function verify() {
   const startedAt = new Date().toISOString();
   const before = await hashes();
+  const dependencyInputs = await dependencyHashes();
   const runnerBefore = await readFile(fileURLToPath(import.meta.url));
   const require = createRequire(path.join(root, 'microi.mcp/package.json'));
   const loader = pathToFileURL(require.resolve('tsx')).href;
@@ -51,14 +60,15 @@ export async function verify() {
   });
   const after = await hashes();
   const sourceUnchanged = JSON.stringify(before) === JSON.stringify(after) && runnerBefore.equals(await readFile(fileURLToPath(import.meta.url)));
+  const dependencyUnchanged = JSON.stringify(dependencyInputs) === JSON.stringify(await dependencyHashes());
   const counters = tapResult(run.stdout, run.code);
   return {
-    protocolVersion: '1.0.1', evidenceKind: 'registered-handler-contract', startedAt, completedAt: new Date().toISOString(),
+    protocolVersion: '1.0.2', evidenceKind: 'registered-handler-contract', startedAt, completedAt: new Date().toISOString(),
     environment: { node: process.version, os: os.platform(), osRelease: os.release(), arch: os.arch() },
     testReporter: 'tap', runner: { file: 'microi.benchmarks/manifest-delivery/verify.mjs', rawSha256: sha256(runnerBefore), lfSha256: sha256(runnerBefore.toString('utf8').replaceAll('\r\n', '\n')) },
-    testFiles, sources: before, sourceUnchanged, counters, exitCode: run.code, timedOut: run.timedOut,
+    testFiles, sources: before, dependencyInputs, sourceUnchanged, dependencyUnchanged, counters, exitCode: run.code, timedOut: run.timedOut,
     rawTapSha256: sha256(run.stdout), stderrSha256: sha256(run.stderr),
-    passed: sourceUnchanged && counters.passed && !run.timedOut,
+    passed: sourceUnchanged && dependencyUnchanged && counters.passed && !run.timedOut,
     boundaries: { realProviderCalls: 0, remoteBusinessWrites: 0, databaseExecutionVerified: false, browserVerified: false, certification: false },
   };
 }

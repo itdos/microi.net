@@ -433,6 +433,20 @@ Passkey、设备生物识别、严格人脸、改密步进验证和自定义 V8 
 
 ## 十、安全升级与发布约束
 
+### MCP 依赖公告与输入校验
+
+2026-10-26 对公开 MCP 锁文件执行 `npm audit --omit=dev`，最初发现 5 个依赖包公告项
+（3 个高危、2 个中危）。已将 MCP SDK 最低版本提升到 1.32.0、Zod 提升到 4.6.7，
+更新相关传递依赖并迁移正式工具 Schema；同日复核返回 0 个公告项。
+公开 CI 同时执行依赖检查、四组系统/Node 合约以及大集合提前拒绝和真实工具发现回归。
+原始问题、版本、锁文件摘要、扫描边界和复跑命令见
+[依赖核验记录](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)
+（[GitHub 镜像](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/compatibility)）。
+
+该结果只描述所绑定 MCP 锁文件在检查时的生产依赖公告，不能推导平台整体零漏洞、
+所有公告在当前部署均可利用或旧版 CLI/已加载 MCP 已升级。部署前仍需核对实际工具版本，
+对输入、权限和运行路径做相应验收；此项不是渗透测试或安全认证。
+
 - Upgrade15 只清理普通角色对“管理员专用”表的直接授权，不删除正常业务菜单权限；曾被旧策略清理的运行表权限按实际角色重新授予。
 - Upgrade16 只补充六个租户上传配置字段，空值保持升级前兼容行为。
 - 安全升级不得删除或清空私有子 Git 中的 `Microi.Server/Microi.net/License/keys/`。授权签名资产与登录 RSA 是两套不同用途的密钥，不能以“清理硬编码密钥”为由混删。

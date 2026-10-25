@@ -14,7 +14,7 @@ type ToolContent = { type: 'text'; text: string };
 type ToolResult = { content: ToolContent[]; isError?: boolean };
 type JsonRecord = Record<string, unknown>;
 
-const jsonRecordSchema = z.record(z.unknown());
+const jsonRecordSchema = z.record(z.string(), z.unknown());
 
 function textResult(text: string, isError = false): ToolResult {
   return { content: [{ type: 'text', text }], isError };

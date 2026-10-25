@@ -50,3 +50,8 @@ node microi.benchmarks/manifest-delivery/verify.mjs --out /已有目录/新的�
 本机 Node 24 的[修复前记录](results/2026-10-26-windows-node24-before.json)保留未知计数和失败退出；
 [修复后记录](results/2026-10-26-windows-node24-after.json)为 54/54，通过显式 TAP 输出获得完整计数。
 两者使用相同正式处理器与责任测试，运行器版本和哈希分别记录，不能把格式修复解释为新增业务覆盖。
+
+1.0.2 另绑定 MCP 的 `package.json` 与 `package-lock.json`，依赖声明或锁文件在执行中变化也拒绝通过。
+依赖升级后的 [Node 20](results/2026-10-26-windows-node20-protocol102.json)
+与 [Node 24](results/2026-10-26-windows-node24-protocol102.json) 记录均为 54/54。
+依赖安全回归和完整 349 项 MCP 回归单独列在[依赖核验](../compatibility/README.md#2026-10-26-mcp-生产依赖公告修复)，不混入本运行器的责任计数。
