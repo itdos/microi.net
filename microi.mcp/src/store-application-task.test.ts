@@ -10,14 +10,14 @@ test('store application MCP request persists only identifiers and a stable backg
     requestId: 'saas-v6.9.4-20260801',
     appId: 'app.microi.saas',
     appName: 'SaaS引擎',
-    storeApiBase: 'https://api.itdos.com/',
+    storeApiBase: 'https://api.microi.net/',
     storeOsClient: 'iTdos',
   });
 
   assert.equal(request.ApiEngineKey, 'import-microi-store-package');
   assert.equal(request.Param.StoreId, '01KSTOREAPP000000000000001');
   assert.equal(request.Param.StoreVersionId, '01M0NPJEGVS6F38SFJKQE0AMGV');
-  assert.equal(request.Param.StoreApiBase, 'https://api.itdos.com');
+  assert.equal(request.Param.StoreApiBase, 'https://api.microi.net');
   assert.equal(request.Param.ResumeInstall, true);
   assert.equal(
     request.Options.IdempotencyKey,
@@ -34,7 +34,7 @@ test('store application MCP request only allows the fixed official marketplace o
     'https://api.example.com/microi',
     'https://api.example.com?tenant=iTdos',
     'http://api.itdos.com',
-    'https://api.itdos.com:8443',
+    'https://api.microi.net:8443',
     'https://127.0.0.1',
   ]) {
     assert.throws(() => buildStoreApplicationBackgroundRequest({

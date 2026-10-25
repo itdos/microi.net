@@ -1,3 +1,4 @@
+import { withApplicationGateDiagnostic } from './application-gate-diagnostic.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -1131,7 +1132,8 @@ export class MicroiClient {
       );
       const tokenKey = tokenKeys[0];
       if (!tokenKey) return;
-      tokens[tokenKey] = tokenKeys.some(key => isProtectedSessionToken(tokens[key])) ? protectSessionToken(this.token) : this.token;
+      // Linux 的新会话始终留在 Secret Service；环境注入登录也不能落盘明文 Token。
+      tokens[tokenKey] = process.platform === 'linux' || tokenKeys.some(key => isProtectedSessionToken(tokens[key])) ? protectSessionToken(this.token) : this.token;
       const dir = path.dirname(filePath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(filePath, JSON.stringify(tokens, null, 2), { encoding: 'utf-8', mode: 0o600 });
@@ -1449,7 +1451,7 @@ export class MicroiClient {
         );
       }
     }
-    return parsed;
+    return withApplicationGateDiagnostic(parsed, this.config);
   }
 
   /**
@@ -1629,7 +1631,7 @@ export class MicroiClient {
         );
       }
     }
-    return parsed;
+    return withApplicationGateDiagnostic(parsed, this.config);
   }
 
   private async requestJsonNative(
@@ -1931,7 +1933,7 @@ export class MicroiClient {
         );
       }
     }
-    return parsed;
+    return withApplicationGateDiagnostic(parsed, this.config);
   }
 
   private isUncertainWriteError(error: unknown): error is MicroiTransportError {
@@ -2006,6 +2008,17 @@ export class MicroiClient {
 
   async getStatus(): Promise<ApiResponse> {
     return this.get(API.GET_STATUS);
+  }
+
+  private async checkApplicationPublishGate(): Promise<ApiResponse | null> {
+    const status = await this.getStatus();
+    if (status.Code !== 1) return status;
+    const data = status.Data && typeof status.Data === 'object' ? status.Data as Record<string, unknown> : {};
+    if (data.ApplicationAssetStreamGateReady !== false) return null;
+    return {
+      ...status, Code: 0,
+      Msg: `${String(data.ApplicationAssetStreamGateReadError || '应用发布门禁不可用')}\n${status.DataAppend?.Hint || ''}`,
+    };
   }
 
   async getAdministrativeCapabilities(): Promise<ApiResponse> {
@@ -2423,7 +2436,7 @@ export class MicroiClient {
     changeSummary?: string;
     confirmLargeReduction?: boolean;
     v8Limit?: boolean;
-    responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP';
+    responseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP' | 'SignalR';
     apiRoutes?: string | string[];
     /** @deprecated Compatibility alias. true maps to v8Limit=false. */
     v8Unlimited?: boolean;
@@ -2593,7 +2606,7 @@ export class MicroiClient {
     Code?: string;
     ApiAddress?: string;
     ApiRoutes?: string | string[];
-    ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP';
+    ResponseType?: 'JSON' | 'String' | 'File' | 'HTML' | 'Stream' | 'HTTP' | 'SignalR';
     V8Limit?: number;
     /** @deprecated Compatibility alias. true maps to V8Limit=0. */
     V8Unlimited?: number;
@@ -2710,6 +2723,8 @@ export class MicroiClient {
   }
 
   async uploadApplicationAssetStream(data: ApplicationAssetStreamUploadRequest): Promise<ApiResponse> {
+    const gateFailure = await this.checkApplicationPublishGate();
+    if (gateFailure) return gateFailure;
     const localPath = path.resolve(data.FilePath);
     const stat = fs.lstatSync(localPath);
     if (!stat.isFile() || stat.isSymbolicLink()) {
@@ -3086,6 +3101,8 @@ export class MicroiClient {
   }
 
   async publishMicroService(data: Record<string, unknown>): Promise<ApiResponse> {
+    const gateFailure = await this.checkApplicationPublishGate();
+    if (gateFailure) return gateFailure;
     return this.post(API.PUBLISH_MICRO_SERVICE, {
       OsClient: this.config.osClient,
       ...data,
@@ -3163,24 +3180,21 @@ export class MicroiClient {
   async getTableData(tableName: string, query: Record<string, unknown> = {}): Promise<ApiResponse> {
     return this.post(API.FORM_GET_TABLE_DATA, {
       OsClient: this.config.osClient,
-      FormEngineKey: tableName,
-      ...query,
+      Operation: 'query', TableName: tableName, Query: query,
     });
   }
 
   async addFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse> {
     return this.post(API.FORM_ADD_FORM_DATA, {
       OsClient: this.config.osClient,
-      FormEngineKey: tableName,
-      ...row,
+      Operation: 'add', TableName: tableName, Row: row, ConfirmExecution: tableName,
     });
   }
 
   async updateFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse> {
     return this.post(API.FORM_UPT_FORM_DATA, {
       OsClient: this.config.osClient,
-      FormEngineKey: tableName,
-      ...row,
+      Operation: 'update', TableName: tableName, Row: row, ConfirmExecution: tableName,
     });
   }
 
@@ -3893,55 +3907,55 @@ export class MicroiClient {
     return this.executeEngine('mci-system-observability-action', command);
   }
 
-  async getRedisStatistics(database = 0, connectionId?: string): Promise<ApiResponse> {
+  async getRedisStatistics(database?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_STATISTICS, {
       Action: 'RedisStatistics',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
     });
   }
 
-  async getRedisKeys(pattern = '*', database = 0, pageSize = 100, cursor?: string, connectionId?: string): Promise<ApiResponse> {
+  async getRedisKeys(pattern = '*', database?: number, pageSize = 100, cursor?: string, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_KEYS, {
       Action: 'Keys',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Pattern: pattern,
       PageSize: pageSize,
       Cursor: cursor || '',
     });
   }
 
-  async getRedisKey(key: string, database = 0, pageIndex = 1, pageSize = 500, connectionId?: string): Promise<ApiResponse> {
+  async getRedisKey(key: string, database?: number, pageIndex = 1, pageSize = 500, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_KEY, {
       Action: 'Key',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Key: key,
       PageIndex: pageIndex,
       PageSize: pageSize,
     });
   }
 
-  async deleteRedisKeys(keys: string[], database = 0, connectionId?: string): Promise<ApiResponse> {
+  async deleteRedisKeys(keys: string[], database?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_DELETE_KEYS, {
       Action: 'DeleteKeys',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Keys: keys,
     });
   }
 
-  async replaceRedisValue(key: string, dataType: string, value: string, database = 0, ttlSeconds?: number, connectionId?: string): Promise<ApiResponse> {
+  async replaceRedisValue(key: string, dataType: string, value: string, database?: number, ttlSeconds?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_REPLACE_VALUE, {
       Action: 'ReplaceValue',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Key: key,
       DataType: dataType,
       Value: value,
@@ -3949,23 +3963,23 @@ export class MicroiClient {
     });
   }
 
-  async renameRedisKey(key: string, newKey: string, database = 0, connectionId?: string): Promise<ApiResponse> {
+  async renameRedisKey(key: string, newKey: string, database?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_RENAME_KEY, {
       Action: 'RenameKey',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Key: key,
       NewKey: newKey,
     });
   }
 
-  async setRedisTtl(key: string, ttlSeconds: number, database = 0, connectionId?: string): Promise<ApiResponse> {
+  async setRedisTtl(key: string, ttlSeconds: number, database?: number, connectionId?: string): Promise<ApiResponse> {
     return this.post(API.REDIS_SET_TTL, {
       Action: 'SetTtl',
       Mode: connectionId ? 'saved' : 'tenant',
       ConnectionId: connectionId || '',
-      Database: database,
+      ...(database === undefined ? {} : { Database: database }),
       Key: key,
       TtlSeconds: ttlSeconds,
     });

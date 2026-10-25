@@ -5,6 +5,7 @@ import type { McpServerContext } from './server.js';
 import { normalizePageJsonObj, normalizePrintObj, normalizePrintPageObj } from './design-engine.js';
 import { buildFileUploadConfig } from './file-upload-config.js';
 import { bindManifestExecutionClient, ManifestContextStore, type ManifestContextInput } from './manifest-context.js';
+import { validateManifestDeclarations } from './manifest-preflight.js';
 
 type JsonRecord = Record<string, unknown>;
 type ToolContent = { type: 'text'; text: string };
@@ -305,7 +306,7 @@ export function analyzeClientChunking(buttonInput: unknown): {
 
 export type StoreApplicationOperation = 'install' | 'update';
 
-const OFFICIAL_STORE_API_BASE = 'https://api.itdos.com';
+const OFFICIAL_STORE_API_BASE = 'https://api.microi.net';
 const OFFICIAL_STORE_OSCLIENT = 'iTdos';
 
 export interface StoreApplicationTaskInput {
@@ -889,12 +890,12 @@ function buildFieldConfig(sourceType: string, options: JsonRecord): { data?: str
   if (type === 'apiengine') {
     const apiEngineKey = getString(options, 'apiEngineKey', 'DataSourceApiEngineKey');
     if (!apiEngineKey) warnings.push('接口引擎数据源缺少 apiEngineKey');
-    return { config: { DataSource: 'ApiEngine', DataSourceApiEngineKey: apiEngineKey, SelectLabel: getString(options, 'selectLabel') || 'name', SelectSaveField: getString(options, 'selectSaveField') || 'id' }, warnings };
+    return { config: { DataSource: 'ApiEngine', DataSourceApiEngineKey: apiEngineKey, SelectLabel: getString(options, 'selectLabel') || 'name', SelectSaveField: getString(options, 'selectSaveField') || 'id', ...selectedValueLookupConfig(options, warnings) }, warnings };
   }
   if (type === 'datasource') {
     const dataSourceId = getString(options, 'dataSourceId', 'DataSourceId');
     if (!dataSourceId) warnings.push('数据源引擎配置缺少 dataSourceId');
-    return { config: { DataSource: 'DataSource', DataSourceId: dataSourceId, SelectLabel: getString(options, 'selectLabel') || 'Name', SelectSaveField: getString(options, 'selectSaveField') || 'Id' }, warnings };
+    return { config: { DataSource: 'DataSource', DataSourceId: dataSourceId, SelectLabel: getString(options, 'selectLabel') || 'Name', SelectSaveField: getString(options, 'selectSaveField') || 'Id', ...selectedValueLookupConfig(options, warnings) }, warnings };
   }
   if (type === 'autonumber') {
     return { config: { AutoNumberFixed: getString(options, 'prefix', 'AutoNumberFixed'), AutoNumberLength: getNumber(options, 'length', 'AutoNumberLength') ?? 4 }, warnings };
@@ -912,6 +913,14 @@ function buildFieldConfig(sourceType: string, options: JsonRecord): { data?: str
   }
   warnings.push(`未知 sourceType: ${sourceType}，已返回空配置`);
   return { config: {}, warnings };
+}
+
+// 任意引擎必须显式实现按已选值解析契约；不把字符串 "false" 误当成启用。
+function selectedValueLookupConfig(options: JsonRecord, warnings: string[]): JsonRecord {
+  const enabled = options.selectedValueLookup ?? options.SelectedValueLookup;
+  if (enabled === undefined) return {};
+  if (typeof enabled !== 'boolean') throw new Error('SelectedValueLookup 必须为 boolean');
+  return { SelectedValueLookup: enabled };
 }
 
 function toSearchFieldModel(meta: FieldMeta, ref?: FieldRef): JsonRecord {
@@ -1538,9 +1547,11 @@ function buildDefaultTableLayout(table: JsonRecord): TableLayoutDefaults {
 }
 
 export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: string[]; warnings: string[] } {
-  const errors: string[] = [];
+  const errors = validateManifestDeclarations(manifest);
   const warnings: string[] = [];
   const plan: string[] = [];
+  // 必须在 asArray/getArray 的兼容过滤前整体拒绝，计划、dry-run、生成和回读共用此门禁。
+  if (errors.length) return { plan, errors, warnings };
   const roles = getArray(manifest, 'roles', 'Roles');
   const tables = getArray(manifest, 'tables', 'Tables');
   const engines = getArray(manifest, 'engines', 'Engines');
@@ -2871,6 +2882,12 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
   const confirmTarget = osClient || 'EXECUTE';
   return {
     osClient,
+    declarationPreflight: {
+      version: 1,
+      order: '原始声明校验 → 关系/权限等领域预检 → dry-run → 已授权写入 → 独立回读',
+      rejects: ['非对象数组或空/无效资源项', '冲突的大小写属性别名', '重复表名/接口Key/数据源Key', '同表重复字段名/显式索引名'],
+      boundary: '声明不合法时在资源调用前整体拒绝；不代替服务端权限、跨资源事务、写入后验证或未知结果回查。',
+    },
     workflow: [
       '先按实际任务范围读取现有表结构；完整新系统须盘点相关资源，局部修改从明确目标和依赖开始，不能凭摘要猜字段。',
       '根据真实需求与本协议整理完整或局部 Manifest，保持原有业务、权限、表单、菜单和验收质量。',
@@ -3196,7 +3213,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     `Build and validate Microi diy_field Data/Config JSON for option controls, SQL/APIEngine/DataSource sources, JoinForm, AutoNumber and DateTime. OsClient: ${osClient}`,
     {
       sourceType: z.enum(['Data', 'KeyValue', 'Sql', 'ApiEngine', 'DataSource', 'AutoNumber', 'JoinForm', 'DateTime', 'FileUpload']).describe('Config source type. FileUpload 的 options 支持 EnableRolePermission、HideUnauthorizedFiles、ShowUnauthorizedFileName、DisableRoleInheritance，均为 boolean，默认 false；ConfigurableRoleIds 是最多 100 个真实角色 Id 的数组，默认 [] 允许所有角色，非空时仅可新增其中角色的附件授权。启用角色权限自动 Limit=true。'),
-      options: jsonRecordSchema.optional().describe('Source options, such as data/options, sql, apiEngineKey, dataSourceId, tableId, prefix, length'),
+      options: jsonRecordSchema.optional().describe('数据源参数：data/options、sql、apiEngineKey、dataSourceId、tableId、prefix、length。ApiEngine/DataSource 可传 selectedValueLookup（boolean，默认不启用）；仅在引擎支持 _ResolveSelectedValues=true、_SelectedValues 数组、保留权限过滤且返回 DataAppend.SelectedValuesResolved=true 后启用，需配套新前端。'),
     },
     async ({ sourceType, options }) => {
       const built = buildFieldConfig(sourceType, options || {});
@@ -3206,7 +3223,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
 
   server.tool(
     'microi_plan_system',
-    '创建完整或局部 Manifest 的只读结构计划。首次传 manifest + detail=summary 获得 manifestRef/hash，后续 dry-run/生成/验收复用引用，仍逐次重新检查。action=read_result 按 resultRef 读取本会话完整回执，不执行写入。',
+    '创建完整或局部 Manifest 的只读结构计划。先拒绝非法资源集合、冲突别名及重复资源Key，再进行领域预检。首次传 manifest + detail=summary 获得 manifestRef/hash，后续 dry-run/生成/验收复用引用，仍逐次重新检查。action=read_result 按 resultRef 读取本会话完整回执，不执行写入。',
     { ...manifestInputSchema, action: z.enum(['plan', 'read_result']).optional(), resultRef: z.string().max(128).optional() },
     async (input) => {
       if (input.action === 'read_result') {

@@ -32,6 +32,33 @@ test('MicroService module dry run uses the selected tenant and preserves explici
         await server.close();
     }
 });
+test('MicroService module dry run uses the selected tenant and preserves explicit legacy URLs', async () => {
+    const server = createMcpServer({}, {
+        osClient: 'loctek', apiBaseUrl: 'https://api.example.test', label: 'tenant route test',
+    });
+    const client = new Client({ name: 'microservice-route-test', version: '1.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+        for (const explicitUrl of [undefined, '/micro-app/microi-3d-engine/designer']) {
+            const result = await client.callTool({ name: 'microi_create_module', arguments: {
+                    name: '3D engine', openType: 'MicroService', microServiceId: 'service-1',
+                    microServicePageId: 'page-1', microServiceKey: 'microi-3d-engine',
+                    microServiceRoutePath: '/designer', ...(explicitUrl ? { url: explicitUrl } : {}),
+                } });
+            assert.notEqual(result.isError, true, JSON.stringify(result.content));
+            const text = result.content.find(item => item.type === 'text');
+            assert.ok(text && text.type === 'text');
+            const preview = JSON.parse(text.text);
+            assert.equal(preview.dryRun, true);
+            assert.equal(preview.module.Url, explicitUrl || '/micro-app/loctek/microi-3d-engine/designer');
+        }
+    }
+    finally {
+        await client.close();
+        await server.close();
+    }
+});
 test('普通 MCP 宿主初始化也收到跨模型的版本与自动更新基础规则', async () => {
     const server = createMcpServer({}, {
         osClient: 'fixture', apiBaseUrl: 'https://api.example.test', label: '基础入口验收',

@@ -22,7 +22,7 @@ test('file cabinet Office discovery routes exact tenant object context and propa
   } as unknown as MicroiClient;
 
   const server = createMcpServer(fakeClient, {
-    osClient: 'iTdos', apiBaseUrl: 'https://api.itdos.com', label: '吾码官方', codexMode: true,
+    osClient: 'iTdos', apiBaseUrl: 'https://api.microi.net', label: '吾码官方', codexMode: true,
   });
   const client = new Client({ name: 'microi-file-cabinet-test', version: '1.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

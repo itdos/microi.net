@@ -1,7 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { payload, notify } from '../scripts/indexnow.mjs'
+import { payload, notify, urlsForPaths } from '../scripts/indexnow.mjs'
 const key = 'a'.repeat(64), url = 'https://microi.net/doc/'
+
+test('new changed-document selection does not replay the original ten-page batch', () => {
+  assert.deepEqual(urlsForPaths(['/doc/v8-engine/mcp-server.html', '/doc/more/security.html']), ['https://microi.net/doc/v8-engine/mcp-server.html', 'https://microi.net/doc/more/security.html'])
+})
+test('changed paths reject external origins, normalization ambiguity, utility pages and oversized batches', () => {
+  for (const paths of [[], {}, null, ['//outside.example/'], ['https://outside.example/'], ['/doc/../profile.html'], ['/doc/?key=private'], ['/doc/#part'], ['/profile.html'], ['/doc/index.html'], Array(101).fill('/doc/')]) assert.throws(() => urlsForPaths(paths))
+})
 test('notification rejects foreign hosts, utility pages and noncanonical query URLs', () => {
   for (const value of ['https://other.example/doc/', 'https://microi.net/profile.html', url + '?token=private', 'https://microi.net/doc/index.html']) assert.throws(() => payload(key, [value]))
   assert.deepEqual(payload(key, [url, url]).urlList, [url])

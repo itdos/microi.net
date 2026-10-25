@@ -23,6 +23,14 @@ import {
   validateApplicationAssetV3FinalizeEvidence,
 } from './server.js';
 
+// Transport fixtures isolate upload/retry behavior; the real status preflight is
+// exercised separately in application-gate-diagnostic.test.ts.
+function makePublishTransportClient(config: ConstructorParameters<typeof MicroiClient>[0]): MicroiClient {
+  const client = new MicroiClient(config);
+  client.getStatus = async () => ({ Code: 1, Data: { ApplicationAssetStreamGateReady: true }, Msg: '' });
+  return client;
+}
+
 const EMPTY_ROUTE_SNAPSHOT_JSON = '[]';
 const EMPTY_ROUTE_SNAPSHOT_HASH = crypto.createHash('sha256').update(EMPTY_ROUTE_SNAPSHOT_JSON, 'utf8').digest('hex');
 
@@ -408,7 +416,7 @@ test('uploadApplicationAssetStream sends raw multipart bytes without Base64 mate
       });
     }) as typeof fetch;
 
-    const client = new MicroiClient({
+    const client = makePublishTransportClient({
       apiBaseUrl: 'https://api.example.test',
       username: '',
       password: '',
@@ -463,7 +471,7 @@ test('uploadApplicationAssetStream falls back to native HTTP with the same raw m
       throw new TypeError('simulated undici stream reset');
     }) as typeof fetch;
 
-    const client = new MicroiClient({
+    const client = makePublishTransportClient({
       apiBaseUrl: `http://127.0.0.1:${address.port}`,
       username: '',
       password: '',
@@ -531,7 +539,7 @@ test('uploadApplicationAssetStream retries through gzip multipart after raw prox
       throw new TypeError('simulated proxy reset');
     }) as typeof fetch;
 
-    const client = new MicroiClient({
+    const client = makePublishTransportClient({
       apiBaseUrl: `http://127.0.0.1:${address.port}`,
       username: '',
       password: '',
@@ -576,7 +584,7 @@ test('legacy microservice source sync never replays a failed fetch through nativ
     globalThis.fetch = (async () => {
       throw new TypeError('simulated fetch disconnect after unknown write outcome');
     }) as typeof fetch;
-    const client = new MicroiClient({
+    const client = makePublishTransportClient({
       apiBaseUrl: `http://127.0.0.1:${address.port}`,
       username: '',
       password: '',
@@ -700,7 +708,7 @@ test('protocol v3 always resumes through durable multipart and sends only the mi
     });
     const address = server.address();
     assert.ok(address && typeof address === 'object');
-    const client = new MicroiClient({
+    const client = makePublishTransportClient({
       apiBaseUrl: `http://127.0.0.1:${address.port}`,
       username: '',
       password: '',
@@ -747,7 +755,7 @@ test('protocol v3 always resumes through durable multipart and sends only the mi
   }
 });
 
-test('publishMicroService falls back to native HTTP with the exact JSON body', async () => {
+test('publishMicroService does not replay an uncertain non-idempotent write through native HTTP', async () => {
   const originalFetch = globalThis.fetch;
   let capturedPath = '';
   let capturedBody = '';
@@ -772,26 +780,21 @@ test('publishMicroService falls back to native HTTP with the exact JSON body', a
       throw new TypeError('simulated undici JSON reset');
     }) as typeof fetch;
 
-    const client = new MicroiClient({
+    const client = makePublishTransportClient({
       apiBaseUrl: `http://127.0.0.1:${address.port}`,
       username: '',
       password: '',
       osClient: 'iTdos',
       token: 'unit-test-token',
     });
-    const result = await client.publishMicroService({
+    await assert.rejects(client.publishMicroService({
       AppId: 'existing-app',
       AppVersion: 'v1.0.1',
       FileList: [{ RelativePath: 'index.html', ContentBase64: 'PGh0bWw+' }],
-    });
-    assert.equal(result.Code, 1);
-    assert.match(capturedPath, /PublishMicroService/u);
-    assert.deepEqual(JSON.parse(capturedBody), {
-      OsClient: 'iTdos',
-      AppId: 'existing-app',
-      AppVersion: 'v1.0.1',
-      FileList: [{ RelativePath: 'index.html', ContentBase64: 'PGh0bWw+' }],
-    });
+    }), /已禁用非幂等传输重放/u);
+    assert.equal(capturedPath, '');
+    assert.equal(capturedBody, '');
+    client.destroy();
   } finally {
     globalThis.fetch = originalFetch;
     await new Promise<void>(resolve => server.close(() => resolve()));
@@ -834,7 +837,7 @@ test('protocol v3 resumable initiation forwards canonical bigint strings and exp
         headers: { 'Content-Type': 'application/json' },
       });
     }) as typeof fetch;
-    const client = new MicroiClient({
+    const client = makePublishTransportClient({
       apiBaseUrl: 'https://api.example.test',
       username: '',
       password: '',

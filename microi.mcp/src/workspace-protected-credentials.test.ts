@@ -16,6 +16,14 @@ function stubMacWorkspace(t: TestContext, filePath: string, values: Record<strin
   const expected = new Map(Object.entries(values).map(([key, value]) => [macAccountFor(filePath, key), value]));
   const calls: string[] = [];
   const replacement = ((command: string, args: string[]) => {
+    if (process.platform === 'linux') {
+      assert.equal(command, '/usr/bin/secret-tool');
+      assert.deepEqual(args.slice(0, 4), ['lookup', 'service', macWorkspaceService, 'account']);
+      assert.match(args[4], /^[a-f0-9]{64}$/); calls.push(args[4]);
+      const value = expected.get(args[4]), status = unavailable || value === undefined ? 1 : 0;
+      const stdout = status === 0 ? Buffer.from(value!, 'utf8').toString('base64') : '';
+      return { pid: 0, output: [null, stdout, ''], stdout, stderr: unavailable ? 'owned unavailable fixture' : '', status, signal: null };
+    }
     assert.equal(command, '/usr/bin/security');
     assert.equal(args.length, 6);
     assert.deepEqual(args.slice(0, 3), ['find-generic-password', '-s', macWorkspaceService]);
@@ -36,17 +44,27 @@ function vaultFixture() {
   return { directory, filePath };
 }
 
-test('imported developer session encrypts for the current OS user and never silently downgrades', () => {
+test('imported developer session encrypts for the current OS user and never silently downgrades', (t) => {
   // 唯一自有fixture；finally只删本次service/account。
   const token = `fixture.session.${randomBytes(16).toString('hex')}.signature`;
-  if (process.platform !== 'win32' && process.platform !== 'darwin') {
+  if (!['win32', 'darwin', 'linux'].includes(process.platform)) {
     assert.throws(() => protectSessionToken(token));
     return;
   }
   const account = createHash('sha256').update(token).digest('hex');
+  // Linux 单测使用隔离 OS provider，不依赖开发机是否启用了图形钥匙环；实际后端另行验收。
+  if (process.platform === 'linux') {
+    let encoded = '';
+    t.mock.method(childProcess, 'spawnSync', ((command: string, args: string[], options: { input?: string }) => {
+      assert.equal(command, '/usr/bin/secret-tool');
+      assert.ok(!args.join(' ').includes(token));
+      if (args[0] === 'store') encoded = String(options.input);
+      return { pid: 0, output: [null, encoded, ''], stdout: encoded, stderr: '', status: 0, signal: null };
+    }) as typeof childProcess.spawnSync);
+  }
   try {
     const encrypted = protectSessionToken(token);
-    assert.ok(encrypted.startsWith(process.platform === 'darwin' ? 'keychain-session-v1:' : 'dpapi-session-v1:'));
+    assert.ok(encrypted.startsWith(process.platform === 'linux' ? 'secretservice-session-v1:' : process.platform === 'darwin' ? 'keychain-session-v1:' : 'dpapi-session-v1:'));
     assert.ok(!encrypted.includes(token));
     assert.equal(unprotectSessionToken(encrypted), token);
     assert.equal(unprotectSessionToken('legacy-token'), 'legacy-token');
@@ -78,7 +96,7 @@ test('workspace credential vault returns only the requested encrypted profile ke
     protection: 'windows-dpapi-current-user',
     ciphertext: Buffer.from('opaque-ciphertext').toString('base64'),
   }));
-  const calls = process.platform === 'darwin' ? stubMacWorkspace(t, filePath, { 'user-key': 'workspace-user', 'password-key': 'workspace-password', 'other-password-key': 'must-not-be-selected' }) : undefined;
+  const calls = ['darwin', 'linux'].includes(process.platform) ? stubMacWorkspace(t, filePath, { 'user-key': 'workspace-user', 'password-key': 'workspace-password', 'other-password-key': 'must-not-be-selected' }) : undefined;
   let dpapiCalls = 0;
   try {
     const credentials = readWorkspaceCredentials({
@@ -92,7 +110,7 @@ test('workspace credential vault returns only the requested encrypted profile ke
     });
     if (calls) {
       assert.deepEqual(calls, [macAccountFor(filePath, 'user-key'), macAccountFor(filePath, 'password-key')]);
-      assert.equal(dpapiCalls, 0, 'macOS uses its provider without DPAPI/plaintext fallback');
+      assert.equal(dpapiCalls, 0, 'native keyring uses its provider without DPAPI/plaintext fallback');
     } else assert.equal(dpapiCalls, 1);
   } finally {
     t.mock.restoreAll();
@@ -118,7 +136,7 @@ test('workspace credential vault fails closed for malformed or incomplete data',
 test('workspace credential provider unavailable fails closed without alternate profile or decoder fallback', (t) => {
   const { directory, filePath } = vaultFixture();
   const values = { 'user-key': 'workspace-user', 'password-key': 'workspace-password' };
-  const calls = process.platform === 'darwin' ? stubMacWorkspace(t, filePath, values, true) : undefined;
+  const calls = ['darwin', 'linux'].includes(process.platform) ? stubMacWorkspace(t, filePath, values, true) : undefined;
   let dpapiCalls = 0;
   try {
     assert.equal(readWorkspaceCredentials({ filePath, usernameKey: 'user-key', passwordKey: 'password-key' }, () => {
@@ -132,7 +150,7 @@ test('workspace credential provider unavailable fails closed without alternate p
 test('workspace credential vault missing requested profile never selects another available password', (t) => {
   const { directory, filePath } = vaultFixture();
   const values = { 'user-key': 'workspace-user', 'other-password-key': 'must-not-be-selected' };
-  const calls = process.platform === 'darwin' ? stubMacWorkspace(t, filePath, values) : undefined;
+  const calls = ['darwin', 'linux'].includes(process.platform) ? stubMacWorkspace(t, filePath, values) : undefined;
   let dpapiCalls = 0;
   try {
     assert.equal(readWorkspaceCredentials({ filePath, usernameKey: 'user-key', passwordKey: 'missing-password-key' }, () => {
