@@ -1113,7 +1113,7 @@ echo ""
 echo -e "  发布模式: ${BOLD}${_mode_names[$DEPLOY_MODE]}${NC}"
 if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ]; then
     print_info "默认验收：常规 Microi.Tests + 全部通用前端测试 + 接口检查 + 程序启动运行与冒烟。"
-    print_info "本次不适用：真实付费 AI、JUNCHI/XJY 客户数据、SQL Server 专项；这些范围保留独立显式入口。"
+    print_info "本次不适用：真实付费 AI、JUNCHI/XJY 客户数据、SQL Server 及独立应用源码专项；这些范围保留独立显式入口。"
 fi
 if [ "$BUMP_VERSION" = true ]; then
     if [ "$CURRENT_VERSION" = "$VERSION" ]; then
@@ -1259,7 +1259,7 @@ fi
 
 # 选定版本已准备；在官方资源写入、NuGet/Docker 推送之前执行平台自动化回归。
 # 常规发行验证 Microi.Tests、全部通用前端、接口及启动运行；不新建租户、不安装聊天应用、不运行独立 Code/Agent 产品测试。
-# 真实付费 AI、JUNCHI/XJY 客户数据及 SQL Server 验收属于独立专项，不进入默认平台发布。
+# 真实付费 AI、JUNCHI/XJY 客户数据、SQL Server 及独立应用源码验收属于独立专项，不进入默认平台发布。
 # 显式 Full 保留真实业务深度验收；两种范围分别冻结和验证，失败均停止发布。
 if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "${PLATFORM_DOCKER_SELECTED:-false}" = true ]; then
     # bin/Release/Dockerfile 是已跟踪的 Docker 构建配方投影。必须在冻结候选前

@@ -7,7 +7,7 @@ description: 每次 Microi 任务开始前必读的基础规范。用于识别�
 
 ## 普通吾码发布固定入口（强制）
 
-用户要求“发布吾码/完整正式发布/一键发布”时，读取 [普通吾码发布固定流程（30 分钟）](../microi-deployment/SKILL.md#普通吾码发布固定流程30-分钟)，执行 `Microi一键编译发布.sh --platform-release`（默认完整选项）。默认版本 +1 一次，发布 NuGet、API/PC Docker 和官方网站文档/Docker；官网不是可选追加项。`PlatformRelease + PlatformFrontendTests` 执行常规 Microi.Tests（平台单元/组件，不自动追加 Full 专项）、吾码前端全部通用 Node/Playwright 测试、真实接口检查与最终加密产物启动/运行冒烟。真实付费 AI、鸿地/JUNCHI、XJY 等指定客户数据专项和 SQL Server 等独立提供商专项默认不纳入，不再逐次询问；只有用户另行明确要求专项时才执行，回执逐项列为“不适用/未执行”，不能冒充通过。以 1800 秒为耗时目标，超过时告警、记录瓶颈及累计耗时并继续完成；真实错误、取消及安全门禁仍有效。只有用户明确要求局部发布时才缩小渠道；不混入 Microi Code/Agent 独立产品测试，不新建租户或安装聊天应用。
+用户要求“发布吾码/完整正式发布/一键发布”时，读取 [普通吾码发布固定流程（30 分钟）](../microi-deployment/SKILL.md#普通吾码发布固定流程30-分钟)，执行 `Microi一键编译发布.sh --platform-release`（默认完整选项）。默认版本 +1 一次，发布 NuGet、API/PC Docker 和官方网站文档/Docker；官网不是可选追加项。`PlatformRelease + PlatformFrontendTests` 执行常规 Microi.Tests（平台单元/组件，不自动追加 Full 专项）、吾码前端全部通用 Node/Playwright 测试、真实接口检查与最终加密产物启动/运行冒烟。真实付费 AI、鸿地/JUNCHI、XJY 等指定客户数据专项和 SQL Server 等独立提供商专项默认不纳入，不再逐次询问；只有用户另行明确要求专项时才执行，回执逐项列为“不适用/未执行”，不能冒充通过。以 1800 秒为耗时目标，超过时告警、记录瓶颈及累计耗时并继续完成；真实错误、取消及安全门禁仍有效。只有用户明确要求局部发布时才缩小渠道；独立商城应用、OpenClaw 等应用源码专项由各自入口执行，不作为平台发布前置；平台 SDK、商城协议、安装器、SaaS 与工作流通用回归继续保留。不混入 Microi Code/Agent 独立产品测试，不新建租户或安装聊天应用。
 
 ## 本地测试复用项目配置（强制入口）
 

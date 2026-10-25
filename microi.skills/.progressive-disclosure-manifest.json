@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-25T06:15:34.689Z",
+  "generatedAt": "2026-10-25T06:52:22.348Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,10 +763,10 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "fadf59f3736794dcccbd3849d31199f7774e93475b3ff8a575128b8caae0a645",
+      "originalSha256": "67ff1ecf98a904a1e532542948e30a02b2466b517d1888907f43151ce94d84ba",
       "originalLines": 716,
-      "prefixSha256": "917edc92d67281476106fc3322c9cf763098ec0f1c18a79bb23f61507241f508",
-      "prefixBytes": 6528,
+      "prefixSha256": "4db717b9f9af4f4ceeb7379ee629ef1230a1bd8445a4cdc8f660a66c292a2dda",
+      "prefixBytes": 6613,
       "entryLines": 117,
       "chunks": [
         {
@@ -3241,10 +3241,10 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "836ed32a4e4ebc3c1bb3ef2c20d7c18c2a176b2985aa3f2e50448c63d9327eba",
+      "originalSha256": "abbda6138774be3736faf520d43bcb7ed899b9a77037e12d47dce991061704e2",
       "originalLines": 722,
-      "prefixSha256": "5c89ddf8bc79c0f59de1027d5622b146eb46cf192bd6ce4a30c321faacac791f",
-      "prefixBytes": 17268,
+      "prefixSha256": "2c5494a2f868c9666e382772961501714d0d6db73b1b189a491fa45bfbaf77e5",
+      "prefixBytes": 17457,
       "entryLines": 183,
       "chunks": [
         {
