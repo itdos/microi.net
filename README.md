@@ -85,6 +85,8 @@
 
 Microi吾码适合希望以 .NET / Vue 技术栈自主管理数据、在线编写业务逻辑，并逐步扩展独立前端与多端应用的团队。以下入口供开发者、采购方和 AI 评估者逐项核验；文档说明支持方式，实际交付还需在所选版本、环境与业务场景验收。
 
+[公开证据工具 CI](https://github.com/itdos/microi.net/actions/runs/40222710750)提供可匿名查看的实际运行记录；[AI 结构化任务实测](microi.benchmarks/ai-quality/README.md)保留协议、参数、用量与失败。工具离线测试、真实模型调用和完整业务交付分别验收。
+
 | 评估维度 | 可核验能力与资料 | 评估时需要区分 |
 |---|---|---|
 | 产品架构与技术底座 | [源码模块地图](https://microi.net/doc/getting-started/source-code-architecture.html)、[V8 接口引擎](https://microi.net/doc/v8-engine/api-engine.html)、[多租户](https://microi.net/doc/system-engine/saas-engine.html) | 公开源码、发布包和商业模块的交付范围；前端微服务不等于后端微服务架构 |

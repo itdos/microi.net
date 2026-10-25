@@ -5,6 +5,9 @@ on:
     paths:
       - 'microi.benchmarks/**'
       - '.github/workflows/public-evidence.yml'
+      - 'microi.doc/scripts/indexnow.mjs'
+      - 'microi.doc/tests/indexnow.test.mjs'
+      - 'microi.doc/docs/.vitepress/config/seo-policy.mjs'
   workflow_dispatch:
   pull_request:
     paths:
@@ -13,6 +16,9 @@ on:
       - 'microi.benchmarks/case-evidence/**'
       - 'microi.benchmarks/ai-quality/**'
       - '.github/workflows/public-evidence.yml'
+      - 'microi.doc/scripts/indexnow.mjs'
+      - 'microi.doc/tests/indexnow.test.mjs'
+      - 'microi.doc/docs/.vitepress/config/seo-policy.mjs'
 permissions:
   contents: read
 jobs:
@@ -27,4 +33,4 @@ jobs:
         with:
           node-version: '20'
       - name: 合成数据与源码盘点测试（不连接数据库或模型）
-        run: node --max-old-space-size=256 --test --test-concurrency=1 microi.benchmarks/ecosystem/collect.test.mjs microi.benchmarks/compatibility/inspect.test.mjs microi.benchmarks/case-evidence/summarize-saas-registry.test.mjs microi.benchmarks/ai-quality/run.test.mjs
+        run: node --max-old-space-size=256 --test --test-concurrency=1 microi.benchmarks/ecosystem/collect.test.mjs microi.benchmarks/compatibility/inspect.test.mjs microi.benchmarks/case-evidence/summarize-saas-registry.test.mjs microi.benchmarks/ai-quality/run.test.mjs microi.doc/tests/indexnow.test.mjs

@@ -31,3 +31,9 @@ node microi.benchmarks/compatibility/inspect.mjs --trx /path/to/microi-platform.
 测试类与逐组数量在 JSON 中公开。原始回执只有持有者可以独立核对，因此历史摘要属于维护方提供的可追踪测试证据，不是第三方背书。源测试入口见 [Microi.Tests](../../Microi.Server/Microi.Tests/README.md)，数据库规则见[扩展数据库](../../microi.doc/docs/doc/system-engine/databases.md)，安全边界见[安全基线](../../microi.doc/docs/doc/more/security.md)。
 
 后续真实适配记录至少包含平台提交/版本、数据库完整版本、驱动、CPU、OS、部署方式、TLS、字符集、账号权限、连接/参数化读写/事务/结构变更/备份恢复的实际结果，以及脱敏回执摘要。使用已授权的既有环境；明确未执行项，不为了补表创建新容器或写业务数据。
+
+## 2026-10-26 平台 8.7.1 基础回归
+
+[本轮脱敏快照](snapshot-2026-10-26.json)核对本次冻结候选的真实 TRX，5,756 项通过、零失败、零未通过；其中数据库契约 78 项、安全契约 287 项。原始 TRX 的 SHA-256 为 `60b6f3fcb968252f50687608d46b1bcd1cdad90182e94d92995f85c41cff23bf`。另有平台/前端四组 Node 回归 4,029 项通过，属于不同运行器，不与 C# 数量混写。
+
+本轮来源基线为 `4466cb6d519bfe9f72cf6d0e0f762046a6418a45`，包含发行过程的 8.7.1 版本及资源准备改动；冻结候选清单 SHA-256 为 `3277c061c0bdd3dc2d6771731c2835791f4476ecc76917b18a0cbc4e90ab9098`，项目文件摘要另列在快照中。测试范围为基础平台回归，排除 FullStack；未追加客户专项、SQL Server 实库、全提供商矩阵或扩展浏览器验收。6 种驱动仍只表示源码声明，不表示 6 种数据库均已实测或取得认证。
