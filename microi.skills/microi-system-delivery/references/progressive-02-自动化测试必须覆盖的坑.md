@@ -6,10 +6,14 @@
 
 临时文件回归必须调用真实 Full `finally` 与发布 `EXIT` 收尾，分别验证成功、原始失败、可捕获中断及清理失败；不能仅断言源码有 `finally`。覆盖祖先/子项链接、Git 标记、已有目录、空格及方括号路径、受保护属性与独占文件锁，断言保护项字节不变、普通删除不传 `-Force`、失败不自动强制重试、回执可定位残留。测试异常与清理异常同时发生时保留原始异常，发布锁仍释放；平台进程被硬杀不能假称已完成收尾。用例位于 `Microi.Tests/ReleaseGate/test-artifact-cleanup.test.mjs` 与 `release-scratch.test.mjs`，不为这些文件生命周期回归启动数据库或 Docker 容器。
 
-<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=a4d82dd8b2c5c3244b450bc5cf5e0fc58c9f32acd5947dfc8c02b926cc34294a -->
+<!-- microi-progressive:chunk id=microi-system-delivery-006 sha256=861ed84dfe05aa7777c247340e6618c0cb07424482b98143309b7691ca1b1cc8 -->
 ## 自动化测试必须覆盖的坑
 
 ### 后端统一测试与发布门禁
+
+普通发布的步骤与超时语义以 [部署 Skill 的固定流程](../../microi-deployment/SKILL.md#普通吾码发布固定流程30-分钟) 为准。`完整发布` 不等于 `Full`；共享的 1800 秒预算不得由阶段或重试重置。
+
+发布入口回归须验证：遗留桌面 Node 配置不影响 `PlatformRelease`；新租户准入、聊天应用安装及 Code/Agent 测试入口均不触发；平台测试失败/零用例/跳过仍阻止发布；新推送也必须核对远端 digest，回读失败或不一致不能写成功；预算耗尽后不再启动下一条发布命令。使用隔离命令夹具覆盖这些行为，不为验证发布流程启动租户或安装应用。
 
 - 官方或社区独立业务应用、游戏和客户项目在应用自己的 `tests/` 或独立测试工程维护回归，由应用自己的测试及发布入口执行；不得通过直接放文件、转调包装或自动扫描加入平台 Quick/Full。官方商城发布不使业务应用变为平台内置能力。平台 SDK、商城协议、安装器及通用缺陷的最小回归仍由平台负责。
 

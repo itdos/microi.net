@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-24T20:41:11.293Z",
+  "generatedAt": "2026-10-25T04:50:52.998496Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,11 +763,11 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "763e3d4b236d769af299e74313b24ce052ae4738fa576c5b403df9c6fa3de027",
-      "originalLines": 711,
-      "prefixSha256": "4b609f39cb11459d3cace78e0da3f848b963b2ec2ff9c5fa07b35f3f1114ea96",
-      "prefixBytes": 6016,
-      "entryLines": 116,
+      "originalSha256": "1cd27e33705589fc329ec9105b419dc0d975e47c09ea2e7dc1cb24c1c02c7a6f",
+      "originalLines": 716,
+      "prefixSha256": "c483217707341ee08df278d2154b7c55296f7509a5ec619af85f0120fc3d9b05",
+      "prefixBytes": 6298,
+      "entryLines": 117,
       "chunks": [
         {
           "id": "microi-system-delivery-000",
@@ -821,8 +821,8 @@
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "a4d82dd8b2c5c3244b450bc5cf5e0fc58c9f32acd5947dfc8c02b926cc34294a",
-          "lines": 149,
+          "sha256": "861ed84dfe05aa7777c247340e6618c0cb07424482b98143309b7691ca1b1cc8",
+          "lines": 153,
           "heading": "自动化测试必须覆盖的坑"
         },
         {
@@ -3241,11 +3241,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "616f00189e10d3a1ed67155eb0143cde50c76e1c3ad53d54a0cbe01eb551a859",
-      "originalLines": 713,
-      "prefixSha256": "c5d7890a69e031a8c9f63dc24982542084bd330d6b90b663b7f9187e597ae176",
-      "prefixBytes": 15123,
-      "entryLines": 175,
+      "originalSha256": "766b3762e646a2c8d5c2729fff666ef05ee28215585f4bad43fec519901d81f5",
+      "originalLines": 717,
+      "prefixSha256": "393e766bde671924a8bfce922da37b5f6557047e4f1166c470f3780bc63e5ec4",
+      "prefixBytes": 15820,
+      "entryLines": 179,
       "chunks": [
         {
           "id": "workspace-conventions-000",

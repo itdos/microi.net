@@ -106,6 +106,24 @@ export function recheckDockerPlan(plan,tag,{run=runDocker}={}){
  if(expected.fixed&&current.state==='present'&&!local.repoDigests.includes(`${tag.slice(0,tag.lastIndexOf(':'))}@${current.digest}`))fail('docker-version-collision');
  return {tag,...current,checkedAt:new Date().toISOString(),atomicAcrossRegistry:false};
 }
+// push 返回成功只证明命令完成；每个实际标签必须独立读回，并与本次本地镜像的仓库摘要相同。
+// 再读本地身份，拒绝回读过程中被其它构建覆盖的同名镜像；跨 Registry 仍不宣称原子发布。
+export function confirmDockerPublication(plan,tag,{run=runDocker}={}){
+ if(plan?.schema!=='microi.release.docker-remote-plan.v1'||!plan.tags?.some(row=>row.tag===tag))fail('docker-tag-not-planned');
+ const before=imageIdentity(plan.image,run);if(before.id!==plan.localImageId)fail('docker-local-image-changed');
+ const remote=inspectDockerRemote(tag,{run});if(remote.state!=='present')fail('docker-published-tag-missing');
+ const repository=tag.slice(0,tag.lastIndexOf(':')),expected=`${repository}@${remote.digest}`;
+ const after=imageIdentity(plan.image,run);
+ if(after.id!==plan.localImageId)fail('docker-local-image-changed');
+ if(!before.repoDigests.includes(expected)||!after.repoDigests.includes(expected))fail('docker-published-digest-mismatch');
+ return {schema:'microi.release.docker-published-tag.v1',image:plan.image,localImageId:after.id,tag,digest:remote.digest,checkedAt:new Date().toISOString(),atomicAcrossRegistry:false,published:true};
+}
+export function writeDockerPublicationReceipt(planFile,tag,receipt,options={}){
+ const proof=confirmDockerPublication(JSON.parse(fs.readFileSync(planFile,'utf8')),tag,options);
+ // 不先建立“成功”占位文件；未知/不一致返回前完全不写，既有回执也不覆盖。
+ fs.writeFileSync(receipt,JSON.stringify(proof,null,2)+'\n',{flag:'wx'});
+ return proof;
+}
 async function main(){
  const [mode,...args]=process.argv.slice(2);
  if(mode==='nuget-preflight'){
@@ -116,6 +134,10 @@ async function main(){
   const [image,prefix,templates,version,receipt]=args;const proof=captureDockerPlan(image,prefix,templates,version);fs.writeFileSync(receipt,JSON.stringify(proof,null,2)+'\n',{flag:'wx'});console.log('Docker remote baseline verified; cross-registry updates are not atomic.');return;
  }
  if(mode==='docker-recheck'){const [receipt,tag]=args;recheckDockerPlan(JSON.parse(fs.readFileSync(receipt,'utf8')),tag);console.log('Docker remote state still matches its pre-push baseline.');return;}
+ if(mode==='docker-confirm'){
+  const [receipt,tag,publishedReceipt]=args;const proof=writeDockerPublicationReceipt(receipt,tag,publishedReceipt);
+  console.log(`Docker published tag verified: ${proof.tag} @ ${proof.digest}`);return;
+ }
  fail('remote-collision-usage');
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(error=>{console.error(`Release remote guard failed: ${error instanceof RemoteCollisionError?error.code:'inspection-unknown'}`);process.exitCode=1;});

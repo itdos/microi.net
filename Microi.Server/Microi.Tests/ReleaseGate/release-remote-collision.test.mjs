@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
-import {inspectNugetPackage,inspectNugetSet,captureDockerPlan,recheckDockerPlan,inspectDockerRemote} from '../../tools/release-remote-collision.mjs';
+import {inspectNugetPackage,inspectNugetSet,captureDockerPlan,recheckDockerPlan,inspectDockerRemote,confirmDockerPublication,writeDockerPublicationReceipt} from '../../tools/release-remote-collision.mjs';
 
 const source='https://packages.example.test/v3/index.json';
 const index=()=>new Response(JSON.stringify({resources:[{'@type':'PackageBaseAddress/3.0.0','@id':'https://flat.example.test/'}]}));
@@ -87,6 +87,74 @@ test('Docker every push recheck rejects absent-to-present, digest mutation, loca
  assert.throws(()=>recheckDockerPlan(plan,'registry.test/team/api:latest',{run:dockerMock(remote,{id:otherDigest})}),/local-image-changed/);
  assert.throws(()=>recheckDockerPlan(plan,'registry.test/team/api:latest',{run:dockerMock({},{unknown:true})}),/unknown/);
 });
+
+test('Docker publication is confirmed only when the remote tag matches this accepted image repository digest',()=>{
+ const tag='registry.test/team/api:v8.6.4',repo='registry.test/team/api';
+ const plan=captureDockerPlan('local','registry.test/team','api:{version}','8.6.4',{run:dockerMock({})});
+ const proof=confirmDockerPublication(plan,tag,{run:dockerMock({[tag]:remoteDigest},{repoDigests:[`${repo}@${remoteDigest}`]})});
+ assert.equal(proof.published,true);assert.equal(proof.localImageId,imageId);assert.equal(proof.digest,remoteDigest);
+ for(const [remote,options,message] of [
+  [{},{repoDigests:[`${repo}@${remoteDigest}`]},/published-tag-missing/],
+  [{[tag]:otherDigest},{repoDigests:[`${repo}@${remoteDigest}`]},/published-digest-mismatch/],
+  [{[tag]:remoteDigest},{repoDigests:[`registry.test/other/api@${remoteDigest}`]},/published-digest-mismatch/],
+  [{[tag]:remoteDigest},{id:otherDigest,repoDigests:[`${repo}@${remoteDigest}`]},/local-image-changed/],
+  [{},{unknown:true},/remote-state-unknown/]
+ ])assert.throws(()=>confirmDockerPublication(plan,tag,{run:dockerMock(remote,options)}),message);
+ let reads=0;const mock=dockerMock({[tag]:remoteDigest},{repoDigests:[`${repo}@${remoteDigest}`]});
+ assert.throws(()=>confirmDockerPublication(plan,tag,{run:args=>args[0]==='image'&&++reads===2?{status:0,stdout:JSON.stringify({id:otherDigest,repoDigests:[`${repo}@${remoteDigest}`]})}:mock(args)}),/local-image-changed/);
+});
+
+test('actual Docker confirmation writes its receipt only after verification and never overwrites earlier evidence',()=>fixture(root=>{
+ const tag='registry.test/team/api:v8.6.4',repo='registry.test/team/api';
+ const planFile=path.join(root,'plan.json'),receipt=path.join(root,'published.json');
+ fs.writeFileSync(planFile,JSON.stringify(captureDockerPlan('local','registry.test/team','api:{version}','8.6.4',{run:dockerMock({})})));
+ for(const run of [dockerMock({}),dockerMock({},{unknown:true}),dockerMock({[tag]:otherDigest},{repoDigests:[`${repo}@${remoteDigest}`]})]){
+  assert.throws(()=>writeDockerPublicationReceipt(planFile,tag,receipt,{run}));
+  assert.equal(fs.existsSync(receipt),false,'A failed or unknown readback must not create a success receipt');
+ }
+ const run=dockerMock({[tag]:remoteDigest},{repoDigests:[`${repo}@${remoteDigest}`]});
+ const proof=writeDockerPublicationReceipt(planFile,tag,receipt,{run}),bytes=fs.readFileSync(receipt);
+ assert.deepEqual(JSON.parse(bytes),proof);assert.equal(proof.published,true);
+ assert.throws(()=>writeDockerPublicationReceipt(planFile,tag,receipt,{run}),/EEXIST/);
+ assert.deepEqual(fs.readFileSync(receipt),bytes);
+}));
+
+for(const scenario of ['success','digest-mismatch','readback-timeout','push-failed'])test(`actual platform Docker loop requires post-push confirmation before completion: ${scenario}`,()=>fixture(root=>{
+ const script=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
+ const start=script.indexOf('docker_push_plan() {'),end=script.indexOf('\nif [ ${#SELECTED_API_PLANS',start);
+ assert.ok(start>0&&end>start);const loop=script.slice(start,end);
+ fs.mkdirSync(path.join(root,'Microi.Server/Microi.net.Api/bin/Release'),{recursive:true});
+ const git=process.platform==='win32'?spawnSync('git',['--exec-path'],{encoding:'utf8'}):null;
+ const bash=git?path.resolve(git.stdout.trim(),'../../..','bin/bash.exe'):'bash';
+ const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:root,encoding:'utf8',timeout:15000,input:`set -e
+MICROI_RELEASE_GATE_DIR="$PWD"; MICROI_RELEASE_CANDIDATE=fixture; PUBLISH_DIR=fixture; MICROI_ENCRYPTION_RECEIPT=fixture
+COMMAND_LOG="$PWD/budget-calls.txt"
+PUBLISH_BACKEND=true; BUILD_CLIENT=false; HAS_ENCRYPT=true; DOCKER_REGISTRY=registry.test; DOCKER_NAMESPACE=team
+print_step(){ :; }; print_info(){ :; }; print_warning(){ :; }; print_fail(){ printf 'FAILED=%s\\n' "$*"; exit 17; }; print_success(){ printf 'COMPLETE=%s\\n' "$*"; }
+run_release_command(){ printf 'BUDGET=%s\\n' "$*" >> "$COMMAND_LOG"; "$@"; }
+node(){
+ if [ "$2" = docker-confirm ]; then
+  printf 'CONFIRM=%s\\n' "$4"
+  ${scenario==='digest-mismatch'?'return 1':scenario==='readback-timeout'?'return 124':':' }
+  printf 'verified' > "$5"
+ fi
+}
+docker(){
+ if [ "$1" = push ]; then printf 'PUSH=%s\\n' "$2"; ${scenario==='push-failed'?'return 42':':'}; fi
+}
+${loop}
+docker_push_plan 'fixture|api|local|api:{latest},api:{version}' 8.6.4
+`});
+ assert.ifError(run.error);
+ const success=scenario==='success';assert.equal(run.status===0,success,run.stdout+'\n'+run.stderr);
+ assert.equal(run.stdout.includes('COMPLETE='),success);
+ const proofs=fs.readdirSync(root).filter(file=>/-published-\d+\.json$/.test(file));assert.equal(proofs.length,success?2:0);
+ if(success){assert.match(run.stdout,/PUSH=.*:latest[\s\S]*CONFIRM=.*:latest[\s\S]*PUSH=.*:v8\.6\.4[\s\S]*CONFIRM=.*:v8\.6\.4[\s\S]*COMPLETE=/);}
+ else assert.equal(run.stdout.includes('PUSH=registry.test/team/api:v8.6.4'),false,'Failed first tag prevents the next tag');
+ const budgetCalls=fs.readFileSync(path.join(root,'budget-calls.txt'),'utf8');
+ for(const command of ['release-artifact.mjs','release-encryption.mjs image','docker tag','docker image inspect','docker push'])assert.ok(budgetCalls.includes(`BUDGET=${command.startsWith('release-')?'node Microi.Server/tools/':''}${command}`),budgetCalls);
+ if(scenario!=='push-failed')assert.match(budgetCalls,/BUDGET=node Microi.Server\/tools\/release-remote-collision.mjs docker-confirm/);
+}));
 test('formal shell runs whole-set preflight before first NuGet and Docker baseline before any version/latest push',()=>{
  const script=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
  const nuget=script.indexOf('release-remote-collision.mjs nuget-preflight'),loop=script.indexOf('while IFS= read -r -d');assert.ok(nuget>0&&nuget<loop);

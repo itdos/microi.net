@@ -207,6 +207,7 @@ test('isolated release targets its own service ports and retains shared defaults
 is_windows_shell(){ return 0; }
 print_info(){ :; }
 powershell.exe(){ printf '%s\\n' "$*"; }
+${budgetFunctions}
 unset MICROI_RELEASE_BACKEND_PORT MICROI_RELEASE_FRONTEND_PORT
 ${ports?`MICROI_RELEASE_BACKEND_PORT=${ports.backend}\nMICROI_RELEASE_FRONTEND_PORT=${ports.frontend}`:''}
 ${preparation}

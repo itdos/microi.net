@@ -292,7 +292,7 @@ prepare_release_workspace() {
     local _scope=all
     if [ "$BUILD_BACKEND" = true ] && [ "$BUILD_CLIENT" != true ]; then _scope=api; fi
     if [ "$BUILD_CLIENT" = true ] && [ "$BUILD_BACKEND" != true ]; then _scope=pc; fi
-    "$_powershell_cmd" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+    run_release_command "$_powershell_cmd" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass \
         -File "$_manager_windows_path" \
         -Action PrepareRelease -ReleaseScope "$_scope" \
         -WorkspaceRoot "$_workspace_windows_path" \
@@ -1208,7 +1208,7 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
     MICROI_RELEASE_CANDIDATE="$MICROI_RELEASE_GATE_DIR/candidate-$(date +%Y%m%d-%H%M%S)-$$.json"
     if is_windows_shell; then MICROI_RELEASE_CANDIDATE=$(cygpath -m "$MICROI_RELEASE_CANDIDATE"); fi
     export MICROI_RELEASE_CANDIDATE
-    if ! node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
+    if ! run_release_command node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
         print_fail "无法记录所选产品范围的候选源码；已停止发布。"
     fi
     if command -v pwsh >/dev/null 2>&1; then
@@ -1219,7 +1219,7 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
         print_fail "缺少 PowerShell，无法执行 Microi.Tests 发布门禁。"
     fi
     _full_test_results="$MICROI_RELEASE_GATE_DIR/$(date +%Y%m%d-%H%M%S)-$$"
-    # 常规 Full 必须使用本轮已观测依赖矩阵；历史跳过例外不能作为发布入口。
+    # 使用本轮所选测试策略的实际回执；历史跳过例外不能作为发布入口。
     if [ -n "${MICROI_TEST_SQLSERVER_EXEMPTION_RECEIPT:-}${MICROI_TEST_SQLSERVER_EXEMPTION_SHA256:-}" ]; then
         print_fail "SQL Server 跳过例外已停用；请使用冻结依赖矩阵及零跳过 Full。"
     fi
@@ -1244,7 +1244,7 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
       if is_windows_shell; then MICROI_RELEASE_TEST_RECEIPT=$(cygpath -m "$MICROI_RELEASE_TEST_RECEIPT"); fi
       export MICROI_RELEASE_TEST_RECEIPT
     fi
-    if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
+    if ! run_release_command node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
         print_fail "验收期间源码发生变化；必须对最终候选重新执行所选范围的测试。"
     fi
     print_success "Microi.Tests ${MICROI_RELEASE_TEST_POLICY} 冻结候选回归通过"
@@ -1271,7 +1271,7 @@ fi
 
 # ─── 阶段（条件）: 双向同步官方升级资源 ──────────────────
 if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
-    if ! node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
+    if ! run_release_command node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
         print_fail "当前版本源码尚未通过所选范围测试；请用最终候选重跑发布。Microi.Ops 保持独立版本。"
     fi
 fi
@@ -1431,11 +1431,11 @@ fi
 if [ "$HAS_ENCRYPT" = true ]; then
     print_divider
     print_step "加密 DLL（Microi.net.dll + Microi.AI.dll + Microi.MCP.dll + Microi.WorkFlow.dll + Microi.Vision.dll）..."
-    node Microi.Server/tools/release-encryption.mjs plain "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" || print_fail "缺少五个实际 DLL 的加密前证据；禁止发布。"
+    run_release_command node Microi.Server/tools/release-encryption.mjs plain "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" || print_fail "缺少五个实际 DLL 的加密前证据；禁止发布。"
     if ! run_release_command bash "$ENCRYPT_SCRIPT" "$PUBLISH_DIR"; then
         print_fail "DLL 加密失败！请查看上方 Obfuscar 具体错误（工具缺失或依赖解析失败）"
     fi
-    node Microi.Server/tools/release-encryption.mjs encrypted "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" || print_fail "实际 DLL 未全部改变或加密指纹不匹配；禁止发布。"
+    run_release_command node Microi.Server/tools/release-encryption.mjs encrypted "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" || print_fail "实际 DLL 未全部改变或加密指纹不匹配；禁止发布。"
     DLL_ENCRYPTED=true
     print_success "DLL 加密完成"
 fi
@@ -1591,7 +1591,7 @@ if ! (
         _smoke_http_status=$(curl --silent --show-error --max-time 2 \
             --output /dev/null --write-out '%{http_code}' "$SMOKE_URL" 2>/dev/null || true)
         if [ "$_smoke_http_status" = "200" ]; then
-            if node "$MICROI_RELEASE_WORKSPACE/Microi.Server/tools/release-smoke.mjs" \
+            if run_release_command node "$MICROI_RELEASE_WORKSPACE/Microi.Server/tools/release-smoke.mjs" \
                 "http://127.0.0.1:${SMOKE_PORT}" "$_local_env" \
                 "$MICROI_RELEASE_GATE_DIR/api-smoke.json" "$PWD"; then
                 echo "  ✅ 冒烟测试通过: 混淆后宿主和真实系统配置接口均返回成功（${i}s）！"
@@ -1744,9 +1744,9 @@ if [ "$PUSH_NUGET" = true ]; then
     if [ "$HAS_ENCRYPT" = true ] && [ "$NUPKG_REPLACED" != true ]; then
         print_fail "NuGet 包中的 DLL 未被替换为加密版本，禁止推送！"
     fi
-    node Microi.Server/tools/release-nuget-closure.mjs Microi.Server "$VERSION" "$_nupkg_list_file" || print_fail "本次 NuGet 包正文的版本或平台依赖闭包不完整；禁止上传。"
+    run_release_command node Microi.Server/tools/release-nuget-closure.mjs Microi.Server "$VERSION" "$_nupkg_list_file" || print_fail "本次 NuGet 包正文的版本或平台依赖闭包不完整；禁止上传。"
     if [ "$HAS_ENCRYPT" = true ]; then
-        node Microi.Server/tools/release-encryption.mjs packages "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_list_file" || print_fail "完整待上传清单的实际 NuGet ZIP 中存在未加密/旧 DLL、遗漏包或缺少闭源 DLL；禁止上传。"
+        run_release_command node Microi.Server/tools/release-encryption.mjs packages "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_list_file" || print_fail "完整待上传清单的实际 NuGet ZIP 中存在未加密/旧 DLL、遗漏包或缺少闭源 DLL；禁止上传。"
     fi
 
     # 推送 NuGet 包
@@ -1756,23 +1756,23 @@ if [ "$PUSH_NUGET" = true ]; then
         print_warning "未找到版本 $VERSION 的 .nupkg 文件"
     else
         _push_count=0
-        # Full 验收之后的构建/打包历时较长；首包和每包上传前都必须确认源码
-        # 仍是经 Full 验收的候选，避免共享工作区漂移后先发布 NuGet。
-        node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "首个 NuGet 上传前候选源码发生变化；禁止上传。"
+        # 测试后的构建/打包仍需绑定同一候选；首包和每包上传前都必须确认源码
+        # 仍是通过所选范围验收的候选，避免共享工作区漂移后先发布 NuGet。
+        run_release_command node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "首个 NuGet 上传前候选源码发生变化；禁止上传。"
         # 首个 push 前再次读取完整实际集合并校验所有包哈希；随后每包再 CAS。
         if [ "$HAS_ENCRYPT" = true ]; then
             if ! find Microi.Server -path "*/bin/Release/*.$VERSION.nupkg" -not -name "*.symbols.nupkg" -print0 > "$_nupkg_check_file"; then
                 print_fail "首个上传前无法复核完整 NuGet 清单；禁止上传。"
             fi
-            node Microi.Server/tools/release-encryption.mjs packages-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_check_file" || print_fail "首个上传前 NuGet 清单或包字节发生变化；禁止全部上传。"
+            run_release_command node Microi.Server/tools/release-encryption.mjs packages-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg_check_file" || print_fail "首个上传前 NuGet 清单或包字节发生变化；禁止全部上传。"
         fi
         # 先查完整远端集合，避免推到一半才发现另一个候选已占用同版；未知读取也停止。
         _nuget_remote_receipt="$MICROI_RELEASE_GATE_DIR/nuget-remote-${VERSION}-${RANDOM}-${RANDOM}.json"
         run_release_command node Microi.Server/tools/release-remote-collision.mjs nuget-preflight Microi.Server "$VERSION" "$_nupkg_list_file" "$CONFIG_FILE" "$_nuget_remote_receipt" || print_fail "远端 NuGet 同版本包不同或无法确认；禁止上传本轮包。"
         while IFS= read -r -d '' _nupkg; do
-            node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "当前 NuGet 上传前候选源码发生变化；禁止上传。"
+            run_release_command node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "当前 NuGet 上传前候选源码发生变化；禁止上传。"
             if [ "$HAS_ENCRYPT" = true ]; then
-                node Microi.Server/tools/release-encryption.mjs package-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg" || print_fail "当前 NuGet 包未经核验或字节发生变化；禁止上传。"
+                run_release_command node Microi.Server/tools/release-encryption.mjs package-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg" || print_fail "当前 NuGet 包未经核验或字节发生变化；禁止上传。"
             fi
             print_step "推送: $(basename "$_nupkg")"
             # Package CAS 仍在每包上传前执行；此进程直接按 V3 服务索引上传，密钥不进 argv。
@@ -1926,7 +1926,7 @@ docker_push_plan() {
     if { [ "$plan_type" = api ] && [ "$PUBLISH_BACKEND" = true ]; } || { [ "$plan_type" = client ] && [ "$BUILD_CLIENT" = true ]; }; then
         receipt_mode=capture
     fi
-    if ! node Microi.Server/tools/release-artifact.mjs "$receipt_mode" "$plan_type" "$MICROI_RELEASE_CANDIDATE" "$receipt"; then
+    if ! run_release_command node Microi.Server/tools/release-artifact.mjs "$receipt_mode" "$plan_type" "$MICROI_RELEASE_CANDIDATE" "$receipt"; then
         print_fail "构建产物没有与 ${MICROI_RELEASE_TEST_POLICY} 测试通过的源码绑定；禁止发布旧产物。"
     fi
 
@@ -1963,25 +1963,28 @@ docker_push_plan() {
 
     # 推送每个远程镜像
     IFS=',' read -ra _images <<< "$remote_images"
+    local _published_index=0 _published_receipt
     for _img_tag in "${_images[@]}"; do
-        if ! node Microi.Server/tools/release-artifact.mjs verify "$plan_type" "$MICROI_RELEASE_CANDIDATE" "$receipt"; then
+        if ! run_release_command node Microi.Server/tools/release-artifact.mjs verify "$plan_type" "$MICROI_RELEASE_CANDIDATE" "$receipt"; then
             print_fail "镜像推送前源码或产物发生漂移；已停止推送。"
         fi
         if [ "$plan_type" = "api" ] && [ "$HAS_ENCRYPT" = true ]; then
-            node Microi.Server/tools/release-encryption.mjs image "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$local_image" || print_fail "实际 Docker 镜像中的闭源 DLL 与本次加密证据不符；禁止上传。"
+            run_release_command node Microi.Server/tools/release-encryption.mjs image "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$local_image" || print_fail "实际 Docker 镜像中的闭源 DLL 与本次加密证据不符；禁止上传。"
         fi
         # 替换占位符
         _img_tag=$(echo "$_img_tag" | sed "s/{latest}/latest/g" | sed "s/{version}/v${version}/g")
         local full_tag="${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${_img_tag}"
+        _published_index=$((_published_index + 1))
+        _published_receipt="${collision_receipt%.json}-published-${_published_index}.json"
         # 镜像名可能和本地镜像名不同，需要 tag
         local _remote_name=$(echo "$_img_tag" | cut -d':' -f1)
         local _remote_tag=$(echo "$_img_tag" | cut -d':' -f2)
-        docker tag "$local_image" "$full_tag"
+        run_release_command docker tag "$local_image" "$full_tag"
         # 断点续发时仅复用已由当前本地镜像取得的同内容仓库摘要。
         # 本地 RepoDigests 与远端指定标签均一致才跳过；下方最后复核拒绝状态漂移。
         local _published_repo="${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${_remote_name}"
         local _local_published_digest
-        _local_published_digest=$(docker image inspect "$local_image" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
+        _local_published_digest=$(run_release_command docker image inspect "$local_image" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
             | awk -v prefix="${_published_repo}@" 'index($0,prefix)==1 {print substr($0,length(prefix)+1); exit}')
         local _remote_digest=""
         if [[ "$_local_published_digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
@@ -1989,6 +1992,7 @@ docker_push_plan() {
         fi
         if [ "$_remote_digest" = "$_local_published_digest" ] && [ -n "$_remote_digest" ]; then
             run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-recheck "$collision_receipt" "$full_tag" || print_fail "远端 Docker 标签在验收后变化，已停止发布。"
+            run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-confirm "$collision_receipt" "$full_tag" "$_published_receipt" || print_fail "复用镜像的远端摘要未能确认，不能报告发布完成。"
             print_info "已回读相同 digest，复用远端标签: $full_tag ($_remote_digest)"
             continue
         fi
@@ -1996,9 +2000,12 @@ docker_push_plan() {
         # Registry 没有跨仓库 CAS；每次 push 前缩短检查窗口，但不宣称原子发布。
         run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-recheck "$collision_receipt" "$full_tag" || print_fail "远端 Docker 标签在验收后变化，已停止发布。"
         run_release_command docker push "$full_tag"
+        # 新推送与断点复用都须读回实际标签；本地 RepoDigest 与远端相同才落成功回执。
+        # 复用本轮绝对截止时间，不能把发布后校验移出 30 分钟预算或吞掉失败。
+        run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-confirm "$collision_receipt" "$full_tag" "$_published_receipt" || print_fail "Docker 已推送，但远端摘要尚未确认；本标签不能报告发布完成，请查看回执后再重试。"
     done
 
-    print_success "$plan_name 推送完成"
+    print_success "$plan_name 推送及远端摘要回读完成"
 }
 
 if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then

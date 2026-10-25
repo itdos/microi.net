@@ -28,6 +28,7 @@ description: 已初始化吾码工作区的默认 AI 开发总控入口，用户
 
 | 工作内容 | 相关 Skill |
 |---|---|
+| 吾码平台编译、测试、一键/Docker 发布 | `microi-deployment` 的“普通吾码发布固定流程（30 分钟）”；默认 `PlatformRelease`，禁止混入新建租户、聊天应用安装和 Code/Agent 测试；完整系统八项清单不扩大本次发布范围 |
 | 需求文档、成熟数据模型、表/字段/索引 | `business-blueprint`、`microi-db-schema`、`microi-form-engine` |
 | 表单宽度、分组、整行控件与视觉 | `microi-form-layout`、`ui-design` |
 | 菜单骨架、AI 开发中占位、逐菜单切换、PageTabs、模块展示 | `module-engine`、`v8-menu-buttons` |

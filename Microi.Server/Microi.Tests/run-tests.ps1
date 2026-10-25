@@ -158,7 +158,8 @@ if ($Mode -eq 'PlatformRelease') {
 # 测试夹具包含真实 node:sqlite 与中文 SQLite 输入。统一使用任务已验证的
 # Node 运行时及 Python UTF-8，防止 Windows PATH/代码页导致假失败；这些变量
 # 仅属于测试进程，不进入生产 API 配置或数据库设置。
-if ($env:MICROI_DESKTOP_NODE_HOME) {
+# 平台发行不继承独立桌面产品的运行时路径；旧 Agent 会话的失效配置不能阻塞吾码发布。
+if ($Mode -ne 'PlatformRelease' -and $env:MICROI_DESKTOP_NODE_HOME) {
     $testNodeName = if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') { 'node.exe' } else { 'node' }
     $testNode = Join-Path $env:MICROI_DESKTOP_NODE_HOME $testNodeName
     if (-not (Test-Path -LiteralPath $testNode -PathType Leaf)) {

@@ -10,7 +10,7 @@ const server = fileURLToPath(new URL('../../', import.meta.url));
 const powershell = [process.env.MICROI_TEST_POWERSHELL, 'pwsh', 'powershell'].filter(Boolean).find(binary =>
   spawnSync(binary, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], {windowsHide:true}).status === 0);
 
-function runFixture(kind, mode = 'PlatformRelease') {
+function runFixture(kind, mode = 'PlatformRelease', inheritedEnvironment = {}) {
   assert.ok(powershell, 'PowerShell is required to execute the actual release runner');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-platform-release-'));
   const fixtureServer = path.join(root, 'Microi.Server'), fixtureTests = path.join(fixtureServer, 'Microi.Tests');
@@ -67,7 +67,7 @@ function dotnet {
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('MICROI_TEST_') && key !== 'MICROI_DESKTOP_NODE_HOME'));
     const result = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-File', driver], {cwd:root, env:{...env,
       MICROI_RELEASE_CANDIDATE:path.join(root, 'candidate.json'), PLATFORM_FIXTURE_ROOT:root,
-      PLATFORM_FIXTURE_COMMANDS:commands, PLATFORM_FIXTURE_KIND:kind, PLATFORM_FIXTURE_MODE:mode},
+      PLATFORM_FIXTURE_COMMANDS:commands, PLATFORM_FIXTURE_KIND:kind, PLATFORM_FIXTURE_MODE:mode,...inheritedEnvironment},
       encoding:'utf8', windowsHide:true, timeout:30000});
     assert.ifError(result.error);
     const calls = fs.existsSync(commands) ? fs.readFileSync(commands,'utf8').trim().split(/\r?\n/).filter(Boolean).map(line=>JSON.parse(line.replace(/^\uFEFF/,''))) : [];
@@ -106,6 +106,17 @@ for (const kind of ['test-fail','trx-skip','node-skip','cleanup-fail']) test(`Pl
 test('PlatformRelease refuses stale results before launching any regression', () => {
   const {result,calls,receipt,matrix} = runFixture('stale');
   assert.notEqual(result.status,0);assert.deepEqual(calls,[]);assert.deepEqual(receipt,{old:true});assert.equal(matrix,null);
+});
+
+test('PlatformRelease ignores inherited desktop runtime and Full signals without starting either scope', () => {
+  const {result,calls,receipt} = runFixture('success','PlatformRelease',{
+    MICROI_DESKTOP_NODE_HOME:path.join(os.tmpdir(),'nonexistent-retired-agent-runtime'),
+    MICROI_RELEASE_TEST_POLICY:'Full',MICROI_TEST_MATRIX_FILE:'old-full-matrix.json',
+    MICROI_TEST_RUNTIME_READY_FILE:'old-full-ready.json',MICROI_TEST_ALLOW_WRITES:'YES'
+  });
+  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+  assert.equal(receipt.scope,'PlatformRelease');
+  assert.equal(calls.some(row=>row.name==='npm'||row.args.some(arg=>/Microi\.(Agent|Code)|admission|notification-center|platform-reminders/.test(String(arg)))),false);
 });
 
 test('explicit Full retains its mandatory admission preflight and fails before regression when the fixture rejects it', () => {
