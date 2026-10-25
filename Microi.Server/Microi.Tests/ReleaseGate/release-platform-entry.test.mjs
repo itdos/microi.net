@@ -30,6 +30,8 @@ for(const scenario of [
  {name:'backend-only entry remains partial',mode:'2',backend:true},
  {name:'legacy platform entry remains partial',mode:'4',backend:true,client:true},
  {name:'website-only entry preserves the platform version',mode:'6',website:true,version:'1.2.3'},
+ {name:'resource preparation failure blocks complete release after version preparation',flag:'--platform-release',complete:true,prepareFails:true},
+ {name:'resource preparation failure blocks backend-only publication',mode:'2',backend:true,prepareFails:true},
  {name:'missing NuGet fails before changing versions',flag:'--platform-release',nuget:false,fail:true},
  {name:'missing PC sources fail before changing versions',flag:'--platform-release',clientAvailable:false,fail:true},
  {name:'missing Docker fails before changing versions',flag:'--platform-release',docker:false,fail:true},
@@ -67,6 +69,16 @@ set -- ${scenario.flag||''}
 ${policy}
 HAS_CLIENT=${scenario.clientAvailable!==false}; HAS_NUGET=${scenario.nuget!==false}; HAS_DOCKER=${scenario.docker!==false}
 ${helpers}
+run_release_command(){
+ if [ "$#" -ne 4 ] || [ "$1" != node ] || [ "$2" != Microi.Server/OfficialApplications/Resource/refresh-resources.mjs ] || [ "$3" != --prepare-candidate ] || [ "$4" != --allow-verified-offline ]; then
+  printf 'UNEXPECTED_COMMAND=%s\\n' "$*" >&2; return 91
+ fi
+ if ! grep -q "<MicroiNetVersion>$VERSION</MicroiNetVersion>" Microi.Server/Directory.Build.props; then
+  printf 'PREPARATION_BEFORE_VERSION_UPDATE\\n' >&2; return 92
+ fi
+ printf 'CALL=prepare-resource-candidate\\n'
+ return ${scenario.prepareFails?23:0}
+}
 ${plans}
 ${scenario.removeFormalApi?'DOCKER_PLANS=("${DOCKER_PLANS[0]}" "${DOCKER_PLANS[2]}" "${DOCKER_PLANS[3]}")':''}
 ${version}
@@ -74,10 +86,25 @@ ${selection}
 unset -f read
 PACKAGE_JSON_FILES=(Microi.Client/package.json)
 ${update}
+printf 'CONTINUE_AFTER_PREPARATION=true\\n'
 printf 'RESULT=%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\\n' "$DEPLOY_MODE" "$VERSION" "$BUMP_VERSION" "$BUILD_BACKEND" "$BUILD_CLIENT" "$PUSH_NUGET" "$PUBLISH_DOC" "\${#SELECTED_API_PLANS[@]}" "\${#SELECTED_CLIENT_PLANS[@]}" "$MICROI_RELEASE_INCLUDE_DOCUMENTATION"
 `});
-  assert.ifError(result.error);assert.equal(result.status,scenario.fail?(scenario.exit||17):0,result.stdout+'\n'+result.stderr);
-  if(scenario.fail){assert.match(fs.readFileSync(props,'utf8'),/>1\.2\.3</);assert.doesNotMatch(result.stdout,/RESULT=/);return;}
+  assert.ifError(result.error);assert.equal(result.status,scenario.fail?(scenario.exit||17):scenario.prepareFails?17:0,result.stdout+'\n'+result.stderr);
+  const prepareCalls=result.stdout.match(/^CALL=prepare-resource-candidate$/gm)||[];
+  assert.equal(prepareCalls.length,!scenario.fail&&(scenario.complete||scenario.backend)?1:0,'Only selected backend publication prepares resources exactly once');
+  assert.doesNotMatch(result.stderr,/UNEXPECTED_COMMAND|PREPARATION_BEFORE_VERSION_UPDATE/);
+  if(scenario.fail){assert.match(fs.readFileSync(props,'utf8'),/>1\.2\.3</);assert.doesNotMatch(result.stdout,/RESULT=|CONTINUE_AFTER_PREPARATION=/);return;}
+  if(prepareCalls.length){
+   assert.ok(result.stdout.indexOf('STEP=更新 Directory.Build.props')<result.stdout.indexOf('CALL=prepare-resource-candidate'),'Version preparation must precede resource preparation');
+  }
+  if(scenario.prepareFails){
+   assert.match(result.stdout,/REJECTED=官方应用资源候选准备失败/);
+   assert.doesNotMatch(result.stdout,/RESULT=|CONTINUE_AFTER_PREPARATION=/,'Preparation failure cannot reach the freeze/test/publication boundary');
+   assert.match(fs.readFileSync(props,'utf8'),/>1\.2\.4</);
+   return;
+  }
+  assert.match(result.stdout,/CONTINUE_AFTER_PREPARATION=true/);
+  if(prepareCalls.length)assert.ok(result.stdout.indexOf('CALL=prepare-resource-candidate')<result.stdout.indexOf('CONTINUE_AFTER_PREPARATION=true'));
   const fields=result.stdout.split(/\r?\n/).find(line=>line.startsWith('RESULT=')).slice(7).split('|');
   assert.equal(fields[1],scenario.version||'1.2.4');
   if(scenario.complete){assert.deepEqual(fields,['8',scenario.version||'1.2.4','true','true','true','true','true','1','1','true']);}
@@ -96,4 +123,9 @@ test('complete release uses one candidate, one elapsed-time target and the exist
  const lock=section('acquire_workspace_lock() {','prepare_release_workspace() {');
  assert.match(lock,/\[ "\$PUBLISH_DOC" = true \]; then _requested\+=\(website\)/);
  assert.doesNotMatch(source.slice(source.indexOf('# --- 发布模式：')),/bash [^\n]*Microi一键编译发布/,'The complete entry must not recursively run separate release modes');
+ const prepare=source.indexOf('refresh-resources.mjs --prepare-candidate --allow-verified-offline');
+ const capture=source.indexOf('release-candidate.mjs capture');
+ const tests=source.indexOf('-File Microi.Server/Microi.Tests/run-tests.ps1');
+ const publish=source.indexOf('refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate');
+ assert.ok(prepare>0&&prepare<capture&&capture<tests&&tests<publish,'Preparation failure occurs before the actual freeze, tests and strict resource publication');
 });
