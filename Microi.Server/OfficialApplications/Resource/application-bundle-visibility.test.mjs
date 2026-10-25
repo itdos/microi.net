@@ -124,17 +124,17 @@ function install(incoming, old) {
   return { row: rows.get('sys_microistore')[0], writes, uploads, readQueries };
 }
 
-function validateFull(incoming, validateOnly = true, healthyPhysicalSchema = false, envelope = 'plural') {
+function validateFull(incoming, validateOnly = true, healthyPhysicalSchema = false, envelope = 'plural', beforeResourceWrites = false) {
   const effects = [], reads = [];
   const applications = envelope === 'plural' ? { ApplicationBundles: [incoming] } : { [envelope]: incoming };
-  // 正向检查使用全部真实前置列；非法声明用旧库缺列场景证明连 DDL 都未发生。
+  // 只读预检不依赖物理列；正式安装用健康列证明仍经过真实物理前置检查。
   const prerequisiteColumns = [...importer.matchAll(/\['([A-Za-z][A-Za-z0-9_]*)',/g)].map(match => ({ ColumnName: match[1] }));
   const context = { V8: { OsClient: 'target', Param: { Package: {
     PackageInfo: { AppId: 'app.public.parent', Version: 'v1.2.0' }, ...applications
   }, ValidateOnly: validateOnly }, CurrentUser: { Id: 'install-admin', Level: 9999 },
   Method: { NewGuid: () => 'install-operation' },
-  Db: { FromSql(sql) { reads.push(sql); return {
-    AddInParameter() { return this; },
+  Db: { FromSql(sql) { const read = { sql, parameters: [] }; reads.push(read); return {
+    AddInParameter(name, value) { read.parameters.push([name, value]); return this; },
     ToArray: () => healthyPhysicalSchema ? prerequisiteColumns : Array.from({ length: 100 }, (_, i) => ({ ColumnName: 'unused' + i })),
     ExecuteNonQuery() { effects.push(sql); throw Error('Unexpected physical write'); }
   }; } },
@@ -142,17 +142,24 @@ function validateFull(incoming, validateOnly = true, healthyPhysicalSchema = fal
   ApiEngine: { Run: (...args) => { effects.push(args); throw Error('Unexpected engine write'); } },
   Cache: { Set: (...args) => { effects.push(args); throw Error('Unexpected cache write'); } }
   } };
-  const result = vm.runInNewContext('(function(){' + importer + '\n})();', context);
+  let entrySource = importer;
+  if (beforeResourceWrites) {
+    // 与版本兼容契约相同：执行真实入口及物理自举，仅在资源写入边界停止。
+    const boundary = importer.search(/\r?\ntry \{\r?\n    if \(scheduleJobContract.Errors.length/);
+    assert.ok(boundary > 0, 'canonical resource write boundary exists');
+    entrySource = importer.slice(0, boundary) + '\nreturn { Code: 1, ReachedResourceWrites: true };';
+  }
+  const result = vm.runInNewContext('(function(){' + entrySource + '\n})();', context);
   return { result: copy(result), effects, reads };
 }
 
 for (const [publicFlag, approvalFlag] of [[0,0], [false,false], ['0','0'], [1,1], [true,true], ['1','1']]) {
   test(`full canonical package preflight accepts source flags ${JSON.stringify([publicFlag,approvalFlag])}`, () => {
-    for (const envelope of ['plural', 'ApplicationBundle', 'AiApplication', 'FrontendApplication']) {
-      const h = validateFull(bundle({ IsPublic: publicFlag, IsApprove: approvalFlag }), true, true, envelope);
+    for (const envelope of ['plural', 'ApplicationBundle', 'AiApplication', 'FrontendApplication']) for (const healthy of [false, true]) {
+      const h = validateFull(bundle({ IsPublic: publicFlag, IsApprove: approvalFlag }), true, healthy, envelope);
       assert.equal(h.result.Code, 1, JSON.stringify(h.result));
       assert.equal(h.result.Data.ApplicationCount, 1); assert.equal(h.effects.length, 0);
-      assert.equal(h.reads.length, 4, 'fixed physical schema reads only');
+      assert.equal(h.reads.length, 0, 'ValidateOnly must not probe or bootstrap physical columns, including legacy databases');
     }
   });
   test(`producer serializes authoritative flags ${JSON.stringify([publicFlag,approvalFlag])} and ignores requested identity overrides`, () => {
@@ -172,6 +179,24 @@ for (const [publicFlag, approvalFlag] of [[0,0], [false,false], ['0','0'], [1,1]
     }
   });
 }
+
+test('non-ValidateOnly canonical source flags retain the four parameterized physical prerequisite reads', () => {
+  for (const flags of [[0,0], [false,false], ['0','0'], [1,1], [true,true], ['1','1']]) {
+    for (const envelope of ['plural', 'ApplicationBundle', 'AiApplication', 'FrontendApplication']) {
+      const h = validateFull(bundle({ IsPublic: flags[0], IsApprove: flags[1] }), false, true, envelope, true);
+      assert.equal(h.result.Code, 1, JSON.stringify(h.result));
+      assert.equal(h.result.ReachedResourceWrites, true, 'valid declarations reach the real resource-write boundary');
+      assert.equal(h.effects.length, 0, 'a healthy physical schema requires no bootstrap writes');
+      assert.equal(h.reads.length, 4, 'formal installation still inspects every prerequisite table');
+      assert.deepEqual(h.reads.map(read => read.parameters), [
+        [['@p0', 'sys_apiengine']], [['@p0', 'diy_table']],
+        [['@p0', 'diy_field']], [['@p0', 'sys_microistore']]
+      ]);
+      for (const read of h.reads) assert.match(read.sql,
+        /^SELECT COLUMN_NAME AS ColumnName FROM INFORMATION_SCHEMA\.COLUMNS WHERE TABLE_SCHEMA=DATABASE\(\) AND LOWER\(TABLE_NAME\)=LOWER\(@p0\)$/);
+    }
+  }
+});
 
 test('publisher normalizes historical NULL public visibility without approving an unapproved source runtime', () => {
   for (const flags of [{}, { IsPublic: null, IsApprove: null }, { IsPublic: undefined, IsApprove: undefined }]) {
