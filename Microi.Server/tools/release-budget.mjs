@@ -15,14 +15,37 @@ async function startedTicks(pid){
  const {stdout}=await ps(`$p=Get-Process -Id ${pid} -ErrorAction SilentlyContinue;if($p){$p.StartTime.ToUniversalTime().Ticks.ToString()}`);
  return /^\d+$/.test(stdout.trim())?stdout.trim():null;
 }
-async function stopWindowsTree(pid,ticks){
- if(!ticks)throw Error('Owned process identity unavailable');
- await ps(`$ErrorActionPreference='Stop';$p=Get-Process -Id ${pid} -ErrorAction SilentlyContinue;if(!$p){exit 0};if($p.StartTime.ToUniversalTime().Ticks.ToString() -ne '${ticks}'){exit 3};
- $owned=@(@{Id=${pid};Start='${ticks}'});$rows=@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId);for($i=0;$i -lt $owned.Count;$i++){foreach($row in $rows){if($row.ParentProcessId -eq $owned[$i].Id -and $row.ProcessId -notin $owned.Id){$child=Get-Process -Id $row.ProcessId -ErrorAction SilentlyContinue;if($child){$owned+=@{Id=[int]$row.ProcessId;Start=$child.StartTime.ToUniversalTime().Ticks.ToString()}}}}};
- $p=Get-Process -Id ${pid} -ErrorAction SilentlyContinue;if(!$p){exit 4};if($p.StartTime.ToUniversalTime().Ticks.ToString() -ne '${ticks}'){exit 3};
- & taskkill.exe /PID ${pid} /T /F 2>&1 | Out-Null;
- $end=[DateTime]::UtcNow.AddSeconds(5);do{$live=@($owned | Where-Object {$q=Get-Process -Id $_.Id -ErrorAction SilentlyContinue;$q -and $q.StartTime.ToUniversalTime().Ticks.ToString() -eq $_.Start});if(!$live.Count){exit 0};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $end);exit 4`);
+// 单独生成脚本供真实进程回归调用；不开放 CLI/环境变量形式的身份或快照替换入口。
+export function windowsTreeCleanupScript(pid,ticks){
+ if(!Number.isSafeInteger(pid)||pid<=0||!/^\d{1,19}$/.test(String(ticks)))throw Error('Owned process identity unavailable');
+ return `$ErrorActionPreference='Stop';$phase='root-identity';$owned=@();$killCode=$null
+ try{
+  $p=Get-Process -Id ${pid} -ErrorAction SilentlyContinue;if(!$p){exit 0};$null=$p.Handle
+  if($p.HasExited){$p.Dispose();exit 0};if($p.StartTime.ToUniversalTime().Ticks.ToString() -ne '${ticks}'){$p.Dispose();exit 3}
+  $owned=@(@{Id=${pid};Start='${ticks}';Process=$p});$phase='snapshot'
+  $rows=@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,CreationDate)
+  for($i=0;$i -lt $owned.Count;$i++){foreach($row in $rows){
+   if($row.ParentProcessId -ne $owned[$i].Id -or $row.ProcessId -in $owned.Id){continue}
+   $child=Get-Process -Id $row.ProcessId -ErrorAction SilentlyContinue;if(!$child){continue}
+   $null=$child.Handle;if($child.HasExited){$child.Dispose();continue};$start=$child.StartTime.ToUniversalTime()
+   # ParentProcessId 会保留旧父 PID；创建时间还须匹配 CIM 快照，避免枚举后 PID 再次复用。
+   if($start.Ticks -lt [long]$owned[$i].Start){$child.Dispose();continue}
+   if(!$row.CreationDate){$child.Dispose();throw 'Missing creation identity'}
+   if($start.ToString('yyyyMMddHHmmssffffff') -ne $row.CreationDate.ToUniversalTime().ToString('yyyyMMddHHmmssffffff')){$child.Dispose();continue}
+   $owned+=@{Id=[int]$row.ProcessId;Start=$start.Ticks.ToString();Process=$child}
+  }}
+  $phase='terminate'
+  if(!$p.HasExited){
+   # taskkill 可能遇到刚退出的后代并写 stderr；是否清理成功由全部已验证句柄的退出状态决定。
+   $ErrorActionPreference='Continue';try{& taskkill.exe /PID ${pid} /T /F 2>&1 | Out-Null;$killCode=$LASTEXITCODE}finally{$ErrorActionPreference='Stop'}
+  }
+  $phase='verify';$end=[DateTime]::UtcNow.AddSeconds(5)
+  do{$live=@($owned | Where-Object {!$_.Process.HasExited});if(!$live.Count){exit 0};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $end)
+  [Console]::Error.WriteLine(('ReleaseBudgetCleanup phase=verify taskkill='+$killCode+' live='+(($live | ForEach-Object {$_.Id.ToString()+':'+$_.Start}) -join ',')));exit 4
+ }catch{[Console]::Error.WriteLine(('ReleaseBudgetCleanup phase='+$phase+' error='+$_.Exception.GetType().Name));exit 5}
+ finally{foreach($entry in $owned){$entry.Process.Dispose()}}`;
 }
+async function stopWindowsTree(pid,ticks){await ps(windowsTreeCleanupScript(pid,ticks));}
 async function stopPosixGroup(pid){
  const signal=name=>{try{process.kill(-pid,name);return true;}catch(error){if(error.code==='ESRCH')return false;throw error;}};
  if(!signal('SIGTERM'))return;
@@ -48,7 +71,11 @@ export function runReleaseBudget(deadline,command,args=[]){
   timer=setTimeout(async()=>{
    if(finished)return;expired=true;
    try{if(windows)await stopWindowsTree(child.pid,await identity);else await stopPosixGroup(child.pid);finish(124);}
-   catch{process.stderr.write('Release budget expired; owned process-tree cleanup could not be confirmed.\n');finish(125);}
+   catch(error){
+    // 不输出命令、环境或完整异常（execFile.message 含完整命令）；只保留安全阶段和退出类别。
+    const detail=String(error.stderr??'').split(/\r?\n/).find(line=>/^ReleaseBudgetCleanup phase=[a-z-]+ (?:error=[A-Za-z0-9]+|taskkill=[\d-]* live=[\d:,]*)$/.test(line));
+    process.stderr.write('Release budget expired; owned process-tree cleanup could not be confirmed.'+(detail?' '+detail:' helperExit='+String(error.code??'identity-unavailable').replace(/[^A-Za-z0-9_-]/g,''))+'\n');finish(125);
+   }
   },Math.min(remaining,2147483647));
  });
 }
