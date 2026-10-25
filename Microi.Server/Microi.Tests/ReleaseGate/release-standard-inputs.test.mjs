@@ -273,6 +273,21 @@ test('官方worker不能借父仓Git HEAD通过合同，即使父HEAD正好等�
 
 const xjyProfile = 'Microi-V8-Engine/集福鲤平台 (api.jifulii.com)/xjy.Product.Internal/接口引擎';
 const xjyReaders = ['microi.uniapp/scripts/test-directory-card-config.mjs', 'microi.uniapp/scripts/test-task-assignee-search.mjs'];
+test('regular candidate omits only unselected XJY customer inputs while Full retains them and generic inputs remain frozen',async t=>{
+ const {root}=await fixture(t);
+ for(const reader of xjyReaders){await fs.mkdir(path.dirname(path.join(root,reader)),{recursive:true});await fs.writeFile(path.join(root,reader),'customer-specific test reader');}
+ const regular=await snapshotStandardInputs(root,{testPolicy:'PlatformRelease'});
+ assert.ok(regular['private-products/app-0/tests/fixture.mjs']);
+ assert.ok(!Object.keys(regular).some(name=>name.startsWith('Microi-V8-Engine/')||xjyReaders.includes(name)));
+ await assert.rejects(snapshotStandardInputs(root),/ENOENT/);
+ await fs.writeFile(path.join(root,'.gitignore'),'Microi-V8-Engine/\nmicroi.uniapp/\n');
+ execFileSync('git',['init','--quiet'],{cwd:root});execFileSync('git',['add','.gitignore'],{cwd:root});execFileSync('git',['-c','user.name=Fixture','-c','user.email=fixture@local.invalid','commit','--quiet','-m','fixture'],{cwd:root});
+ const candidate=await snapshotCandidate(root,['.'],{testPolicy:'PlatformRelease'});
+ assert.ok(!Object.keys(candidate.files).some(name=>name.startsWith('Microi-V8-Engine/')||xjyReaders.includes(name)));
+ await fs.writeFile(path.join(root,'private-products/app-0/tests/fixture.mjs'),'generic input changed');
+ assert.ok(changedCandidate(candidate,await snapshotCandidate(root,['.'],{testPolicy:'PlatformRelease'})).includes('private-products/app-0/tests/fixture.mjs'));
+ await assert.rejects(snapshotCandidate(root,['.'],{testPolicy:'Full'}),/ENOENT/);
+});
 async function syncedXjyInputs(root, profile = xjyProfile) {
   for (const reader of xjyReaders) {
     await fs.mkdir(path.dirname(path.join(root, reader)), {recursive: true}); await fs.writeFile(path.join(root, reader), 'actual fixed reader');

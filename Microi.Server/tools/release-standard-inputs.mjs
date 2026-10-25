@@ -45,7 +45,8 @@ async function snapshotFounderSolution(root) {
 
 // Full 读取的标准产品责任源码按唯一契约冻结，即使它们被根公开仓忽略。
 // 只记录指纹，不把这些私有文件暂存或复制进公开仓。
-export async function snapshotStandardInputs(root, {includeTestInputs = true} = {}) {
+export async function snapshotStandardInputs(root, {includeTestInputs = true, testPolicy = 'Full'} = {}) {
+  if (!['Full', 'PlatformRelease'].includes(testPolicy)) throw Error('Unknown standard-input test policy');
   const founder = await snapshotFounderSolution(root);
   // 同版本免测 Docker 发布仍冻结实际方案；不要求未执行的产品测试私有夹具。
   if (!includeTestInputs) return founder;
@@ -216,7 +217,7 @@ export async function snapshotStandardInputs(root, {includeTestInputs = true} = 
     ['microi.uniapp/scripts/test-directory-card-config.mjs', ['get-sysUser-list']],
     ['microi.uniapp/scripts/test-task-assignee-search.mjs', ['get-sysUser-list', 'shouhoudd_zhipai']],
   ], engineKeys = new Set();
-  for (const [reader, requiredKeys] of readers) {
+  for (const [reader, requiredKeys] of testPolicy === 'Full' ? readers : []) {
     try { await fs.lstat(path.join(root, reader)); }
     catch (error) { if (error.code === 'ENOENT') continue; throw error; }
     await addInput(reader);

@@ -271,7 +271,9 @@ if (Test-Path -LiteralPath $desktopPackage) {
 # PlatformRelease 只覆盖平台本身；Code/Agent 的独立产品检查仍保留在原 Quick/Full 入口。
 # 双 API、新租户安装及跨产品浏览器验收仅属于显式 Full，不作为平台发布的先决条件。
 # 自动发现平台统一入口、平台内置应用包和 PC 端的 node:test 回归；新增测试不依赖手工清单。
-node (Join-Path $testRoot 'run-node-regressions.mjs') $ResultsDirectory
+$nodeRegressionArguments = @((Join-Path $testRoot 'run-node-regressions.mjs'), $ResultsDirectory)
+if ($Mode -eq 'PlatformRelease' -and -not $AllPlatformTests) { $nodeRegressionArguments += '--regular-platform' }
+node @nodeRegressionArguments
 if ($LASTEXITCODE -ne 0) { throw "Discovered Node regression gate failed with exit code $LASTEXITCODE." }
 
 $v8Test = Join-Path $testRoot "V8\empty-database-sanitization.test.mjs"

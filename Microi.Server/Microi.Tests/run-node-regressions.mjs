@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
 import {createRequire} from 'node:module';
+import {createHash} from 'node:crypto';
 
 const workspace=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const {parse}=createRequire(path.join(workspace,'Microi.Client/package.json'))('@babel/parser');
@@ -19,11 +20,24 @@ roots.push(path.relative(workspace,path.join(platformRoot,'test')).replaceAll('\
 // Microi Code 桌面仓的当前测试使用 Vitest + TypeScript，由 run-tests.ps1 通过
 // 该应用自己的 npm test 入口执行。不要把它误交给 node --test，也不要因为旧的
 // 空 tests/ 目录存在就把零用例当作一个有效回归根。
-export function discoverTests(directory){
+export const regularNodeSpecialists={
+ 'Microi.Server/Microi.Tests/V8/directory-card.test.mjs':'XJY customer directory API source and customer-specific UniApp acceptance',
+ 'Microi.Server/Microi.Tests/V8/xjy-service-assignment.test.mjs':'XJY customer service-assignment API source and customer-specific business rules'
+};
+// 精确路径声明专项责任，不按名称通配、不转换成 test.skip。默认/显式 Full 仍保留原发现范围。
+export function discoverNodeScope(directory,{regularPlatform=false,workspaceRoot=workspace}={}){
+ const notApplicable=regularPlatform?Object.entries(regularNodeSpecialists).filter(([file])=>{
+  const target=path.resolve(workspaceRoot,file),relative=path.relative(path.resolve(directory),target);
+  return relative!==''&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative)&&fs.existsSync(target);
+ }).map(([file,reason])=>({file,reason,status:'NotApplicable',sha256:createHash('sha256').update(fs.readFileSync(path.join(workspaceRoot,file))).digest('hex')})):[];
+ return {scope:regularPlatform?'RegularPlatform':'AllPlatformNode',notApplicable,files:discoverTests(directory,{regularPlatform,workspaceRoot})};
+}
+export function discoverTests(directory,{regularPlatform=false,workspaceRoot=workspace}={}){
  return fs.readdirSync(directory,{withFileTypes:true}).flatMap(entry=>{
   const file=path.join(directory,entry.name);
-  if(entry.isDirectory())return /^(node_modules|bin|obj|TestResults|\.git)$/.test(entry.name)?[]:discoverTests(file);
+  if(entry.isDirectory())return /^(node_modules|bin|obj|TestResults|\.git)$/.test(entry.name)?[]:discoverTests(file,{regularPlatform,workspaceRoot});
   if(!/\.(?:test|spec)\.[cm]?js$/.test(entry.name))return [];
+  if(regularPlatform&&Object.hasOwn(regularNodeSpecialists,path.relative(workspaceRoot,file).replaceAll('\\','/')))return [];
   const source=fs.readFileSync(file,'utf8');
   const references=moduleReferences(source);
   if(references.some(name=>/^(?:@playwright\/test|playwright\/test)$/.test(name)))return [];
@@ -82,17 +96,20 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  const results=path.resolve(process.argv[2]||path.join(workspace,'.tmp/node-regressions'));
  fs.mkdirSync(results,{recursive:true});
  const summary=[];
- for(const root of roots){
-  const files=discoverTests(path.join(workspace,root));
+ const regularPlatform=process.argv.slice(3).includes('--regular-platform');
+ const plans=roots.map(root=>({root,...discoverNodeScope(path.join(workspace,root),{regularPlatform})}));
+ fs.writeFileSync(path.join(results,'node-regression-scope.json'),JSON.stringify(plans.map(({files,...plan})=>({...plan,files:files.map(file=>path.relative(workspace,file))})),null,2));
+ for(const {root,files,scope,notApplicable} of plans){
   if(!files.length)throw Error(`No regression tests discovered: ${root}`);
   const log=regressionLogFile(results,root);
   console.log(`Node regression discovery: ${root}: ${files.length} files`);
+  for(const row of notApplicable)console.log(`Node NotApplicable: ${row.file}: ${row.reason}`);
   const output=await new Promise((resolve,reject)=>{
    const child=spawn(process.execPath,['--test','--test-concurrency=1','--test-reporter=tap',...files.map(f=>path.relative(workspace,f))],{cwd:workspace,windowsHide:true});
    let text='';child.stdout.on('data',b=>text+=b);child.stderr.on('data',b=>text+=b);
    child.on('error',reject);child.on('close',code=>{fs.writeFileSync(log,text);if(code!==0)reject(Error(`Node regression failed (${code}); inspect ${log}\n${text.split('\n').filter(l=>/^not ok|^# (?:fail|tests)|error:/.test(l)).slice(0,40).join('\n')}`));else resolve(text);});
   });
-  const counts=assertTestSummary(output);summary.push({root,files:files.map(f=>path.relative(workspace,f)),...counts});
+  const counts=assertTestSummary(output);summary.push({root,scope,notApplicable,files:files.map(f=>path.relative(workspace,f)),...counts});
   console.log(`${root}: ${counts.pass} passed, 0 failed/skipped`);
  }
  fs.writeFileSync(path.join(results,'node-regressions.json'),JSON.stringify(summary,null,2));

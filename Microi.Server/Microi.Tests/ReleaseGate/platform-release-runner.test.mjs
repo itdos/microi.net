@@ -94,6 +94,7 @@ test('PlatformRelease executes platform regressions and returns scoped evidence 
   assert.equal(component.args[component.args.indexOf('--logger')+1],'trx;LogFileName=microi-platform.trx');
   assert.equal(calls.some(row=>row.name==='npm' || row.args.some(arg=>/Microi\.(Agent|Code)|admission|notification-center|platform-reminders/.test(String(arg)))),false);
   assert.ok(calls.some(row=>String(row.args[0]).endsWith('run-node-regressions.mjs')));
+  assert.ok(calls.find(row=>String(row.args[0]).endsWith('run-node-regressions.mjs')).args.includes('--regular-platform'));
   assert.ok(calls.some(row=>String(row.args[1]).endsWith('file-cabinet-office.spec.mjs')));
   assert.equal(receipt.scope,'PlatformRelease');assert.equal(receipt.status,'Passed');
   assert.equal(receipt.dotnet.tests,1);assert.equal(receipt.dotnet.passed,1);assert.equal(receipt.node.tests,1);
@@ -161,6 +162,7 @@ test('all-platform release executes unfiltered C# and every browser responsibili
  assert.ok(calls.some(row=>String(row.args[0]).endsWith('platform-all-tests.mjs')&&row.args[1]==='browser'));
  assert.ok(calls.some(row=>row.args.includes('--all-platform-tests')));
  assert.ok(calls.some(row=>row.args[1]==='freeze'&&row.args.includes('--platform-only')));
+ assert.equal(calls.find(row=>String(row.args[0]).endsWith('run-node-regressions.mjs')).args.includes('--regular-platform'),false);
  assert.equal(calls.some(row=>row.name==='npm'),false);
  assert.equal(receipt.allPlatformTests,true);assert.equal(receipt.filter,'AllPlatformTests');assert.equal(receipt.browser.passed,2);
 });

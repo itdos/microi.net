@@ -7,7 +7,7 @@ import {verifyHdfsEvidence} from './staged-full-runtime.mjs';
 import {releaseBrowserWidths} from './release-browser-viewports.mjs';
 import {snapshotDesktopInputs} from '../../tools/release-desktop-inputs.mjs';
 import {snapshotCandidate,changedCandidate} from '../../tools/release-candidate.mjs';
-import {roots as nodeRoots,discoverTests,assertTestSummary,regressionLogFile} from '../run-node-regressions.mjs';
+import {roots as nodeRoots,discoverNodeScope,assertTestSummary,regressionLogFile} from '../run-node-regressions.mjs';
 import {discoverBrowserTests,validateBrowserReport,platformFrontendScope,browserCaseInventory} from './platform-all-tests.mjs';
 
 const check=(condition,message)=>{if(!condition)throw Error(message);};
@@ -157,11 +157,13 @@ export async function readPlatformReleaseTests(receiptFile){
  check(Array.isArray(groups)&&groups.length===nodeRoots.length,'PlatformRelease Node 责任范围缺失');
  for(const [index,row] of groups.entries()){
   check(row.root===nodeRoots[index],'PlatformRelease Node 责任范围或顺序漂移');
-  const actualFiles=discoverTests(path.join(root,row.root)).map(file=>path.relative(root,file));
+  const selection=discoverNodeScope(path.join(root,row.root),{regularPlatform:receipt.allPlatformTests!==true});
+  const actualFiles=selection.files.map(file=>path.relative(root,file));
   check(actualFiles.length>0&&JSON.stringify(actualFiles)===JSON.stringify(row.files),'PlatformRelease Node 文件发现清单漂移');
+  check(row.scope===selection.scope&&JSON.stringify(row.notApplicable)===JSON.stringify(selection.notApplicable),'PlatformRelease Node 专项分类或原始源码摘要漂移');
   const tapFile=regressionLogFile(directory,row.root),tapBytes=readFile(tapFile),counts=assertTestSummary(tapBytes.toString('utf8'));
   check(Object.entries(counts).every(([key,value])=>row[key]===value),'PlatformRelease Node TAP 与报告计数不一致');
-  tapReceipts.push({file:tapFile,sha256:hash(tapBytes)});
+  tapReceipts.push({file:tapFile,sha256:hash(tapBytes),scope:selection.scope,notApplicable:selection.notApplicable});
  }
  let browser;
  if(receipt.allPlatformTests===true||receipt.platformFrontendTests===true){
