@@ -15,6 +15,13 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 
 应用包是声明式资源的权威交付边界：当前包标记为 `Managed` 的表单元数据、菜单、字段、接口引擎等资源按包覆盖；当前包标记为 `CreateIfMissing` 或 `InsertIfMissing` 的租户扩展/配置只补缺。覆盖安装不等于整表清空，仍禁止把发布方租户业务数据、密钥或连接配置原样复制到目标租户。
 
+## 最低运行版本与只读预检
+
+- 从安装器 v3.1.1 开始，`PackageInfo.ServerMinVersion/ClientMinVersion` 接受可选 `v` 前缀的三段或四段非负整数版本；不接受范围、预发布后缀、非字符串或不合法数字。省略、空白或 null 保留旧包兼容，返回 `NotDeclared`，不得宣称已经核验。
+- 后端只信任当前节点 `V8.Method.GetBackendVersion()`，低于要求返回 `PACKAGE_RUNTIME_VERSION_TOO_LOW`；有声明但能力缺失、异常或运行版本无法解析返回 `PACKAGE_RUNTIME_VERSION_UNAVAILABLE`。格式错误返回 `PACKAGE_RUNTIME_VERSION_INVALID`。直接包、下载包、Managed 同版本重装和每个后台续跑分片都在任何安装写入前核验，不采信请求参数或历史检查点里的版本。
+- 服务端无法可信获取浏览器实际部署版本，前端声明仅返回 `PendingClientVerification` 和警告；不得从 `V8.Param.ClientVersion` 冒充检查通过，也不能据此宣称前端已部署或验收。
+- 使用现有 MCP `microi_run_engine` 调用 `import-microi-store-package`，传 `ValidateOnly:true`（或 `Action:"validate"`）检查结构及 `Data.Compatibility`。只读预检不得运行物理引导 DDL、更新后台进度或写包正文缓存；它不替代正式安装任务和资源回读。无需新增工具或绕过 MCP；升级应用商城交付安装器，目标后端没有可信版本原子时先升级后端。
+
 ## 平台升级的应用商城边界（强制）
 
 - 默认启动只恢复表单、模块、系统设置的核心结构与普通账号登录、权限、导航、商城安装所需资源；由一个 `app.microi.bootstrap` 投影包交付，不等于完整安装其来源应用。SSO、AI、通知、备份、OCR、翻译、工作流及 SaaS 管理界面等按需从商城安装。新增平台包、配置字段或微服务页面不能自动加入启动恢复范围。本文历史复盘中提到的九包／106 接口方案已经收缩，不再作为默认启动要求。
