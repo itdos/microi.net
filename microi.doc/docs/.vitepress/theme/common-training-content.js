@@ -1,6 +1,6 @@
 // 两个版本共用同一份开场与价值文案，保证网页、搜索索引和导出课件保持一致。
 export const trainingArchitectureImage = {
-  src: 'https://file.microi.net/itdos/official-docs/images/a35ae58a338f6b32f032d64a3ccf4fea1f7fad6cc42de9897907ffcfa1974f4d/202610/microi-ai-platform-architecture-2026_09_04_1.svg',
+  src: 'https://file.microi.net/itdos/official-docs/images/af8f0aad7815c1f68e224cbce706d5723c5223bd1557e1eea71a19b45891d169/202610/microi-ai-platform-architecture-2026_10_25_1.svg',
   alt: 'Microi吾码 AI 平台系统架构图：AI 开发工具、30+ 引擎、分布式底座与多端交付',
 }
 

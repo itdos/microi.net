@@ -318,10 +318,10 @@ let openClawAuthBridge = null
 
 const brandFeatures = [
   '30+ 成熟引擎 · 开箱即用',
-  'AI 低代码 · Token 更省 10 倍+',
+  'AI 低代码 · 复用通用引擎',
   'V8 引擎 · 业务逻辑保存即生效',
   '微服务 · .NET / Vue 深度扩展',
-  '典型场景 · 开发速度提升 10 倍+'
+  '在线编排 · 聚焦业务增量'
 ]
 
 const defaultTenantSteps = [

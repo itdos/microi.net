@@ -47,9 +47,10 @@ test('presentation covers the complete technical learning path', () => {
   assert.match(component, /const expectedSlideCount = 47/)
   for (const phrase of [
     '开源 AI 开发框架',
-    '10×+',
-    'Token 更省*',
-    'AI 开发更快*',
+    '引擎复用',
+    '减少重复开发',
+    '在线编排',
+    '聚焦业务增量',
     '企业研发，为什么要先选一套开源 AI 开发框架？',
     '为什么选择吾码？',
     '三种方式开始使用，再让 AI 接管开发环境',
@@ -108,6 +109,7 @@ test('presentation covers the complete technical learning path', () => {
   ]) assert.ok(sharedSource.includes(phrase), `missing syllabus topic: ${phrase}`)
 
   assert.match(sharedSource, /典型平台能力高复用场景[，；]实际收益取决于需求与团队基线/)
+  assert.doesNotMatch(sharedSource, /10\s*[×xX]\s*\+|Token 更省\*|AI 开发更快\*/)
   assert.match(component, /class="mci-engine-slide-title"[\s\S]*\{\{ slide\.engine\.nav \}\}[\s\S]*\{\{ slide\.title \}\}/u)
   assert.match(component, /const atlasEntryIds = atlasGroups\.flatMap/u)
   assert.doesNotMatch(component, /nav: '视觉识别'/u)

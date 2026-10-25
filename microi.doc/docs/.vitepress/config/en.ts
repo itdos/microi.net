@@ -1,5 +1,6 @@
 import { defineConfig, type DefaultTheme } from "vitepress";
 import { set_sidebar } from "../../en/guide/set_sidebar.mts";
+import { fancyboxUrls } from '../../../scripts/fancybox-assets.mjs'
 
 export const en = defineConfig({
 	base: "/en",
@@ -9,8 +10,8 @@ export const en = defineConfig({
 	head: [
 		["meta", { name: "author", content: "Microi风闲,Anderson. ᴹⁱᶜʳᵒⁱ" }],
 		["link", { rel: "icon", href: "/icon.png" }],
-		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
-		["script", { src: "/assets/fancybox.umd.js" }],
+		["link", { rel: "stylesheet", href: fancyboxUrls.css }],
+		["script", { src: fancyboxUrls.script }],
 	],
 	appearance: 'dark',
 	markdown: {

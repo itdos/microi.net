@@ -1626,7 +1626,7 @@ try {
                 // 【源】ZijianSX: sourceMaterial.ZijianSX,    // 子件属性（目标表无此字段）
                 // 【源】ShifouDC: sourceMaterial.ShifouDC,    // 是否倒冲（目标表无此字段）
                 // 【源】JibenYL: sourceMaterial.JibenYL,      // 基本用量（目标表无此字段）
-                // 【源】FApproveDate: sourceMaterial.FApproveDate, // 金蝶审核时间（目标表无此字段）
+                // 【源】FApproveDate: sourceMaterial.FApproveDate, // 外部系统审核时间（目标表无此字段）
                 // 【源】FREPLACEGROUP: sourceMaterial.FREPLACEGROUP, // 项次（目标表无此字段）
                 // 【源】JichuSL: sourceMaterial.JichuSL,      // 基础用量（目标表无此字段）
                 

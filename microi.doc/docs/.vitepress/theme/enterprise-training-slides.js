@@ -18,7 +18,7 @@ const definitions = [
       {title:'从订单到现场',text:'工艺流程 · 采购协同 · 计划排产（APS）· 生产派工 · 车间管理 · BOM'},
       {title:'从质量到资源',text:'质量管理 · 仓储管理 · 设备管理 · 设备机联 · 模具管理 · 能耗管理'},
       {title:'从执行到经营',text:'计件工资 · 全链路追溯 · 报表看板 · 移动端现场流程办公 · 蓝牙打印'},
-      {title:'系统打通，持续调整',text:'金蝶 / 用友流程对接打通；实施、交付人员可在线调整业务配置。'},
+      {title:'系统打通，持续调整',text:'第三方 ERP 流程对接打通；实施、交付人员可在线调整业务配置。'},
     ],takeaway:'业务发生变化，实施与交付人员在线调整，让工业软件持续贴合工厂。' },
   { id:'enterprise-iot', nav:'数字孪生/IoT物联网', layout:'case', group:'iot', title:'从真实现场，到实时数字世界', summary:'AI驱动场景构建，30+引擎驱动业务，IoT实时通信连接设备与运营。', eyebrow:'06 / DIGITAL TWIN & IOT', metric:'AI + 3D',metricLabel:'照片 / 视频 → AI建模 → 三维呈现',
     cards:[

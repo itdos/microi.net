@@ -142,9 +142,9 @@ const copy = computed(() => locale.value === 'en-US' ? {
   eyebrow: 'Open-source AI development framework',
   titleLeadParts: ['Open-source AI', 'development framework'],
   titleEmphasisLines: ['30+ mature engines'],
-  lead: 'AI low-code, microservices, and the V8 engine share one delivery path. In high-reuse business scenarios, AI development can use 10×+ fewer tokens and move 10×+ faster.',
+  lead: 'AI low-code, microservices, and the V8 engine share one delivery path. Reuse platform capabilities and compose business logic online; measure results with equivalent tasks and acceptance criteria.',
   getStartedAction: 'Get started', primaryAction: 'Training syllabus', secondaryAction: 'Microi Agent',
-  proofAction: 'See the reproducible 10×+ benchmark and scope', proofLabel: 'Platform facts',
+  proofAction: 'View the retest method and scope', proofLabel: 'Platform facts',
   proofPoints: ['Evolving since 2014', 'MIT open source', 'AI low-code + microservices', '30+ mature engines'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: 'Use the right layer for each problem',
   mapDesc: 'Low-code, V8, and microservices share one AI-ready foundation.',
@@ -159,8 +159,8 @@ const copy = computed(() => locale.value === 'en-US' ? {
   valueLabel: 'Why teams choose Microi',
   values: [
     { kicker: 'Ready out of the box', title: 'Reuse 30+ mature engines', description: 'AI low-code, identity, workflow, data, integration, and delivery capabilities start from a proven foundation.' },
-    { kicker: 'Use 10×+ fewer tokens', title: 'Let AI focus on business change', description: 'MCP, Skills, schemas, and V8 reduce repeated framework and boilerplate generation.' },
-    { kicker: 'Develop 10×+ faster', title: 'Deliver working applications sooner', description: 'Visual modeling, V8, microservices, and source extensions form one continuous delivery path.' }
+    { kicker: 'Reuse platform engines', title: 'Let AI focus on business change', description: 'MCP, Skills, schemas, and V8 reduce repeated framework and boilerplate generation.' },
+    { kicker: 'Compose business logic online', title: 'Compose and verify working applications', description: 'Visual modeling, V8, microservices, and source extensions form one continuous delivery path.' }
   ],
   chatTitle: 'Open-source AI development framework, built on 30+ mature engines',
   chatDesc: 'AI low-code, V8, and microservices share one delivery foundation, so teams can focus on real business change.',
@@ -176,9 +176,9 @@ const copy = computed(() => locale.value === 'en-US' ? {
   eyebrow: '开源 AI 开发框架',
   titleLeadParts: ['开源 AI', '开发框架'],
   titleEmphasisLines: ['30+ 成熟引擎'],
-  lead: '融合 AI 低代码、微服务与 V8 引擎；在平台能力高度复用的典型业务场景中，让 AI 开发更省 Token 10 倍+、速度提升 10 倍+，更快交付企业应用。',
+  lead: '融合 AI 低代码、微服务与 V8 引擎；复用成熟平台能力，在线编排业务逻辑，让 AI 聚焦业务增量。具体收益按同条件任务实测。',
   getStartedAction: '开始使用', primaryAction: '培训大纲', secondaryAction: 'Microi Agent',
-  proofAction: '查看 10 倍+ 实测与适用边界', proofLabel: '平台事实',
+  proofAction: '查看复测方法与适用边界', proofLabel: '平台事实',
   proofPoints: ['始于 2014', 'MIT 开源', 'AI 低代码 + 微服务', '30+ 成熟引擎'],
   mapEyebrow: 'DEVELOPMENT CONTINUUM', mapTitle: '用合适的层，解决合适的问题',
   mapDesc: '低代码、V8 与微服务共用一套可复用的 AI 开发底座。',
@@ -193,8 +193,8 @@ const copy = computed(() => locale.value === 'en-US' ? {
   valueLabel: '选择 Microi吾码的核心理由',
   values: [
     { kicker: '开箱即用', title: '复用 30+ 成熟引擎', description: 'AI 低代码、权限、流程、数据、集成与交付能力从成熟底座起步，不再重复造轮子。' },
-    { kicker: 'Token 更省 10 倍+', title: '让 AI 聚焦业务增量', description: 'MCP、Skills、实时 Schema 与 V8 减少框架解释、胶水代码和重复生成。' },
-    { kicker: '速度提升 10 倍+', title: '更快交付可运行应用', description: '可视化建模、V8、微服务与源码扩展贯通一条连续开发和验收链。' }
+    { kicker: '复用通用引擎', title: '让 AI 聚焦业务增量', description: 'MCP、Skills、实时 Schema 与 V8 减少框架解释、胶水代码和重复生成。' },
+    { kicker: '在线编排业务', title: '交付可验收的业务应用', description: '可视化建模、V8、微服务与源码扩展贯通一条连续开发和验收链。' }
   ],
   chatTitle: '开源 AI 开发框架，让 AI 站在 30+ 成熟引擎上，更快交付',
   chatDesc: 'AI 低代码、V8 与微服务共用一套成熟底座，减少重复生成，直接进入业务交付。',

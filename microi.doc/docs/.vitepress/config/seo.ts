@@ -10,6 +10,8 @@ const EN_BASE_KEYWORDS = ['Microi', 'open-source low-code platform', 'AI low-cod
 function cleanText(value) {
   return String(value || '')
     .replace(/^---[\s\S]*?---\s*/m, '')
+    // 注释中的停售价格、旧版本和维护备注不是当前公开内容，须先于 HTML 标签清理。
+    .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
@@ -31,7 +33,7 @@ function sourceSummary(pageData, ctx) {
     if (!file) return ''
     const source = readFileSync(resolve(ctx.siteConfig.srcDir, file), 'utf8')
     // 摘要优先解释本页内容，忽略组件初始化代码、图片和重复的一级标题。
-    const body = source.replace(/^---[\s\S]*?---\s*/m, '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, '').replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, '')
+    const body = source.replace(/^---[\s\S]*?---\s*/m, '').replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, '').replace(/```[\s\S]*?```|~~~[\s\S]*?~~~/g, '')
     const intro = body.split(/\n\s*\n/).filter(block => !/^\s*#{1,6}\s/.test(block)).map(cleanText).find(text => text.length >= 25)
     return (intro || cleanText(body.replace(/^#\s+.+$/gm, ''))).slice(0, 220)
   } catch (_) {

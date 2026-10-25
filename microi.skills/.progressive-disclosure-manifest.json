@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-25T05:08:01.436Z",
+  "generatedAt": "2026-10-25T05:49:08.519Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2259,7 +2259,7 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "eaa27bfbc5d48176e7209158f0894cb12b8d7059074811ad3b399b5a523f8d56",
+      "originalSha256": "b85e129836a43fe001c56b154644f82d3477dc16f51d6344dd86c6f76e2d0a2d",
       "originalLines": 691,
       "prefixSha256": "5b42e3b11954bc1de401574a135c2fee80ef12201bdbaa0271377fb06843baf4",
       "prefixBytes": 19947,
@@ -2317,7 +2317,7 @@
           "id": "v8-file-upload-006",
           "ordinal": 4,
           "destination": "v8-file-upload/references/progressive-01-公有桶-vs-私有桶.md",
-          "sha256": "2dcf2dd7a571cc4757e9015cf213191be2dc3f041d91b0de51ed8ee00b0b86e7",
+          "sha256": "405f2dc31677040e3b81ae5f2e84820680b13d4384477ec7c4bf9186e3b3abef",
           "lines": 50,
           "heading": "接口直接响应文件（下载/导出）"
         },

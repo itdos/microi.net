@@ -1,10 +1,10 @@
-export const architectureVersion = '2026.09.04.1'
-export const platformVersion = 'v7.9.0'
+export const architectureVersion = '2026.10.25.1'
+export const platformVersion = '能力概览'
 export const architectureAssetBaseName = `microi-ai-platform-architecture-${architectureVersion}`
 
 export const valueCards = [
-  ['10×+', 'Token 更省'],
-  ['10×+', '典型交付更快'],
+  ['引擎复用', '减少重复开发'],
+  ['在线编排', '聚焦业务增量'],
   ['30+', '成熟引擎复用'],
   ['在线生效', 'V8 无需编译发布']
 ]

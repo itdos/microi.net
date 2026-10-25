@@ -1367,7 +1367,7 @@ var count = V8.Db.FromSql("select count(1) from sys_user where Status = @p0")
 
 ## 扩展数据库对象 V8.Dbs
 
-“数据库管理”中启用的连接按 `DbKey` 暴露为 `V8.Dbs.<DbKey>`。当前认证类型为 `MySql`、`SqlServer`、`Oracle`、`PostgreSql`、`DaMeng`、`KingBase`；完整配置、MCP 结构读取和附件迁移说明见[扩展数据库与外部数据迁移](../system-engine/databases.md)。
+“数据库管理”中启用的连接按 `DbKey` 暴露为 `V8.Dbs.<DbKey>`。当前支持配置的数据库类型为 `MySql`、`SqlServer`、`Oracle`、`PostgreSql`、`DaMeng`、`KingBase`；完整配置、MCP 结构读取和附件迁移说明见[扩展数据库与外部数据迁移](../system-engine/databases.md)。
 
 安装或更新应用商城中的“数据库扩展”后，`microi_database` 的后端提交后事件会调用 `V8.Method.RefreshExtensionDatabases()`。事件在事务提交后递增按 `OsClient` 隔离的 Redis 版本，因此新增、修改、停用或删除连接后，各 API 节点下一次访问 `V8.Dbs` 即可看到新配置，无需重启；短 TTL 仅作为旧版本节点的兼容兜底。
 
