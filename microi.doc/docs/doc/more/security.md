@@ -2,7 +2,7 @@
 
 > 本文说明 Microi 吾码平台在 FormEngine、接口引擎、SaaS、多租户、文件、登录会话和外部 HTTP 访问中的服务端安全边界。安全能力必须在服务端生效；隐藏按钮、前端路由和“用户已经登录”都不能代替授权。
 
-安全说明与测试证据分别维护。可复核入口见[适配与安全证据工具](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/compatibility)）：2026-10-25 核对的历史 `8.6.8` TRX 摘要一致，选取的租户配置、访问密钥、Token 轮换、租户边界与 SSRF 兼容共 287 项通过；它是维护方的历史回归记录，不是第三方安全认证，也不代替新版本或目标部署验收。当前源码版本、依赖和历史回执版本在快照中分开显示。测试源码与运行条件见 [Microi.Tests](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）。
+安全说明与测试证据分别维护。可复核入口见[适配与安全证据工具](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/compatibility)）：2026-10-26 本轮 `8.7.1` 基础平台回归 5,756 项通过、零失败、零未通过；选取的租户配置、访问密钥、Token 轮换、租户边界与 SSRF 兼容共 287 项通过。快照公开原始 TRX 摘要、源码文件摘要和所选范围，保留旧版记录。它是维护方的可追踪回归证据，不是独立渗透测试或第三方安全认证，也不代替目标部署验收；本轮未执行全数据库实库矩阵、客户专项和扩展浏览器验收。测试源码与运行条件见 [Microi.Tests](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)）。
 
 上线需逐项核对 HTTPS 与数据库证书、代理信任范围、CORS 来源、是否启用严格 SSRF、角色/租户隔离和敏感日志留存。保留具体平台版本、部署组合、失败与未执行项；没有第三方报告或真实环境回执时，应标注“未核验”。安全问题按[贡献指南的私下报告入口](https://gitee.com/ITdos/microi.net/blob/master/CONTRIBUTING.md#私下报告安全问题)（[GitHub](https://github.com/itdos/microi.net/blob/master/CONTRIBUTING.md#私下报告安全问题)）联系，公开 Issue 不上传凭据或客户数据。
 
