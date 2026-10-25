@@ -1,10 +1,35 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import manifest, { policyFields } from '../PlatformService/file-resource-manifest.mjs';
 import { configureFileResourceCandidate, fileResourceCandidateNames } from './configure-file-resource-candidate.mjs';
 import { alignMasterCatalogMetadata, masterCatalogMetadata, baseFieldNames } from '../PlatformService/sync-file-resource-master-metadata.mjs';
 const load = name => JSON.parse(fs.readFileSync(new URL(name, import.meta.url), 'utf8'));
+
+test('canonical monitoring source retains the complete catalog through the standard runtime generator', () => {
+  const source = load('system-observability-package-source.json');
+  const pkg = load('app.microi.sys-log.json');
+  const names = new Set(['mci_file_resource', 'mci_file_traffic_window', 'mci_file_replica']);
+  const tables = pkg.DiyTables.filter(row => names.has(row.Name));
+  const ids = new Set(tables.map(row => row.Id));
+  const selections = {
+    DiyTables: [row => names.has(row.Name), 3],
+    DiyFields: [row => ids.has(row.TableId), 67],
+    PhysicalColumns: [row => names.has(row.TABLE_NAME), 67],
+    DDLStatements: [row => names.has(row.TableName), 8],
+    SysApiEngines: [row => row.ApiEngineKey === 'mci-file-resource-manager', 1],
+  };
+  for (const [key, [select, count]] of Object.entries(selections)) {
+    const expected = pkg[key].filter(select);
+    assert.equal(expected.length, count, key);
+    assert.deepEqual(source[key].filter(select), expected, key);
+  }
+  assert.deepEqual(source.ResourcePolicies.ApiEngines['mci-file-resource-manager'],
+    pkg.ResourcePolicies.ApiEngines['mci-file-resource-manager']);
+  execFileSync(process.execPath, [new URL('./configure-system-observability-package.mjs', import.meta.url).pathname.replace(/^\/(?:([A-Za-z]):)/, '$1:'), '--verify-only'],
+    { windowsHide: true, stdio: 'pipe' });
+});
 
 test('complete master export supplies all 18 base field metadata and the one exact manager without touching shared resources', () => {
   const pkg = load('app.microi.sys-log.json');
