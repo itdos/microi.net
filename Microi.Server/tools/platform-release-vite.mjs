@@ -22,6 +22,8 @@ source=source.replace(/(from\s+)(['"])([^'"]+)\2/g,(all,prefix,quote,specifier)=
 });
 source='const __dirname='+JSON.stringify(project)+';\n'+source;
 const config=path.join(runtime,'native-vite.config.mjs');fs.writeFileSync(config,source);
-const server=await createServer({root:project,configFile:config,configLoader:'native',cacheDir:path.join(runtime,'vite-cache'),server:{host:'127.0.0.1',port,strictPort:true,https:false}});
+// 候选复用已安装的依赖目录；只允许该依赖实际路径，避免字体等资源被 Vite 的严格文件边界拒绝。
+const dependencyRoot=fs.realpathSync(path.join(project,'node_modules'));
+const server=await createServer({root:project,configFile:config,configLoader:'native',cacheDir:path.join(runtime,'vite-cache'),server:{host:'127.0.0.1',port,strictPort:true,https:false,fs:{strict:true,allow:[project,dependencyRoot]}}});
 await server.listen();console.log('Owned platform frontend ready.');
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,async()=>{await server.close();process.exit(0);});

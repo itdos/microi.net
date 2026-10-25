@@ -243,6 +243,15 @@ async function expectRecordSearch(scope, { dialog = false } = {}) {
 async function readPresentationVisualSignature(scope) {
     const nav = scope.locator(".diy-form-section-nav:visible").first();
     await expect(nav).toBeVisible({ timeout: 30_000 });
+    // 分组切换可见后仍有颜色过渡；只等实际取样元素的动画完成，避免把插值颜色当作最终样式。
+    await expect.poll(() => nav.evaluate((element) => {
+        const root = element.closest(".diy-form--controlcenter, .diy-form--settingscenter");
+        const active = element.querySelector(".diy-form-section-nav__item.active");
+        const main = root?.querySelector(".diy-form-presentation-main");
+        if (!active || !main) return -1;
+        return [element, active, main].flatMap((target) => target.getAnimations())
+            .filter((animation) => animation.pending || animation.playState === "running").length;
+    }), { timeout: 3_000, message: "表单呈现签名必须在对应元素的真实动画结束后取样" }).toBe(0);
     return nav.evaluate((element) => {
         const root = element.closest(".diy-form--controlcenter, .diy-form--settingscenter");
         const active = element.querySelector(".diy-form-section-nav__item.active");
