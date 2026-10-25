@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 
 const permissionSource = await readFile(new URL("../src/permission.js", import.meta.url), "utf8");
 const assistantSource = await readFile(new URL("../src/views/ai-engine/index.vue", import.meta.url), "utf8");
@@ -31,7 +32,78 @@ test("应用商城微服务在卡片和详情中承载 AI 应用预览与开发�
     assert.match(marketplaceSource, /function canPreviewApp\(app\)/);
     assert.match(marketplaceSource, /function canDevelopApp\(app\)/);
     assert.match(marketplaceSource, /path:`\/mic-ai-app\/\$\{encodeURIComponent\(appId\)\}`/);
-    assert.match(marketplaceSource, /window\.open\(url,'_blank','noopener,noreferrer'\)/);
+    assert.match(marketplaceSource, /async function openAppPreview\(app\)/);
+});
+
+function previewHarness({ result, publicApp = true, url = "https://file.microi.net/app/index.html", blocked = false, reject = false, changeTenant = false } = {}) {
+    const events = [];
+    const context = { apiBase: "https://api.itdos.com", osClient: "iTdos", currentUser: { Id: "user-a" } };
+    const target = {
+        set opener(value) { events.push(["opener", value]); },
+        location: { replace(value) { events.push(["navigate", value]); } },
+        close() { events.push(["close"]); }
+    };
+    const source = marketplaceSource.split(/\r?\n/).find(line => line.startsWith("async function openAppPreview(app)"));
+    assert.ok(source, "必须测试已发布源码中的真实预览函数");
+    const open = runInNewContext(`${source}\nopenAppPreview`, {
+        URL, context,
+        runtimePreviewUrl: () => url,
+        isPublicApp: () => publicApp,
+        showMessage: (...args) => events.push(["message", ...args]),
+        window: { location: { origin: "https://web.microi.net" }, open: (...args) => { events.push(["open", ...args]); return blocked ? null : target; } },
+        client: { post: async (path, body, options) => {
+            events.push(["resolve", path, body.FilePathName, options.checkCode]);
+            if (changeTenant) context.osClient = "other";
+            if (reject) throw new Error("offline");
+            return result;
+        } }
+    });
+    return { events, open };
+}
+
+test("公开预览仅选择已验证 HTTPS 副本，且在异步查询前隔离 opener", async () => {
+    const h = previewHarness({ result: { Code: 1, Data: { UseBackup: true, Url: "https://hub.microi.net:1120/itdos/verified/index.html" } } });
+    await h.open({});
+    assert.deepEqual(h.events, [
+        ["open", "about:blank", "_blank"], ["opener", null],
+        ["resolve", "/apiengine/mci-file-resource-public-url", "app/index.html", false],
+        ["navigate", "https://hub.microi.net:1120/itdos/verified/index.html"]
+    ]);
+});
+
+test("未就绪、失败或非 HTTPS 副本均保留原公开入口", async () => {
+    for (const options of [
+        { result: { Code: 1, Data: { UseBackup: false, Url: "https://hub.microi.net/x" } } },
+        { result: { Code: 0, Data: { UseBackup: true, Url: "https://hub.microi.net/x" } } },
+        { result: { Code: 1, Data: { UseBackup: true, Url: "http://hub.microi.net/x" } } },
+        { reject: true }, { result: null }
+    ]) {
+        const h = previewHarness(options);
+        await h.open({});
+        assert.deepEqual(h.events.at(-1), ["navigate", "https://file.microi.net/app/index.html"]);
+    }
+});
+
+test("私有预览不查询公开副本，切换租户后关闭待导航窗口", async () => {
+    const privatePreview = previewHarness({ publicApp: false });
+    await privatePreview.open({});
+    assert.equal(privatePreview.events.some(event => event[0] === "resolve"), false);
+    assert.deepEqual(privatePreview.events.at(-1), ["navigate", "https://file.microi.net/app/index.html"]);
+    const switched = previewHarness({ changeTenant: true, result: { Code: 1, Data: { UseBackup: true, Url: "https://hub.microi.net/x" } } });
+    await switched.open({});
+    assert.deepEqual(switched.events.at(-1), ["close"]);
+    assert.equal(switched.events.some(event => event[0] === "navigate"), false);
+});
+
+test("没有运行入口或浏览器拦截窗口时明确提示", async () => {
+    const missing = previewHarness({ url: "" });
+    await missing.open({});
+    assert.equal(missing.events.length, 1);
+    assert.equal(missing.events[0][0], "message");
+    const blocked = previewHarness({ blocked: true });
+    await blocked.open({});
+    assert.equal(blocked.events.at(-1)[0], "message");
+    assert.equal(blocked.events.some(event => event[0] === "navigate"), false);
 });
 
 test("应用商城筛选条件分成两行并允许选项自然换行", () => {
