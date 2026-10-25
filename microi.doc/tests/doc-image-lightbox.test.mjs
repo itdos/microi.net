@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import { createServer } from 'node:http'
 import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { docAssets, getDocAssetUrl } from '../docs/.vitepress/theme/doc-assets.js'
 import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
 import { architectureAssetBaseName } from '../scripts/ai-platform-architecture-data.mjs'
+import { fancyboxDevPlugin, readFancyboxAssets, writeFancyboxAssets } from '../scripts/fancybox-assets.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = relativePath => fs.readFileSync(path.join(projectRoot, relativePath), 'utf8')
@@ -16,9 +18,95 @@ test('documentation keeps one shared Fancybox image preview implementation', () 
   const theme = read('docs/.vitepress/theme/index.ts')
 
   assert.match(shared, /mdItCustomAttrs,\s*"image",\s*\{\s*"data-fancybox":\s*"gallery"\s*\}/)
-  assert.match(shared, /\/assets\/fancybox\.css/)
-  assert.match(shared, /\/assets\/fancybox\.umd\.js/)
+  for (const locale of ['shared', 'en', 'zh']) {
+    const config = read(`docs/.vitepress/config/${locale}.ts`)
+    assert.match(config, /href: fancyboxUrls\.css/)
+    assert.match(config, /src: fancyboxUrls\.script/)
+    assert.doesNotMatch(config, /["']\/assets\/fancybox\.(?:css|umd\.js)["']/)
+  }
+  assert.match(shared, /await writeFancyboxAssets\(siteConfig\)/)
+  assert.match(shared, /await writeDiscoveryIndex\(siteConfig\)/)
+  assert.match(shared, /plugins: \[fancyboxDevPlugin\(\)\]/)
   assert.doesNotMatch(theme, /DocImageLightbox/)
+})
+
+test('Fancybox fingerprints identify the exact existing public CSS and JavaScript bytes', () => {
+  const assets = readFancyboxAssets()
+  assert.equal(assets.length, 2)
+  for (const asset of assets) {
+    const source = fs.readFileSync(path.join(projectRoot, 'docs/public/assets', asset.name))
+    assert.deepEqual(asset.bytes, source)
+    const digest = createHash('sha256').update(source).digest('hex')
+    assert.equal(asset.sha256, digest)
+    assert.ok(asset.url.endsWith(`.${digest}.${path.extname(asset.name).slice(1)}`))
+  }
+})
+
+test('Fancybox build copies retain source bytes and aliases while byte changes produce new URLs', async t => {
+  const tempRoot = path.resolve(projectRoot, '../.tmp')
+  fs.mkdirSync(tempRoot, { recursive: true })
+  const scratch = fs.mkdtempSync(path.join(tempRoot, 'fancybox-assets-test-'))
+  t.after(() => {
+    assert.equal(path.dirname(path.resolve(scratch)), tempRoot)
+    assert.equal(fs.lstatSync(scratch).isSymbolicLink(), false)
+    fs.rmSync(scratch, { recursive: true })
+  })
+  const publicDir = path.join(scratch, 'public')
+  const outDir = path.join(scratch, 'dist')
+  for (const dir of [publicDir, outDir]) fs.mkdirSync(path.join(dir, 'assets'), { recursive: true })
+  for (const [name, content] of [['fancybox.css', '.gallery { display: block; }'], ['fancybox.umd.js', 'window.Fancybox = {};']]) {
+    fs.writeFileSync(path.join(publicDir, 'assets', name), content)
+    // VitePress copies public aliases before calling buildEnd.
+    fs.copyFileSync(path.join(publicDir, 'assets', name), path.join(outDir, 'assets', name))
+  }
+  const initial = readFancyboxAssets(publicDir)
+  fs.appendFileSync(path.join(publicDir, 'assets/fancybox.css'), '\n')
+  const changed = readFancyboxAssets(publicDir)
+  assert.notEqual(changed[0].url, initial[0].url)
+  assert.equal(changed[1].url, initial[1].url)
+
+  // Even if source bytes change later, each published URL keeps its own bytes.
+  await writeFancyboxAssets({ outDir }, initial)
+  await writeFancyboxAssets({ outDir }, changed)
+  for (const asset of [...initial, ...changed]) {
+    const emitted = fs.readFileSync(path.join(outDir, asset.url.slice(1)))
+    assert.deepEqual(emitted, asset.bytes)
+    assert.equal(createHash('sha256').update(emitted).digest('hex'), asset.sha256)
+  }
+  for (const asset of initial) {
+    assert.deepEqual(fs.readFileSync(path.join(outDir, 'assets', asset.name)), asset.bytes)
+  }
+  assert.deepEqual(fs.readFileSync(path.join(publicDir, 'assets/fancybox.css')), changed[0].bytes)
+})
+
+test('Fancybox dev middleware serves fingerprint URLs with correct bytes, MIME and HEAD semantics', async t => {
+  const assets = readFancyboxAssets()
+  let middleware
+  fancyboxDevPlugin(assets).configureServer({ middlewares: { use(handler) { middleware = handler } } })
+  const server = createServer((request, response) => middleware(request, response, () => {
+    response.statusCode = 404
+    response.end('not handled')
+  }))
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  t.after(async () => {
+    server.closeAllConnections()
+    await new Promise(resolve => server.close(resolve))
+  })
+  const origin = `http://127.0.0.1:${server.address().port}`
+  for (const asset of assets) {
+    const response = await fetch(`${origin}${asset.url}?preview=1`)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('content-type'), asset.contentType)
+    assert.match(response.headers.get('cache-control'), /immutable/)
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), asset.bytes)
+    const head = await fetch(`${origin}${asset.url}`, { method: 'HEAD' })
+    assert.equal(head.status, 200)
+    assert.equal(Number(head.headers.get('content-length')), asset.bytes.length)
+    assert.equal((await head.arrayBuffer()).byteLength, 0)
+  }
+  assert.equal((await fetch(`${origin}/assets/fancybox.css`)).status, 404, 'legacy URLs remain owned by the public-file middleware')
+  assert.equal((await fetch(`${origin}/assets/fancybox.unknown.css`)).status, 404)
+  assert.equal((await fetch(`${origin}${assets[0].url}`, { method: 'POST' })).status, 404)
 })
 
 test('platform introduction raw HTML cases join one Fancybox gallery', () => {

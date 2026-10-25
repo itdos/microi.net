@@ -1,5 +1,6 @@
 import { defineConfig, type DefaultTheme } from "vitepress";
 import { set_sidebar } from "../../guide/set_sidebar.mjs";
+import { fancyboxUrls } from '../../../scripts/fancybox-assets.mjs'
 
 export const zh = defineConfig({
 	base: "/",
@@ -11,8 +12,8 @@ export const zh = defineConfig({
 		// 百度爬虫专项
 		["meta", { name: "baidu-site-verification", content: "codeva-2a7cV8xUpf" }], // 填入百度站长平台验证码
 		["link", { rel: "icon", href: "/icon.png" }],
-		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
-		["script", { src: "/assets/fancybox.umd.js" }],
+		["link", { rel: "stylesheet", href: fancyboxUrls.css }],
+		["script", { src: fancyboxUrls.script }],
 	],
 	appearance: 'dark', // 整站初次访问默认暗色，仍保留明暗切换
 	markdown: {
