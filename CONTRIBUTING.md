@@ -14,6 +14,8 @@
 
 服务商名录用于发现公开联系入口，不代表统一资质、响应时限或某个项目已经验收。
 
+在 [Gitee 新建 Issue](https://gitee.com/ITdos/microi.net/issues/new) 或 [GitHub 选择模板](https://github.com/itdos/microi.net/issues/new/choose)时，使用[故障报告](.github/ISSUE_TEMPLATE/bug_report.md)或[功能建议](.github/ISSUE_TEMPLATE/feature_request.md)填写版本、复现材料或验收条件。两站共用默认分支的 `.github/ISSUE_TEMPLATE/`；[Gitee 官方模板说明](https://help.gitee.com/issue/templates)确认支持该目录。若页面没有自动带入模板，可复制对应模板正文后填写，公开前先完成脱敏。
+
 ## 提交可复现的问题
 
 请提供以下信息；不适用的项注明原因，不需要上传完整客户工程或数据库：
