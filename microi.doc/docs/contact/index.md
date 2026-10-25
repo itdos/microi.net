@@ -1,6 +1,6 @@
 ---
 title: 联系我们与吾码服务商名录
-description: Microi吾码官方商务、渠道与技术支持联系入口，汇总 11 家公开列示服务商，说明企业采购、技术咨询、实施培训与生态合作的联系路径；具体服务范围以双方确认的项目约定为准。
+description: Microi吾码官方商务、渠道与技术支持联系入口，汇总 11 家公开列示服务商，提供已确认服务地区、统一联系方式与核实日期；具体服务范围以双方确认的项目约定为准。
 ---
 
 # 📞 联系我们
@@ -14,9 +14,13 @@ description: Microi吾码官方商务、渠道与技术支持联系入口，汇�
 | 平台使用、技术咨询与问题定位 | 联系技术支持，提供实际版本、最小复现与脱敏日志；可先查[常见问题](/doc/about/faq) |
 | 项目实施、定制开发与培训 | 从[服务商名录](#service-providers)选择沟通对象，或请商务协助对接；培训内容可参考[培训大纲](/doc/about/microi-training-syllabus) |
 
+<ServiceCoverage />
+
 ## 官方联系入口
 
 <script setup>
+import ServiceCoverage from '../.vitepress/theme/components/ServiceCoverage.vue'
+import { serviceNetwork } from '../.vitepress/config/service-network.mjs'
 const contacts = [
   {
     name: 'Anderson・周',
@@ -30,11 +34,11 @@ const contacts = [
     link: 'https://microi.net',
   },
   {
-    name: '邓总',
+    name: serviceNetwork.contactName,
     role: '总经理、商务',
     qrCode: '/contact/dengzong.jpeg',
     avatar: 'https://file.microi.net/upload/img/026-02-07_002647_346.jpg',
-    phone: '13615741649',
+    phone: serviceNetwork.telephone,
     email: '-',
     link: '-',
   },

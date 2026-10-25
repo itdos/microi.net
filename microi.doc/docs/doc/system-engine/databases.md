@@ -9,7 +9,7 @@
 | DbType | 数据库 | 默认端口 | 连接字符串示例 |
 |---|---|---:|---|
 | `MySql` | MySQL | 3306 | `Server=127.0.0.1;Port=3306;Database=app;Uid=user;Pwd=***;` |
-| `SqlServer` | SQL Server | 1433 | `Server=127.0.0.1,1433;Database=app;User Id=user;Password=***;TrustServerCertificate=True;` |
+| `SqlServer` | SQL Server | 1433 | `Server=db.example.com,1433;Database=app;User Id=user;Password=***;Encrypt=True;TrustServerCertificate=False;` |
 | `Oracle` | Oracle | 1521 | `User Id=user;Password=***;Data Source=127.0.0.1:1521/ORCL;` |
 | `PostgreSql` | PostgreSQL | 5432 | `Host=127.0.0.1;Port=5432;Database=app;Username=user;Password=***;` |
 | `DaMeng` | 达梦 DM8 | 5236 | `Server=127.0.0.1;Port=5236;User Id=user;Password=***;` |
@@ -18,6 +18,27 @@
 这里的“支持”表示 Dos.ORM 已包含对应驱动、SQL 方言和结构读取实现。正式接入仍需用目标数据库的真实版本、网络、字符集和最小权限账号进行连接、查询与写入验收。
 
 驱动支持不等于已经取得国产化适配认证，也不代表任意 CPU、操作系统、数据库版本及部署组合均已验证。项目选型应记录具体组合，验证连接、类型与字符集、参数化查询、事务、结构变更和备份恢复；需要认证时，单独核对证书的机构、产品版本、适用组合及有效范围，不能以本页列表代替证书。
+
+### 版本与验证证据
+
+以下为 2026-10-25 源码依赖盘点；版本来自 `Dos.ORM.csproj`。驱动包版本不是数据库服务器版本，升级时应重新运行[适配证据核验工具](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)，查看源码摘要、运行环境和历史回执的准确范围。
+
+| 数据库 | .NET 驱动与声明版本 | 此次核验范围 | 目标环境验收 |
+|---|---|---|---|
+| MySQL | `MySql.Data 9.7.0` | 驱动声明、平台与数据库管理契约测试的历史回执 | 未据此证明任意 MySQL 版本通过 |
+| SQL Server | `System.Data.SqlClient 4.9.1` | 驱动声明与离线契约 | 本次未执行 SQL Server 实库专项 |
+| Oracle | `Oracle.ManagedDataAccess.Core 23.26.300` | 驱动声明与离线契约 | 精确服务端版本、字符集及事务行为待目标环境验证 |
+| PostgreSQL | `Npgsql 8.0.9` | 驱动声明与离线契约 | 精确服务端版本、类型及结构变更待目标环境验证 |
+| 达梦 DM8 | `DM.DmProvider 8.3.1.47463` | 驱动声明与方言实现 | CPU、操作系统、数据库完整版本及认证材料未提供 |
+| 人大金仓 V9 | `Kdbndp_V9 10.0.1.703` | 驱动声明与方言实现 | CPU、操作系统、数据库完整版本及认证材料未提供 |
+
+核验工具仅读取源码和选定回执，不连接数据库、不启动容器、不创建租户。公开仓可运行工具的离线测试；完整后端回归与真实环境验收仍使用 [Microi.Tests 的既有入口](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Tests/README.md)。旧版本回执不能替代新版本验收，Windows 上的测试也不能自动扩展到 Linux、macOS、国产操作系统或 ARM64。
+
+### 生产连接的传输安全
+
+上表是连接格式示例，密码须来自后端受限配置。SQL Server 生产连接显式使用 `Encrypt=True;TrustServerCertificate=False`，连接域名应与服务端证书匹配，API 宿主应信任签发 CA。证书错误应修复证书、域名或信任链；`TrustServerCertificate=True` 会跳过服务器身份校验，只能用于明确受控的开发排错，不能作为生产故障的通用修复。此配置适用于当前使用的 `System.Data.SqlClient`，不是更换驱动。详见 [SqlClient 连接字符串与加密说明](https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/connection-string-syntax#sqlclient-connection-strings)。
+
+其余数据库也应按对应驱动版本配置 TLS、证书校验和最小权限；连接格式示例没有声明加密时，不代表连接已加密。上线回执应记录是否验证服务器证书、读写账号权限和数据库版本，排除真实地址、密码与完整连接串。
 
 ## 保存连接：数据库管理
 
@@ -69,7 +90,7 @@ try {
 ```js
 var db = V8.Dbs.Open(
   'SqlServer',
-  'Server=127.0.0.1,1433;Database=app;User Id=user;Password=***;TrustServerCertificate=True;'
+  'Server=db.example.com,1433;Database=app;User Id=user;Password=***;Encrypt=True;TrustServerCertificate=False;'
 );
 
 var rows = db.FromSql('SELECT Id, Name FROM Customer WHERE Status = @p0')

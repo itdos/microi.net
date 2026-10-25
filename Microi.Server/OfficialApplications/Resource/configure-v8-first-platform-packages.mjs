@@ -161,15 +161,16 @@ export const packageDefinitions = Object.freeze([
   Object.freeze({
     file: 'app.microi.ai-engine.json',
     name: 'AI助手',
-    version: 'v7.7.3',
+    version: 'v7.7.8',
+    serverMinVersion: '8.7.0',
     bootstrapUrl: 'https://static.itdos.com/itdos/microi-store/packages/01kggwkhpq6hw8axdaz4n94rq2/202608/app_microi_ai-engine-v6_3_4-efb7fcdf70c2f467.json',
     bootstrapSha256: 'efb7fcdf70c2f467ffd99b72581b15bcd8790ad977a3ba1f78b33cfd71069763',
     bootstrapSize: 732784,
-    history: '2026-09-08 v7.7.3 音乐生成改用持久后台任务和原任务轮询，浏览器停止等待或刷新不会取消后台生成；保存官方 Music3 事件编号与完成文件地址，断流或下载失败可恢复原结果且不重新作曲。失败与不确定状态保留诊断，图片和音乐中转等待任务合并限流并预留供应商执行槽。需同步更新平台 Core、AI、API、前端及使用的吾码中转节点；应用包不会替换二进制，未保存回执的历史请求不自动重发。保留租户模型、密钥、策略与会话数据。',
-    changeLogTitle: '音乐持久任务与原结果恢复',
-    changeType: 'Fix',
-    changeLogContent: '音乐生成改用持久后台任务和原任务轮询，浏览器停止等待或刷新不会取消后台生成；保存官方 Music3 事件编号与完成文件地址，断流或下载失败可恢复原结果且不重新作曲。失败与不确定状态保留诊断，图片和音乐中转等待任务合并限流并预留供应商执行槽。需同步更新平台 Core、AI、API、前端及使用的吾码中转节点；应用包不会替换二进制，未保存回执的历史请求不自动重发。保留租户模型、密钥、策略与会话数据。',
-    releaseTime: '2026-09-08 15:30:00',
+    history: '2026-10-25 v7.7.8 新增主租户管理员中转无限额度查询、授予与撤销动作，严格校验精确目标、布尔值和预期权益状态；补齐账户开关及最近操作人、时间的物理列和表单元数据。无限权益仅免本地中转赠送 Token 上限，保留余额、实际用量和历史，不替代订阅、供应商配额、身份与并发保护。要求先更新支持最低版本预检的商城导入器并部署平台 Core、AI、API 8.7.0 或更高兼容版本；应用包不替换二进制，不包含实际账户数据，保留模型、密钥、媒体任务与租户扩展。',
+    changeLogTitle: '中转无限额度与受控管理员管理',
+    changeType: 'Feature',
+    changeLogContent: '新增主租户管理员中转无限额度查询、授予与撤销动作，严格校验精确目标、布尔值和预期权益状态；补齐账户开关及最近操作人、时间的物理列和表单元数据。无限权益仅免本地中转赠送 Token 上限，保留余额、实际用量和历史，不替代订阅、供应商配额、身份与并发保护。要求先更新支持最低版本预检的商城导入器并部署平台 Core、AI、API 8.7.0 或更高兼容版本；应用包不替换二进制，不包含实际账户数据，保留模型、密钥、媒体任务与租户扩展。',
+    releaseTime: '2026-10-25 22:41:42',
     capabilities: [
       'ApiEngine:mci_ai_data_assistant@v1.1.8',
       'ApiEngine:platform-ai-account@v1.1.0',
@@ -202,6 +203,7 @@ export const packageDefinitions = Object.freeze([
       'V8.AI.GenerateMiniMaxImage',
       'V8.AI.GetMiniMaxImageTask',
       'V8.AI.RecoverMiniMaxImageTask',
+      'ApiEngine:platform-ai-account@v1.1.1',
     ],
     exactEngineKeys: [
       'mci_ai_data_assistant',
@@ -225,7 +227,7 @@ export const packageDefinitions = Object.freeze([
     ],
     removeTables: aiRemovedDuplicateTableNames,
     engines: [
-      { key: 'platform-ai-account', name: 'AI 平台账户与支付编排', source: 'platform-ai-account.js', id: '019d2a01-9d63-7f91-8c02-000000000007', version: 'v1.1.0', enableLog: 1, allowAnonymous: 1 },
+      { key: 'platform-ai-account', name: 'AI 平台账户与支付编排', source: 'platform-ai-account.js', id: '019d2a01-9d63-7f91-8c02-000000000007', version: 'v1.1.1', enableLog: 1, allowAnonymous: 1 },
       {
         key: 'platform-ai-runtime',
         name: 'AI 非流式兼容运行时',
@@ -365,6 +367,9 @@ function loadRelayUsageTableSpecs() {
     GiftTokens: '赠送 Token',
     UsedTokens: '已用 Token',
     RemainingTokens: '剩余 Token',
+    IsUnlimited: '不限制本地中转赠送 Token 额度',
+    UnlimitedUpdatedBy: '额度开关最近操作人',
+    UnlimitedUpdatedAt: '额度开关最近操作时间',
   };
   return definitions.map(definition => {
     const classStart = source.indexOf(`internal sealed class ${definition.className}`);
@@ -381,7 +386,7 @@ function loadRelayUsageTableSpecs() {
         COLUMN_TYPE: columnType,
         DATA_TYPE: columnType.replace(/\(.*/, ''),
         IS_NULLABLE: name === 'Id' ? 'NO' : 'YES',
-        COLUMN_DEFAULT: null,
+        COLUMN_DEFAULT: definition.tableName === 'mci_ai_token_account' && name === 'IsUnlimited' ? '0' : null,
         COLUMN_COMMENT: comments[name] || '',
         COLUMN_KEY: name === 'Id' ? 'PRI' : (definition.indexes.some(index => index[1] === name) ? 'MUL' : ''),
         EXTRA: '',
@@ -391,10 +396,11 @@ function loadRelayUsageTableSpecs() {
     if (!columns.length) throw new Error(`RelayUsageSchema.cs 的 ${definition.className} 没有字段。`);
     const columnSql = columns.map(column => {
       const nullable = column.IS_NULLABLE === 'NO' ? ' NOT NULL' : ' NULL';
+      const defaultSql = column.COLUMN_DEFAULT === '0' ? ' DEFAULT 0' : '';
       const comment = column.COLUMN_COMMENT
         ? ` COMMENT '${column.COLUMN_COMMENT.replace(/'/g, "''")}'`
         : '';
-      return `  \`${column.COLUMN_NAME}\` ${column.COLUMN_TYPE}${nullable}${comment}`;
+      return `  \`${column.COLUMN_NAME}\` ${column.COLUMN_TYPE}${nullable}${defaultSql}${comment}`;
     });
     columnSql.push('  PRIMARY KEY (`Id`)');
     for (const [indexName, fieldName] of definition.indexes) {
@@ -480,7 +486,7 @@ function configureOwnedTable(packageModel, spec) {
       NameConfirm: 1,
       TableWidth: 150,
       TableId: tableId,
-      Readonly: /^(?:Id|CreateTime|UpdateTime|UserId|UserName|IsDeleted|OsClient)$/.test(name) ? 1 : 0,
+      Readonly: /^(?:Id|CreateTime|UpdateTime|UserId|UserName|IsDeleted|OsClient|IsUnlimited|UnlimitedUpdatedBy|UnlimitedUpdatedAt)$/.test(name) ? 1 : 0,
       Encrypt: 0,
       Component: fieldComponent(column),
       Visible: sensitive || hiddenSystemField ? 0 : 1,

@@ -151,9 +151,9 @@ function engine(model, key) {
   return model.SysApiEngines.find(item => item.ApiEngineKey === key);
 }
 
-test('AI assistant v7.7.3 has an exact four-engine closure', () => {
+test('AI assistant v7.7.8 has an exact four-engine closure', () => {
   assert.ok(aiDefinition, 'missing app.microi.ai-engine package definition');
-  assert.equal(aiDefinition.version, 'v7.7.3');
+  assert.equal(aiDefinition.version, 'v7.7.8');
   assert.deepEqual([...aiDefinition.exactEngineKeys].sort(), [...expectedKeys].sort());
   assert.deepEqual([...aiDefinition.removeEngines].sort(), [...legacyStoreEngineKeys].sort());
 
@@ -161,7 +161,7 @@ test('AI assistant v7.7.3 has an exact four-engine closure', () => {
   const actualKeys = model.SysApiEngines.map(item => item.ApiEngineKey);
   assert.deepEqual([...actualKeys].sort(), [...expectedKeys].sort());
   assert.equal(new Set(actualKeys).size, 4);
-  assert.equal(model.PackageInfo.Version, 'v7.7.3');
+  assert.equal(model.PackageInfo.Version, 'v7.7.8');
   assert.equal(model.PackageInfo.ApiEngineCount, 4);
   assert.deepEqual(
     Object.keys(model.ResourcePolicies.ApiEngines).sort(),
@@ -269,9 +269,9 @@ test('generated AI and system-account package JSON files are idempotent with exa
       file: 'app.microi.ai-engine.json',
       counts: {
         TableCount: 17,
-        FieldCount: 250,
+        FieldCount: 253,
         DDLCount: 17,
-        PhysicalColumnCount: 529,
+        PhysicalColumnCount: 532,
         ApiEngineCount: 4,
         DataSetCount: 1,
         DataRowCount: 6,

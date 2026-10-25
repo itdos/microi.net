@@ -3,6 +3,7 @@ import { get as httpGet } from 'node:http'
 import { get as httpsGet } from 'node:https'
 import { SITE_URL } from '../docs/.vitepress/config/seo-policy.mjs'
 import { headTags } from './seo-discovery.mjs'
+import { auditServiceNetworkHtml } from './service-network-audit.mjs'
 
 const baseIndex = process.argv.indexOf('--base')
 if (baseIndex < 0 || !process.argv[baseIndex + 1]) throw new Error('请指定 --base，例如 http://127.0.0.1:61513；该命令只执行公开 GET 验收。')
@@ -61,6 +62,11 @@ await Promise.all(Array.from({ length: 3 }, async () => {
     check(response.status === 200, `${canonical}: 规范页面不可用或仍在跳转`)
     check(headTags(body, 'link').some(item => item.rel === 'canonical' && item.href === canonical), `${canonical}: canonical 不匹配`)
     check(!headTags(body, 'meta').some(item => item.name === 'robots' && /noindex/.test(item.content)), `${canonical}: 公开页面被禁止索引`)
+    const path = new URL(canonical).pathname
+    if (['/contact/', '/doc/about/partner.html'].includes(path)) {
+      const failures = auditServiceNetworkHtml(body, { structured: path === '/contact/' })
+      check(failures.length === 0, `${canonical}: ${failures.join('；')}`)
+    }
   }
 }))
 for (const path of ['/login.html', '/profile.html', '/app-detail.html']) {
@@ -71,6 +77,7 @@ const { body: robots } = await get('/robots.txt')
 check(robots.includes(`Sitemap: ${SITE_URL}/sitemap.xml`) && !/Disallow:\s*\/assets\//i.test(robots), 'robots 必须允许渲染资源并使用规范域名')
 const { response: indexResponse, body: index } = await get('/llms.txt')
 check(indexResponse.status === 200 && index.includes('/doc/v8-engine/v8-server.html') && index.includes('/en/doc/'), 'AI 文档索引必须可读且包含中英文入口')
+check(index.includes('## 按问题查找资料') && index.includes('哪些地区可以对接实施、培训与技术服务'), 'AI 文档索引应提供服务与能力问题入口')
 const { response: homeResponse, body: home } = await get('/')
 check(homeResponse.status === 200 && homeResponse.headers.get('cache-control') === 'no-cache', 'HTML 应可重新校验，不能被长期缓存')
 const resources = [...new Set([

@@ -23,6 +23,8 @@ namespace Microi.net
                 "GetApiKeyList",
                 "GetApiKeyBindUsers",
                 "GetApiKeyCapacity",
+                "GetRelayTokenAccount",
+                "SetRelayTokenLimit",
                 "PersistMiniMaxVideoFile"
             };
 
@@ -35,6 +37,8 @@ namespace Microi.net
                 "ResetUserAiApiKey",
                 "GetRelayTokenSummary",
                 "GetRelayTokenUsage",
+                "GetRelayTokenAccount",
+                "SetRelayTokenLimit",
                 "GetQuotaWindow",
                 "CreateAlipay",
                 "ConsumeQuota",
@@ -98,6 +102,13 @@ namespace Microi.net
 
                 if (AiPlatformAdministratorAtomActions.Contains(authorizationTarget))
                 {
+                    if ((string.Equals(authorizationTarget, "GetRelayTokenAccount", StringComparison.OrdinalIgnoreCase)
+                         || string.Equals(authorizationTarget, "SetRelayTokenLimit", StringComparison.OrdinalIgnoreCase))
+                        && !string.Equals(osClient, TenantConfigurationSecurity.NormalizeTenantId(OsClientExtend.GetConfigOsClient()),
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new DosResult(0, null, "中转额度管理只允许当前主租户管理员操作主租户账户。");
+                    }
                     if (currentUser == null
                         || UserAccessKeySecurity.IsSession(currentUser)
                         || !PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(

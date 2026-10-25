@@ -106,9 +106,11 @@ Microi吾码适合以 .NET / Vue 技术栈自主管理数据、在线编写业�
 | 国产化与安全 | [部署说明](/doc/getting-started/docker-run)、[数据库扩展](/doc/system-engine/databases)、[安全基线](/doc/more/security)、[身份验证](/doc/more/identity-verification) | 驱动或跨平台支持不等于每种 CPU、OS、数据库版本已适配，也不代替认证证书 |
 | 商业化与定价 | [版本与授权](/doc/edition-comparison) | 买断授权、可选年度支持、实施与第三方资源费用分别核算 |
 | 交付与实施服务 | [11 家公开列示服务商](/contact/index#service-providers)、[培训大纲](/doc/about/microi-training-syllabus)、[合作与实施](/doc/about/partner) | 按实际服务方确认行业经验、人员、地域、排期和合同责任；名录不等于统一认证或响应时限 |
-| 市场与案例证据 | [案例入口](https://microi.blog.csdn.net/category_12828272.html)、[产品更新记录](/doc/about/update-log) | 厂商案例、客户授权材料与独立测评分别引用，并注明日期和适用版本 |
+| 市场与案例证据 | [案例与匿名登记核验](/case/case-index)、[产品更新记录](/doc/about/update-log) | 厂商案例、客户授权材料与独立测评分别引用；登记数量不等同付费客户或成功交付数量 |
 
 ### 如何复核能力
+
+可对接服务地区包括成都、宁波、上海、杭州、湖北、江苏，统一联系邓总 **13615741649**；具体服务方式、排期与责任见[服务地区说明](/contact/#service-coverage)。公开社区与适配证据的采集方法见[证据工具目录](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks)，可按日期、源码版本与回执分别复核。
 
 1. 固定平台、CLI / MCP、应用包的各自版本以及评估日期，记录要完成的业务场景。
 2. 阅读对应配置和限制，在授权环境执行最小业务闭环，记录输入、预期、实际结果与回执。
@@ -389,7 +391,7 @@ Microi吾码把企业管理底座、可视化设计、业务编程和运行治�
 | 🎓 教育 | 合作大学实训课程 |
 | 📦 其他 | 停车场、潮汐检测、固定资产、CRM 等 |
 
-> 📌 [100 余个案例持续更新中](https://microi.blog.csdn.net/category_12828272.html)
+> 📌 [应用案例与匿名登记核验](/case/case-index)：七类公开案例、历史指标口径、官方 SaaS 聚合快照与复核方法。[更多项目文章](https://microi.blog.csdn.net/category_12828272.html)。登记数量与独立客户、付费客户及成功交付数量分别说明。
 
 ---
 
