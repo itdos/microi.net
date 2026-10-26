@@ -20,6 +20,13 @@ export function isIndexablePage(input, pageData = {}) {
     !/\bnoindex\b/i.test(explicitRobots) && !UTILITY_PAGES.has(canonicalPath(input))
 }
 
+// 纯文本是同一公开阅读页的表示，不另造产品事实或可索引的重复文章。
+export function discoveryTextPath(input) {
+  const path = canonicalPath(input)
+  if (!isIndexablePage(path) || !/^\/(?:en\/)?(?:doc|case|contact)\//.test(path)) return ''
+  return `/ai-docs${path.endsWith('/') ? `${path}index.txt` : path.replace(/\.html$/, '.txt')}`
+}
+
 export function breadcrumbsFor(input, title) {
   const path = canonicalPath(input)
   const en = path.startsWith('/en/')

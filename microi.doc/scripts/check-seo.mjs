@@ -1,8 +1,9 @@
 import { readFile } from 'node:fs/promises'
 import { resolve, relative } from 'node:path'
-import { SITE_URL, canonicalPath, isIndexablePage } from '../docs/.vitepress/config/seo-policy.mjs'
+import { SITE_URL, canonicalPath, isIndexablePage, discoveryTextPath } from '../docs/.vitepress/config/seo-policy.mjs'
 import { sourceIsIndexable } from '../docs/.vitepress/config/seo-source.mjs'
-import { htmlFiles, headTags, decodeHtml as decode } from './seo-discovery.mjs'
+import { htmlFiles, headTags, pageRevision, decodeHtml as decode } from './seo-discovery.mjs'
+import { readableAsset } from './seo-readable.mjs'
 import { auditServiceNetworkHtml } from './service-network-audit.mjs'
 
 const distDir = resolve(process.cwd(), 'docs/.vitepress/dist')
@@ -13,6 +14,7 @@ const pageCanonicals = new Map()
 const pageDescriptions = new Map()
 const indexableUrls = new Set()
 const alternateTargets = []
+const expectedReadable = new Map()
 
 for (const file of files) {
   const html = await readFile(file, 'utf8')
@@ -45,6 +47,18 @@ for (const file of files) {
     const description = descriptions[0]?.content || ''
     if (pageDescriptions.has(description)) failures.push(`${name}: description reused by ${pageDescriptions.get(description)}`)
     pageDescriptions.set(description, name)
+    const textPath = discoveryTextPath(name)
+    if (textPath) {
+      const textUrl = `${SITE_URL}${textPath}`
+      if (!links.some(link => link.rel === 'alternate' && link.type === 'text/plain' && link.href === textUrl)) failures.push(`${name}: missing readable alternate`)
+      try {
+        const expected = readableAsset({ html, canonical: expectedCanonical, title: title.replace(/\s*\|\s*Microi吾码$/, ''), description,
+          revision: pageRevision(html, expectedCanonical), textUrl })
+        const actual = await readFile(resolve(distDir, textPath.slice(1)), 'utf8')
+        if (actual !== expected.text) failures.push(`${name}: readable body differs from published HTML`)
+        expectedReadable.set(textUrl, expected.metadata)
+      } catch (error) { failures.push(`${name}: readable document: ${error.message}`) }
+    }
   }
   const expectedLang = name.startsWith('en/') ? 'en-US' : 'zh-CN'
   if (html.match(/<html\b[^>]*lang=["']([^"']+)["']/i)?.[1] !== expectedLang) failures.push(`${name}: invalid HTML language`)
@@ -78,7 +92,18 @@ if (!robotsText.includes(`Sitemap: ${SITE_URL}/sitemap.xml`)) failures.push('rob
 const discovery = await readFile(resolve(distDir, 'llms.txt'), 'utf8')
 if (!discovery.includes('## 按问题查找资料')) failures.push('llms.txt: missing question-based discovery')
 for (const url of indexableUrls) if (/\/(doc|case|contact)\//.test(url) && !discovery.includes(`](${url})`)) failures.push(`llms.txt: missing ${url}`)
-for (const [, url] of discovery.matchAll(/\]\((https:\/\/microi\.net\/[^)]+)\)/g)) if (!indexableUrls.has(url)) failures.push(`llms.txt: unpublished or non-indexable target ${url}`)
+for (const [, url] of discovery.matchAll(/\]\((https:\/\/microi\.net\/[^)]+)\)/g)) if (!indexableUrls.has(url) && !expectedReadable.has(url)) failures.push(`llms.txt: unpublished or non-indexable target ${url}`)
+try {
+  const manifest = JSON.parse(await readFile(resolve(distDir, 'ai-docs/index.json'), 'utf8'))
+  if (manifest.schemaVersion !== 1 || manifest.source !== 'published-ssr' || manifest.canonicalSite !== SITE_URL) throw new Error('incorrect schema or source')
+  if (!Array.isArray(manifest.documents) || manifest.documents.length !== expectedReadable.size) throw new Error('document count differs from published HTML')
+  const seen = new Set()
+  for (const document of manifest.documents) {
+    if (seen.has(document.textUrl) || JSON.stringify(document) !== JSON.stringify(expectedReadable.get(document.textUrl))) throw new Error(`unexpected metadata or digest for ${document.textUrl}`)
+    if (!discovery.includes(`](${document.textUrl})`)) throw new Error(`llms.txt missing ${document.textUrl}`)
+    seen.add(document.textUrl)
+  }
+} catch (error) { failures.push(`ai-docs/index.json: ${error.message}`) }
 
 if (failures.length) {
   console.error(`SEO audit failed with ${failures.length} issue(s):`)
@@ -86,5 +111,5 @@ if (failures.length) {
   if (failures.length > 80) console.error(`- ... ${failures.length - 80} more`)
   process.exitCode = 1
 } else {
-  console.log(`SEO audit passed: ${files.length} HTML pages, ${indexableUrls.size} indexable URLs; unique descriptions/canonicals, robots, sitemap, reciprocal hreflang, JSON-LD and documentation index verified.`)
+  console.log(`SEO audit passed: ${files.length} HTML pages, ${indexableUrls.size} indexable URLs, ${expectedReadable.size} readable documents; unique descriptions/canonicals, robots, sitemap, reciprocal hreflang, JSON-LD, text body parity and SHA-256 manifest verified.`)
 }

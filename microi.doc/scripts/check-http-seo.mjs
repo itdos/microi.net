@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { get as httpGet } from 'node:http'
 import { get as httpsGet } from 'node:https'
-import { SITE_URL } from '../docs/.vitepress/config/seo-policy.mjs'
+import { createHash } from 'node:crypto'
+import { SITE_URL, discoveryTextPath } from '../docs/.vitepress/config/seo-policy.mjs'
 import { headTags } from './seo-discovery.mjs'
 import { auditServiceNetworkHtml } from './service-network-audit.mjs'
 
@@ -78,6 +79,21 @@ check(robots.includes(`Sitemap: ${SITE_URL}/sitemap.xml`) && !/Disallow:\s*\/ass
 const { response: indexResponse, body: index } = await get('/llms.txt')
 check(indexResponse.status === 200 && index.includes('/doc/v8-engine/v8-server.html') && index.includes('/en/doc/'), 'AI 文档索引必须可读且包含中英文入口')
 check(index.includes('## 按问题查找资料') && index.includes('哪些地区可以对接实施、培训与技术服务'), 'AI 文档索引应提供服务与能力问题入口')
+const { response: readableIndexResponse, body: readableIndexBody } = await get('/ai-docs/index.json')
+check(readableIndexResponse.status === 200 && /application\/json/i.test(readableIndexResponse.headers.get('content-type') || ''), '机器文档清单必须以 JSON 公开读取')
+const readableIndex = JSON.parse(readableIndexBody)
+const expectedReadable = urls.filter(url => discoveryTextPath(url))
+check(readableIndex.schemaVersion === 1 && readableIndex.source === 'published-ssr' && readableIndex.documents?.length === expectedReadable.length, '机器文档清单必须完整对应当前公开阅读页')
+const seenReadable = new Set()
+for (const item of readableIndex.documents) {
+  check(expectedReadable.includes(item.canonical) && item.textUrl === SITE_URL + discoveryTextPath(item.canonical) && !seenReadable.has(item.canonical), `机器文档来源或路径无效: ${item.canonical}`)
+  seenReadable.add(item.canonical)
+  const { response, body } = await get(new URL(item.textUrl).pathname)
+  check(response.status === 200 && /text\/plain/i.test(response.headers.get('content-type') || ''), `${item.textUrl}: 应返回纯文本`)
+  check(response.headers.get('x-robots-tag') === 'noindex, follow' && response.headers.get('cache-control') === 'no-cache', `${item.textUrl}: 应允许读取并避免重复收录及过期缓存`)
+  check(Buffer.byteLength(body) === item.bytes && createHash('sha256').update(body).digest('hex') === item.sha256 && body.includes(`Canonical: ${item.canonical}`), `${item.textUrl}: 文本与来源清单不一致`)
+  check(index.includes(`](${item.textUrl})`), `${item.textUrl}: llms.txt 缺少入口`)
+}
 const { response: homeResponse, body: home } = await get('/')
 check(homeResponse.status === 200 && homeResponse.headers.get('cache-control') === 'no-cache', 'HTML 应可重新校验，不能被长期缓存')
 const resources = [...new Set([

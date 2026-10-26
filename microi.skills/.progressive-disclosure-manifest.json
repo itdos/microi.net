@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-26T01:11:09.164Z",
+  "generatedAt": "2026-10-26T02:43:20.301Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,8 +763,8 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "43de2a6e3c3a9d6fc65168dc5dda01eee7ecb50be82fbc1de36c6ed661b4d5d8",
-      "originalLines": 716,
+      "originalSha256": "9db37be1921e828867a3d1878f42b72fbfd346d7d11b42d0203f0b48c891b83a",
+      "originalLines": 718,
       "prefixSha256": "b6b97e8df68678ea61b8d67ad14057c0deb0c09a3834e8b77994d20aaeb92e7e",
       "prefixBytes": 6666,
       "entryLines": 117,
@@ -837,8 +837,8 @@
           "id": "microi-system-delivery-008",
           "ordinal": 8,
           "destination": "microi-system-delivery/references/context-quality.md",
-          "sha256": "0e9e14b98ac7ab7ca0bf1c4ef97bad2bf061d0c01b170325ddbaf961a02a0de4",
-          "lines": 54,
+          "sha256": "7d4c1226d529de92a79f6dcb277178f3d274738f51ed4b0fa609bb6f39ae9cb0",
+          "lines": 56,
           "heading": "质量优先的上下文与增量开发"
         }
       ],

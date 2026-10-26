@@ -42,6 +42,31 @@ test('generate_system rejects a completed validator whose Data.Passed is false',
   assert.equal(buildGenerateSystemValidationPayload([], { Code: 1, Msg: '', Data: { Passed: false, Errors: ['field mismatch'] } }).ok, false);
 });
 
+test('验收成功必须显式 Passed=true，空白、非布尔或矛盾结果不能算通过', async () => {
+  for (const data of [undefined, null, {}, { Passed: 'true' }, { Passed: 1 }, { Passed: true, Errors: 'invalid envelope' }, { Passed: true, Errors: ['resource mismatch'] }]) {
+    const validation = { Code: 1, Msg: 'server response', Data: data };
+    assert.equal(buildGenerateSystemValidationPayload([], validation).ok, false);
+    assert.deepEqual(buildGenerateSystemValidationPayload([], validation).validation, { ...validation, Data: data ?? null });
+    const handlers = new Map<string, (...args: any[]) => Promise<any>>();
+    registerAdvancedTools({ tool(name: string, ...args: any[]) { handlers.set(name, args.at(-1)); } } as any, {
+      validateLowCodeSystem: async () => validation,
+      writeAuditLog: async () => ({ Code: 1 }),
+      getDbSchema: async () => ({ Code: 1, Data: {} }),
+    } as any, { osClient: 'test' } as any);
+    for (const detail of ['summary', 'full']) {
+      const result = await handlers.get('microi_validate_system')!({ manifest: {}, detail });
+      assert.equal(result.isError, true, JSON.stringify({ data, detail, result }));
+      if (detail === 'summary' && (typeof data?.Passed !== 'boolean' || typeof data?.Errors === 'string')) {
+        assert.deepEqual(JSON.parse(result.content[0].text).validation.Data.ServerValidation, JSON.parse(JSON.stringify(validation)));
+      }
+    }
+    const generated = await handlers.get('microi_generate_system')!({ manifest: {}, dryRun: false, confirmExecution: 'test' });
+    assert.equal(generated.isError, true);
+    assert.equal(JSON.parse(generated.content[0].text).ok, false);
+  }
+  assert.equal(buildGenerateSystemValidationPayload([], { Code: 1, Msg: '', Data: { Passed: true } }).ok, true, '明确通过且未声明错误集合的旧响应保持兼容');
+});
+
 const bannerTable = { name: 'Biz_Content', fields: [{ name: 'Name', label: '名称', component: 'Text', type: 'varchar(100)' }] };
 const bannerManifest = { name: '内容系统', tables: [bannerTable] };
 
