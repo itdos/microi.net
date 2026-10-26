@@ -45,12 +45,16 @@ def describe(source, size):
     return {"bytes": count, "sha256": sha.hexdigest(), "md5": md5.hexdigest()}
 
 
-def inspect_image(filename, image_id, dll_names):
+def inspect_image(filename, image_id, dll_names, configuration=False):
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
         raise ValueError("Invalid immutable Docker image ID")
-    if not dll_names or len(set(dll_names)) != len(dll_names) or any(
-        not re.fullmatch(r"[A-Za-z0-9_.-]+\.dll", name) for name in dll_names
-    ):
+    # 配置验证只开放固定安全模板，不把通用任意文件读取能力暴露给发布入口。
+    valid_names = dll_names == ["appsettings.json"] if configuration else (
+        bool(dll_names) and len(set(dll_names)) == len(dll_names) and all(
+            re.fullmatch(r"[A-Za-z0-9_.-]+\.dll", name) for name in dll_names
+        )
+    )
+    if not valid_names:
         raise ValueError("Invalid required DLL names")
     targets = {"app/" + name: name for name in dll_names}
     state = {}
@@ -149,7 +153,9 @@ def inspect_image(filename, image_id, dll_names):
 
 if __name__ == "__main__":
     try:
-        print(json.dumps(inspect_image(sys.argv[1], sys.argv[2], json.loads(sys.argv[3]))))
+        if len(sys.argv) > 4 and sys.argv[4:] != ["--configuration"]:
+            raise ValueError("Unknown static image inspection option")
+        print(json.dumps(inspect_image(sys.argv[1], sys.argv[2], json.loads(sys.argv[3]), len(sys.argv) > 4)))
     except Exception as error:
         print("Static Docker DLL verification failed: " + str(error), file=sys.stderr)
         sys.exit(1)

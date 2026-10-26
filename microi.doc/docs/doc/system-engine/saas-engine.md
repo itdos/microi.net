@@ -324,6 +324,34 @@ Upgrade16/Upgrade35 会在 `sys_osclients` 增加以下可空字段，并将容�
 ## MinIO配置
 >* 如果未使用阿里云OSS，则可以使用MinIO
 >* 值得注意的是，MinIO在做反向代理的时候，必须要设置【proxy_set_header Host $http_host】，而阿里云OSS、CDN、负载均衡默认配置情况下均不会有问题。
+
+### 通过 MCP 安全维护 MinIO
+
+修改 MinIO、数据库等普通配置时，表单回传的授权字段若与主库原值相同，后端会从
+本次更新中移除这些字段，保持授权原值。真正修改主租户授权仍须使用授权管理；
+子租户授权的管理员、期限及版本上限校验继续生效。
+
+`microi_manage_saas_minio` 专门维护当前主租户、当前运行分区的 `sys_osclients`
+MinIO 配置。它需要配套后端支持；旧后端没有该入口时应升级，不能改用通用表工具、
+SQL 或临时接口引擎绕过密钥保护。子租户、访问密钥和普通开发角色不能使用此控制面。
+
+| 动作 | 行为 |
+|---|---|
+| `Inspect` | 返回端点、桶名、凭据是否已配置和不含明文的 `Revision` |
+| `Probe` | 用已保存配置验证公有桶签名访问，不复制文件、不改桶策略 |
+| `Save` | 先探测候选，再按 `expectedRevision` 行锁校验并保存，刷新配置后回读 |
+
+保存时传 `configuration`，可选字段为 `endpoint`、`internetEndpoint`、`useSsl`、
+`privateUseSsl`、`publicBucket`、`privateBucket`、`region`、`accessKey`、`secretKey`。
+省略的凭据保留原值；不会返回明文或密文。确认参数为
+`confirmExecution="SAVE_MINIO:<当前租户>:<Inspect返回的Revision>"`。
+凭据只通过受保护的工具输入传输，不放入源码、命令参数或报告。
+
+此入口不会修改 `HDFS`、OSS 配置或公私桶权限，所以可以保持 OSS 主存储并单独配置
+MinIO 备用存储。`ProbeSucceeded` 只证明签名桶访问，不能代替实际文件复制和业务分流验收。
+返回 `Persisted=true` 但 `RuntimeVerified=false` 时，保存已经提交，须重新 Inspect/Probe
+确认运行状态；超时同样先回读，不能盲目重复 Save。
+
 >* 比如说博主的反向代理配置文件
 ::: details 展开查看 Shell 命令（88 行）
 ```shell

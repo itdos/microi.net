@@ -105,7 +105,7 @@ return 1";
                     throw new InvalidOperationException("PublicStorageOwnerMismatch");
             if (source.OsClientModel.Value<string>("HDFS") != "Aliyun")
                 throw new InvalidOperationException("PublicSourceProviderUnsupported");
-            var applications = JArray.FromObject(source.Db.FromSql("SELECT Id,AppId,AppKey,IsPublic,Status,BuildStatus,CommittedPublishVersionId,CommittedRuntimeManifestHash FROM sys_microistore WHERE (AppKey=@app OR AppId=@app) AND (IsDeleted IS NULL OR IsDeleted=0)")
+            var applications = JArray.FromObject(source.Db.FromSql("SELECT Id,AppId,AppKey,ApplicationType,IsPublic,Status,BuildStatus,PublishProtocolVersion,PublishState,CommittedPublishVersionId,CommittedRuntimeManifestHash FROM sys_microistore WHERE (AppKey=@app OR AppId=@app) AND (IsDeleted IS NULL OR IsDeleted=0)")
                 .AddInParameter("@app", appKey).ToArray());
             if (applications.Count != 1 || !(applications[0] is JObject application)
                 || application["IsPublic"] != null && application["IsPublic"].Type != JTokenType.Null && application.Value<int>("IsPublic") != 1
@@ -114,6 +114,19 @@ return 1";
             var rows = source.Db.FromSql("SELECT BuildVersion,StorageMode,AssetManifestJson,AssetsJson FROM sys_microiservice WHERE MsKey=@app AND IsEnable=1 AND (IsDeleted IS NULL OR IsDeleted=0)")
                 .AddInParameter("@app", appKey).ToArray();
             var services = JArray.FromObject(rows);
+            var committedId = application.Value<string>("CommittedPublishVersionId");
+            JObject committed = null;
+            if (!string.IsNullOrWhiteSpace(committedId))
+            {
+                var versions = JArray.FromObject(source.Db.FromSql("SELECT Id,AppId,PublishProtocolVersion,PublishState,VersionNo,RequestFingerprint,ReleasePrefix,AssetManifestJson,RuntimeManifestHash FROM mci_ai_app_version WHERE Id=@id AND AppId=@application AND (IsDeleted IS NULL OR IsDeleted=0)")
+                    .AddInParameter("@id", committedId).AddInParameter("@application", application.Value<string>("Id")).ToArray());
+                if (versions.Count != 1 || !(versions[0] is JObject versionRow))
+                    throw new InvalidOperationException("CommittedRuntimeRequired");
+                committed = versionRow;
+            }
+            // Web/UniApp 的 v3 权威清单归版本记录，不需要伪造一个 MicroService 行。
+            if (services.Count == 0)
+                services.Add(BuildCommittedPublicWebManifest(tenant, appKey, application, committed));
             if (services.Count != 1) throw new InvalidOperationException("CurrentPublicApplicationNotUnique");
             var service = (JObject)services[0];
             if (!string.Equals(service.Value<string>("StorageMode"), "file", StringComparison.OrdinalIgnoreCase))
@@ -142,13 +155,9 @@ return 1";
             var sorted = new JArray(selected.OrderBy(a => a.Value<string>("Path"), StringComparer.Ordinal));
             var version = service.Value<string>("BuildVersion");
             if (string.IsNullOrWhiteSpace(version)) throw new InvalidOperationException("CurrentPublicVersionRequired");
-            var committedId = application.Value<string>("CommittedPublishVersionId");
             if (!string.IsNullOrWhiteSpace(committedId))
             {
-                var versions = JArray.FromObject(source.Db.FromSql("SELECT PublishProtocolVersion,PublishState,VersionNo,RuntimeManifestHash FROM mci_ai_app_version WHERE Id=@id AND AppId=@application AND (IsDeleted IS NULL OR IsDeleted=0)")
-                    .AddInParameter("@id", committedId).AddInParameter("@application", application.Value<string>("Id")).ToArray());
-                if (versions.Count != 1 || !(versions[0] is JObject committed)
-                    || committed.Value<int>("PublishProtocolVersion") != 3 || committed.Value<string>("PublishState") != "Completed"
+                if (committed.Value<int>("PublishProtocolVersion") != 3 || committed.Value<string>("PublishState") != "Completed"
                     || committed.Value<string>("VersionNo") != version)
                     throw new InvalidOperationException("CommittedRuntimeRequired");
                 var actual = string.Join("\n", sorted.Select(a => a.Value<string>("Path") + "\t" + a.Value<string>("Sha256") + "\t" + a.Value<long>("Size").ToString(CultureInfo.InvariantCulture)));
@@ -159,6 +168,45 @@ return 1";
             var identity = tenant.ToLowerInvariant() + "\n" + appKey + "\n" + version + "\n" + committedId + "\n" + sorted.ToString(Formatting.None);
             return new JObject { ["SourceTenant"] = tenant, ["AppKey"] = appKey, ["Version"] = version,
                 ["SourceRevision"] = PublicResourceOffloadProtocol.Digest(identity), ["Assets"] = sorted };
+        }
+
+        internal static JObject BuildCommittedPublicWebManifest(string tenant, string appKey, JObject application, JObject version)
+        {
+            var type = application?.Value<string>("ApplicationType");
+            if (!(type == "Web" || type == "UniApp") || version == null
+                || application.Value<string>("Status") != "Published" || application.Value<string>("BuildStatus") != "Success"
+                || (application["IsPublic"]?.Type != JTokenType.Null && application["IsPublic"] != null && application.Value<int>("IsPublic") != 1)
+                || application.Value<int>("PublishProtocolVersion") != 3 || application.Value<string>("PublishState") != "Completed"
+                || application.Value<string>("AppKey") != appKey
+                || string.IsNullOrWhiteSpace(application.Value<string>("Id"))
+                || application.Value<string>("Id") != version.Value<string>("AppId")
+                || application.Value<string>("CommittedPublishVersionId") != version.Value<string>("Id")
+                || version.Value<int>("PublishProtocolVersion") != 3 || version.Value<string>("PublishState") != "Completed")
+                throw new InvalidOperationException("CommittedPublicWebRuntimeRequired");
+            var name = version.Value<string>("VersionNo");
+            var fingerprint = version.Value<string>("RequestFingerprint");
+            if (!PublicResourceOffloadProtocol.Identifier(tenant,64) || !PublicResourceOffloadProtocol.Identifier(appKey)
+                || !PublicResourceOffloadProtocol.AssetPath(name) || name.Contains('/') || !PublicResourceOffloadProtocol.Hash(fingerprint))
+                throw new InvalidOperationException("CommittedPublicWebIdentityRequired");
+            var prefix = "microi/application-assets/v3/tenants/" + tenant.ToLowerInvariant()
+                + "/kinds/runtime/apps/" + appKey + "/releases/" + name + "/requests/" + fingerprint;
+            if (version.Value<string>("ReleasePrefix") != prefix)
+                throw new InvalidOperationException("CommittedPublicWebPrefixMismatch");
+            var assets = JArray.Parse(version.Value<string>("AssetManifestJson") ?? "[]");
+            if (assets.Count == 0 || assets.Count > 10000) throw new InvalidOperationException("CompletePublicManifestRequired");
+            var selected = new JArray();
+            foreach (var item in assets.OfType<JObject>())
+            {
+                var asset = (JObject)item.DeepClone();
+                if (!PublicResourceOffloadProtocol.AssetPath(Text(asset,"Path","path")))
+                    throw new InvalidOperationException("AuthoritativePublicAssetRequired");
+                // FilePathName 只由不可变版本身份重算，不接受清单中的任意源 URL/对象覆盖。
+                asset["FilePathName"] = prefix + "/assets/" + Text(asset,"Path","path");
+                selected.Add(asset);
+            }
+            if (assets.Count != selected.Count) throw new InvalidOperationException("CompletePublicManifestRequired");
+            return new JObject { ["BuildVersion"] = name, ["StorageMode"] = "file",
+                ["AssetManifestJson"] = new JObject { ["Assets"] = selected }.ToString(Formatting.None) };
         }
 
         /// <summary>

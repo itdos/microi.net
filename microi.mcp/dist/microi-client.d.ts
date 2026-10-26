@@ -267,6 +267,8 @@ export interface ListEnvelope<T> {
     Total?: number;
 }
 interface RequestOptions {
+    /** 凭据控制面不能把请求体随 HTTP 重定向发送到另一个入口。 */
+    redirect?: 'error';
     timeoutMs?: number;
     /** Ordinary JSON requests stay bounded to ten minutes unless an explicit
      * long-running streaming operation raises this ceiling. */
@@ -573,6 +575,12 @@ export declare class MicroiClient {
     getStatus(): Promise<ApiResponse>;
     private checkApplicationPublishGate;
     getAdministrativeCapabilities(): Promise<ApiResponse>;
+    manageSaasMinio(input: {
+        action: 'Inspect' | 'Probe' | 'Save';
+        expectedRevision?: string;
+        confirmExecution?: string;
+        configuration?: Record<string, unknown>;
+    }): Promise<ApiResponse>;
     administerTableData(input: {
         operation: 'query' | 'get' | 'add' | 'update' | 'delete';
         tableName: string;

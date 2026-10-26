@@ -119,11 +119,50 @@ ${scenario.body}
   if(scenario.damaged)assert.throws(()=>f.verify());else assert.equal(f.verify().sha256,sha(f.original));
  }finally{f.dispose();}
 });
-for(const bad of [false,true])test(`immutable image configuration byte check ${bad?'rejects leakage':'passes safe template'} without running a container`,()=>{
- const f=fixture();const calls=[];try{
-  const run=(_command,args)=>{calls.push(args);if(args[0]==='image')return 'sha256:'+'a'.repeat(64);if(args[0]==='create')return 'b'.repeat(64);if(args[0]==='cp'){fs.writeFileSync(args.at(-1),bad?f.input:f.original);return '';}if(args[0]==='rm')return '';throw Error('Unexpected Docker operation');};
-  if(bad)assert.throws(()=>verifyPublishedImage('fixture-image',f.template,run),/section|private/);else assert.equal(verifyPublishedImage('fixture-image',f.template,run).configuration.sha256,sha(f.original));
-  assert.ok(calls.every(args=>!['run','start','build','push'].includes(args[0])));assert.equal(calls.find(args=>args[0]==='create').at(-1),'sha256:'+'a'.repeat(64));assert.equal(calls.at(-1)[0],'rm');
+test('image inspection never creates a container even for byte verification',()=>{
+ const f=fixture();try{
+  const calls=[];
+  const run=(_command,args)=>{calls.push(args);if(args[0]==='image'&&args[1]==='inspect')return 'sha256:'+'a'.repeat(64);throw Error('inspection stopped');};
+  assert.throws(()=>verifyPublishedImage('fixture-image',f.template,run));
+  assert.ok(calls.every(args=>!['create','cp','rm','run','start'].includes(args[0])),'static inspection must never create a temporary container');
+ }finally{f.dispose();}
+});
+// 使用真实 tar 层字节测试最终文件视图；Docker 适配器仅提供 inspect/save，不允许创建容器。
+function imageTar(entries){
+ const parts=[];
+ for(const {name,bytes=Buffer.alloc(0),type='0',link=''} of entries){
+  const body=Buffer.from(bytes),header=Buffer.alloc(512);
+  header.write(name,0,100);header.write('0000644\0',100,8);header.write('0000000\0',108,8);header.write('0000000\0',116,8);
+  header.write(body.length.toString(8).padStart(11,'0')+'\0',124,12);header.write('00000000000\0',136,12);
+  header.fill(32,148,156);header.write(type,156,1);header.write(link,157,100);header.write('ustar\0',257,6);header.write('00',263,2);
+  header.write(header.reduce((sum,byte)=>sum+byte,0).toString(8).padStart(6,'0')+'\0 ',148,8);
+  parts.push(header,body,Buffer.alloc((512-body.length%512)%512));
+ }
+ return Buffer.concat([...parts,Buffer.alloc(1024)]);
+}
+function imageAdapter(layers,{tamper=false,manifestStore=false}={}){
+ const bytes=layers.map(imageTar),config=Buffer.from(JSON.stringify({rootfs:{type:'layers',diff_ids:bytes.map(layer=>'sha256:'+sha(layer))}}));
+ const configId='sha256:'+sha(config),imageId=manifestStore?'sha256:'+'b'.repeat(64):configId;
+ const archive=imageTar([{name:'manifest.json',bytes:JSON.stringify([{Config:'config.json',Layers:bytes.map((_,i)=>`layer${i}.tar`)}])},{name:'config.json',bytes:config},...bytes.map((layer,i)=>({name:`layer${i}.tar`,bytes:tamper&&i===0?imageTar([{name:'app/appsettings.json',bytes:'changed'}]):layer}))]);
+ const calls=[];let saved;
+ const run=(_command,args)=>{
+  calls.push(args);
+  if(args[0]==='image'&&args[1]==='inspect')return JSON.stringify({Id:imageId,...(manifestStore?{Descriptor:{digest:imageId,mediaType:'application/vnd.oci.image.manifest.v1+json',annotations:{'config.digest':configId}}}:{})});
+  if(args[0]==='image'&&args[1]==='save'){assert.equal(args.at(-1),imageId);saved=args[3];fs.writeFileSync(saved,archive);return '';}
+  throw Error('No container or mutable operation permitted');
+ };
+ return {run,calls,imageId,cleaned(){assert.ok(saved&&!fs.existsSync(saved));}};
+}
+for(const scenario of ['safe','private','replaced','deleted','linked','layer-drift','manifest-store'])test(`static immutable image configuration: ${scenario}`,()=>{
+ const f=fixture();try{
+  const layers=[[{name:'app/appsettings.json',bytes:scenario==='private'?f.input:f.original}]];
+  if(scenario==='replaced')layers.push([{name:'app/appsettings.json',bytes:f.input}]);
+  if(scenario==='deleted')layers.push([{name:'app/.wh.appsettings.json'}]);
+  if(scenario==='linked')layers.push([{name:'app/appsettings.json',type:'2',link:'outside'}]);
+  const a=imageAdapter(layers,{tamper:scenario==='layer-drift',manifestStore:scenario==='manifest-store'});
+  if(['safe','manifest-store'].includes(scenario))assert.equal(verifyPublishedImage('fixture-image',f.template,a.run).configuration.sha256,sha(f.original));
+  else assert.throws(()=>verifyPublishedImage('fixture-image',f.template,a.run));
+  assert.deepEqual(a.calls.map(args=>args.slice(0,2)),[['image','inspect'],['image','save']]);a.cleaned();
  }finally{f.dispose();}
 });
 test('normal release protects reused artifacts, each Docker retry and every API image independent of encryption',()=>{
