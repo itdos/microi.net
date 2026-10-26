@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform_auth_sms_login
- * Version: v1.0.3
+ * Version: v1.0.4
  * Function:
  * - 兼容 SmsLogin 地址的短信验证码登录与首次注册编排；验证码原子消费、密码哈希和 DiyToken 由可信原子负责。
  */
@@ -41,14 +41,16 @@ if (requestedTenant && requestedTenant.toLowerCase() !== text(V8.OsClient).toLow
 
 var phone = text(V8.Param && V8.Param.Phone);
 var code = text(V8.Param && (V8.Param._CaptchaValue || V8.Param.SmsCode));
-var password = text(V8.Param && (V8.Param.Pwd || V8.Param.Password));
+var rawPassword = V8.Param && (V8.Param.Pwd === undefined ? V8.Param.Password : V8.Param.Pwd);
+var password = rawPassword === null || rawPassword === undefined ? '' : String(rawPassword);
+var lang = text(V8.Param && V8.Param._Lang) || text(V8.Header && (V8.Header.lang || V8.Header.Lang)) || 'cn';
 var clientType = text(V8.Param && V8.Param._ClientType) || 'PC';
 var did = text(V8.Param && (V8.Param.Did || V8.Param.did));
 if (!/^1\d{10}$/.test(phone)) return fail('请输入正确的11位手机号！');
 if (!code || code.length > 32) return fail('请输入短信验证码！');
 if (password && password.length < 6) return fail('密码长度不能少于6位！');
 
-var proofResult = V8.Method.CreatePlatformSmsProof({ Phone: phone, Code: code });
+var proofResult = V8.Method.CreatePlatformSmsProof({ Phone: phone, Code: code, _Lang: lang });
 if (!proofResult || proofResult.Code !== 1 || !proofResult.Data) {
   return proofResult || fail('短信验证码验证失败。');
 }
@@ -70,7 +72,8 @@ if (!user) {
   var createResult = V8.Method.CreatePlatformSmsUser({
     Proof: proof,
     Phone: phone,
-    Password: password
+    Password: password,
+    _Lang: lang
   });
   if (!createResult || createResult.Code !== 1 || !createResult.Data) {
     return createResult || fail('注册失败。');
@@ -80,7 +83,7 @@ if (!user) {
 } else {
   var state = text(user.State).toLowerCase();
   var deleted = text(user.IsDeleted).toLowerCase();
-  if (state === '0' || state === '-1' || state === 'false' || deleted === '1' || deleted === 'true') {
+  if (state !== '1' || deleted === '1' || deleted === 'true') {
     return fail('帐号已停用，请联系管理员。');
   }
   if (!text(user.Account) || !text(user.Name)) {
@@ -101,7 +104,8 @@ var loginResult = V8.Method.CompletePlatformSmsLogin({
   ClientType: clientType,
   Did: did,
   PasswordProvided: !!password,
-  IsNewUser: isNewUser
+  IsNewUser: isNewUser,
+  _Lang: lang
 });
 if (!loginResult || loginResult.Code !== 1) return loginResult || fail('短信登录失败。');
 

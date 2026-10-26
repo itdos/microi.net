@@ -258,6 +258,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useData } from 'vitepress'
 import { createOpenClawAuthBridge } from '../openclaw-auth-bridge'
 import { siteStyle } from '../site-style'
 import { buildSiteApiEngineUrl, resolveSiteApiBase } from '../utils/site-api-base.js'
@@ -266,6 +267,9 @@ import { buildSiteSessionHeaders, getOrCreateSiteDid, isSiteSessionExpired, read
 
 const API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_API_BASE)
 const OS_CLIENT = 'iTdos'
+const { lang: pageLanguage } = useData()
+// 语言随当前页面变化；Header 与正文一致，供网关和嵌套接口引擎沿用同一语言。
+const requestLanguage = computed(() => pageLanguage.value || 'zh-CN')
 
 const isRestoring = ref(true)
 const isCaptchaLoading = ref(false)
@@ -442,6 +446,7 @@ function apiEngineHeaders(extra = {}) {
       osClient: OS_CLIENT,
       did: getOrCreateSiteDid(localStorage, window.crypto)
     }),
+    lang: requestLanguage.value,
     ...extra
   }
 }
@@ -509,6 +514,7 @@ async function sendRegisterSmsCode() {
         Phone: registerPhone.value,
         _CaptchaId: captchaId.value,
         _CaptchaValue: captchaValue.value,
+        _Lang: requestLanguage.value,
         OsClient: OS_CLIENT
       })
     })
@@ -558,6 +564,7 @@ async function sendResetSmsCode() {
         Phone: resetPhone.value,
         _CaptchaId: captchaId.value,
         _CaptchaValue: captchaValue.value,
+        _Lang: requestLanguage.value,
         OsClient: OS_CLIENT
       })
     })
@@ -604,6 +611,7 @@ async function resetPassword() {
         SmsCode: resetSmsCode.value,
         NewPassword: resetPasswordValue.value,
         ConfirmPassword: resetConfirmPassword.value,
+        _Lang: requestLanguage.value,
         OsClient: OS_CLIENT
       })
     })
@@ -653,6 +661,7 @@ async function handleLogin() {
       LoginType: 'password',
       Account: loginAccount.value,
       Pwd: loginPassword.value,
+      _Lang: requestLanguage.value,
       OsClient: OS_CLIENT
     }
     const resp = await fetch(apiEngineUrl('official_sms_login'), {
@@ -712,6 +721,7 @@ async function handleRegister() {
         _CaptchaValue: devSmsBypass.value ? '' : registerSmsCode.value,
         _SmsCaptchaValue: devSmsBypass.value ? '' : registerSmsCode.value,
         Pwd: registerPassword.value,
+        _Lang: requestLanguage.value,
         OsClient: OS_CLIENT
       })
     })

@@ -103,11 +103,14 @@ return 1";
                 if (existing.Code != 1 && existing.Code != 2)
                     return new DosResult(0, null, existing.Msg ?? "注册前用户查询失败。");
 
-                var passwordProvided = !SsoAtomText(request["Password"]).DosIsNullOrWhiteSpace();
+                string suppliedPassword;
+                try { suppliedPassword = PasswordResetSecurity.ReadRegistrationPassword(request["Password"]); }
+                catch (ArgumentException) { return new DosResult(0, null, "注册密码不能为空白且不能超过200位。"); }
+                var passwordProvided = suppliedPassword.Length > 0;
                 var password = passwordProvided
-                    ? SsoAtomText(request["Password"], 200)
+                    ? suppliedPassword
                     : "Mi!" + OpaqueTokenSecurity.NewOpaqueValue(16).Substring(0, 10) + "A7#";
-                var passwordError = new SysUserLogic().CheckPwd(password).GetAwaiter().GetResult();
+                var passwordError = new SysUserLogic().CheckPwd(password, request["_Lang"]?.ToString()).GetAwaiter().GetResult();
                 if (!passwordError.DosIsNullOrWhiteSpace())
                     return new DosResult(0, null, passwordError);
 

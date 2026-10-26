@@ -16,7 +16,7 @@ function run(options = {}) {
   const calls = [], logs = [], updates = [], tokens = [];
   const V8 = {
     OsClient: 'iTdos', Param: { Action: 'login', LoginType: 'password', Account: 'admin', Pwd: 'test-only-password', ...options.param }, Header: { did: 'test-only-device' },
-    ApiEngine: { Run(key, param) { calls.push({ type: 'authenticate', key, param }); return options.authResult || { Code: 1, Data: { ...authenticated }, DataAppend: options.authAppend || {} }; } },
+    ApiEngine: { Run(key, param) { calls.push({ type: 'authenticate', key, param }); return options.authResult || { Code: 1, Data: { ...authenticated }, DataAppend: options.authAppend || { Token: 'test-only-token' } }; } },
     FormEngine: {
       GetFormData(table, param) {
         calls.push({ type: 'read', table, param });
@@ -38,6 +38,7 @@ function run(options = {}) {
     Method: {
       SetSysUserRoleInfo(user) { return { ...user }; },
       GetAccessToken(param) { tokens.push(param); return { Code: 1, Data: { Token: 'test-only-token' } }; },
+      GetCurrentToken(token, osClient) { return { OsClient: osClient, CurrentUser: authenticated, Token: token }; },
       GetUserTenant() { return { Code: 2 }; }, GetClientIP() { return { Data: '' }; },
       NewGuid() { return 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'; },
       AddSysLog(log) { logs.push(log); }
@@ -52,7 +53,9 @@ function assertAdmin(r) {
   assert.equal(r.result.Data.Id, admin.Id);
   assert.equal(r.result.Data.Account, 'admin');
   assert.equal(r.result.Data.Level, 9999);
-  assert.equal(r.tokens[0].CurrentUser.Id, admin.Id);
+  assert.equal(r.tokens.length, 0, '官网包装器不能二次签发会话');
+  assert.equal(r.result.Data.Authorization, 'test-only-token');
+  assert.equal(r.result.DataAppend.Token, 'test-only-token');
   assert.ok(r.updates.every(u => u.param.Id === admin.Id));
 }
 

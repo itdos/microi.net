@@ -1417,9 +1417,9 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
       else assert.fail(`${key} 缺少受支持的资源策略`);
     }
   }
-  assert.equal(seenKeys.size, 177);
+  assert.equal(seenKeys.size, 178);
   assert.ok(seenKeys.has('mci-tree-drag-sort'));
-  assert.equal(managedCount, 165);
+  assert.equal(managedCount, 166);
   // 新增聊天维护只归通知包；数量增加必须同时证明固定身份、路由、非匿名权限及 Managed 策略。
   const maintenance = publishedEngines.get('platform-chat-maintenance');
   assert.ok(maintenance);
@@ -1445,6 +1445,16 @@ test('官网资源回读后以独立第二次 RPC 投影 Managed 并保留 Creat
   assert.ok(seenKeys.has('ai_app_cdn_backfill'), '官方 CDN 维护入口必须随商城包投影');
   for (const key of ['official_sms_login', 'official_account_invitations', 'official_account_licenses']) assert.ok(seenKeys.has(key));
   assert.ok(seenKeys.has('official_password_reset_send_sms'), '找回密码入口必须随官方包投影');
+  const passwordReset = publishedEngines.get('official_password_reset');
+  assert.ok(passwordReset, '短信重置的可信原子编排必须随官方包投影');
+  assert.equal(passwordReset.packageName, 'app.microi.saas-engine.json');
+  assert.deepEqual(passwordReset.policy, { Ownership: 'Platform', UpgradePolicy: 'Managed' });
+  assert.equal(passwordReset.engine.Id, '01KXNQH47N7WWYSREPC300N39Q');
+  assert.equal(passwordReset.engine.Version, 'v1.0.1');
+  assert.equal(passwordReset.engine.ApiAddress, '/apiengine/official_password_reset');
+  assert.equal(passwordReset.engine.AllowAnonymous, 1);
+  assert.equal(passwordReset.engine.EnableLog, 0);
+  assert.equal(passwordReset.engine.StopHttp, 0);
   assert.ok(seenKeys.has('platform-hdfs-upload'));
   assert.ok(seenKeys.has('platform-hdfs-upload-hook'));
   for (const key of ['platform-reminder-runtime','platform-reminder-official-feed','platform-reminder-tick','platform-message-notification-config']) assert.ok(seenKeys.has(key));

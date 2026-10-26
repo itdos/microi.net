@@ -9,8 +9,8 @@
       "Kind": "ApiEngine",
       "SourceRole": "CanonicalReleaseSource",
       "File": "platform_auth_sms_login.js",
-      "Version": "v1.0.3",
-      "Sha256": "a10fb9aa09890b96680361ce304501470cab57557daef810a4d22e716a7a1c4d",
+      "Version": "v1.0.4",
+      "Sha256": "f123a4159cb4f07007d72c5a8d1bde94972beff0e38ec0302a5f9d2c0b600e47",
       "Package": "app.microi.saas-engine.json"
     },
     {
@@ -381,6 +381,24 @@
       "Version": "v1.1.4",
       "Sha256": "5e169af84e1182a995c3f9ab3afc2662dce64d23bb21c2ca87c40fbdb837df7c",
       "Package": "app.microi.store.json"
+    },
+    {
+      "Key": "official_sms_login",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/official_sms_login.js",
+      "Version": "v1.1.7",
+      "Sha256": "7f51da0303bc3b841b4775037c649dbec26a2e1a6d8e18c0bf261cf96912de8d",
+      "Package": "app.microi.saas-engine.json"
+    },
+    {
+      "Key": "official_password_reset",
+      "Kind": "ApiEngine",
+      "SourceRole": "CanonicalReleaseSource",
+      "File": "OfficialApiSources/official_password_reset.js",
+      "Version": "v1.0.1",
+      "Sha256": "5f04b5a43baed3e521b886b95c4eb56ad043ae50fd91468541ce9675b6f5c543",
+      "Package": "app.microi.saas-engine.json"
     }
   ]
 }

@@ -1294,6 +1294,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
 
         public async Task<DosResult<dynamic>> Login(SysUserParam param)
         {
+            param.PasswordAuthentication = null;
             //LogHelper.Debug("开始1", "调试Login_");
             if (string.IsNullOrWhiteSpace(param.Account) || string.IsNullOrWhiteSpace(param.Pwd)
                 //|| param.OsClient.DosIsNullOrWhiteSpace()
@@ -1420,6 +1421,8 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             //    }
             //}
             JObject model = JObject.FromObject(modelDynamic);
+            // 密码校验后可能发生短信重置；签发方必须在会话锁内重新核对这份内部快照。
+            param.PasswordAuthentication = PasswordAuthenticationSnapshot.Capture(param.OsClient, model, param._Lang);
             await GetSysUserOtherInfo(model, param.OsClient);
             SanitizeLoginProjection(model);
 
