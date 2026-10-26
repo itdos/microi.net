@@ -374,6 +374,14 @@ namespace Microi.net.Api
             return await Mcp.SaveDatabaseConnection(param);
         }
 
+        /// <summary>仅承载管理员存储配置协议；密钥、探测和 CAS 实现归 MCP 类库。</summary>
+        [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
+        public async Task<IActionResult> ManageSaasMinio([FromBody] JObject param)
+        {
+            return await Mcp.ManageSaasMinio(param);
+        }
+
         [HttpPost]
         [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> ImportExternalAttachment([FromBody] JObject param)

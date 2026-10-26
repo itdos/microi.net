@@ -1,0 +1,1 @@
+{"version":3,"file":"saas-minio-tools.d.ts","sourceRoot":"","sources":["../src/saas-minio-tools.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,SAAS,EAAE,MAAM,yCAAyC,CAAC;AAEzE,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,oBAAoB,CAAC;AAEvD,wCAAwC;AACxC,wBAAgB,sBAAsB,CAAC,MAAM,EAAE,SAAS,EAAE,MAAM,EAAE,YAAY,EAAE,MAAM,EAAE,MAAM,GAAG,IAAI,CAoCpG"}

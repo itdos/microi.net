@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {dockerConfigIdentity} from './release-encryption.mjs';
+import {createReleaseScratch,cleanupReleaseScratch} from './release-scratch.mjs';
 
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const bootstrap=new Set(['OsClient','OsClientType','OsClientNetwork','OsClientDbType','OsClientDbConn','OsClientRedisHost','OsClientRedisPort','OsClientRedisPwd','OsClientRedisDataBase','OsClientDbMongoConn']);
@@ -70,23 +71,22 @@ export function restoreSmokeConfig(folder,stateFile){
 }
 export function verifyPublishedImage(image,template,run=execFileSync){
  const expected=ordinary(template);safeTemplate(expected);
- const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'microi-public-config-'));let container;
+ const workspace=fileURLToPath(new URL('../../',import.meta.url));
+ const temporary=createReleaseScratch(process.env.MICROI_RELEASE_GATE_DIR||path.join(workspace,'.tmp','public-config-image'));let failure;
  try{
-  const imageId=run('docker',['image','inspect',image,'--format','{{.Id}}'],{encoding:'utf8'}).trim();
-  assert.match(imageId,/^sha256:[a-f0-9]{64}$/,'Invalid immutable image identity');
-  container=run('docker',['create','--network','none','--entrypoint','/bin/true',imageId],{encoding:'utf8'}).trim();
-  assert.match(container,/^[a-f0-9]{64}$/,'Invalid inspection container identity');
-  // Never run a container. Inspect the exact image which will be tagged/pushed.
-  const target=path.join(temporary,'appsettings.json');
-  run('docker',['cp',`${container}:/app/appsettings.json`,target],{stdio:['ignore','pipe','pipe']});
-  return {imageId,configuration:assertPublishedConfigBytes(ordinary(target),expected)};
+  const {imageId,configId}=dockerConfigIdentity(JSON.parse(run('docker',['image','inspect',image,'--format','{{json .}}'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()));
+  const archive=path.join(temporary,'image.tar');
+  // 仅读取不可变镜像层；复用已有摘要/whiteout/链接校验，禁止创建临时容器。
+  run('docker',['image','save','--output',archive,imageId],{stdio:['ignore','pipe','pipe']});
+  const python=process.platform==='win32'?'python':'python3';
+  const inspected=JSON.parse(execFileSync(python,[fileURLToPath(new URL('./inspect-docker-image-dlls.py',import.meta.url)),archive,configId,'["appsettings.json"]','--configuration'],{encoding:'utf8',stdio:['ignore','pipe','pipe']}));
+  assert.equal(inspected.imageId,configId,'Configuration archive is bound to another image');
+  const actual=inspected.dlls['appsettings.json'];
+  assert.ok(actual&&actual.bytes===expected.length&&actual.sha256===hash(expected),'Published image configuration differs from the frozen public template');
+  return {imageId,configId,configuration:{bytes:actual.bytes,sha256:actual.sha256}};
+ }catch(error){failure=error;throw error;
  }finally{
-  try{if(container&&/^[a-f0-9]{64}$/.test(container))run('docker',['rm',container],{stdio:['ignore','pipe','pipe']});}
-  finally{
-   // Remove only this function's own copied inspection file and empty directory.
-   const target=path.join(temporary,'appsettings.json');if(fs.existsSync(target))fs.unlinkSync(target);
-   fs.rmdirSync(temporary);
-  }
+  try{cleanupReleaseScratch(temporary);}catch(error){if(!failure)throw error;console.error(`Image configuration cleanup failed: ${error.message}`);}
  }
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){

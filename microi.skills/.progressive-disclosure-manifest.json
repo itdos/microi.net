@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-26T01:11:09.164Z",
+  "generatedAt": "2026-10-26T01:35:12.673Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -2259,11 +2259,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "fd6861d3cb03da6b637a9ba121d5747d96ea35a63de9c45e0e108f4161ec39aa",
-      "originalLines": 700,
+      "originalSha256": "bfc0c1c807b45ca191bf73cbb6f3f3058331e3906ece175e41e317020b09b9ac",
+      "originalLines": 704,
       "prefixSha256": "f48498030cbd3737919132045f906096cc118c04342ea4630c633f36acbd916b",
       "prefixBytes": 20644,
-      "entryLines": 279,
+      "entryLines": 283,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -2293,8 +2293,8 @@
           "id": "v8-file-upload-003",
           "ordinal": 5,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "9d8f1e54ec058d9624a051cc55270019fa1b4a88dadc20f03b2cfa1b856a5bc3",
-          "lines": 20,
+          "sha256": "08b60d1f33338b9e54c39850d9074ca0089c2b867d2fff4a5857b34d8f1d14a9",
+          "lines": 24,
           "heading": "跨平台文件同步登录会话"
         },
         {
@@ -2831,18 +2831,18 @@
       ]
     },
     "v8-security": {
-      "originalSha256": "5cb7ae6c184c89b2eb4a6a2309a0f0c6d24e03d3b737d342071b71b614e5b2a9",
-      "originalLines": 566,
+      "originalSha256": "b46bc6a930754ae64f22903c2530428c123c40e510f4ca0ca6c7489edf418da3",
+      "originalLines": 573,
       "prefixSha256": "52262abdb901d909adf460efdd98fbfb715b53536c081816ff0d37f7cfe2d81e",
       "prefixBytes": 6943,
-      "entryLines": 236,
+      "entryLines": 243,
       "chunks": [
         {
           "id": "v8-security-000",
           "ordinal": 0,
           "destination": "v8-security/SKILL.md",
-          "sha256": "a6a4311b1a799ea4ed005b22c01cb8230509aaf09aeead5a17c8c46da74772c8",
-          "lines": 52,
+          "sha256": "0dfa03a03298161e6aa29dff18f68fdb00e4f0865cb7562fec090dcadd745c43",
+          "lines": 59,
           "heading": "0. 租户动态系统设置与密钥边界"
         },
         {

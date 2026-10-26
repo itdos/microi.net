@@ -732,6 +732,7 @@ export class MicroiClient {
             const fetchResponse = await fetch(url, {
                 method,
                 headers,
+                ...(options.redirect ? { redirect: options.redirect } : {}),
                 signal: controller.signal,
                 ...(jsonBody !== undefined ? { body: jsonBody } : {}),
             });
@@ -1282,6 +1283,12 @@ export class MicroiClient {
     }
     async getAdministrativeCapabilities() {
         return this.get(API.GET_ADMINISTRATIVE_CAPABILITIES);
+    }
+    async manageSaasMinio(input) {
+        return this.post('/api/V8Engine/ManageSaasMinio', {
+            Action: input.action, ExpectedRevision: input.expectedRevision,
+            ConfirmExecution: input.confirmExecution, Configuration: input.configuration,
+        }, { timeoutMs: this.writeRequestTimeoutMs, operationName: 'SaaS MinIO configuration', allowNativeFallback: false, redirect: 'error' });
     }
     async administerTableData(input) {
         return this.post(API.ADMINISTER_TABLE_DATA, {
