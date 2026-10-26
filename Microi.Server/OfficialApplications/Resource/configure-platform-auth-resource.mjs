@@ -15,6 +15,16 @@ function safeLoginHookTemplate(source) {
 }
 const specs = [
   {
+    id: '01KWTB17DXX1SEQ6KPK0QEWDFK', key: 'official_sms_login',
+    name: '[官网]短信登录注册', version: 'v1.1.7',
+    allowAnonymous: 1, stopHttp: 0, ownership: 'Platform', policy: 'Managed'
+  },
+  {
+    id: '01KXNQH47N7WWYSREPC300N39Q', key: 'official_password_reset',
+    name: '[官网]短信重置密码', version: 'v1.0.1',
+    allowAnonymous: 1, stopHttp: 0, ownership: 'Platform', policy: 'Managed'
+  },
+  {
     id: '01KXNQJGRK4H5WGWPMYP4AH3EP', key: 'official_password_reset_send_sms',
     name: '[官网]找回密码发送短信', file: '[官网]找回密码发送短信(official_password_reset_send_sms).js',
     allowAnonymous: 1, stopHttp: 0,
@@ -24,7 +34,7 @@ const specs = [
   {
     id: '76000000-1000-4000-8000-000000000001',
     key: 'platform_auth_sms_login',
-    version: 'v1.0.3',
+    version: 'v1.0.4',
     name: '平台短信登录注册',
     file: '[系统]短信登录注册(platform_auth_sms_login).js',
     allowAnonymous: 1,

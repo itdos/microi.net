@@ -163,6 +163,12 @@ namespace Microi.net
         /// </summary>
         DosResult CompletePlatformSmsLogin(dynamic dynamicParam);
 
+        /// <summary>固定官网入口通过短信证明重置单向密码哈希。</summary>
+        DosResult ResetPlatformSmsPassword(dynamic dynamicParam);
+
+        /// <summary>固定管理入口有界诊断/修复旧重置造成的密码编码不一致。</summary>
+        DosResult RepairPlatformPasswordEncoding(dynamic dynamicParam);
+
         /// <summary>
         /// 获取当前token
         /// </summary>

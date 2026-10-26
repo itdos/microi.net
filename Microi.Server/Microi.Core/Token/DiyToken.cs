@@ -768,6 +768,21 @@ namespace Microi.net
                         UseExponentialBackoff = true
                     }, async () =>
                     {
+                        if (param.PasswordAuthentication != null)
+                        {
+                            // 与撤销使用同一 Rotate 锁，并从主库重验已验证的密码材料。
+                            // 旧密码在重置前验证、重置后才进入签发的请求不能创建新会话。
+                            var latestCredential = clientModel.Db.FromSql(
+                                "SELECT Id,State,IsDeleted,Pwd,PwdEncode FROM sys_user WHERE Id=@Id")
+                                .AddInParameter("Id", userId).First<dynamic>();
+                            var primaryUser = latestCredential == null ? null : JObject.FromObject((object)latestCredential);
+                            if (!param.PasswordAuthentication.Matches(osClient, primaryUser))
+                            {
+                                rotationFailureMessage = DiyMessage.GetLang(osClient, "AccountOrPwdError", param.PasswordAuthentication.Language);
+                                tokenModel = null;
+                                return;
+                            }
+                        }
                         try
                         {
                             tokenModel = await DiyCacheBase.GetAsync<CurrentToken>(userTokenCacheKey);
