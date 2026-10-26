@@ -5,6 +5,8 @@ import {
   trainingEngineGroups,
   trainingAdditionalEngines,
   trainingWhyProof,
+  trainingBenefitNote,
+  trainingWhyNote,
   trainingCoreBenefits,
   trainingDeliveryStages,
   trainingFrameworkLayers,
@@ -65,7 +67,7 @@ const coverRoute = computed(() => isEnterprise.value
           <span class="mci-common-benefits__glyph" aria-hidden="true">{{ benefit.code }}</span><div><strong>{{ benefit.title }}</strong><small>{{ benefit.text }}</small></div>
         </article>
       </section>
-      <footer class="mci-common-cover__foot"><div class="mci-common-trust"><span v-for="signal in trainingTrustSignals" :key="signal">{{ signal }}</span></div><small>* 典型平台能力高复用场景；实际收益取决于需求与团队基线。</small></footer>
+      <footer class="mci-common-cover__foot"><div class="mci-common-trust"><span v-for="signal in trainingTrustSignals" :key="signal">{{ signal }}</span></div><small>{{ trainingBenefitNote }}</small></footer>
     </template>
 
     <template v-else-if="kind === 'decision'">
@@ -107,7 +109,7 @@ const coverRoute = computed(() => isEnterprise.value
       </div>
       <footer class="mci-engine-proof__promise"><p class="mci-common-why__promise"><span>一句话，开发大型企业应用</span><strong>0 代码提速，工程化不设上限</strong></p><p>AI 负责理解业务，<strong>引擎负责把事做对。</strong></p></footer>
       <div class="mci-engine-proof__foundation"><span>高性能 · 分布式原生 · .NET 10 / Vue 3 / Redis · L1 + L2</span><span>MCP + Skills · 全自动化测试 · 企业级治理</span></div>
-      <p class="mci-engine-proof__note">* Token 收益依需求与团队基线而异；AI CAD / SolidWorks 为技术预览。各能力配置与适用范围详见官方文档，欢迎与优秀框架全方位对比。</p>
+      <p class="mci-engine-proof__note">{{ trainingWhyNote }}</p>
     </template>
 
     <template v-else>
@@ -115,7 +117,7 @@ const coverRoute = computed(() => isEnterprise.value
       <section class="mci-common-benefits is-closing-benefits" aria-label="再次回顾 Microi吾码核心优势"><article v-for="benefit in trainingCoreBenefits" :key="benefit.code" :class="`is-tone-${benefit.tone}`"><span class="mci-common-benefits__glyph" aria-hidden="true">{{ benefit.code }}</span><div><strong>{{ benefit.title }}</strong><small>{{ benefit.text }}</small></div></article></section>
       <div class="mci-common-closing__outcomes"><span>引擎复用 · 减少重复开发</span><span>在线编排 · 聚焦业务增量</span><span>30+ 成熟引擎</span><span v-for="signal in trainingTrustSignals" :key="signal">{{ signal }}</span><span>成熟案例</span></div>
       <div class="mci-common-closing__actions mci-screen-only"><a href="/profile.html#/overview" class="is-primary">立即开始使用 <span aria-hidden="true">→</span></a><a href="/doc/" target="_blank" rel="noopener noreferrer">打开官方文档 <span aria-hidden="true">↗</span></a></div>
-      <small class="mci-common-closing__signature">* 典型平台能力高复用场景；实际收益取决于需求与团队基线。<br>MICROI吾码 · OPEN-SOURCE AI DEVELOPMENT FRAMEWORK</small>
+      <small class="mci-common-closing__signature">{{ trainingBenefitNote }}<br>MICROI吾码 · OPEN-SOURCE AI DEVELOPMENT FRAMEWORK</small>
     </template>
   </div>
 </template>

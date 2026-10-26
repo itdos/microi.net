@@ -10,6 +10,7 @@ import { trainingPreviewPath } from '../training-previews.js'
 import '../styles/training-presentation-controls.scss'
 import { trainingEngineAssets } from '../training-engine-assets.js'
 import '../styles/training-engine-gallery.scss'
+import * as trainingText from '../common-training-content.js'
 
 type DeckPanel = '' | 'help'
 type SlideKind = 'cover' | 'decision' | 'why' | 'start' | 'atlas' | 'mcp' | 'engine' | 'multi-end' | 'cases' | 'closing' | 'enterprise'
@@ -640,6 +641,12 @@ const activationLinks = [
   { label: '@microi.net/cli', href: '/doc/v8-engine/mcp-server.html#cli' },
 ]
 
+const activationPaths = [
+  { label: '01 · 强烈建议', title: '一键安装开始使用', text: '按官方文档执行一条安装命令，适合非专业研发人员与快速试用。', href: '/doc/getting-started/docker-run.html', linkLabel: 'Docker 一键安装', recommended: true },
+  { label: '02 · 源码开发者', title: '拉取 Gitee 源码本地运行', text: '适合希望研究架构、调试内核和参与源码开发的专业用户。', href: '/doc/getting-started/local-run.html', linkLabel: '本地编译运行' },
+  { label: '03 · 零安装体验', title: '官网注册并开通免费 SaaS 租户', text: '注册账号、创建独立租户数据库，直接进入在线平台体验。', href: '/login.html?tab=register', linkLabel: '免费注册 SaaS' },
+]
+
 const mcpSteps = [
   { no: '01', title: '读取事实', text: 'Schema · 应用 · 权限' },
   { no: '02', title: '形成计划', text: '蓝图 · Manifest' },
@@ -674,6 +681,47 @@ const caseIndustries = [
 function commonKind(slide: SlideMeta): 'cover' | 'decision' | 'why' | 'closing' | undefined {
   const kind = slide.enterprise?.commonKind || slide.kind
   return ['cover', 'decision', 'why', 'closing'].includes(kind) ? kind as 'cover' | 'decision' | 'why' | 'closing' : undefined
+}
+
+// 讲义与演示直接共用课程数据；原生 details 的正文始终由 SSR 输出，读者展开即可阅读。
+// 不从浏览器 DOM 临时抓取，也不另写只提供给爬虫的版本。两套课程都保留，切换演示不会删掉讲义。
+const transcriptCourses: { id: DeckVersion; title: string; slides: SlideMeta[] }[] = [
+  { id: 'technical', title: '技术架构版', slides: technicalSlideMeta },
+  { id: 'enterprise', title: '企业版', slides: enterpriseSlides.map(slide => ({ ...slide, kind: 'enterprise' as const, enterprise: slide })) },
+]
+function transcriptPoints(slide: SlideMeta): string[] {
+  const kind = commonKind(slide)
+  if (kind === 'cover' || kind === 'closing') return [
+    ...trainingText.trainingCoreBenefits.map(item => `${item.title}：${item.text}`),
+    trainingText.trainingTrustSignals.join(' · '), trainingText.trainingDeliveryStages.join(' → '),
+    trainingText.trainingBenefitNote,
+  ]
+  if (kind === 'decision') return [
+    trainingText.trainingFrameworkLayers.map(item => item.label).join(' · '),
+    ...trainingText.trainingFrameworkPaths.map(item => `${item.title}：${item.steps.join(' → ')}。${item.text}${item.outcome}`),
+  ]
+  if (kind === 'why') return [
+    ...trainingText.trainingWhyAdvantages.map(item => `${item.title}：${item.text}`),
+    ...trainingText.trainingEngineGroups.map(group => `${group.title}：${group.engines.join('、')}`),
+    ...trainingText.trainingAdditionalEngines,
+    trainingText.trainingWhyNote,
+  ]
+  if (slide.kind === 'mcp') return mcpSteps.map(item => `${item.title}：${item.text}`)
+  if (slide.kind === 'multi-end') return devices.map(item => `${item.title}：${item.text}`)
+  if (slide.kind === 'cases') return caseIndustries.map(item => `${item.title}：${item.scenes}`)
+  if (slide.enterprise) return [
+    ...slide.enterprise.cards.map(item => `${item.title}：${item.text}`),
+    ...slide.enterprise.sectors, slide.enterprise.takeaway,
+  ].filter(Boolean)
+  return []
+}
+const transcriptRef = ref<HTMLDetailsElement | null>(null)
+async function openTranscript() {
+  if (document.fullscreenElement) await document.exitFullscreen()
+  if (!transcriptRef.value) return
+  transcriptRef.value.open = true
+  transcriptRef.value.querySelector('summary')?.focus()
+  transcriptRef.value.scrollIntoView({ block: 'start' })
 }
 const previewImage = ref<{ src: string; alt: string } | null>(null)
 const imageZoom = ref(false)
@@ -829,6 +877,9 @@ function downloadPdf() {
 function handleKeydown(event: KeyboardEvent) {
   // 浏览器搜索、打印、F11 等组合键及输入法始终保留默认行为。
   if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return
+  // 文字讲义属于正常文档阅读；方向键、空格和 PageDown 不再驱动背后的演示。
+  if (event.target instanceof Element && event.target.closest('.mci-training-transcript')) return
+  if (transcriptRef.value?.open && !(event.target instanceof Element && deckRef.value?.contains(event.target))) return
   const key = event.key
   // 大图弹层独占按键与焦点，避免 Esc/Tab 或方向键误翻动背后的课件。
   if (previewImage.value) {
@@ -968,6 +1019,7 @@ onBeforeUnmount(() => {
     <header class="mci-training-deck__topbar">
       <div class="mci-training-deck__identity"><button class="mci-training-brand" type="button" aria-label="返回第一张幻灯片" @click="goTo(0, 'prev')"><img src="/icon.png" alt="" aria-hidden="true"><span><strong>Microi吾码</strong><small>AI DEVELOPMENT FRAMEWORK</small></span></button><nav class="mci-training-deck__versions" aria-label="选择培训版本"><button type="button" class="is-technical" :aria-pressed="deckVersion === 'technical'" @click="switchVersion('technical')">技术架构版</button><button type="button" class="is-enterprise" :aria-pressed="deckVersion === 'enterprise'" @click="switchVersion('enterprise')">企业版</button></nav></div>
       <div class="mci-training-deck__top-actions" aria-label="演示工具">
+        <a href="#mci-training-transcript" class="mci-training-transcript-link" @click.prevent="openTranscript">文字讲义</a>
         <button type="button" :aria-label="railCollapsed ? '展开导航' : '收起导航'" :aria-expanded="!railCollapsed" aria-controls="mci-training-navigation" :title="railCollapsed ? '展开搜索与导航' : '收起导航，扩大演示区域'" @click="railCollapsed = !railCollapsed"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M5 8h2m-2 4h2m-2 4h2"/></svg><span>导航</span></button>
         <button type="button" aria-label="查看操作帮助" aria-keyshortcuts="H" title="操作帮助（H / ?）" @click="openPanel('help')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9a2.4 2.4 0 1 1 3.2 2.26c-.7.32-1 .76-1 1.49M12 17h.01"/></svg><span>帮助</span></button>
         <button type="button" aria-label="切换全屏" title="也可使用浏览器 F11 全屏" @click="toggleFullscreen"><svg v-if="!isFullscreen" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5V3M21 8h-5V3M3 16h5v5M21 16h-5v5"/></svg><span>{{ isFullscreen ? '退出' : '全屏' }}</span></button>
@@ -998,7 +1050,7 @@ onBeforeUnmount(() => {
 
           <template v-else-if="slide.kind === 'start'">
             <header class="mci-training-slide__heading mci-deck-reveal"><div><p class="mci-deck-eyebrow">04 · START IN MINUTES</p><h2>{{ slide.title }}</h2><p>{{ slide.summary }}</p></div><span>{{ padSlide(index) }}</span></header>
-            <div class="mci-start-paths"><a class="mci-start-card is-recommended mci-deck-reveal" href="/doc/getting-started/docker-run.html" target="_blank" rel="noopener noreferrer"><span>01 · 强烈建议</span><h3>一键安装开始使用</h3><p>按官方文档执行一条安装命令，适合非专业研发人员与快速试用。</p><strong>Docker 一键安装 ↗</strong></a><a class="mci-start-card mci-deck-reveal" href="/doc/getting-started/local-run.html" target="_blank" rel="noopener noreferrer"><span>02 · 源码开发者</span><h3>拉取 Gitee 源码本地运行</h3><p>适合希望研究架构、调试内核和参与源码开发的专业用户。</p><strong>本地编译运行 ↗</strong></a><a class="mci-start-card mci-deck-reveal" href="/login.html?tab=register" target="_blank" rel="noopener noreferrer"><span>03 · 零安装体验</span><h3>官网注册并开通免费 SaaS 租户</h3><p>注册账号、创建独立租户数据库，直接进入在线平台体验。</p><strong>免费注册 SaaS ↗</strong></a></div>
+            <div class="mci-start-paths"><a v-for="item in activationPaths" :key="item.href" class="mci-start-card mci-deck-reveal" :class="{ 'is-recommended': item.recommended }" :href="item.href" target="_blank" rel="noopener noreferrer"><span>{{ item.label }}</span><h3>{{ item.title }}</h3><p>{{ item.text }}</p><strong>{{ item.linkLabel }} ↗</strong></a></div>
             <div class="mci-start-ai mci-deck-reveal"><div><span>NEXT · AI READY</span><strong>让 AI 自动连接 Microi吾码</strong><p>VS Code 安装 Microi吾码插件；或在 Codex、WorkBuddy、Claude Code 等工具中安装 <code>@microi.net/cli</code>。在本地安全录入平台地址、账号和密码后，自然语言让 AI 添加 MCP 并初始化配置。</p></div><nav aria-label="AI 开发接入文档"><a v-for="item in activationLinks" :key="item.label" :href="item.href" target="_blank" rel="noopener noreferrer">{{ item.label }} ↗</a></nav></div>
           </template>
 
@@ -1073,4 +1125,34 @@ onBeforeUnmount(() => {
     </dialog>
     <div v-if="activePanel" class="mci-training-deck__overlay mci-screen-only" role="presentation" @click.self="closePanel"><section class="mci-training-deck__panel" role="dialog" aria-modal="true" aria-labelledby="mci-deck-help-title"><header><div><p>MICROI PRESENTATION</p><h2 id="mci-deck-help-title">演示操作</h2></div><button ref="panelCloseRef" type="button" aria-label="关闭" @click="closePanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div class="mci-training-deck__help"><article><kbd>←</kbd><kbd>→</kbd><span><strong>上一页 / 下一页</strong><small>也支持 ↑ ↓、PageUp / PageDown</small></span></article><article><kbd>Space</kbd><span><strong>继续演示</strong><small>空格键进入下一页</small></span></article><article><kbd>Home</kbd><kbd>End</kbd><span><strong>首尾跳转</strong><small>快速回到封面或致辞页</small></span></article><article><kbd>O</kbd><span><strong>缩略图导航</strong><small>聚焦左侧当前页预览</small></span></article><article><kbd>F11</kbd><span><strong>浏览器全屏</strong><small>Ctrl+F / ⌘F 保留浏览器搜索；左侧可搜索标题和内容</small></span></article><article><kbd>P</kbd><span><strong>下载暗色 PDF</strong><small>顶栏可直接选择暗色或浅色高质量版</small></span></article><article><span class="mci-training-deck__gesture">↔</span><span><strong>鼠标 / 触控</strong><small>滚轮、两侧按钮或横向拖动切页</small></span></article><article><span class="mci-training-deck__gesture">↗</span><span><strong>现场讲解</strong><small>所有功能入口均在新窗口打开官方文档</small></span></article></div></section></div>
   </div>
+
+  <details id="mci-training-transcript" ref="transcriptRef" class="mci-training-transcript">
+    <summary>完整课程文字讲义 · 技术架构版 {{ technicalSlideMeta.length }} 页 / 企业版 {{ enterpriseSlides.length }} 页</summary>
+    <div class="mci-training-transcript__body">
+      <p>按课程顺序阅读标题、要点和演示步骤；内容与上方幻灯片共用同一份课程数据。可使用浏览器查找，也可沿文档链接继续学习。</p>
+      <section v-for="course in transcriptCourses" :key="course.id" :aria-labelledby="`training-course-${course.id}`">
+        <h2 :id="`training-course-${course.id}`">{{ course.title }} · {{ course.slides.length }} 页</h2>
+        <ol class="mci-training-transcript__lessons">
+          <li v-for="(slide, index) in course.slides" :id="`training-lesson-${course.id}-${slide.id}`" :key="slide.id" :data-training-course="course.id" :data-training-lesson="slide.id">
+            <h3>{{ padSlide(index) }} · {{ slide.nav }} — {{ slide.title }}</h3>
+            <p>{{ slide.summary }}</p>
+            <template v-if="slide.engine">
+              <p>{{ slide.engine.promise }}</p>
+              <p>{{ slide.engine.orbit.join(' · ') }}</p>
+              <ul><li v-for="item in slide.engine.highlights" :key="item.title"><strong>{{ item.title }}：</strong>{{ item.text }}</li></ul>
+              <p><strong>现场演示步骤</strong></p>
+              <ol><li v-for="step in slide.engine.demo" :key="step">{{ step }}</li></ol>
+              <p><a :href="slide.engine.href">{{ slide.engine.linkLabel }}</a></p>
+            </template>
+            <template v-else>
+              <ul v-if="transcriptPoints(slide).length"><li v-for="(point, pointIndex) in transcriptPoints(slide)" :key="pointIndex">{{ point }}</li></ul>
+              <ul v-if="slide.kind === 'start'"><li v-for="item in activationPaths" :key="item.href"><a :href="item.href">{{ item.title }}</a>：{{ item.text }}</li><li v-for="item in activationLinks" :key="item.label"><a :href="item.href">{{ item.label }}</a></li></ul>
+              <ul v-if="slide.kind === 'atlas'"><li v-for="group in atlasGroups" :key="group.code"><strong>{{ group.title }}：</strong><ul><li v-for="entry in entriesInAtlasGroup(group)" :key="entry.id"><a :href="entry.href">{{ entry.nav }}</a></li></ul></li></ul>
+              <p v-for="source in slide.enterprise?.sources || []" :key="source.href"><a :href="source.href">{{ source.label }}</a></p>
+            </template>
+          </li>
+        </ol>
+      </section>
+    </div>
+  </details>
 </template>

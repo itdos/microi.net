@@ -137,6 +137,44 @@ html.dark .mci-training-ppt-page {
 
 .mci-training-deck-source { display: none !important; }
 
+/* 课程文字与演示共用数据，但保留独立的正常阅读流；折叠不移除 SSR 正文。 */
+.mci-training-transcript {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 20px clamp(16px, 4vw, 48px);
+  color: var(--mci-deck-text);
+  background: var(--mci-deck-surface-strong);
+  border-top: 1px solid var(--mci-deck-line-strong);
+  scroll-margin-top: calc(var(--vp-nav-height, 64px) + 12px);
+  overflow-wrap: anywhere;
+  user-select: text;
+
+  > summary {
+    max-width: 90ch;
+    margin: 0 auto;
+    padding: 8px 0;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 650;
+    line-height: 1.7;
+  }
+
+  > summary:focus-visible,
+  a:focus-visible { outline: 2px solid var(--mci-deck-primary); outline-offset: 4px; }
+
+  &__body { max-width: 90ch; margin: 16px auto; line-height: 1.85; }
+  &__lessons { padding: 0 !important; list-style: none !important; }
+  &__lessons > li { padding: 16px 0 24px; border-bottom: 1px solid var(--mci-deck-line); }
+  h2, h3 { color: var(--mci-deck-text); line-height: 1.55; }
+  h3 { margin: 16px 0; font-size: 19px; }
+  p, li { color: var(--mci-deck-text); }
+  a { color: var(--mci-deck-primary); text-decoration: underline; text-underline-offset: 3px; }
+}
+
+/* 讲义不进入已冻结的幻灯截图/PDF 画布；网页和无 JavaScript 阅读仍可展开。 */
+.mci-training-deck.is-artifact-capture + .mci-training-transcript { display: none; }
+@media print { .mci-training-transcript { display: none; } }
+
 .mci-training-ppt-page .vp-doc > .header-anchor {
   display: none !important;
 }

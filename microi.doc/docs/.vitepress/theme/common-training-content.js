@@ -55,6 +55,8 @@ export const trainingAdditionalEngines = ['角色 / 部门 / 字段 / 数据权�
 
 // 静态课件冻结已回读的官方快照，网页与PDF使用同一数字和日期。
 export const trainingWhyProof = { downloads: '1,207', date: '2026年10月18日', totalDownloads: 12070344, queriedAt: '2026-10-18T13:00:04.962Z' }
+export const trainingBenefitNote = '* 典型平台能力高复用场景；实际收益取决于需求与团队基线。'
+export const trainingWhyNote = '* Token 收益依需求与团队基线而异；AI CAD / SolidWorks 为技术预览。各能力配置与适用范围详见官方文档，欢迎与优秀框架全方位对比。'
 export const trainingWhyAdvantages = [
   { code: 'AI', title: 'AI 低代码 · 0 代码自然语言', text: '从业务需求到数据、表单与完整系统。', tone: 'blue' },
   { code: 'V8', title: 'V8 引擎 AI 编程', text: '低代码与 V8 在线生效，无需编译发布。', tone: 'purple' },

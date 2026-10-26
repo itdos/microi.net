@@ -8,6 +8,7 @@ import { docAssets } from '../docs/.vitepress/theme/doc-assets.js'
 import { verifiedDocAssetPath } from '../scripts/prepare-doc-assets.mjs'
 import { trainingPreviewAssets, trainingPreviewPath } from '../docs/.vitepress/theme/training-previews.js'
 import * as commonContent from '../docs/.vitepress/theme/common-training-content.js'
+import './training-syllabus-ssr.test.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const staticPdfPaths = [
@@ -115,8 +116,8 @@ test('presentation covers the complete technical learning path', () => {
   assert.doesNotMatch(component, /nav: '视觉识别'/u)
   assert.match(component, /OsClient、OsClientType、OsClientNetwork/s)
   assert.match(component, /Code=1 自动提交.*自动回滚/s)
-  assert.match(component, /href="\/doc\/getting-started\/docker-run\.html" target="_blank"/)
-  assert.match(component, /href="\/login\.html\?tab=register" target="_blank"/)
+  assert.match(component, /href: '\/doc\/getting-started\/docker-run\.html'/)
+  assert.match(component, /href: '\/login\.html\?tab=register'/)
   assert.match(component, /:href="slide\.engine\.href" target="_blank"/)
   assert.match(component, /:href="entry\.href" target="_blank"/)
   assert.match(component, /href="\/case\/case-index\.html" target="_blank"/)
@@ -232,7 +233,7 @@ test('page 03 covers every official system-engine topic and every technical engi
     for (const term of terms) assert.ok(labels.includes(term), `${topic} missing ${term}`)
   }
   assert.ok(!commonContent.trainingEngineGroups.flatMap(group => group.engines).includes('数据源引擎'), 'legacy data sources stay within the API engine')
-  assert.match(read('docs/.vitepress/theme/components/CommonTrainingSlide.vue'), /AI CAD \/ SolidWorks 为技术预览/u)
+  assert.match(commonContent.trainingWhyNote, /AI CAD \/ SolidWorks 为技术预览/u)
   assert.equal(commonContent.trainingFrameworkLayers.at(-1).label, '更多框架与能力')
 })
 

@@ -1,0 +1,276 @@
+{
+  "schemaVersion": 1,
+  "evidenceType": "github-actions-public-run-job-status",
+  "collectedAt": "2026-10-26T06:39:55.939955+00:00",
+  "repository": "itdos/microi.net",
+  "collection": {
+    "authentication": "none",
+    "artifactDownloads": 0,
+    "logDownloads": 0,
+    "apiVersion": "2022-11-28",
+    "note": "Snapshot of public run/jobs responses; not an exported test-runner report."
+  },
+  "scope": {
+    "proves": [
+      "The listed commit's workflow and seven jobs were completed with the reported conclusions at collection time.",
+      "The Ubuntu / Node 24 full offline job and its listed execution step reported success."
+    ],
+    "doesNotProve": [
+      "Individual test totals, test assertions or source-tree hashes from the Linux runner; no Artifact was downloaded.",
+      "The runner's exact Node patch version, OS release or image digest.",
+      "Production tenant behavior, database compatibility, browser acceptance, third-party certification or all possible environments."
+    ],
+    "testCounts": null,
+    "countNote": "No Windows test count is attributed to the Ubuntu job."
+  },
+  "sources": [
+    {
+      "url": "https://api.github.com/repos/itdos/microi.net/actions/runs/40275365593",
+      "httpStatus": 200,
+      "serverDate": "Mon, 26 Oct 2026 06:39:50 GMT",
+      "responseBytes": 12317,
+      "responseSha256": "03bdbbd1d64fc119f098112d805a3b49335bd57cf92a69e151d1ad0aab39d35f",
+      "paginationLink": null
+    },
+    {
+      "url": "https://api.github.com/repos/itdos/microi.net/actions/runs/40275365593/jobs?per_page=100",
+      "httpStatus": 200,
+      "serverDate": "Mon, 26 Oct 2026 06:39:50 GMT",
+      "responseBytes": 19583,
+      "responseSha256": "ca66f876a609a652cf368e1492700ef1cce110cd2f8a69dc96b40468720f5d3d",
+      "paginationLink": null
+    }
+  ],
+  "run": {
+    "id": 40275365593,
+    "name": "公开证据工具离线回归",
+    "path": ".github/workflows/public-evidence.yml",
+    "head_branch": "master",
+    "head_sha": "e831ead555120d23479385a16cfbe553f1d04244",
+    "event": "push",
+    "run_number": 11,
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-26T05:39:06Z",
+    "run_started_at": "2026-10-26T05:39:06Z",
+    "updated_at": "2026-10-26T05:40:13Z",
+    "url": "https://api.github.com/repos/itdos/microi.net/actions/runs/40275365593",
+    "html_url": "https://github.com/itdos/microi.net/actions/runs/40275365593"
+  },
+  "runTimestampNote": "The run API has no completed_at field in this snapshot; updated_at is not relabeled as a completion time. Job completion times are retained below.",
+  "workflowSourceUrl": "https://github.com/itdos/microi.net/blob/e831ead555120d23479385a16cfbe553f1d04244/.github/workflows/public-evidence.yml",
+  "reportedJobCount": 7,
+  "capturedJobCount": 7,
+  "successfulJobCount": 7,
+  "jobs": [
+    {
+      "id": 121416870240,
+      "name": "dependency-audit",
+      "run_id": 40275365593,
+      "head_sha": "e831ead555120d23479385a16cfbe553f1d04244",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:09Z",
+      "completed_at": "2026-10-26T05:39:23Z",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "url": "https://api.github.com/repos/itdos/microi.net/actions/jobs/121416870240",
+      "html_url": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870240",
+      "environment": {
+        "runnerLabelSource": "jobs API labels; exact OS image/release not supplied by this snapshot",
+        "declaredNodeMajor": "22",
+        "nodeMajorSource": "setup-node configuration at the run head commit; not an API-reported runtime version",
+        "nodeVersionExact": null,
+        "workflowJob": "dependency-audit",
+        "workflowSourceUrl": "https://github.com/itdos/microi.net/blob/e831ead555120d23479385a16cfbe553f1d04244/.github/workflows/public-evidence.yml"
+      }
+    },
+    {
+      "id": 121416870422,
+      "name": "offline",
+      "run_id": 40275365593,
+      "head_sha": "e831ead555120d23479385a16cfbe553f1d04244",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:10Z",
+      "completed_at": "2026-10-26T05:39:32Z",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "url": "https://api.github.com/repos/itdos/microi.net/actions/jobs/121416870422",
+      "html_url": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870422",
+      "environment": {
+        "runnerLabelSource": "jobs API labels; exact OS image/release not supplied by this snapshot",
+        "declaredNodeMajor": "20",
+        "nodeMajorSource": "setup-node configuration at the run head commit; not an API-reported runtime version",
+        "nodeVersionExact": null,
+        "workflowJob": "offline",
+        "workflowSourceUrl": "https://github.com/itdos/microi.net/blob/e831ead555120d23479385a16cfbe553f1d04244/.github/workflows/public-evidence.yml"
+      }
+    },
+    {
+      "id": 121416870474,
+      "name": "MCP 完整离线回归 / Ubuntu / Node 24",
+      "run_id": 40275365593,
+      "head_sha": "e831ead555120d23479385a16cfbe553f1d04244",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:10Z",
+      "completed_at": "2026-10-26T05:40:13Z",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "url": "https://api.github.com/repos/itdos/microi.net/actions/jobs/121416870474",
+      "html_url": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870474",
+      "environment": {
+        "runnerLabelSource": "jobs API labels; exact OS image/release not supplied by this snapshot",
+        "declaredNodeMajor": "24",
+        "nodeMajorSource": "jobs API name; major version only",
+        "nodeVersionExact": null,
+        "workflowJob": "full-mcp",
+        "workflowSourceUrl": "https://github.com/itdos/microi.net/blob/e831ead555120d23479385a16cfbe553f1d04244/.github/workflows/public-evidence.yml"
+      }
+    },
+    {
+      "id": 121416870514,
+      "name": "MCP 合约 ubuntu-latest / Node 24",
+      "run_id": 40275365593,
+      "head_sha": "e831ead555120d23479385a16cfbe553f1d04244",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:10Z",
+      "completed_at": "2026-10-26T05:39:33Z",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "url": "https://api.github.com/repos/itdos/microi.net/actions/jobs/121416870514",
+      "html_url": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870514",
+      "environment": {
+        "runnerLabelSource": "jobs API labels; exact OS image/release not supplied by this snapshot",
+        "declaredNodeMajor": "24",
+        "nodeMajorSource": "jobs API name; major version only",
+        "nodeVersionExact": null,
+        "workflowJob": "manifest",
+        "workflowSourceUrl": "https://github.com/itdos/microi.net/blob/e831ead555120d23479385a16cfbe553f1d04244/.github/workflows/public-evidence.yml"
+      }
+    },
+    {
+      "id": 121416870516,
+      "name": "MCP 合约 windows-latest / Node 24",
+      "run_id": 40275365593,
+      "head_sha": "e831ead555120d23479385a16cfbe553f1d04244",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:11Z",
+      "completed_at": "2026-10-26T05:40:01Z",
+      "labels": [
+        "windows-latest"
+      ],
+      "url": "https://api.github.com/repos/itdos/microi.net/actions/jobs/121416870516",
+      "html_url": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870516",
+      "environment": {
+        "runnerLabelSource": "jobs API labels; exact OS image/release not supplied by this snapshot",
+        "declaredNodeMajor": "24",
+        "nodeMajorSource": "jobs API name; major version only",
+        "nodeVersionExact": null,
+        "workflowJob": "manifest",
+        "workflowSourceUrl": "https://github.com/itdos/microi.net/blob/e831ead555120d23479385a16cfbe553f1d04244/.github/workflows/public-evidence.yml"
+      }
+    },
+    {
+      "id": 121416870547,
+      "name": "MCP 合约 windows-latest / Node 22",
+      "run_id": 40275365593,
+      "head_sha": "e831ead555120d23479385a16cfbe553f1d04244",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:10Z",
+      "completed_at": "2026-10-26T05:40:00Z",
+      "labels": [
+        "windows-latest"
+      ],
+      "url": "https://api.github.com/repos/itdos/microi.net/actions/jobs/121416870547",
+      "html_url": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870547",
+      "environment": {
+        "runnerLabelSource": "jobs API labels; exact OS image/release not supplied by this snapshot",
+        "declaredNodeMajor": "22",
+        "nodeMajorSource": "jobs API name; major version only",
+        "nodeVersionExact": null,
+        "workflowJob": "manifest",
+        "workflowSourceUrl": "https://github.com/itdos/microi.net/blob/e831ead555120d23479385a16cfbe553f1d04244/.github/workflows/public-evidence.yml"
+      }
+    },
+    {
+      "id": 121416870571,
+      "name": "MCP 合约 ubuntu-latest / Node 22",
+      "run_id": 40275365593,
+      "head_sha": "e831ead555120d23479385a16cfbe553f1d04244",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:10Z",
+      "completed_at": "2026-10-26T05:39:37Z",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "url": "https://api.github.com/repos/itdos/microi.net/actions/jobs/121416870571",
+      "html_url": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870571",
+      "environment": {
+        "runnerLabelSource": "jobs API labels; exact OS image/release not supplied by this snapshot",
+        "declaredNodeMajor": "22",
+        "nodeMajorSource": "jobs API name; major version only",
+        "nodeVersionExact": null,
+        "workflowJob": "manifest",
+        "workflowSourceUrl": "https://github.com/itdos/microi.net/blob/e831ead555120d23479385a16cfbe553f1d04244/.github/workflows/public-evidence.yml"
+      }
+    }
+  ],
+  "fullOfflineExecutionSteps": [
+    {
+      "number": 4,
+      "name": "确认真实 TLS 回归的 OpenSSL 前置",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:17Z",
+      "completed_at": "2026-10-26T05:39:17Z",
+      "jobId": 121416870474,
+      "sourceUrl": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870474"
+    },
+    {
+      "number": 6,
+      "name": "MCP TypeScript 检查",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:20Z",
+      "completed_at": "2026-10-26T05:39:25Z",
+      "jobId": 121416870474,
+      "sourceUrl": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870474"
+    },
+    {
+      "number": 7,
+      "name": "自动发现并串行执行全部 MCP 测试（含本机 HTTP 和 TLS 夹具）",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:39:25Z",
+      "completed_at": "2026-10-26T05:40:10Z",
+      "jobId": 121416870474,
+      "sourceUrl": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870474"
+    },
+    {
+      "number": 8,
+      "name": "保存完整回归的脱敏结果（失败也保留）",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-26T05:40:10Z",
+      "completed_at": "2026-10-26T05:40:11Z",
+      "jobId": 121416870474,
+      "sourceUrl": "https://github.com/itdos/microi.net/actions/runs/40275365593/job/121416870474"
+    }
+  ],
+  "retention": {
+    "storage": "Version-controlled JSON in the public source repository.",
+    "artifactRetentionIndependent": true,
+    "limitations": "Repository availability and retention still depend on the hosting service and repository owner; this file does not promise permanent availability of GitHub Actions logs or artifacts."
+  }
+}

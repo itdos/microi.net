@@ -24,8 +24,6 @@ import { serviceNetwork } from '../.vitepress/config/service-network.mjs'
 const contacts = [
   {
     name: 'Anderson・周',
-// 暂停个人版销售，保留原文以便恢复
-//     role: 'CTO、个人版售前/售后',
     role: 'CTO/首席技术官',
     qrCode: 'https://file.microi.net/upload/img/ScreenShot_2026-02-07_011010_5522.jpeg',
     avatar: '/contact/anderson-avatar.jpg',
@@ -98,9 +96,6 @@ const contacts = [
 <ContactCard :contacts="contacts" />
 
 ::: tip 💡 购买提示
-<!-- 暂停个人版销售，保留原文以便恢复
-- 购买 **个人版** 需告知您的推荐来源（了解 Microi吾码的渠道）
--->
 - 购买 **企业版** 请联系 **商务**
 :::
 

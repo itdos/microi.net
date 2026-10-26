@@ -57,6 +57,51 @@ node microi.benchmarks/manifest-delivery/verify.mjs --suite full --out /已有�
 GitHub Actions 失败时也将同一受限定位写为 check-run 错误注解，并转义命令控制字符；
 注解不包含错误正文，可先用公开检查信息定位，详细复现仍使用绑定提交与源码。
 
+## 可匿名读取的 CI 状态摘要
+
+[2026-10-26 公共运行状态 JSON](results/2026-10-26-github-run-40275365593-status.json)
+保存了[运行 40275365593](https://github.com/itdos/microi.net/actions/runs/40275365593)的匿名 API 快照：
+提交 `e831ead555120d23479385a16cfbe553f1d04244`，7 个作业均为 `completed / success`，
+包含 Ubuntu / Node 24 完整离线回归和 Linux/Windows × Node 22/24 的四个合约作业。
+JSON 保留每个作业的名称、运行标签、开始/结束时间、结论及来源链接，作为源码文件长期保存，
+不受 Actions Artifact 的 90 天保留期限制。
+
+这份摘要证明作业状态，**不包含 Linux 逐项测试数量或完整测试明细**，没有下载登录附件，
+也没有把本机 Windows 的 356 项记录写成 Linux 证据。系统使用 API 返回的 runner 标签；
+Node 主版本注明来自作业名称或同一提交的工作流配置，实际精确版本未知并保留为 `null`。
+运行级 API 的 `updated_at` 仍称更新时间，不冒充完成时间；结束时间使用各作业的 `completed_at`。
+
+可在 Node 22/24 的 Bash 环境中运行以下最小脚本，重新读取同一运行的公开状态。
+它只向标准输出打印 JSON，不修改文件；没有有效结果或清单不完整时直接失败。
+配置补充可核对[同一提交的工作流](https://github.com/itdos/microi.net/blob/e831ead555120d23479385a16cfbe553f1d04244/.github/workflows/public-evidence.yml)。
+
+```sh
+node --input-type=module <<'JS'
+const base = 'https://api.github.com/repos/itdos/microi.net/actions/runs/40275365593';
+const headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+// 只读取匿名状态；不读取认证信息、日志或 Artifact，也不轮询。
+const [run, page] = await Promise.all([base, base + '/jobs?per_page=100'].map(async url => {
+  const response = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+  if (!response.ok || response.headers.get('link')?.includes('rel="next"')) {
+    throw new Error('请求失败或需要继续分页：' + url);
+  }
+  return response.json();
+}));
+if (page.jobs.length !== page.total_count ||
+    page.jobs.some(job => job.run_id !== run.id || job.head_sha !== run.head_sha)) {
+  throw new Error('作业清单不完整或不属于同一次提交');
+}
+const fields = ['id', 'name', 'head_sha', 'status', 'conclusion',
+  'started_at', 'completed_at', 'labels', 'url', 'html_url'];
+const pick = (value, keys) => Object.fromEntries(keys.map(key => [key, value[key] ?? null]));
+console.log(JSON.stringify({
+  run: pick(run, ['id', 'head_sha', 'run_attempt', 'status', 'conclusion', 'run_started_at', 'updated_at', 'html_url']),
+  total_count: page.total_count,
+  jobs: page.jobs.map(job => pick(job, fields))
+}, null, 2));
+JS
+```
+
 ## 原问题和修复
 
 旧的兼容读取会丢弃 `null`、字符串及空对象等错误资源；错误的集合类型也可能被当作未声明。

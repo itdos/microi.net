@@ -17,7 +17,9 @@ test('实际键盘处理器保留 Ctrl+F、Cmd+F、Alt、输入法和 F11 默认
  assert.ok(start>=0&&end>start);const code=ts.transpileModule(component.slice(start,end),{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
  const events=[];const action=name=>()=>events.push(name);
  const activePanel={value:''},previewImage={value:null};
- const dependencies={activePanel,previewImage,deckRef:{value:null},document:{activeElement:null},closePreview:action('close-preview'),isInteractiveTarget:target=>target==='input',nextSlide:action('next'),previousSlide:action('previous'),goTo:(...args)=>events.push(['go',...args]),scrollActiveThumbnail:action('overview'),openPanel:action('help'),downloadPdf:action('pdf'),closePanel:action('close'),slideMeta:{value:Array.from({length:10},()=>({}))}};
+ class TestElement { constructor(area){this.area=area} closest(selector){return selector==='.mci-training-transcript'&&this.area==='transcript'?this:null} contains(target){return target?.area==='deck'} }
+ const transcriptRef={value:{open:false}},deckRef={value:new TestElement('deck')};
+ const dependencies={activePanel,previewImage,transcriptRef,deckRef,Element:TestElement,document:{activeElement:null},closePreview:action('close-preview'),isInteractiveTarget:target=>target==='input',nextSlide:action('next'),previousSlide:action('previous'),goTo:(...args)=>events.push(['go',...args]),scrollActiveThumbnail:action('overview'),openPanel:action('help'),downloadPdf:action('pdf'),closePanel:action('close'),slideMeta:{value:Array.from({length:10},()=>({}))}};
  const handler=new Function(...Object.keys(dependencies),code+';return handleKeydown;')(...Object.values(dependencies));
  for(const event of [{key:'f',ctrlKey:true},{key:'f',metaKey:true},{key:'F11'},{key:'f'},{key:'p',ctrlKey:true},{key:'ArrowDown',altKey:true},{key:'ArrowDown',isComposing:true},{key:'ArrowDown',defaultPrevented:true},{key:'ArrowDown',target:'input'}])handler({...event,preventDefault:()=>events.push('prevented')});
  assert.deepEqual(events,[]);handler({key:'ArrowRight',preventDefault:()=>events.push('prevented')});assert.deepEqual(events,['prevented','next']);
@@ -30,6 +32,16 @@ test('实际键盘处理器保留 Ctrl+F、Cmd+F、Alt、输入法和 F11 默认
  events.length=0;previewImage.value=null;activePanel.value='help';
  handler({key:'ArrowRight',preventDefault:()=>events.push('prevented')});assert.deepEqual(events,[]);
  handler({key:'Escape',preventDefault:()=>events.push('prevented')});assert.deepEqual(events,['prevented','close']);
+ events.length=0;activePanel.value='';
+ for(const open of [false,true]){
+  transcriptRef.value.open=open;
+  for(const key of ['ArrowDown','ArrowUp','PageDown','PageUp',' ','Home','End','p'])handler({key,target:new TestElement('transcript'),preventDefault:()=>events.push('prevented')});
+ }
+ assert.deepEqual(events,[],'讲义含收起状态下的 summary 保留原生阅读按键');
+ for(const key of ['ArrowDown','PageDown',' ','Home','End'])handler({key,target:new TestElement('body'),preventDefault:()=>events.push('prevented')});
+ assert.deepEqual(events,[],'讲义展开后，段落点击导致的 body 焦点也不能误翻幻灯');
+ handler({key:'ArrowRight',target:new TestElement('deck'),preventDefault:()=>events.push('prevented')});
+ assert.deepEqual(events,['prevented','next'],'焦点回到演示区域仍可翻页');
 });
 test('搜索索引来自全部幻灯片正文，导航提供可反复收起和展开的控制',()=>{
  assert.match(component,/slideSearchContent\.value = slideMeta\.value\.map[\s\S]*?textContent/);

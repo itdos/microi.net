@@ -182,7 +182,7 @@ Microi吾码适合希望以 .NET / Vue 技术栈自主管理数据、在线编�
 |---|---|
 | 业务负责人 / 架构师 | [AI 平台治理](https://microi.net/doc/system-engine/ai-platform-governance.html) · [AI 工作流与业务蓝图](https://microi.net/doc/system-engine/ai-workflow-suite.html) · [版本选择](https://microi.net/doc/edition-comparison.html) |
 | 低代码开发者 | [快速开始](https://microi.net/doc/getting-started/start-use.html) · [表单引擎](https://microi.net/doc/form-engine/form-engine-info.html) · [模块引擎](https://microi.net/doc/system-engine/module-engine.html) · [工作流](https://microi.net/doc/system-engine/wf-engine.html) |
-| AI / V8 开发者 | [AI + V8 编程](https://microi.net/doc/v8-engine/ai-apiengine.html) · [VS Code 插件](https://microi.net/doc/v8-engine/vs-code-plugin.html) · [接口引擎](https://microi.net/doc/v8-engine/api-engine.html) |
+| AI / V8 开发者 | [AI + V8 编程](https://microi.net/doc/v8-engine/ai-apiengine.html) · [Microi Agent / VS Code 工具](https://microi.net/doc/v8-engine/microi-agent.html) · [接口引擎](https://microi.net/doc/v8-engine/api-engine.html) |
 | 前端与多端开发者 | [Microi.UI](https://microi.net/doc/system-engine/microi-ui.html) · [多端客户端](https://microi.net/doc/system-engine/multi-end-client.html) · [前端微服务](https://microi.net/doc/system-engine/micro-app.html) · [Unity / WebGL](https://microi.net/doc/system-engine/unity-integration.html) |
 | 运维 / 安全负责人 | [Docker 部署](https://microi.net/doc/getting-started/docker-run.html) · [安全基线](https://microi.net/doc/more/security.html) · [任务调度](https://microi.net/doc/system-engine/job.html) · [消息通知](https://microi.net/doc/system-engine/message-notification.html) |
 | 系统集成开发者 | [接口引擎](https://microi.net/doc/v8-engine/api-engine.html) · [数据源引擎](https://microi.net/doc/system-engine/datasource-engine.html) · [MQ](https://microi.net/doc/system-engine/mq.html) / [MQTT](https://microi.net/doc/system-engine/mqtt-engine.html) · [应用商城](https://microi.net/doc/system-engine/app-store.html) |
@@ -317,18 +317,7 @@ Microi吾码把企业管理底座、可视化设计、业务编程和运行治�
 
 ---
 
-<!-- 暂停个人版销售，保留原文以便恢复
-## 💰 开源版、个人版、企业版区别
--->
 ## 💰 开源版、企业版区别
-
-<!-- 暂停个人版销售，保留原文以便恢复
-<tr><td><strong>个人版</strong></td><td><strong>￥999 买断</strong></td><td>额外包含 <strong>WebOS 源码</strong>，功能与企业版一致，<strong>无任何限制、无限分发部署、无限商用、永久有效</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
--->
-
-<!-- 暂停个人版销售，保留原文以便恢复
-<tr><td><strong>企业版</strong></td><td><strong>￥2.5w 买断</strong></td><td><strong>永久有效</strong>，并提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
--->
 
 <table>
 <thead><tr><th width="80">版本</th><th width="140">价格</th><th>说明</th></tr></thead>
@@ -338,17 +327,11 @@ Microi吾码把企业管理底座、可视化设计、业务编程和运行治�
 </tbody>
 </table>
 
-<!-- 暂停个人版销售，保留原文以便恢复
-> 个人版 ￥999、企业版 ￥2.5w 均为一次买断价格，授权永久有效。后续可选技术支持为个人版 ¥499/年、企业版 ¥1.5w/年，由用户自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”。
--->
 > 企业版 ￥7.8w 为一次买断价格，授权永久有效。后续可选技术支持为 ¥1.5w/年，由用户自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”。
 
-<!-- 暂停个人版销售，保留原文以便恢复
-> [→ 查看开源版、个人版、企业版的详细区别与选择建议](https://microi.net/doc/edition-comparison.html)
--->
 > [→ 查看开源版、企业版的详细区别与选择建议](https://microi.net/doc/edition-comparison.html)
 
-> 当前销售说明：个人版已暂停销售；源文件注释及历史文章中的 ￥999、￥2.5w 等旧价格不代表当前报价。企业版为 ￥7.8w 一次买断，可选后续技术支持为 ¥1.5w/年。采购以购买时版本页面与正式合同为准。
+> 当前销售说明：个人版已暂停销售；历史文章中的旧价格不代表当前报价。企业版为 ￥7.8w 一次买断，可选后续技术支持为 ¥1.5w/年。采购以购买时版本页面与正式合同为准。
 
 ---
 
