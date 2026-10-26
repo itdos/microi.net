@@ -46,14 +46,41 @@ namespace Microi.net
                     case "Drain": result = store.Drain(tenant, scope, epoch); break;
                     case "Status": result = store.Read(tenant, scope); break;
                     case "End":
-                        if (input["ExpectedRevision"]?.Type != JTokenType.Integer)
+                        if (!TryReadManagedStorageRevision(input["ExpectedRevision"], out long revision))
                             return new DosResult(0, null, "结束维护必须提供刚读取的准入版本。");
-                        result = store.End(tenant, scope, epoch, input.Value<long>("ExpectedRevision")); break;
+                        result = store.End(tenant, scope, epoch, revision); break;
                     default: return new DosResult(0, null, "未知维护操作。");
                 }
                 return new DosResult(1, JObject.FromObject(result));
             }
             catch { return new DosResult(0, null, "维护状态未知、租户尚未排空或已有操作进行中；请重新读取状态。"); }
+        }
+
+        private static bool TryReadManagedStorageRevision(JToken token, out long revision)
+        {
+            const long maximumSafeInteger = 9007199254740991L;
+            revision = 0;
+            if (token?.Type == JTokenType.Integer)
+                return long.TryParse(token.ToString(Newtonsoft.Json.Formatting.None),
+                    System.Globalization.NumberStyles.AllowLeadingSign,
+                    System.Globalization.CultureInfo.InvariantCulture, out revision)
+                    && revision >= 0 && revision <= maximumSafeInteger;
+            if (token?.Type != JTokenType.Float) return false;
+
+            // Jint objects reach JsonHelper as ExpandoObject; an exact JS integer
+            // becomes a Float JToken. Accept its value, never coerce strings or round.
+            if (((JValue)token).Value is decimal precise)
+            {
+                if (precise < 0 || precise > maximumSafeInteger || decimal.Truncate(precise) != precise)
+                    return false;
+                revision = (long)precise;
+                return true;
+            }
+            var number = token.Value<double>();
+            if (double.IsNaN(number) || double.IsInfinity(number) || number < 0
+                || number > maximumSafeInteger || Math.Truncate(number) != number) return false;
+            revision = (long)number;
+            return true;
         }
     }
 }

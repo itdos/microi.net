@@ -50,7 +50,7 @@ function Get-CimInstance { [pscustomobject]@{TotalVisibleMemorySize=33554432;Fre
 function node {
   Record-Command 'node' $args
   $global:LASTEXITCODE=0
-  if ($args[0] -like '*fixtures/admission/runtime.mjs') { $global:LASTEXITCODE=17; return }
+  if (($args[0] -replace '\\\\','/') -like '*fixtures/admission/runtime.mjs') { $global:LASTEXITCODE=17; return }
   if ($args[1] -eq 'freeze-platform') { '{}' | Set-Content -LiteralPath $args[3]; return }
   if ($args[1] -eq 'verify-platform') { '{"scope":"PlatformRelease","status":"Passed"}' | Set-Content -LiteralPath $args[4]; return }
   if ($args[1] -eq 'freeze') { '{"fullFilter":"Category=FullStack","requiredEnvironment":[]}' ; return }
@@ -184,7 +184,7 @@ test('platform release rejects inherited Docker fixture selectors before any tes
 });
 
 test('all-platform release executes unfiltered C# and every browser responsibility without Code/Agent',()=>{
- const {result,calls,receipt}=runFixture('success','PlatformRelease',{MICROI_TEST_MATRIX_FILE:'existing.json',MICROI_TEST_ALLOW_WRITES:'YES'},true);
+ const {result,calls,receipt}=runFixture('success','PlatformRelease',{MICROI_TEST_MATRIX_FILE:'existing.json',MICROI_TEST_ALLOW_WRITES:'YES',MICROI_TEST_ALLOW_APPLICATION_MAINTENANCE:'YES'},true);
  assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
  const dotnet=calls.find(row=>row.name==='dotnet'&&row.args[0]==='test');
  assert.equal(dotnet.args.includes('--filter'),false);
@@ -193,6 +193,25 @@ test('all-platform release executes unfiltered C# and every browser responsibili
  assert.ok(calls.some(row=>row.args[1]==='freeze'&&row.args.includes('--platform-only')));
  assert.equal(calls.find(row=>String(row.args[0]).endsWith('run-node-regressions.mjs')).args.includes('--regular-platform'),false);
  assert.equal(calls.some(row=>row.name==='npm'),false);
+ assert.equal(receipt.allPlatformTests,true);assert.equal(receipt.filter,'AllPlatformTests');assert.equal(receipt.browser.passed,2);
+});
+
+test('all-platform missing existing fixture prerequisites stops before any compiler, browser or provisioner',()=>{
+ const {result,calls,receipt}=runFixture('all-preflight-fail','PlatformRelease',{},true);
+ assert.notEqual(result.status,0);assert.equal(receipt,null);
+ assert.equal(calls.some(row=>row.name==='dotnet'||row.name==='npm'),false);
+ assert.equal(calls.some(row=>row.args[1]==='browser'),false);
+});
+test('all-platform release executes unfiltered C# and every browser responsibility without Code/Agent',()=>{
+ const {result,calls,receipt}=runFixture('success','PlatformRelease',{MICROI_TEST_MATRIX_FILE:'existing.json',MICROI_TEST_ALLOW_WRITES:'YES'},true);
+ assert.equal(result.status,0,result.stdout+'\n'+result.stderr);
+ const dotnet=calls.find(row=>row.name==='dotnet'&&row.args[0]==='test');
+ assert.equal(dotnet.args.includes('--filter'),false);
+ assert.ok(calls.some(row=>String(row.args[0]).endsWith('platform-all-tests.mjs')&&row.args[1]==='browser'));
+ assert.ok(calls.some(row=>row.args.includes('--all-platform-tests')));
+ assert.ok(calls.some(row=>row.args[1]==='freeze'&&row.args.includes('--platform-only')));
+ assert.equal(calls.some(row=>row.name==='npm'),false);
+ assert.equal(calls.some(row=>/fixtures[\\/]admission[\\/]runtime\.mjs$/.test(String(row.args[0]))),false);
  assert.equal(receipt.allPlatformTests,true);assert.equal(receipt.filter,'AllPlatformTests');assert.equal(receipt.browser.passed,2);
 });
 

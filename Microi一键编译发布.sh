@@ -223,6 +223,18 @@ MICROI_RELEASE_LOCK_DIR=""
 MICROI_RELEASE_SCRATCH=""
 MICROI_PLATFORM_RUNTIME_OWNED_CONTROL=""
 MICROI_RELEASE_SCRATCH_TOOL="$PWD/Microi.Server/tools/release-scratch.mjs"
+MICROI_SMOKE_CONFIG_STATE=""
+MICROI_SMOKE_CONFIG_PUBLISH=""
+
+restore_smoke_config() {
+    [ -z "$MICROI_SMOKE_CONFIG_STATE" ] && return 0
+    if [ ! -f "$MICROI_SMOKE_CONFIG_STATE" ]; then
+        # No recovery record is safe only when injection never changed publish.
+        node "$MICROI_SMOKE_CONFIG_TOOL" verify "$MICROI_SMOKE_CONFIG_PUBLISH" "$MICROI_SMOKE_CONFIG_TEMPLATE"
+        return $?
+    fi
+    node "$MICROI_SMOKE_CONFIG_TOOL" restore "$MICROI_SMOKE_CONFIG_PUBLISH" "$MICROI_SMOKE_CONFIG_STATE"
+}
 
 # 只清理本进程新建并登记的 scratch；不扫描共享 .tmp，也不清空发布报告。
 cleanup_release_scratch() {
@@ -357,6 +369,14 @@ finish_windows_session() {
             [ "$_exit_code" -ne 0 ] || _exit_code=1
         fi
     fi
+    # EXIT also runs for INT/TERM/HUP and unexpected command failures. Restore
+    # before scratch cleanup, preserving a failed recovery record for diagnosis.
+    if [ -n "$MICROI_SMOKE_CONFIG_STATE" ] && ! restore_smoke_config; then
+        echo "冒烟私有配置还原失败，已保留恢复记录并阻止发布。" >&2
+        [ "$_exit_code" -ne 0 ] || _exit_code=1
+        release_workspace_lock
+        exit "$_exit_code"
+    fi
     if ! cleanup_release_scratch; then
         echo "临时文件清理未完成，已保留路径及错误回执：$MICROI_RELEASE_SCRATCH" >&2
         [ "$_exit_code" -ne 0 ] || _exit_code=1
@@ -434,6 +454,8 @@ PACKAGE_JSON_FILES=(
 # 切换到脚本所在目录（确保所有相对路径正确）
 cd "$(dirname "$0")"
 MICROI_RELEASE_BUDGET_TOOL="$PWD/Microi.Server/tools/release-budget.mjs"
+MICROI_SMOKE_CONFIG_TOOL="$PWD/Microi.Server/tools/release-smoke-config.mjs"
+MICROI_SMOKE_CONFIG_TEMPLATE="$PWD/Microi.Server/Microi.net.Api/appsettings.json"
 START_TIME=$(date +%s)
 
 # ──────────────────────────────────────────────────────────────
@@ -646,6 +668,7 @@ cleanup_publish_artifacts() {
 
 validate_publish_artifacts() {
     local target_dir="$1"
+    node "$MICROI_SMOKE_CONFIG_TOOL" verify "$target_dir" "$MICROI_RELEASE_WORKSPACE/Microi.Server/Microi.net.Api/appsettings.json" || print_fail "发布配置不是原安全模板，或仍有私有配置/冒烟备份；禁止发布。"
     for required_file in Microi.net.Api.dll Microi.net.Api.deps.json Microi.net.Api.runtimeconfig.json; do
         if [ ! -f "$target_dir/$required_file" ]; then
             print_fail "发布产物缺少必需文件: $required_file"
@@ -1660,23 +1683,22 @@ fi
 # 环境名，并依赖 ASP.NET Core 加载 appsettings.{Environment}.json 覆盖 appsettings.json 里的
 # 数据库/Redis/Mongo 连接串。如果发布目录里只有空的 appsettings.json，启动会卡在初始化直到超时。
 # 这里临时把当前环境的 appsettings.{OsClient}.json 拷贝到发布目录，冒烟测试结束后还原。
-SMOKE_BACKUP="$PUBLISH_DIR/appsettings.json.smoke.bak"
 SMOKE_INJECTED=false
+MICROI_SMOKE_CONFIG_STATE="$MICROI_RELEASE_SCRATCH/smoke-config.json"
+MICROI_SMOKE_CONFIG_PUBLISH="$MICROI_RELEASE_WORKSPACE/$PUBLISH_DIR"
 if [ -n "${MICROI_RELEASE_SMOKE_CONFIG:-}" ]; then
     _local_appsettings="$MICROI_RELEASE_SMOKE_CONFIG"
     [ -f "$_local_appsettings" ] || print_fail "指定的冒烟配置不存在。"
     _local_env=$(json_value "OsClient" "$_local_appsettings")
     [ -n "$_local_env" ] || print_fail "指定的冒烟配置缺少 OsClient。"
-    cp "$PUBLISH_DIR/appsettings.json" "$SMOKE_BACKUP"
-    cp "$_local_appsettings" "$PUBLISH_DIR/appsettings.json"
+    node "$MICROI_SMOKE_CONFIG_TOOL" inject "$PUBLISH_DIR" "$MICROI_RELEASE_WORKSPACE/Microi.Server/Microi.net.Api/appsettings.json" "$_local_appsettings" "$MICROI_SMOKE_CONFIG_STATE" || print_fail "无法安全注入冒烟配置，已停止发布。"
     SMOKE_INJECTED=true
     print_info "冒烟测试已注入显式隔离环境配置: $_local_env"
 elif [ -f "Microi.Server/Microi.net.Api/.microi-local" ]; then
     _local_env=$(tr -d '\r\n[:space:]' < "Microi.Server/Microi.net.Api/.microi-local")
     _local_appsettings="Microi.Server/Microi.net.Api/appsettings.${_local_env}.json"
     if [ -f "$_local_appsettings" ] && [ -d "$PUBLISH_DIR" ]; then
-        [ -f "$PUBLISH_DIR/appsettings.json" ] && cp "$PUBLISH_DIR/appsettings.json" "$SMOKE_BACKUP"
-        cp "$_local_appsettings" "$PUBLISH_DIR/appsettings.json"
+        node "$MICROI_SMOKE_CONFIG_TOOL" inject "$PUBLISH_DIR" "$MICROI_RELEASE_WORKSPACE/Microi.Server/Microi.net.Api/appsettings.json" "$_local_appsettings" "$MICROI_SMOKE_CONFIG_STATE" || print_fail "无法安全注入冒烟配置，已停止发布。"
         SMOKE_INJECTED=true
         print_info "冒烟测试已注入环境配置: $_local_env"
     else
@@ -1732,7 +1754,7 @@ if [ "$SMOKE_INJECTED" = true ]; then
 
         if [ "$_precheck_failed" = true ]; then
             # 先还原 appsettings 备份再中止，避免临时配置遗留
-            [ -f "$SMOKE_BACKUP" ] && mv "$SMOKE_BACKUP" "$PUBLISH_DIR/appsettings.json"
+            restore_smoke_config || print_fail "冒烟配置还原失败，已停止发布。"
             print_fail "依赖服务不可达，冒烟测试必失败。
   排查方向：
     1. DNS / 路由: ping ${_db_host:-net.itdos.net}
@@ -1824,9 +1846,7 @@ if ! (
     exit 1
 ); then
     # 先还原 appsettings，再让脚本整体中止，避免把临时配置留给发布产物
-    if [ "$SMOKE_INJECTED" = true ] && [ -f "$SMOKE_BACKUP" ]; then
-        mv "$SMOKE_BACKUP" "$PUBLISH_DIR/appsettings.json"
-    fi
+    restore_smoke_config || print_fail "冒烟配置还原失败，已停止发布。"
     # 失败路径同样清理本次冒烟生成的临时 logs/PDB，避免反复失败后 publish 膨胀。
     cleanup_publish_artifacts "$PUBLISH_DIR"
     print_fail "冒烟测试失败，请检查编译产物"
@@ -1834,8 +1854,8 @@ fi
 
 # --- 还原冒烟测试临时注入的 appsettings ---
 # 还原发布目录原始的 appsettings.json，避免发布产物带真实数据库/Redis/Mongo 连接串。
-if [ "$SMOKE_INJECTED" = true ] && [ -f "$SMOKE_BACKUP" ]; then
-    mv "$SMOKE_BACKUP" "$PUBLISH_DIR/appsettings.json"
+if [ "$SMOKE_INJECTED" = true ]; then
+    restore_smoke_config || print_fail "冒烟配置还原失败，已停止发布。"
     print_info "已还原发布目录的 appsettings.json"
 fi
 
@@ -2113,6 +2133,10 @@ prepare_docker_context() {
 !publish/**
 publish/logs/
 publish/**/*.pdb
+publish/appsettings.*.json
+publish/appsettings.json.*
+publish/.microi-local
+publish/smoke-config.json
 EOF
         print_info "后端 Docker 上下文已限制为 publish/（net10.0 已排除）"
     elif [ "$plan_type" = "client" ]; then
@@ -2190,6 +2214,7 @@ docker_push_plan() {
     local _docker_build_ok=false
     local _docker_build_attempt=1
     while [ "$_docker_build_attempt" -le 2 ]; do
+        if [ "$plan_type" = api ]; then validate_publish_artifacts "$PUBLISH_DIR"; fi
         if (cd "$build_dir" && run_release_command docker build --provenance=false --sbom=false --pull --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0.13" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             _docker_build_ok=true
             break
@@ -2202,6 +2227,7 @@ docker_push_plan() {
     done
     if [ "$_docker_build_ok" != true ]; then
         print_warning "远端基础镜像连续拉取失败，尝试使用 Docker 本地缓存完成本次构建..."
+        if [ "$plan_type" = api ]; then validate_publish_artifacts "$PUBLISH_DIR"; fi
         if (cd "$build_dir" && run_release_command docker build --provenance=false --sbom=false --pull=false --build-arg "MICROI_ASPNET_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/dotnet-aspnet:10.0.13" --build-arg "MICROI_NODE_IMAGE=docker.io/library/node:22-bookworm-slim@sha256:48e4b67d85f87bd551df43704e24d252f56cc5f8e9718841aace50f19948f0f9" --build-arg "MICROI_NGINX_IMAGE=${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/nginx:acs-sample-20260909" -t "$local_image" .); then
             print_warning "已使用本地缓存的基础镜像完成构建；发布后请关注远端 Registry 连通性。"
         else
@@ -2224,6 +2250,9 @@ docker_push_plan() {
     for _img_tag in "${_images[@]}"; do
         if ! run_release_command node Microi.Server/tools/release-artifact.mjs verify "$plan_type" "$MICROI_RELEASE_CANDIDATE" "$receipt"; then
             print_fail "镜像推送前源码或产物发生漂移；已停止推送。"
+        fi
+        if [ "$plan_type" = "api" ]; then
+            run_release_command node "$MICROI_SMOKE_CONFIG_TOOL" image "$local_image" "$MICROI_RELEASE_WORKSPACE/Microi.Server/Microi.net.Api/appsettings.json" || print_fail "实际 API 镜像包含非安全模板配置；禁止上传。"
         fi
         if [ "$plan_type" = "api" ] && [ "$HAS_ENCRYPT" = true ]; then
             run_release_command node Microi.Server/tools/release-encryption.mjs image "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$local_image" || print_fail "实际 Docker 镜像中的闭源 DLL 与本次加密证据不符；禁止上传。"

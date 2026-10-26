@@ -238,7 +238,13 @@ public sealed class ManagedStorageAdmissionHttpTests
             }
             return {Code:1,Data:{Nonce:nonce,Messages:[],HasMore:false,NextCursor:''}};
             """;
-        var control = "V8.Param.Scope='platform-chat-runtime';return V8.Method.ManageManagedStorageMaintenance(V8.Param);";
+        // Match the managed engine's constructed JS object, including Jint's
+        // integer -> Float bridge; forwarding the original JObject hid this bug.
+        var control = """
+            return V8.Method.ManageManagedStorageMaintenance({Scope:'platform-chat-runtime',
+                Operation:V8.Param.Operation,OperationId:V8.Param.OperationId,
+                Epoch:V8.Param.Epoch,ExpectedRevision:V8.Param.ExpectedRevision});
+            """;
         var probeCode = "var nonce=" + jsNonce + ",key=" + jsCache + ";\n" + """
             var action=String(V8.Param.Action||'');
             if(action==='Reset'){V8.Cache.Remove(key+':started');V8.Cache.Remove(key+':release');return {Code:1};}
@@ -379,7 +385,16 @@ public sealed class ManagedStorageAdmissionHttpTests
                     var drained = await Control("Drain", epoch);
                     Assert.True(drained["Data"]!.Value<bool>("WritersDrained"));
                     Assert.Equal(0, drained["Data"]!.Value<int>("ActiveCount"));
-                    var reopened = await Control("End", epoch, drained["Data"]!.Value<long>("Revision"));
+                    var revision = drained["Data"]!.Value<long>("Revision");
+                    Assert.True(revision > 0);
+                    var staleEnd = await Post(Route(maintenance), new JObject
+                    { ["Operation"] = "End", ["Epoch"] = epoch, ["ExpectedRevision"] = revision - 1 }, false);
+                    Assert.Equal(0, staleEnd.Value<int>("Code"));
+                    var unchanged = await Control("Status");
+                    Assert.Equal("Maintenance", unchanged["Data"]!.Value<string>("Phase"));
+                    Assert.Equal(epoch, unchanged["Data"]!.Value<string>("Epoch"));
+                    Assert.Equal(revision, unchanged["Data"]!.Value<long>("Revision"));
+                    var reopened = await Control("End", epoch, revision);
                     Assert.Equal("Open", reopened["Data"]!.Value<string>("Phase"));
                 }
                 finally
