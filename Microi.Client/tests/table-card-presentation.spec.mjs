@@ -156,9 +156,9 @@ test("card template and styles keep visible surfaces and no longer index rows by
     assert.doesNotMatch(component, /class="preview card-image-fallback"/);
     assert.match(component, /class="card-avatar card-avatar--fallback"/);
     assert.match(component, /!GetCardImageValue\(item, SysMenuModel\.TableCardImgField\)/);
-    assert.match(component, /@keydown\.enter\.prevent="CardItemClick\(item\)"/);
-    assert.match(component, /@keydown\.space\.prevent="CardItemClick\(item\)"/);
-    assert.match(component, /class="card-action-more-label">更多<\/span>/);
+    assert.match(component, /@keydown\.enter\.self\.prevent="CardItemClick\(item\)"/);
+    assert.match(component, /@keydown\.space\.self\.prevent="CardItemClick\(item\)"/);
+    assert.match(component, /class="card-action-more-label">\{\{ \$t\('Msg.More'\) \}\}<\/span>/);
     assert.match(component, /class="mobile-card-select-toggle"[\s\S]*?toggleCardSelection\(item\)/);
     assert.match(component, /v-if="!diyStore\.IsPhoneView" class="card-actions"/);
     assert.match(component, /class="card-mobile-footer-actions"[\s\S]*?showMoreMenu\(\$event, item\)/);
@@ -177,7 +177,7 @@ test("card template and styles keep visible surfaces and no longer index rows by
     assert.match(presentation, /if \(!value\.trim\(\) && this\.CardPrimaryField\)[\s\S]*?this\.GetPresentationFieldValue\(row, this\.CardPrimaryField\)/);
     assert.doesNotMatch(styles, /\.card-image-fallback\s*\{/);
     assert.match(styles, /\.card-avatar--fallback\s*\{/);
-    assert.match(styles, /\.card-action-btn-more\s*\{[\s\S]*?width:\s*34px;[\s\S]*?\.card-action-more-label/);
+    assert.match(styles, /\.card-action-btn-more\s*\{[\s\S]*?width:\s*auto;[\s\S]*?\.card-action-more-label/);
     assert.match(styles, /\.card-actions\s+:deep\(\.card-action-btn\s*>\s*span\)[\s\S]*?color:\s*inherit\s*!important/);
     assert.doesNotMatch(styles, /\.card-actions\s*\{\s*display:\s*grid/);
     assert.match(styles, /\.mobile-card-select-toggle\s*\{[\s\S]*?width:\s*44px;[\s\S]*?height:\s*44px;/);

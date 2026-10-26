@@ -405,6 +405,10 @@ if ($Mode -eq "Full") {
     node (Join-Path $testRoot 'FullStack\button-keyboard-focus.component.mjs') $ResultsDirectory
     if ($LASTEXITCODE -ne 0) { throw "Button keyboard-focus browser component gate failed with exit code $LASTEXITCODE." }
 
+    Write-Host "Validating action-column geometry with actual density styles and multilingual labels..."
+    node (Join-Path $testRoot 'FullStack\table-action-column-width.component.mjs')
+    if ($LASTEXITCODE -ne 0) { throw "Action-column browser component gate failed with exit code $LASTEXITCODE." }
+
     Write-Host "Validating real login and notification-center maintenance in isolated browser contexts..."
     node (Join-Path $testRoot 'FullStack\notification-center.e2e.mjs') $ResultsDirectory
     if ($LASTEXITCODE -ne 0) { throw "Notification-center browser release gate failed with exit code $LASTEXITCODE." }
