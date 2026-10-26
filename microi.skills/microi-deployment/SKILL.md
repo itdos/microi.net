@@ -72,7 +72,7 @@ description: Microi 安装、部署、升级和本地运行指南。用于吾码
 - 新面板默认独立 HTTPS 端口 61890，管理员密码与 PFX 密码存于服务器权限受限文件；不要把它们复制进业务 SaaS、V8、MCP 参数或日志。旧 Ops 保留原 `OPS_*`、目录、账号、端口、数据保护密钥及 `MicroiOpsUrl`，用原 Compose 替换为 Panel 镜像，不能重新初始化。
 - 业务 MCP 继续通过 `microi_get_administrative_capabilities`、`microi_admin_table_data`、`microi_update_module` 和应用发布工具维护平台入口；DiyToken 不授予主机 Docker 权限，不增加能从租户会话执行任意宿主机命令的工具。主机安装与恢复使用授权的 SSH/终端和独立面板会话。
 - 真实验收归入 `Microi.Tests/Panel` 专项，包含全部目录版本、数据库/对象存储写读与冷恢复、SSL/续期、文件、任务重启、独立安装升级回退，以及真实宝塔/1Panel 两种安装顺序。普通外部容器只能证明资源归属保护，不能替代第三方面板共存结论。
-- 主机密码防爆破必须同时核对镜像 `io.microi.panel.authguard.protocol=1`、root 专用 Unix socket 和 `microi-auth-guard` 的真实回执。默认开启，同 IP 跨已接入服务累计 3 次封禁 86400 秒，窗口 0 表示累计至解封；成功登录不清零。配置与实际保护分别回读，来源日志/代理或防火墙异常不能标为已生效。当前 `2.0.1` 为源码候选，未完成正式发行；候选安装器要求显式 `--image`，历史镜像仅在 `--legacy-panel-only` 下允许安装，不能称为主机防护已交付。
+- 主机密码防爆破必须同时核对镜像 `io.microi.panel.authguard.protocol=1`、root 专用 Unix socket 和 `microi-auth-guard` 的真实回执。默认开启，同 IP 跨已接入服务累计 3 次封禁 86400 秒，窗口 0 表示累计至解封；成功登录不清零。配置与实际保护分别回读，来源日志/代理或防火墙异常不能标为已生效。当前 `2.0.1` 为源码候选，未完成正式发行；新版必须显式选定 `--image`。默认安装入口仍保持已发布 `v2.0.0` 并明确标注旧版范围，显式选择历史镜像需 `--legacy-panel-only`；两者都不能称为新主机防护已交付，也不能把新镜像失败后回退成旧镜像。
 - 面板登录有独立 SQLite 防护与可撤销会话；SSH 读取真实宿主认证日志，新 MySQL/MongoDB 使用可验证认证日志，Redis 必须经逐次认证结果代理。禁止根据跨 IP 聚合的 Redis ACL LOG count 封禁最后一个 IP。新 Redis 使用独立网络、不直接发布后端端口；存量实例需维护窗口迁移，不能升级时静默断开连接或宣称已保护。
 - 主机防护使用最小 systemd 服务，面板只挂载其 root Unix socket，不给业务 V8/MCP 泛化 Shell/防火墙能力。nftables 使用内核超时；iptables 兼容模式的自动解封依赖运行中的守护进程。IPv4/IPv6、INPUT/转发、两个来源 IP、真实失败/成功、手动/自动解封、去重、重启、白名单与规则故障分别验收；Docker Desktop 的专有网络空间测试不能替代原生 Linux 安装/重启或客户生产验收。独立安全专项入口在 `Microi.Panel/Tests/Security` 和 `Microi.Panel/AuthGuard/tests`。
 

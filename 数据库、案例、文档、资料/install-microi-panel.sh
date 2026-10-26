@@ -6,9 +6,10 @@ PANEL_ROOT=/microi/panel
 PANEL_PORT=61890
 PANEL_BIND=0.0.0.0
 PANEL_HOST=''
-PANEL_IMAGE=registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.1
+PANEL_IMAGE=registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.0
 PANEL_IMAGE_EXPLICIT=0
 PANEL_LEGACY_PANEL_ONLY=0
+PANEL_STABLE_DEFAULT=0
 PANEL_OFFLINE=0
 PANEL_UPGRADE=0
 PANEL_CHECK=0
@@ -33,10 +34,13 @@ PANEL_GUARD_PREVIOUS_SERVICE=''
 PANEL_GUARD_CANDIDATE_SERVICE=''
 PANEL_ORIGINAL_ARGS=("$@")
 fail(){ printf 'Microi.Panel：%s\n' "$*" >&2; exit 1; }
-panel_candidate_gate(){
-  # 2.0.1当前只交付源码候选。正式发布且完整门禁通过后，才可移除此门并启用默认公开镜像。
-  if ((PANEL_CHECK==0 && PANEL_IMAGE_EXPLICIT==0)); then
-    fail '2.0.1尚未正式发布；本候选安装器必须用--image指定已校验候选镜像，本地镜像请同时使用--offline。未开始写入或拉取默认镜像'
+panel_select_install_scope(){
+  # 官网既有无--image命令固定保留已发布稳定版；这不是候选下载失败后的回退，也不授予显式镜像旧版豁免。
+  PANEL_STABLE_DEFAULT=0
+  if ((PANEL_IMAGE_EXPLICIT==0)); then
+    [[ "$PANEL_IMAGE" == registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.0 ]] || fail '未指定镜像时只允许已发布的稳定默认镜像，请使用--image明确选择并校验其它镜像'
+    PANEL_STABLE_DEFAULT=1
+    printf 'Microi.Panel：使用默认稳定版v2.0.0：仅旧版面板，不含SSH/数据库认证防护。2.0.1新防护尚未正式发布，须使用--image显式选择已验证候选；本地候选同时使用--offline。\n' >&2
   fi
 }
 # 主机只允许一个安装/升级进程，锁覆盖盘点、下载、切换和恢复；退出后由内核释放，不删除共享锁文件。
@@ -125,9 +129,9 @@ panel_guard_feature(){
   case "$protocol" in
     1) PANEL_HAS_AUTH_GUARD=1;;
     ''|'<no value>')
-      ((PANEL_LEGACY_PANEL_ONLY)) || fail '所选镜像缺少io.microi.panel.authguard.protocol=1；默认要求主机认证防护，已停止安装。只有明确接受旧版面板不含防护时才使用--legacy-panel-only'
+      ((PANEL_LEGACY_PANEL_ONLY || ${PANEL_STABLE_DEFAULT:-0})) || fail '所选镜像缺少io.microi.panel.authguard.protocol=1；显式镜像默认要求主机认证防护，已停止安装。只有明确接受旧版面板不含防护时才使用--legacy-panel-only'
       PANEL_HAS_AUTH_GUARD=0
-      printf 'Microi.Panel：已显式选择仅旧版面板，不含SSH/数据库认证防护；不能视为SSH或数据库已受保护。\n' >&2;;
+      printf 'Microi.Panel：所选镜像仅旧版面板，不含SSH/数据库认证防护；不能视为SSH或数据库已受保护。\n' >&2;;
     *) fail '候选面板防护协议不受当前安装器支持，停止升级';;
   esac
 }
@@ -145,7 +149,7 @@ panel_report_completion(){
   if ((PANEL_HAS_AUTH_GUARD)); then
     printf 'Microi.Panel：安装完成，宿主防护控制面已回读；各服务实际覆盖仍以安全防护状态为准。\n'
   else
-    ((PANEL_LEGACY_PANEL_ONLY)) || fail '缺少默认主机防护回执，不能报告安装完成'
+    ((PANEL_LEGACY_PANEL_ONLY || ${PANEL_STABLE_DEFAULT:-0})) || fail '缺少默认主机防护回执，不能报告安装完成'
     printf 'Microi.Panel：安装完成：仅旧版面板，不含SSH/数据库认证防护。\n'
   fi
   printf '入口 %s\n账号 paneladmin；密码文件 %s/config/admin-password\n' "$PANEL_URL" "$PANEL_ROOT"
@@ -337,7 +341,7 @@ usage(){
   --port <端口>         独立HTTPS端口，默认61890
   --bind <IPv4>         监听地址，默认0.0.0.0；内网代理可设127.0.0.1
   --root <目录>         独立目录，默认/microi/panel
-  --image <镜像>        候选阶段必须显式指定已校验镜像；不自动拉取默认候选
+  --image <镜像>        显式选择已校验镜像，默认要求主机防护协议1
   --offline             只使用已经docker load导入的本地镜像
   --legacy-panel-only   仅首装或旧版升级旧版可用；仅旧版面板，不含SSH/数据库认证防护
   --install-docker      新主机缺少Docker时安装Docker Engine
@@ -346,7 +350,9 @@ usage(){
   --yes                 非交互执行；新安装必须同时明确--host
   --help                查看帮助
 已有宝塔/1Panel无需停止。端口已占用时请改用独立端口；安装器不抢占端口。
-默认必须包含主机防护协议1；候选验收使用--image指定镜像，本地候选同时传--offline。
+未传--image时使用默认稳定版v2.0.0：仅旧版面板，不含SSH/数据库认证防护。
+2.0.1新防护尚未正式发布，须用--image选择已验证候选；本地候选同时传--offline。
+显式旧版镜像须加--legacy-panel-only；已安装主机防护协议的面板禁止降级到旧版。
 HELP
 }
 while (($#)); do
@@ -361,7 +367,7 @@ while (($#)); do
     --yes) PANEL_YES=1; shift;; --help|-h) usage; exit 0;; *) fail "未知参数：$1";;
   esac
 done
-panel_candidate_gate
+panel_select_install_scope
 if ((EUID!=0 && PANEL_CHECK==0)); then
   command -v sudo >/dev/null 2>&1 || fail '需要root权限，当前系统没有sudo；请su -后重新运行本命令'
   exec sudo -- bash "$0" "${PANEL_ORIGINAL_ARGS[@]}"
