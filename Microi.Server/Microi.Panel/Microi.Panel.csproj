@@ -1,11 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <Version>2.0.0</Version>
+    <Version>2.0.1</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
     <DefaultItemExcludes>$(DefaultItemExcludes);Client/**;tests/**;Tests/**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="AuthGuard/*.py;AuthGuard/*.service;AuthGuard/*.sh;AuthGuard/*.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Update="AuthGuard/*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Remove="AuthGuard/tests/**;AuthGuard/**/__pycache__/**" />
     <InternalsVisibleTo Include="Microi.Ops.Tests" />
+    <InternalsVisibleTo Include="Microi.Panel.Security.Tests" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
   </ItemGroup>

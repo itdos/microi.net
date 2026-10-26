@@ -14,6 +14,7 @@ description: 独立 Docker 服务器面板，提供插件市场、Nginx 网站�
 | 页面 | 可完成的工作 |
 | --- | --- |
 | 服务器 | 主机 CPU、内存、面板数据磁盘空间、Docker 状态及受管容器资源用量 |
+| 安全防护 | 密码错误计数、IP 封禁、白名单、自动与手动解封，以及各服务实际接入状态；需要配套主机防护服务 |
 | 插件市场 | 选择服务及版本，配置独立端口和数据卷；安装、启动、停止、重启、查看日志和卸载 |
 | 网站 | Docker Nginx 的静态网站、域名、路径反向代理、请求体大小、超时和 HTTPS |
 | 证书 | 导入 PEM 证书与私钥，验证私钥匹配和域名 SAN；HTTP-01 自动申请、续期与暂停 |
@@ -25,14 +26,120 @@ description: 独立 Docker 服务器面板，提供插件市场、Nginx 网站�
 
 适合单台 Linux Docker 主机上部署吾码平台、静态站点和已有应用的 HTTP 服务。当前不提供通用 SSH 终端、任意宿主机文件编辑、PHP 运行环境、邮件服务器、数据库在线 SQL 管理器、主机防火墙编辑或 Kubernetes/Swarm 管理；需要这些功能时继续使用专用工具。已有第三方容器可观测，写操作只作用于明确登记归属的资源。
 
+## 密码防暴力破解
+
+::: warning 2.0.1 源码候选，尚未正式发布
+以下安全能力属于本地候选，公开 `v2.0.0` 不包含此功能。候选完成 Docker Desktop
+隔离网络专项后，仍需原生 Linux 的安装、systemd、整机重启及共存验收，再按正式门禁发布。
+不要仅更新文档或脚本，就向客户承诺已具备该防护。
+:::
+
+本节适用于携带 `io.microi.panel.authguard.protocol=1` 的面板镜像及配套
+`microi-auth-guard` 主机服务。旧 `v2.0.0` 镜像不因更新网页或安装脚本而自动具有此能力。
+交付时分别核验镜像、主机服务和「安全防护」中的实际回执。
+
+### 默认策略与解封
+
+| 设置 | 默认值 | 含义 |
+| --- | --- | --- |
+| 自动防护 | 开启 | 采集已接入服务的真实认证失败，并执行 IP 封禁 |
+| 错误次数 | 3 次 | 同一来源 IP 跨已接入服务累计，不按用户名分别计算 |
+| 自动解封 | 24 小时 | 从达到阈值时开始计算，解封后清零本轮计数 |
+| 统计窗口 | 0 分钟 | 累计至解封；成功登录不清零。可显式改成滚动时间窗口 |
+| 运维白名单 | 空 | 可登记固定 IP/CIDR；主机服务另外豁免回环及已确认的本机地址 |
+
+进入「安全防护」修改次数、时长、窗口和白名单；保存后回读实际策略。
+「封禁 IP」显示来源、原因、到期时间与执行状态，输入完整 IP 后可以手动解封。
+策略有版本校验，两位管理员同时编辑时，旧页面不能覆盖新设置。
+
+默认封禁覆盖该来源到本机及经本机转发的流量，因此会影响同一出口 IP 的其它连接。
+共享 NAT 出口使用相同计数；通过代理访问时，必须正确配置可信代理和保留源 IP。
+异步日志采集存在延迟，不能承诺第三个认证报文之后不存在任何并发在途请求。
+
+### 每种服务如何接入
+
+| 服务 | 认证事件来源 | 生效条件 |
+| --- | --- | --- |
+| 面板登录 | 独立登录接口的实际验证结果 | SQLite 持久计数；主机服务离线时继续提供面板自身防护 |
+| SSH | 宿主 journald 或 `auth.log/secure` | 正确读取 OpenSSH 密码失败日志；公钥尝试、断开和重复 PAM 行不计为密码错误 |
+| MySQL | 服务端认证拒绝日志 | 新实例启用 `log_error_verbosity=3` 和数字来源地址；存量实例需核对日志配置 |
+| MongoDB | 结构化认证结果日志 | 支持目录内版本的认证事件，排除普通权限错误及未完成的认证 |
+| Redis | 独立 RESP 认证入口的逐次返回结果 | 新实例使用独立网络，后端不直接发布端口，外部访问经过认证代理 |
+
+OpenSSH 的 `password` 失败会在 INFO 级别记录，但 `keyboard-interactive` 的早期失败可能
+仅在 VERBOSE 级别记录。使用交互式密码或 PAM 时，应验证实际 `LogLevel` 和认证日志路径；
+仅能读取 journal 不代表每次失败都可计数。面板不会自动修改已有 sshd 配置。
+
+MongoDB 按服务端实际认证协议失败计次，包含 `isSpeculative=true` 且认证失败的事件。
+驱动的一次 `connect()` 可能包含 speculative 与常规认证，不能把应用调用次数等同于
+密码失败次数，也不能简单跳过 speculative；普通断开造成的未完成认证不计数。
+
+Redis 的 `ACL LOG` 会合并多个客户端的失败，不能把聚合次数归给最后一个 IP。
+因此新实例由主机服务提供所选访问端口；管理代理不可用时不会开放一个绕过防护的备用端口。
+代理支持普通认证、管道、事务及 Pub/Sub；TLS 直通、复制/集群流、`MONITOR` 和
+`CLIENT REPLY OFF/SKIP` 不属于此入口支持范围，不能把它用于这些场景后宣称已保护。
+
+存量 Redis 保留原端口、数据与运行方式，显示「需要迁移」。迁移需在维护窗口完成：
+先验证可恢复备份及连接方式，再建立受保护的新实例并使用 Redis 支持的数据迁移流程，
+核对真实读写与三次失败拦截后切换客户端。不要直接修改既有卷的数据库大版本。
+旧 MySQL 不自动开启 `skip_name_resolve`，以免影响按主机名授权的已有账号。
+
+第三方面板安装的数据库、远程数据库，以及未适配的 PostgreSQL、SQL Server、Oracle
+不会仅因本机开关开启就自动获得认证计数。原生 MySQL/MongoDB 可由主机管理员在
+受限配置文件中登记日志源；面板不提供任意日志路径或 Shell 执行入口。
+
+### 状态、运行与恢复边界
+
+「已开启」表示策略；「保护运行中」还要求该服务的日志/代理、源地址和防火墙回读正常。
+缺少日志、未知格式、权限不足、规则异常或旧实例未迁移时显示待验证或需要处理，
+不能以容器 `Running`、静态健康检查或一个配置值代替实际保护。
+
+业务服务继续通过 Docker 运行。防护代理是宿主机上的小型 Python/systemd 服务，
+与业务数据库和面板独立；固定使用 `/opt/microi-auth-guard`、`/etc/microi-auth-guard`、
+`/var/lib/microi-auth-guard` 和 `/run/microi-auth-guard`。控制接口仅通过 root 专用 Unix
+socket 通信，不监听公网管理端口，不向业务 V8 或 DiyToken 授予防火墙权限。
+
+防火墙仅维护吾码自己的表、集合和链，覆盖宿主 INPUT 与 Docker 转发链路。
+nftables 使用内核超时；iptables 兼容模式依赖守护进程按时移除规则，守护进程停止时
+不能保证准点自动解封。页面须以实际后端及回读为准。云安全组、第三方封禁规则或上游
+代理的限制不由吾码的「解封」按钮解除。
+
+主机管理员可在控制台检查服务，不需要启动业务平台：
+
+```bash
+systemctl status microi-auth-guard --no-pager
+python3 -B /opt/microi-auth-guard/daemon.py --verify-ready
+# 将示例地址替换为需要解封的真实来源 IP，以 root 执行：
+sudo python3 -B /opt/microi-auth-guard/daemon.py --unban 198.51.100.25
+```
+
+控制台解封调用同一个 root Unix socket 接口，只有指定 IP 的规则移除并回读确认后才返回
+成功；同时清零该 IP 的失败计数。主机服务未运行或返回失败时，不代表已解封，应先恢复服务
+再重试。该命令不会删除其它防火墙规则，也不会直接改写数据库。
+
+面板不可访问时应使用云控制台或另一可信管理来源恢复，不能关闭整台主机防火墙作为
+常规解封步骤。备份面板 `config/data` 时，也保存防护服务的配置和持久状态；恢复到另一
+主机前重新核对 Docker 身份、网络与来源地址。Docker Desktop 隔离容器验收只能证明
+对应协议和网络空间的行为，不能替代真实 Linux 主机的 systemd、重启及第三方面板共存验收。
+
 ## 独立一键安装
+
+当前候选安装器必须显式指定 `--image`，默认要求认证防护协议 1。测试新版时，先把已核验
+的候选镜像导入 Linux 测试机，再执行：
+
+```bash
+bash install-microi-panel.sh --offline --image microi-panel-auth-guard-candidate:2.0.1 --host panel.example.com
+```
+
+该本地镜像名不是已公开发布的下载地址。下面保留 `v2.0.0` 历史发行的安装方式；
+`--legacy-panel-only` 表示明确只安装旧面板，**不包含 SSH、MySQL、MongoDB、Redis 防爆破**。
 
 使用 Linux 主机的 SSH 终端执行。普通账号会通过 `sudo` 进入安装流程；没有 `sudo` 时先使用 `su -`。安装器会询问浏览器使用的域名或服务器 IPv4；主机缺少 Docker 时再询问是否安装 Docker Engine。
 
 `v2.0.0` 面板镜像按 `Linux/amd64` 交付；首装、升级回退及宝塔/1Panel 两种安装顺序的实际验收使用 Ubuntu 24.04。插件目录中的 ARM64 标识仅表示对应插件镜像支持该架构，不代表面板及所有 Linux 发行版均已验收。
 
 ```bash
-panel_url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh; (if command -v curl >/dev/null 2>&1; then curl -fSL -o install-microi-panel.sh "$panel_url"; else wget -O install-microi-panel.sh "$panel_url"; fi) && sed -i 's/\r$//' install-microi-panel.sh && bash install-microi-panel.sh
+panel_url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh; (if command -v curl >/dev/null 2>&1; then curl -fSL -o install-microi-panel.sh "$panel_url"; else wget -O install-microi-panel.sh "$panel_url"; fi) && sed -i 's/\r$//' install-microi-panel.sh && bash install-microi-panel.sh --image registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.0 --legacy-panel-only
 ```
 
 安装脚本也提供 [GitHub 备用下载](https://github.com/itdos/microi.net/raw/refs/heads/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi-panel.sh)。
@@ -42,7 +149,7 @@ panel_url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA
 自动化部署可指定参数，例如：
 
 ```bash
-bash install-microi-panel.sh --host panel.example.com --port 61890 --root /microi/panel --install-docker --yes
+bash install-microi-panel.sh --offline --image microi-panel-auth-guard-candidate:2.0.1 --host panel.example.com --port 61890 --root /microi/panel --yes
 ```
 
 将域名替换为实际地址。已有 Docker 时复用现有引擎，不重新安装或改写守护进程配置。云安全组按需放行所选面板端口；数据库和存储端口按实际业务范围开放。
@@ -104,7 +211,7 @@ Oracle 使用原厂镜像渠道；SQL Server 需按实际用途选择许可版�
 独立面板使用宿主机安装器更新自身。它先拉取候选镜像，保留原编排、账号、证书和数据，健康检查通过才报告成功；失败会在核对当前容器身份后尝试恢复原镜像。
 
 ```bash
-bash install-microi-panel.sh --upgrade --root /microi/panel
+bash install-microi-panel.sh --upgrade --root /microi/panel --offline --image microi-panel-auth-guard-candidate:2.0.1
 ```
 
 手工重建时同时加载原编排与镜像覆盖文件，保留精确镜像版本：

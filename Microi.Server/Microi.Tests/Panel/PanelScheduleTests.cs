@@ -8,7 +8,7 @@ public sealed class PanelScheduleTests
     [Fact]
     public async Task ConcurrentScheduleTicksEnqueueOneTaskAndAdvanceSlotAtomically()
     {
-        var root=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"../../../../../../.tmp/panel-20260910/tests",Guid.NewGuid().ToString("N")));
+        using var directory = new PanelTestDirectory(); var root = directory.Root;
         var options=new OpsOptions{DataDir=root,LogDir=root};using var store=new OpsStore(options);var repo=new PanelRepository(options,store,new EphemeralDataProtectionProvider());
         var resource=PanelCatalog.Prepare(new(){Name="cache",PluginId="redis",Version="7.4.11",Password="Schedule-Test-Password-592"},repo.OwnerId);
         var installed=repo.Enqueue("Install",Guid.NewGuid().ToString(),resource,"test");installed.State="Succeeded";repo.SaveOperation(installed);resource.State="Installed";repo.SaveResource(resource);
@@ -22,7 +22,7 @@ public sealed class PanelScheduleTests
     [Fact]
     public void DisabledAndStaleScheduleCannotCreateAnOperation()
     {
-        var root=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"../../../../../../.tmp/panel-20260910/tests",Guid.NewGuid().ToString("N")));
+        using var directory = new PanelTestDirectory(); var root = directory.Root;
         var options=new OpsOptions{DataDir=root,LogDir=root};using var store=new OpsStore(options);var repo=new PanelRepository(options,store,new EphemeralDataProtectionProvider());
         var resource=PanelCatalog.Prepare(new(){Name="cache",PluginId="redis",Version="7.4.11",Password="Schedule-Test-Password-592"},repo.OwnerId);
         var installed=repo.Enqueue("Install",Guid.NewGuid().ToString(),resource,"test");installed.State="Succeeded";repo.SaveOperation(installed);resource.State="Installed";repo.SaveResource(resource);

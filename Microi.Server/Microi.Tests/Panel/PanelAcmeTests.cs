@@ -77,7 +77,7 @@ public sealed class PanelAcmeTests
     [Fact]
     public async Task RenewalSlotAndLedgerAdvanceAtomicallyAndPauseRejectsStaleWork()
     {
-        var root=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"../../../../../../.tmp/panel-20260910/tests",Guid.NewGuid().ToString("N")));
+        using var directory = new PanelTestDirectory(); var root = directory.Root;
         var options=new OpsOptions{DataDir=root,LogDir=root};using var store=new OpsStore(options);var repo=new PanelRepository(options,store,new EphemeralDataProtectionProvider());
         var resource=PanelCatalog.Prepare(new(){Name="gateway",PluginId="nginx",Version="1.30.4"},repo.OwnerId);
         var install=repo.Enqueue("Install",Guid.NewGuid().ToString(),resource,"tester");install.State="Succeeded";repo.SaveOperation(install);resource.State="Installed";repo.SaveResource(resource);
@@ -97,7 +97,7 @@ public sealed class PanelAcmeTests
     [Fact]
     public void RejectedAcmeQueueCannotOverwritePolicyOrLoseRenewalSlot()
     {
-        var root=Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,"../../../../../../.tmp/panel-20260910/tests",Guid.NewGuid().ToString("N")));
+        using var directory = new PanelTestDirectory(); var root = directory.Root;
         var options=new OpsOptions{DataDir=root,LogDir=root};using var store=new OpsStore(options);var repo=new PanelRepository(options,store,new EphemeralDataProtectionProvider());
         var resource=PanelCatalog.Prepare(new(){Name="gateway",PluginId="nginx",Version="1.30.4"},repo.OwnerId);repo.Enqueue("Install",Guid.NewGuid().ToString(),resource,"tester");resource.State="Installed";repo.SaveResource(resource);
         var registration=new PanelAcmeRegistration{Id="acme-test",Revision="one",ResourceId="gateway",AutoRenew=true,NextCheck=DateTimeOffset.UtcNow.AddMinutes(-1)};

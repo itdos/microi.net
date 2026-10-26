@@ -49,14 +49,15 @@ public sealed class PanelContractTests
         var config = PanelDockerConfig.Create(plan, "sha256:" + new string('a', 64));
         Assert.False(config["HostConfig"]!["Privileged"]!.GetValue<bool>());
         Assert.Null(config["HostConfig"]!["Binds"]);
-        Assert.Equal("mci-panel-panel-a", config["HostConfig"]!["NetworkMode"]!.GetValue<string>());
+        Assert.Equal("mci-panel-panel-a-cache-guard", config["HostConfig"]!["NetworkMode"]!.GetValue<string>());
+        Assert.Empty(config["HostConfig"]!["PortBindings"]!.AsObject()); // 新 Redis 仅由认证代理开放入口，后端不能直连绕过计数。
         Assert.DoesNotContain("docker.sock", config.ToJsonString());
     }
 
     [Fact]
     public async Task InstallationLedgerDeduplicatesConcurrentRequestsAndSurvivesRestart()
     {
-        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../.tmp/panel-20260910/tests", Guid.NewGuid().ToString("N")));
+        using var directory = new PanelTestDirectory(); var root = directory.Root;
         var options = new OpsOptions { DataDir = root, LogDir = root };
         var protection = new EphemeralDataProtectionProvider();
         var resource = PanelCatalog.Prepare(new() { PluginId = "redis", Version = "7.4.11", Name = "cache", Password = "Sensitive-Secret-987654" }, "panel-a");

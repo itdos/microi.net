@@ -43,7 +43,7 @@ export function verifyPanelGate(receipts,{sourceHash,imageId,catalog}){
  assert.match(sourceHash,/^[a-f0-9]{64}$/);assert.match(imageId,/^sha256:[a-f0-9]{64}$/);
  for(const receipt of receipts){assert.equal(receipt.completed,true,'Incomplete stage: '+receipt.stage);assert.equal(receipt.sourceHash,sourceHash,'Source changed since '+receipt.stage);assert.equal(receipt.imageId,imageId,'Candidate image mismatch: '+receipt.stage);assert(receipt.checks>0,'Zero checks in '+receipt.stage);assert.equal(receipt.failed,0);assert.equal(receipt.skipped,0);}
  for(const stage of requiredStages)assert.equal(receipts.filter(r=>r.stage===stage).length,1,'Missing or duplicated stage: '+stage);
- const unit=receipts.find(r=>r.stage==='unit');assert(unit.counts.csharp>0&&unit.counts.node>0&&unit.counts.legacy>0,'Unit coverage is incomplete');
+ const unit=receipts.find(r=>r.stage==='unit');assert(unit.counts.csharp>0&&unit.counts.node>0&&unit.counts.legacy>0&&unit.counts.security>0&&unit.counts.authGuard>0,'Unit coverage is incomplete');
  const core=receipts.find(r=>r.stage==='core');assert(core.counts.docker>=24&&core.counts.browser>=9&&core.counts.platformEntry>=5,'Core behavior coverage is incomplete');
  assert(receipts.find(r=>r.stage==='acme').checks>=5,'Real ACME coverage is incomplete');
  const legacy=receipts.find(r=>r.stage==='legacy');assert.deepEqual([...legacy.scripts].sort(),[...legacyScripts].sort(),'Legacy protocol suite is incomplete');

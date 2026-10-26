@@ -8,7 +8,18 @@ public static class PanelDockerConfig
     public const string OwnerLabel = "io.microi.panel.owner";
     public const string ResourceLabel = "io.microi.panel.resource";
     public static string Network(string owner) => "mci-panel-" + PanelCatalog.SafeName(owner);
-    public static JsonObject Labels(PanelResource spec) => new() { [OwnerLabel] = spec.OwnerId, [ResourceLabel] = spec.Id, ["io.microi.panel.plugin"] = spec.PluginId };
+    public static string Network(PanelResource spec) => spec.RedisAuthProxy ? Network(spec.OwnerId) + "-" + PanelCatalog.SafeName(spec.Id) + "-guard" : Network(spec.OwnerId);
+    public static JsonObject Labels(PanelResource spec)
+    {
+        var labels = new JsonObject { [OwnerLabel] = spec.OwnerId, [ResourceLabel] = spec.Id, ["io.microi.panel.plugin"] = spec.PluginId };
+        if (spec.RedisAuthProxy)
+        {
+            labels["io.microi.panel.auth-guard.redis-proxy"] = "true";
+            labels["io.microi.panel.auth-guard.redis-proxy-port"] = spec.Ports["database"].ToString(System.Globalization.CultureInfo.InvariantCulture);
+            labels["io.microi.panel.auth-guard.redis-proxy-bind"] = spec.BindAddress;
+        }
+        return labels;
+    }
     public static JsonObject Create(PanelResource spec, string imageId)
     {
         var plugin = PanelCatalog.Get(spec.PluginId);
@@ -16,7 +27,8 @@ public static class PanelDockerConfig
         foreach (var port in plugin.Ports)
         {
             var key = port.ContainerPort + "/tcp"; exposed[key] = new JsonObject();
-            ports[key] = new JsonArray(new JsonObject { ["HostIp"] = spec.BindAddress, ["HostPort"] = spec.Ports[port.Name].ToString(System.Globalization.CultureInfo.InvariantCulture) });
+            if (!spec.RedisAuthProxy)
+                ports[key] = new JsonArray(new JsonObject { ["HostIp"] = spec.BindAddress, ["HostPort"] = spec.Ports[port.Name].ToString(System.Globalization.CultureInfo.InvariantCulture) });
         }
         var mounts = new JsonArray(new JsonObject { ["Type"] = "volume", ["Source"] = spec.VolumeName, ["Target"] = plugin.DataPath });
         var health = Healthcheck(spec.PluginId);
@@ -34,7 +46,7 @@ public static class PanelDockerConfig
             ["Env"] = JsonSerializer.SerializeToNode(environment.Select(x => x.Key + "=" + x.Value).ToArray()),
             ["HostConfig"] = new JsonObject
             {
-                ["Privileged"] = false, ["NetworkMode"] = Network(spec.OwnerId), ["PortBindings"] = ports, ["Mounts"] = mounts,
+                ["Privileged"] = false, ["NetworkMode"] = Network(spec), ["PortBindings"] = ports, ["Mounts"] = mounts,
                 ["Memory"] = spec.MemoryMb * 1024L * 1024L, ["MemorySwap"] = spec.MemoryMb * 1024L * 1024L,
                 ["PidsLimit"] = 1024, ["RestartPolicy"] = new JsonObject { ["Name"] = "unless-stopped" },
                 ["LogConfig"] = new JsonObject { ["Type"] = "json-file", ["Config"] = new JsonObject { ["max-size"] = "10m", ["max-file"] = "3" } }

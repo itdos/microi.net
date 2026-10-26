@@ -88,18 +88,18 @@ public static class PanelCatalog
         switch (plugin.Id)
         {
             case "nginx": command = ["nginx", "-c", NginxConfig.Root + "/current.conf", "-g", "daemon off;"]; break;
-            case "mysql": env["MYSQL_ROOT_PASSWORD"] = request.Password!; env["MYSQL_DATABASE"] = request.Database!; break;
+            case "mysql": env["MYSQL_ROOT_PASSWORD"] = request.Password!; env["MYSQL_DATABASE"] = request.Database!; command = ["mysqld", "--log-error-verbosity=3", "--skip-name-resolve"]; break;
             case "postgresql": env["POSTGRES_PASSWORD"] = request.Password!; env["POSTGRES_USER"] = request.Username!; env["POSTGRES_DB"] = request.Database!; break;
             case "sqlserver": env["ACCEPT_EULA"] = "Y"; env["MSSQL_SA_PASSWORD"] = request.Password!; env["MSSQL_PID"] = request.Edition; break;
             case "oracle": env["ORACLE_PWD"] = request.Password!; break;
-            case "mongodb": env["MONGO_INITDB_ROOT_USERNAME"] = request.Username!; env["MONGO_INITDB_ROOT_PASSWORD"] = request.Password!; break;
+            case "mongodb": env["MONGO_INITDB_ROOT_USERNAME"] = request.Username!; env["MONGO_INITDB_ROOT_PASSWORD"] = request.Password!; command = ["mongod", "--setParameter", "enableDetailedConnectionHealthMetricLogLines=true"]; break;
             case "minio": env["MINIO_ROOT_USER"] = request.Username!; env["MINIO_ROOT_PASSWORD"] = request.Password!; command = ["server", "/data", "--console-address", ":9001"]; break;
             case "redis": command = ["redis-server", "--appendonly", "yes", "--requirepass", request.Password!]; env["REDISCLI_AUTH"] = request.Password!; break;
             case "translate": env["LT_LOAD_ONLY"] = "zh,en"; env["LT_UPDATE_MODELS"] = "true"; env["LT_THREADS"] = "1"; break;
         }
         return new() { Id = request.Name, OwnerId = owner, PluginId = plugin.Id, Version = version.Id, Image = version.Image,
             ContainerName = id, VolumeName = id + "-data", BindAddress = request.BindAddress, Ports = ports, MemoryMb = memory,
-            Environment = env, Command = command, LocalOnly = request.LocalOnly, State = "Pending" };
+            Environment = env, Command = command, LocalOnly = request.LocalOnly, RedisAuthProxy = plugin.Id == "redis", State = "Pending" };
     }
 }
 
@@ -121,10 +121,12 @@ public sealed class PanelResource
     public string[] Command { get; set; } = [];
     public int MemoryMb { get; set; }
     public bool LocalOnly { get; set; }
+    // Omitted in existing records: never silently remove a running legacy Redis port during an upgrade.
+    public bool RedisAuthProxy { get; set; }
     public string State { get; set; } = "Pending";
     public DateTimeOffset Created { get; set; } = DateTimeOffset.UtcNow;
     public string ConfigRevision { get; set; } = NginxConfig.InitialRevision;
     public NginxConfiguration Websites { get; set; } = new();
     public object Public() => new { Id, OwnerId, PluginId, Version, Image, ImageId, Digest, ContainerName, ContainerId,
-        VolumeName, BindAddress, Ports, MemoryMb, LocalOnly, State, Created, ConfigRevision };
+        VolumeName, BindAddress, Ports, MemoryMb, LocalOnly, RedisAuthProxy, State, Created, ConfigRevision };
 }

@@ -3,7 +3,7 @@ import test from 'node:test';
 import {verifyPanelGate,requiredPluginChecks,legacyScripts,compareGeneratedEndpoints} from './panel-gate-contract.mjs';
 const current={sourceHash:'a'.repeat(64),imageId:'sha256:'+'b'.repeat(64),catalog:[{id:'nginx',versions:[{id:'1'},{id:'2'}]}]};
 function evidence(){const common={completed:true,sourceHash:current.sourceHash,imageId:current.imageId,checks:1,failed:0,skipped:0};return[
- {...common,stage:'unit',counts:{csharp:1,node:1,legacy:1}},
+ {...common,stage:'unit',counts:{csharp:1,node:1,legacy:1,security:1,authGuard:1}},
  {...common,stage:'core',counts:{docker:24,browser:9,platformEntry:5}},
  {...common,stage:'acme',checks:5},
  {...common,stage:'legacy',scripts:[...legacyScripts]},
@@ -13,6 +13,9 @@ function evidence(){const common={completed:true,sourceHash:current.sourceHash,i
 test('Panel gate accepts complete current-candidate evidence',()=>assert.equal(verifyPanelGate(evidence(),current).completed,true));
 test('Panel gate rejects missing stages, failed, skipped and zero-case receipts',()=>{
  for(const alter of [r=>r.pop(),r=>r[0].completed=false,r=>r[0].failed=1,r=>r[0].skipped=1,r=>r[0].checks=0,r=>r.splice(4,1)]){const r=evidence();alter(r);assert.throws(()=>verifyPanelGate(r,current));}
+});
+test('Panel gate cannot reuse receipts from before default authentication protection',()=>{
+ for(const key of ['security','authGuard']){const r=evidence();delete r[0].counts[key];assert.throws(()=>verifyPanelGate(r,current));}
 });
 test('Panel gate rejects stale source or a different tested image',()=>{
  for(const key of ['sourceHash','imageId']){const r=evidence();r[0][key]='changed';assert.throws(()=>verifyPanelGate(r,current));}

@@ -45,7 +45,16 @@ public static class PanelDockerRuntime
         {
             var container = await Owned(docker, resource, ct);
             if (container["Config"]?["Healthcheck"]?["Test"] is not JsonArray checks || checks.Count == 0 || checks[0]?.ToString() == "NONE") throw new OpsException("该镜像缺少服务就绪检查，不能仅凭容器运行宣告成功。");
-            if (container["State"]?["Running"]?.GetValue<bool>() == true && container["State"]?["Health"]?["Status"]?.ToString() == "healthy") return;
+            if (container["State"]?["Running"]?.GetValue<bool>() == true && container["State"]?["Health"]?["Status"]?.ToString() == "healthy")
+            {
+                if (resource.RedisAuthProxy)
+                {
+                    using var guard = new PanelAuthGuardClient();
+                    try { await guard.RequireRedisReady(resource.Id, ct); return; }
+                    catch (OpsException) when (DateTimeOffset.UtcNow < deadline) { }
+                }
+                else return;
+            }
             if (DateTimeOffset.UtcNow > deadline) throw new OpsException("服务未在限时内就绪，保留数据卷与容器；可查看日志后继续原任务。", 502);
             await Task.Delay(2000, ct);
         }

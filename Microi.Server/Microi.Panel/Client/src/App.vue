@@ -7,6 +7,7 @@ import NginxWorkspace from './NginxWorkspace.vue';
 import FilesWorkspace from './FilesWorkspace.vue';
 import BackupsWorkspace from './BackupsWorkspace.vue';
 import SchedulesWorkspace from './SchedulesWorkspace.vue';
+import SecurityWorkspace from './SecurityWorkspace.vue';
 
 const session = ref(null), snapshot = ref(null), error = ref(''), notice = ref(''), busy = ref(false), tab = ref('server');
 const credentials = reactive({ account: '', password: '' });
@@ -21,9 +22,9 @@ const taskId = ref(location.hash.slice(1));
 function showTask(id) { taskId.value = id; location.hash = id; }
 function hashChanged() { taskId.value = location.hash.slice(1); }
 let timer, polling = false;
-const nav = [ ['server', '服务器总览'], ['market', '插件市场'], ['websites', '网站与反向代理'], ['certificates', 'SSL 证书'], ['files', '网站文件'], ['backups', '备份与恢复'], ['schedules', '计划任务'], ['services', '容器管理'], ['operations', '操作任务'], ['overview', '吾码运行状态'], ['updates', '吾码平台升级'], ['tasks', '升级任务'], ['policy', '自动更新'], ['platform', '平台连接'], ['logs', '运维日志'] ];
+const nav = [ ['server', '服务器总览'], ['security', '安全防护'], ['market', '插件市场'], ['websites', '网站与反向代理'], ['certificates', 'SSL 证书'], ['files', '网站文件'], ['backups', '备份与恢复'], ['schedules', '计划任务'], ['services', '容器管理'], ['operations', '操作任务'], ['overview', '吾码运行状态'], ['updates', '吾码平台升级'], ['tasks', '升级任务'], ['policy', '自动更新'], ['platform', '平台连接'], ['logs', '运维日志'] ];
 const modes = { Manual: '仅手动', Notify: '检查并通知', Download: '自动下载', Automatic: '维护窗口自动更新' };
-const isPanelPage = computed(() => ['server','market','websites','certificates','files','backups','schedules','services','operations'].includes(tab.value));
+const isPanelPage = computed(() => ['server','security','market','websites','certificates','files','backups','schedules','services','operations'].includes(tab.value));
 const active = computed(() => snapshot.value?.tasks.find(x => ['Queued', 'Running', 'Recovering', 'NeedsAttention'].includes(x.state)));
 const runningCount = computed(() => snapshot.value?.containers.filter(x => x.state === 'running').length || 0);
 const available = computed(() => plan.value?.services.filter(x => x.changed) || []);
@@ -116,6 +117,7 @@ onUnmounted(() => { clearInterval(timer); window.removeEventListener('hashchange
         <template v-else>
           <div class="page-heading"><div><span class="eyebrow">{{ snapshot?.deployment.name || '吾码服务器运维面板' }}</span><h1>{{ nav.find(x => x[0] === tab)?.[1] }}</h1></div><MciButton variant="plain" :disabled="busy" @click="refresh">刷新状态</MciButton></div>
           <PanelWorkspace v-if="['server','market','services','operations'].includes(tab)" :page="tab" @navigate="chooseTab" />
+          <SecurityWorkspace v-if="tab === 'security'" />
           <NginxWorkspace v-if="['websites','certificates'].includes(tab)" :page="tab" @navigate="chooseTab" />
           <FilesWorkspace v-if="tab === 'files'" @navigate="chooseTab" />
           <BackupsWorkspace v-if="tab === 'backups'" @navigate="chooseTab" />

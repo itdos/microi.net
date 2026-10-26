@@ -83,7 +83,7 @@ public sealed class NginxContractTests
     [Fact]
     public void WebsitePublicationIsAtomicIdempotentAndRejectsStaleEditors()
     {
-        var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../.tmp/panel-20260910/tests", Guid.NewGuid().ToString("N")));
+        using var directory = new PanelTestDirectory(); var root = directory.Root;
         var options = new OpsOptions { DataDir = root, LogDir = root };
         using var store = new OpsStore(options);
         var repo = new PanelRepository(options, store, new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());

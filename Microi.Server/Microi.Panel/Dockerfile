@@ -1,4 +1,4 @@
-# 从仓库根目录：docker build -f Microi.Server/Microi.Panel/Dockerfile -t microi-panel:v2.0.0 .
+# 从仓库根目录：docker build -f Microi.Server/Microi.Panel/Dockerfile -t microi-panel:v2.0.1 .
 FROM node:24-bookworm-slim AS ui
 WORKDIR /src
 COPY Microi.UI/ Microi.UI/
@@ -13,7 +13,8 @@ COPY --from=ui /src/Microi.Server/Microi.Panel/wwwroot/ wwwroot/
 RUN dotnet publish Microi.Panel.csproj -c Release -o /out -m:1 -p:UseSharedCompilation=false --disable-build-servers
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
-LABEL io.microi.ops.controller="true" io.microi.panel.controller="true" org.opencontainers.image.title="Microi.Panel" org.opencontainers.image.version="2.0.0"
+LABEL io.microi.ops.controller="true" io.microi.panel.controller="true" org.opencontainers.image.title="Microi.Panel" org.opencontainers.image.version="2.0.1"
+LABEL io.microi.panel.authguard.protocol="1"
 WORKDIR /app
 COPY --from=build /out/ .
 ENV ASPNETCORE_URLS=http://+:8080 OPS_DATA_DIR=/microi/ops/data OPS_LOG_DIR=/microi/logs/ops

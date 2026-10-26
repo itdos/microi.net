@@ -1,0 +1,11 @@
+{
+  "protocol": 1,
+  "entrypoint": "daemon.py",
+  "files": ["daemon.py", "store.py", "firewall.py", "collectors.py", "redis_proxy.py", "run.sh", "microi-auth-guard.service"],
+  "controlSocket": "/run/microi-auth-guard/control.sock",
+  "stateDirectory": "/var/lib/microi-auth-guard",
+  "configFile": "/etc/microi-auth-guard/config.json",
+  "preflightArguments": ["--check"],
+  "recoveryArguments": ["--unban", "IP"],
+  "recoveryRequires": "running-root-unix-control-service"
+}

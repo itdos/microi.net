@@ -113,7 +113,13 @@ if(stage==='unit'){
  await run('unit-legacy-build','dotnet',['build','Microi.Server/Microi.Panel/Tests/Microi.Ops.Tests.csproj','-c','Release','--no-restore','--disable-build-servers','-m:1','-p:UseSharedCompilation=false','-v:minimal']);
  const legacy=await run('unit-legacy','dotnet',['Microi.Server/Microi.Panel/Tests/bin/Release/net10.0/Microi.Ops.Tests.dll',resolve(directory,'legacy-unit-'+stamp)]);
  const legacyCount=Number(legacy.output.match(/All (\d+) Ops regression checks passed/)?.[1]);assert(legacyCount>0);
- await receipt({checks:values.total+nodeCounts.tests+legacyCount,counts:{csharp:values.total,node:nodeCounts.tests,legacy:legacyCount}},[trx,nodeResult.path,legacy.path]);
+ // 认证防护是候选面板的默认能力，不能仅由人工单跑而在后续正式发行门禁中遗漏。
+ const security=await run('unit-security','dotnet',['run','--project','Microi.Server/Microi.Panel/Tests/Security/Microi.Panel.Security.Tests.csproj','-c','Release','--',root]);
+ const securityCount=Number(security.output.match(/All (\d+) Panel security checks passed/)?.[1]);assert(securityCount>0);
+ const guard=await run('unit-auth-guard',parameters.get('python')||(process.platform==='win32'?'python':'python3'),['-B','-m','unittest','discover','-s','Microi.Server/Microi.Panel/AuthGuard/tests','-p','test_*.py'],{env:{PYTHONUTF8:'1'}});
+ const guardCount=Number(guard.output.match(/Ran (\d+) tests? in /)?.[1]);assert(guardCount>0&&/^OK\s*$/m.test(guard.output));
+ assert(!/skipped=|expected failures=|unexpected successes=/i.test(guard.output),'AuthGuard unit suite has skipped or non-passing outcomes');
+ await receipt({checks:values.total+nodeCounts.tests+legacyCount+securityCount+guardCount,counts:{csharp:values.total,node:nodeCounts.tests,legacy:legacyCount,security:securityCount,authGuard:guardCount}},[trx,nodeResult.path,legacy.path,security.path,guard.path]);
 }else if(stage==='core'){
  const work=resolve(directory,runId);let owner;
  try{

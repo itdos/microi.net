@@ -10,14 +10,15 @@ using Microi.Panel.Panel;
 
 if (args.Contains("--bootstrap", StringComparer.Ordinal)) { await Bootstrap.Run(CancellationToken.None); return; }
 if (args.Contains("--init-panel", StringComparer.Ordinal)) { PanelBootstrap.Initialize(); return; }
-if (args.Contains("--health-check", StringComparer.Ordinal))
+if (args.Contains("--health-check", StringComparer.Ordinal) || args.Contains("--ready-check", StringComparer.Ordinal))
 {
     // 镜像不额外安装curl；探测命令不加载凭据、不创建账本，也不会启动第二个控制器。
     using var healthClient=new HttpClient{Timeout=TimeSpan.FromSeconds(5)};
     try
     {
-        var health=await healthClient.GetFromJsonAsync<System.Text.Json.Nodes.JsonObject>("http://127.0.0.1:8080/health");
-        Environment.ExitCode=health?["service"]?.ToString()=="Microi.Panel"&&health["status"]?.ToString()=="healthy"?0:1;
+        var readiness = args.Contains("--ready-check", StringComparer.Ordinal);
+        var health=await healthClient.GetFromJsonAsync<System.Text.Json.Nodes.JsonObject>("http://127.0.0.1:8080/" + (readiness ? "ready" : "health"));
+        Environment.ExitCode=health?["service"]?.ToString()=="Microi.Panel"&&health["status"]?.ToString()==(readiness ? "ready" : "healthy")?0:1;
     }
     catch(Exception){Environment.ExitCode=1;}
     return;
@@ -48,9 +49,12 @@ builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<OpsStore>();
 builder.Services.AddSingleton<DockerEngine>();
 builder.Services.AddSingleton<OpsAudit>();
+builder.Services.AddSingleton<PanelLoginSecurity>();
 builder.Services.AddSingleton<PlatformConnection>();
 builder.Services.AddSingleton<UpdateCoordinator>();
 builder.Services.AddSingleton<PanelRepository>();
+builder.Services.AddSingleton<PanelAuthGuardClient>();
+builder.Services.AddHostedService<PanelSecuritySync>();
 builder.Services.AddSingleton<NginxService>();
 builder.Services.AddSingleton<PanelFiles>();
 builder.Services.AddSingleton<PanelHostMonitor>();
@@ -83,7 +87,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     {
         if (ctx.Principal?.FindFirstValue("credential-version") != options.CredentialVersion
             || !long.TryParse(ctx.Principal.FindFirstValue("login-at"), out var issued)
-            || DateTimeOffset.FromUnixTimeSeconds(issued) < DateTimeOffset.UtcNow.AddHours(-8))
+            || DateTimeOffset.FromUnixTimeSeconds(issued) < DateTimeOffset.UtcNow.AddHours(-8)
+            || !ctx.HttpContext.RequestServices.GetRequiredService<PanelLoginSecurity>().ValidateSession(
+                ctx.Principal.FindFirstValue("session-id") ?? "", ctx.Principal.Identity?.Name ?? "", options.CredentialVersion))
         { ctx.RejectPrincipal(); await ctx.HttpContext.SignOutAsync(); }
     };
 });
@@ -91,14 +97,17 @@ builder.Services.AddAuthorization();
 builder.Services.AddRateLimiter(rate =>
 {
     rate.RejectionStatusCode = 429;
-    rate.AddPolicy("login", _ => RateLimitPartition.GetFixedWindowLimiter("ops-login", _ => new() { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    // 保护密码哈希计算成本，但单一来源不能耗尽所有管理员的登录配额。
+    rate.AddPolicy("login", context => RateLimitPartition.GetFixedWindowLimiter(PanelLoginSecurity.NormalizeIp(context.Connection.RemoteIpAddress), _ => new() { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 var app = builder.Build();
 _ = app.Services.GetRequiredService<OpsStore>();
-// 只信任已登记代理传递的协议；不接受任意客户端伪造 HTTPS 或 Host。
-var forwarded = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedProto, ForwardLimit = 1 };
+// 转发地址只来自显式登记代理；清空框架默认回环信任，防止把普通直连客户端的XFF当作真实来源。
+var forwarded = new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor, ForwardLimit = Math.Clamp(options.TrustedProxyIps.Length, 1, 16) };
+forwarded.KnownProxies.Clear(); forwarded.KnownIPNetworks.Clear();
 foreach (var ip in options.TrustedProxyIps) forwarded.KnownProxies.Add(ip);
-app.UseForwardedHeaders(forwarded);
+// 空白白名单不是信任所有代理：没有登记代理时完全不启用ForwardedHeaders中间件。
+if (options.TrustedProxyIps.Length > 0) app.UseForwardedHeaders(forwarded);
 app.Use(async (context, next) =>
 {
     context.Response.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors "
@@ -118,7 +127,7 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { error = "服务暂不可用，请检查运维日志、平台连接或 Docker 状态。" });
     }
 });
-app.UseAuthentication(); app.UseAuthorization(); app.UseRateLimiter();
+app.UseAuthentication(); app.UseAuthorization();
 app.Use(async (context, next) =>
 {
     if (context.Request.Path.StartsWithSegments("/ops-api") && !HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
@@ -129,23 +138,62 @@ app.Use(async (context, next) =>
     }
     await next();
 });
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "Microi.Panel", version = "2.0.0" }));
+app.UseRateLimiter();
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "Microi.Panel", version = "2.0.1" }));
+app.MapGet("/ready", async (OpsStore store, PanelRepository repository, DockerEngine docker, PanelAuthGuardClient guard, CancellationToken ct) =>
+{
+    _ = store.Get<string>("panel-owner-id");
+    _ = repository.Resources(); // Reads the durable ledger and validates persisted DataProtection keys.
+    var engine = await docker.Info(ct);
+    var protection = await guard.Status(ct);
+    var engineId = engine?["ID"]?.ToString();
+    var enrolledEngine = store.Get<string>("docker-engine-id");
+    var ready = !string.IsNullOrWhiteSpace(engineId) && (enrolledEngine == null || enrolledEngine == engineId)
+        && (options.Deployment.DockerEngineId.Length == 0 || options.Deployment.DockerEngineId == engineId)
+        && protection?["firewall"]?["verified"]?.GetValue<bool>() == true;
+    return Results.Json(new { service = "Microi.Panel", status = ready ? "ready" : "not-ready" }, statusCode: ready ? 200 : 503);
+});
 app.MapGet("/ops-api/session", (HttpContext ctx, IAntiforgery antiforgery) => Results.Ok(new
 {
     authenticated = ctx.User.Identity?.IsAuthenticated == true, account = ctx.User.Identity?.Name,
-    csrfToken = antiforgery.GetAndStoreTokens(ctx).RequestToken, publicUrl = options.PublicUrl.ToString(), version = "2.0.0"
+    csrfToken = antiforgery.GetAndStoreTokens(ctx).RequestToken, publicUrl = options.PublicUrl.ToString(), version = "2.0.1"
 }));
-app.MapPost("/ops-api/login", async (OpsLogin request, HttpContext ctx, OpsAudit audit) =>
+app.MapPost("/ops-api/login", async (OpsLogin request, HttpContext ctx, OpsAudit audit, PanelLoginSecurity security, PanelAuthGuardClient guard) =>
 {
+    var ip = PanelLoginSecurity.NormalizeIp(ctx.Connection.RemoteIpAddress);
+    var hostProtection = await PanelSecurityEndpoints.CheckHost(guard, security, ip, ctx.RequestAborted);
+    if (hostProtection?["banned"]?.GetValue<bool>() == true) return Results.Json(new { error = "该来源 IP 已被主机防护临时封禁，请等待自动解封或联系管理员。" }, statusCode: 429);
+    var protection = security.Check(ip);
+    if (hostProtection == null && protection.Banned) return Results.Json(new { error = "该来源IP已临时封禁，请等待自动解封或联系管理员。", protection.BannedUntil }, statusCode: 429);
     if (request.Account?.Length > 100 || request.Password?.Length > 512 || !options.ValidatePassword(request.Account ?? "", request.Password ?? ""))
-    { audit.Write("LoginFailed", "anonymous", "运维账号验证失败。", false); return Results.Json(new { error = "账号或密码错误。" }, statusCode: 401); }
-    var claims = new[] { new Claim(ClaimTypes.Name, options.AdminUsername), new Claim("credential-version", options.CredentialVersion), new Claim("login-at", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()) };
+    {
+        var eventId = Guid.NewGuid().ToString("N");
+        protection = security.Failure(ip, eventId);
+        await PanelSecurityEndpoints.FlushFailures(guard, security, ctx.RequestAborted, ip);
+        hostProtection = await PanelSecurityEndpoints.CheckHost(guard, security, ip, ctx.RequestAborted);
+        audit.Write("LoginFailed", "anonymous", "来源IP " + ip + " 运维账号验证失败。", false);
+        var banned = hostProtection?["banned"]?.GetValue<bool>() ?? protection.Banned;
+        return Results.Json(new { error = banned ? "该来源IP已达到密码失败阈值并临时封禁。" : "账号或密码错误。", protection.BannedUntil }, statusCode: banned ? 429 : 401);
+    }
+    // A parallel failed request may have crossed the threshold during password verification.
+    hostProtection = await PanelSecurityEndpoints.CheckHost(guard, security, ip, ctx.RequestAborted);
+    if (hostProtection?["banned"]?.GetValue<bool>() ?? security.Check(ip).Banned)
+        return Results.Json(new { error = "该来源 IP 已临时封禁，请等待自动解封或联系管理员。" }, statusCode: 429);
+    security.Success(ip);
+    var sessionId = security.IssueSession(options.AdminUsername, options.CredentialVersion);
+    var claims = new[] { new Claim(ClaimTypes.Name, options.AdminUsername), new Claim("credential-version", options.CredentialVersion), new Claim("login-at", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()), new Claim("session-id", sessionId) };
     await ctx.SignInAsync(new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)));
     audit.Write("LoginSucceeded", options.AdminUsername, "独立运维登录成功。"); return Results.Ok(new { success = true });
 }).RequireRateLimiting("login");
 var api = app.MapGroup("/ops-api").RequireAuthorization();
 api.MapPanel();
-api.MapPost("/logout", async (HttpContext ctx, OpsAudit audit) => { audit.Write("Logout", ctx.User.Identity!.Name!, "独立运维会话已退出。"); await ctx.SignOutAsync(); return Results.Ok(); });
+api.MapPanelSecurity();
+api.MapPost("/logout", async (HttpContext ctx, OpsAudit audit, PanelLoginSecurity security) =>
+{
+    // 服务端先撤销，退出后的Cookie副本也不能继续访问Docker权限入口。
+    security.RevokeSession(ctx.User.FindFirstValue("session-id") ?? "");
+    audit.Write("Logout", ctx.User.Identity!.Name!, "独立运维会话已退出并撤销。"); await ctx.SignOutAsync(); return Results.Ok();
+});
 api.MapGet("/snapshot", async (DockerEngine docker, OpsStore store, PlatformConnection platform, OpsAudit audit, CancellationToken ct) =>
 {
     var containers = new List<object>(); var dockerError = "";

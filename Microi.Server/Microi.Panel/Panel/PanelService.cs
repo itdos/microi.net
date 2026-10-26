@@ -148,7 +148,7 @@ public sealed class PanelService(PanelRepository repository, DockerEngine docker
         }
         if (await docker.Image(resource.ImageId, ct) == null) throw new OpsException("计划锁定的镜像已被删除，请恢复该镜像后继续。", 409);
         Progress(operation, "创建独立网络与持久数据卷");
-        var networkName = PanelDockerConfig.Network(resource.OwnerId);
+        var networkName = PanelDockerConfig.Network(resource);
         var network = await docker.Json(HttpMethod.Get, "/networks/" + networkName, ct: ct, allowMissing: true);
         if (network == null)
         {
@@ -205,7 +205,16 @@ public sealed class PanelService(PanelRepository repository, DockerEngine docker
             var container = await OwnedContainer(resource, ct);
             if (container["Config"]?["Healthcheck"]?["Test"] is not JsonArray checks || checks.Count == 0 || checks[0]?.ToString() == "NONE")
                 throw new OpsException("该镜像缺少服务就绪检查，不能仅凭容器运行宣告成功。");
-            if (container["State"]?["Running"]?.GetValue<bool>() == true && container["State"]?["Health"]?["Status"]?.ToString() == "healthy") return;
+            if (container["State"]?["Running"]?.GetValue<bool>() == true && container["State"]?["Health"]?["Status"]?.ToString() == "healthy")
+            {
+                if (resource.RedisAuthProxy)
+                {
+                    using var guard = new PanelAuthGuardClient();
+                    try { await guard.RequireRedisReady(resource.Id, ct); return; }
+                    catch (OpsException) when (DateTimeOffset.UtcNow < deadline) { }
+                }
+                else return;
+            }
             if (DateTimeOffset.UtcNow > deadline) throw new OpsException("服务未在限时内就绪，保留数据卷与容器；可查看日志后继续原任务。", 502);
             await Task.Delay(2000, ct);
         }
