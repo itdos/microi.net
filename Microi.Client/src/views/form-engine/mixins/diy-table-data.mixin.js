@@ -1,6 +1,7 @@
 import _u from "underscore";
 import { markRaw } from "vue";
 import { debounce } from "lodash";
+import { appendPresentationSelectFields } from "../utils/table-presentation-query.js";
 import {
     appendWhereList,
     buildSearchWhere,
@@ -111,14 +112,7 @@ export default {
             if (!param.ModuleEngineKey && !param.FormEngineKey) {
                 param.FormEngineKey = self.TableId;
             }
-            // ViewSchema 的复合列/卡片区域可能引用不单独显示的依赖字段。
-            // 显式与既有 SelectFields 求并集，默认接口与自定义 SelectApi 都可据此返回完整展示数据。
-            if (self.PresentationRequiredFieldNames && self.PresentationRequiredFieldNames.length > 0) {
-                var configuredSelectNames = (Array.isArray(self.SysMenuModel.SelectFields) ? self.SysMenuModel.SelectFields : [])
-                    .map(function (field) { return typeof field === 'string' ? field : (field.Name || field.AsName); })
-                    .filter(Boolean);
-                param._SelectFields = Array.from(new Set(['Id'].concat(configuredSelectNames, self.PresentationRequiredFieldNames)));
-            }
+            appendPresentationSelectFields(param, self.SysMenuModel, self.PresentationRequiredFieldNames);
             return param;
         },
         FilterTreeLazyDirectChildren(rows, tree, treeParentField) {
@@ -918,6 +912,9 @@ export default {
                     }
                 });
             }
+            // 普通列表、移动卡片和自定义 SelectApi 与树懒加载使用同一展示字段投影。
+            // 放在外部参数合并之后，避免卡片配置在常规列表路径中被静默漏取。
+            appendPresentationSelectFields(param, self.SysMenuModel, self.PresentationRequiredFieldNames);
             // zhy：所有查询条件组装完成后再统一格式，避免数组条件与父子外键对象条件混用时服务端漏掉其中一类。
             if (Array.isArray(param._Where) && param._Where.length > 0) {
                 param._Where = normalizeMixedWhereList(param._Where);
