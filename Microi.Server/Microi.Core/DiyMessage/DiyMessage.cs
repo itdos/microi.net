@@ -40,7 +40,21 @@ namespace Microi.net
             // Security and parameter failures must remain understandable on legacy
             // tenant databases whose diy_lang rows predate these message keys.
             { "NoAuth", JObject.FromObject(new { ZhCN = "您没有权限做此操作！", En = "You do not have permission to perform this operation.", ZhTW = "您沒有權限執行此操作！" }) },
-            { "ParamError", JObject.FromObject(new { ZhCN = "参数错误！", En = "Invalid parameters.", ZhTW = "參數錯誤！" }) }
+            { "ParamError", JObject.FromObject(new { ZhCN = "参数错误！", En = "Invalid parameters.", ZhTW = "參數錯誤！" }) },
+            // 登录发生在租户语言缓存预热之前，也可能遇到旧库缺词；关键认证错误不能向用户返回内部 Key。
+            { "AccountOrPwdError", JObject.FromObject(new { ZhCN = "用户名或密码错误！", En = "Incorrect username or password.", ZhTW = "用戶名或密碼錯誤！" }) },
+            { "AccountNoNull", JObject.FromObject(new { ZhCN = "用户名和密码不能为空！", En = "Username and password are required.", ZhTW = "用戶名和密碼不能為空！" }) },
+            { "AccountStop", JObject.FromObject(new { ZhCN = "账号已停用，请联系管理员。", En = "This account is disabled. Please contact an administrator.", ZhTW = "帳號已停用，請聯絡管理員。" }) },
+            { "OldPwdError", JObject.FromObject(new { ZhCN = "原密码错误！", En = "The current password is incorrect.", ZhTW = "原密碼錯誤！" }) },
+            { "PasswordResetInvalidPhone", JObject.FromObject(new { ZhCN = "请输入正确的11位手机号！", En = "Enter a valid 11-digit phone number.", ZhTW = "請輸入正確的11位手機號！" }) },
+            { "PasswordResetInvalidSms", JObject.FromObject(new { ZhCN = "短信验证码不正确或已过期，请重新获取。", En = "The SMS verification code is incorrect or expired. Request a new code.", ZhTW = "簡訊驗證碼不正確或已過期，請重新取得。" }) },
+            { "PasswordResetInvalidPassword", JObject.FromObject(new { ZhCN = "新密码长度必须为6至32位。", En = "The new password must contain 6 to 32 characters.", ZhTW = "新密碼長度必須為6至32位。" }) },
+            { "PasswordResetConfirmationMismatch", JObject.FromObject(new { ZhCN = "两次输入的新密码不一致！", En = "The new passwords do not match.", ZhTW = "兩次輸入的新密碼不一致！" }) },
+            { "PasswordResetUserUnavailable", JObject.FromObject(new { ZhCN = "账号不存在或不可用，请联系管理员。", En = "The account is unavailable. Please contact an administrator.", ZhTW = "帳號不存在或不可用，請聯絡管理員。" }) },
+            { "PasswordResetSmsLimited", JObject.FromObject(new { ZhCN = "短信验证码错误次数过多，请10分钟后重新获取。", En = "Too many incorrect SMS codes. Try again in 10 minutes.", ZhTW = "簡訊驗證碼錯誤次數過多，請10分鐘後重新取得。" }) },
+            { "PasswordResetConflict", JObject.FromObject(new { ZhCN = "账号资料已变化，请重新获取验证码后重试。", En = "The account has changed. Request a new verification code and try again.", ZhTW = "帳號資料已變更，請重新取得驗證碼後重試。" }) },
+            { "PasswordResetFailed", JObject.FromObject(new { ZhCN = "密码重置失败，请重新获取验证码后重试。", En = "The password could not be reset. Request a new verification code and try again.", ZhTW = "密碼重設失敗，請重新取得驗證碼後重試。" }) },
+            { "PasswordResetSuccess", JObject.FromObject(new { ZhCN = "密码已重置，请使用新密码登录。", En = "Your password has been reset. Sign in with the new password.", ZhTW = "密碼已重設，請使用新密碼登入。" }) }
         };
 
         public static string GetLang(string osClient, string key, string lang = "cn")
@@ -66,7 +80,9 @@ namespace Microi.net
                     && clientMsg != null
                     && clientMsg.TryGetValue(key, out var jObj))
                 {
-                    return GetJObjectLang(jObj, key, lang);
+                    var translated = GetJObjectLang(jObj, key, lang);
+                    if (!string.IsNullOrWhiteSpace(translated)
+                        && !string.Equals(translated, key, StringComparison.Ordinal)) return translated;
                 }
             }
             catch (System.Exception)
@@ -98,6 +114,8 @@ namespace Microi.net
                             continue;
                         }
                         var value = GetJObjectLang(item.Value, item.Key, lang);
+                        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, item.Key, StringComparison.Ordinal))
+                            value = GetBuiltInLang(item.Key, lang);
                         if (!value.DosIsNullOrWhiteSpace())
                         {
                             result[item.Key] = value;

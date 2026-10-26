@@ -28,5 +28,8 @@ namespace Microi.net
         // 仅可信会话协议可创建独立开发终端；JSON/V8 调用不能设置这些控制位。
         [Newtonsoft.Json.JsonIgnore]
         internal string IndependentSessionSourceToken { get; set; }
+
+        [Newtonsoft.Json.JsonIgnore]
+        internal PasswordAuthenticationSnapshot PasswordAuthentication { get; set; }
     }
 }

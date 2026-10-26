@@ -860,6 +860,14 @@ SSO 与平台短信登录遵循“接口引擎编排，C# 只补不可伪造的�
 | `CreatePlatformSmsProof` | 限频并原子消费短信验证码，签发短时证明 | `platform_auth_sms_login` |
 | `CreatePlatformSmsUser` | 在短信证明约束下创建带盐哈希用户 | `platform_auth_sms_login` |
 | `CompletePlatformSmsLogin` | 原子消费短信证明并签发 DiyToken | `platform_auth_sms_login` |
+| `ResetPlatformSmsPassword({Phone,SmsCode,NewPassword,ConfirmPassword,_Lang})` | 原子消费短信验证码，同时保存密码哈希与 `PwdEncode`，撤销旧会话 | `official_password_reset` |
+| `RepairPlatformPasswordEncoding({UserIds,DryRun,ConfirmExecution,_Lang})` | 主库复核管理员后预览或修复已确认的历史密码编码不一致；最多 20 个用户 | `platform-sys-user-admin` 的 `RepairPasswordEncoding` 动作 |
+
+短信重置与编码修复需要后端 **8.7.5 或更高版本**，配套 SaaS 引擎 **v8.6.13**、系统账号 **v8.4.13**；仅升级应用包不能代替后端能力升级。`official_password_reset` 由 SaaS 包单独以 `Managed` 资源交付，V8 直接返回原子结果，不能自行用 DES 写 `Pwd` 或把密码交给租户 Hook。`Pwd` 与 `PwdEncode` 必须作为一组一致更新：旧脚本只更新 `Pwd` 会造成后台仍可显示遗留密文对应原文，而密码验证按新编码失败。注册、重置与密码登录使用同一原始密码输入，不应在某一环节单独 `trim`。
+
+编码修复默认 `DryRun=true`；实际执行需 `DryRun=false` 与 `ConfirmExecution='REPAIR_PASSWORD_ENCODING'`。返回仅含用户 Id、分类及是否可修复/已修复，不返回密码材料，也不改变用户状态、账号或权限。仅 `State=1` 且未删除的用户可登录，历史 `State=2` 仍是禁用。官网登录的手机号别名只在精确账号不存在且手机号唯一时解析；最终身份仍使用可信认证结果的用户 Id。
+
+前端传入的 `_Lang` 必须继续传给嵌套登录/重置原子。没有参数时可沿用 `lang` 请求头，再默认 `cn`；服务端按语言返回可读错误，语言缓存未预热也不能直接返回 `AccountOrPwdError` 等内部 Key。`V8.TranslateEngine.GetLang(key, lang)` 的第二个参数是目标语言。
 
 接口引擎不得把这些方法包装成“通用用户创建/Token 生成”接口，也不得让客户端传入目标 `OsClient`、任意用户对象、Role Level、Secret 保存位置或回调地址。官方应用分别通过 `app.microi.sso` 与自动安装的 `app.microi.saas-engine` 交付编排代码和 ResourcePolicies；应用尚未安装时，普通账号密码登录仍由最小启动内核保证可用。
 

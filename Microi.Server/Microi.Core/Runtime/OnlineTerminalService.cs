@@ -791,8 +791,27 @@ namespace Microi.net
 
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
             var loginTokenKey = GetLoginTokenKey(osClient, targetUserId);
-            var tokenModel = await cache.GetAsync<CurrentToken>(loginTokenKey).ConfigureAwait(false);
-            var revokedTokenCount = tokenModel?.Tokens?.Count ?? (tokenModel?.Token.DosIsNullOrWhiteSpace() == false ? 1 : 0);
+            var revokedTokenCount = 0;
+            // 与 DiyToken.GetAccessToken 的写回锁一致。删除也必须排在正在进行的续签之后，
+            // 否则续签可能把删除前读到的旧 Token 集合重新写回，复活已撤销会话。
+            var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam
+            {
+                Key = $"{loginTokenKey}:Rotate",
+                OsClient = osClient,
+                Expiry = TimeSpan.FromSeconds(10),
+                RetryIntervalMs = 10,
+                UseExponentialBackoff = true
+            }, async () =>
+            {
+                var tokenModel = await cache.GetAsync<CurrentToken>(loginTokenKey).ConfigureAwait(false);
+                revokedTokenCount = tokenModel?.Tokens?.Count ?? (tokenModel?.Token.DosIsNullOrWhiteSpace() == false ? 1 : 0);
+                // 旧 Token、轮换宽限 Token 和 RefreshToken 共同失去 Redis 事实源。
+                await cache.RemoveAsync(loginTokenKey).ConfigureAwait(false);
+            }).ConfigureAwait(false);
+            if (lockResult.Code != 1)
+            {
+                return new DosResult(0, null, "用户会话撤销繁忙，请稍后重试。");
+            }
             var clientInfo = await cache.GetAsync<ClientInfo>(GetChatOnlineKey(osClient, targetUserId)).ConfigureAwait(false)
                              ?? cache.HashGet<ClientInfo>(GetOnlineHashKey(osClient), targetUserId);
             var connectionIds = (clientInfo?.ConnectionIds ?? new List<string>())
@@ -800,9 +819,6 @@ namespace Microi.net
                 .Where(d => !d.DosIsNullOrWhiteSpace() && !IsTokenConnectionId(d))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-            // 先删除用户级 Token 集合。旧 Token、轮换宽限 Token 和 RefreshToken 都会立即失去 Redis 事实源。
-            await cache.RemoveAsync(loginTokenKey).ConfigureAwait(false);
 
             var logoutReason = reason.DosIsNullOrWhiteSpace("登录信息已被管理员清除，请重新登录。");
             if (RealtimePushRuntime.IsConfigured && connectionIds.Count > 0)

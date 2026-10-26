@@ -10,9 +10,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: platform-sys-user-admin
- * Version: v1.0.4
+ * Version: v1.0.5
  * Function:
- * - 系统账号新增、修改、删除、查询与登录投影刷新；可信权限校验后调用租户扩展 Hook。
+ * - 系统账号新增、修改、删除、查询与登录投影刷新；可信权限校验后调用租户扩展 Hook。历史密码编码修复只经管理员专用可信原子，不进入租户 Hook。
  */
 
 /* LEGACY_ROUTE_ACTIONS_V1:BEGIN */
@@ -60,6 +60,16 @@ function runHook(stage, action, targetUserId) {
 }
 
 var action = text(PARAM.Action).trim();
+// 修复只允许可信原子从当前租户主库复核管理员，并检查密码材料是否确实与编码标识矛盾。
+// 该窄入口不接收明文/密文密码，也不让可编辑租户 Hook 接触凭据或决定修复授权。
+if (action === "RepairPasswordEncoding") {
+  return V8.Method.RepairPlatformPasswordEncoding({
+    UserIds: PARAM.UserIds,
+    DryRun: PARAM.DryRun !== false,
+    ConfirmExecution: PARAM.ConfirmExecution,
+    _Lang: PARAM._Lang || (V8.Header && (V8.Header.lang || V8.Header.Lang)) || 'cn'
+  });
+}
 if (!ACTIONS[action]) {
   return { Code: 0, Msg: "不支持的系统账号操作。" };
 }
