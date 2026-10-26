@@ -9,6 +9,7 @@ import { auditServiceNetworkHtml } from './service-network-audit.mjs'
 const distDir = resolve(process.cwd(), 'docs/.vitepress/dist')
 
 const files = await htmlFiles(distDir)
+const documentUrls = new Set(files.map(file => `${SITE_URL}${canonicalPath(relative(distDir, file))}`))
 const failures = []
 const pageCanonicals = new Map()
 const pageDescriptions = new Map()
@@ -53,7 +54,7 @@ for (const file of files) {
       if (!links.some(link => link.rel === 'alternate' && link.type === 'text/plain' && link.href === textUrl)) failures.push(`${name}: missing readable alternate`)
       try {
         const expected = readableAsset({ html, canonical: expectedCanonical, title: title.replace(/\s*\|\s*Microi吾码$/, ''), description,
-          revision: pageRevision(html, expectedCanonical), textUrl })
+          revision: pageRevision(html, expectedCanonical), textUrl, documentUrls })
         const actual = await readFile(resolve(distDir, textPath.slice(1)), 'utf8')
         if (actual !== expected.text) failures.push(`${name}: readable body differs from published HTML`)
         expectedReadable.set(textUrl, expected.metadata)

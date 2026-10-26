@@ -56,7 +56,9 @@ export async function writeDiscoveryIndex(siteConfig) {
   const groups = new Map([['中文文档', []], ['联系与服务', []], ['English documentation', []], ['案例 / Case studies', []]])
   const published = new Map()
   const documents = []
-  for (const file of await htmlFiles(siteConfig.outDir)) {
+  const files = await htmlFiles(siteConfig.outDir)
+  const documentUrls = new Set(files.map(file => `${SITE_URL}${canonicalPath(relative(siteConfig.outDir, file))}`))
+  for (const file of files) {
     const path = canonicalPath(relative(siteConfig.outDir, file))
     if (!isIndexablePage(path) || !/\/(doc|case|contact)\//.test(path)) continue
     const html = await readFile(file, 'utf8')
@@ -69,7 +71,7 @@ export async function writeDiscoveryIndex(siteConfig) {
     const revision = pageRevision(html, `${SITE_URL}${path}`)
     const revisionLabel = path.startsWith('/en/') ? 'Page revision' : '页面修订'
     const textPath = discoveryTextPath(path)
-    const asset = readableAsset({ html, canonical: `${SITE_URL}${path}`, title, description, revision, textUrl: `${SITE_URL}${textPath}` })
+    const asset = readableAsset({ html, canonical: `${SITE_URL}${path}`, title, description, revision, textUrl: `${SITE_URL}${textPath}`, documentUrls })
     const textFile = join(siteConfig.outDir, textPath.slice(1))
     await mkdir(dirname(textFile), { recursive: true })
     await writeFile(textFile, asset.text, 'utf8')

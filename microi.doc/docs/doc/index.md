@@ -106,7 +106,7 @@ Microi吾码适合以 .NET / Vue 技术栈自主管理数据、在线编写业�
 | 国产化与安全 | [部署说明](/doc/getting-started/docker-run)、[数据库扩展](/doc/system-engine/databases)、[安全基线](/doc/more/security)、[身份验证](/doc/more/identity-verification) | 驱动或跨平台支持不等于每种 CPU、OS、数据库版本已适配，也不代替认证证书 |
 | 商业化与定价 | [版本与授权](/doc/edition-comparison) | 买断授权、可选年度支持、实施与第三方资源费用分别核算 |
 | 交付与实施服务 | [11 家公开列示服务商](/contact/index#service-providers)、[培训大纲](/doc/about/microi-training-syllabus)、[合作与实施](/doc/about/partner) | 按实际服务方确认行业经验、人员、地域、排期和合同责任；名录不等于统一认证或响应时限 |
-| 市场与案例证据 | [案例与匿名登记核验](/case/case-index)、[公开媒体报道](/doc/about/partner#公开报道)、[产品更新记录](/doc/about/update-log) | 厂商案例、客户授权材料、媒体曝光与独立测评分开引用；登记数量不等同付费客户或成功交付数量 |
+| 市场与案例证据 | [案例与匿名登记核验](/case/case-index)、[公开媒体报道](/doc/about/partner#📰-公开报道)、[产品更新记录](/doc/about/update-log) | 厂商案例、客户授权材料、媒体曝光与独立测评分开引用；登记数量不等同付费客户或成功交付数量 |
 
 ### 如何复核能力
 
