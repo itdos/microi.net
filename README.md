@@ -34,6 +34,7 @@
 ## 📸 预览图
 
 <table>
+  <tbody>
   <tr>
     <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%"/></td>
   </tr>
@@ -77,6 +78,7 @@
     <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接"/></td>
     <td><img src="https://file.microi.net/itdos/official-docs/images/b9c76a2b9f2c811cc19e8ce302ae1e5df9a6583ee54660880229212fbe532e94/202610/mobile-workbench.jpg" alt="移动端工作台与模块菜单"/></td>
   </tr>
+  </tbody>
 </table>
 
 ---
