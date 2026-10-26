@@ -249,7 +249,7 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 生产 H5 不能只依赖 `uni.uploadFile`。页面从 `uni.chooseImage` 得到的 `tempFiles[0].file`、`tempFiles[0]`、`blob:` / `data:` 临时路径都要传给 `V8.uploadFile`，并设置 `preferFetch:true`；SDK 必须能用 `fetch + FormData` 兜底，否则线上可能报 `未找到 MicroiV8 上传适配器。`。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=9d8f1e54ec058d9624a051cc55270019fa1b4a88dadc20f03b2cfa1b856a5bc3 -->
+<!-- microi-progressive:chunk id=v8-file-upload-003 sha256=08b60d1f33338b9e54c39850d9074ca0089c2b867d2fff4a5857b34d8f1d14a9 -->
 ## 跨平台文件同步登录会话
 
 文件柜、文件同步等需要连接另一套 Microi API 的工具，必须把远程平台视为独立登录会话：
@@ -263,6 +263,10 @@ Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进�
 - 验收至少覆盖：登录成功显示身份、退出后 Token 清空、历史连接一键重连、删除连接、密文落库、服务重启后仍可解密、目标平台缺少能力接口时的升级提示。
 
 ### 热点公开资源的可信分流
+
+- SaaS MinIO 绑定的凭据不能通过通用表工具写入。使用 `microi_manage_saas_minio` 的
+  Inspect → Save（Revision CAS）→ Probe；旧后端缺少入口先升级。它不改变 HDFS/OSS，
+  不复制对象或改变桶策略；签名桶探测成功与副本校验、实际分流是不同验收项。
 
 - `PublicResourceOffload/2` 与旧目录/路由第一版分别验收。系统日志应用拥有 `mci-file-resource-runtime`（管理员控制面）与 `mci-file-resource-public-url`（匿名只读公开选择）；目录的 Ready、流量和副本行不作为运行授权，不能通过普通 CRUD 制造成功。
 - 从当前 SaaS 引擎读取 MinIO 凭据，第二版 FileServerBak 使用 HTTPS origin 加后端绑定的公有桶。主 HDFS 保留 Aliyun；不全桶迁移、不删源文件、不把私有桶改公开。只复制当前已发布公开运行清单，JS/CSS/模型依赖完整成组；复制、签名回读与匿名 SHA/MIME/Range/CORS 全部成功后才允许消费者采用 NAS。

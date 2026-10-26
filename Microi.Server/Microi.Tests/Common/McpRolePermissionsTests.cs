@@ -48,6 +48,7 @@ public sealed class McpRolePermissionsTests
             Assert.False(McpRoleRequestAuthorization.CanEnter(auth,"NewUnreviewedAction",V8McpScope.Read));
             Assert.False(McpRoleRequestAuthorization.CanEnter(auth,"SetRolePermission",V8McpScope.Admin));
             Assert.False(McpRoleRequestAuthorization.CanEnter(auth,"GetPlaywrightContext",V8McpScope.Admin));
+            Assert.False(McpRoleRequestAuthorization.CanEnter(auth,"ManageSaasMinio",V8McpScope.Admin));
             Assert.False(McpRoleRequestAuthorization.CanEnter(auth,"GetStatus",V8McpScope.Write));
         }
         Assert.False(McpRoleRequestAuthorization.CanEnter(Auth(Grant("Role",true,true)),"GetApiEngineCode",V8McpScope.Read));

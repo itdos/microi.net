@@ -408,6 +408,8 @@ export interface ListEnvelope<T> {
 }
 
 interface RequestOptions {
+  /** 凭据控制面不能把请求体随 HTTP 重定向发送到另一个入口。 */
+  redirect?: 'error';
   timeoutMs?: number;
   /** Ordinary JSON requests stay bounded to ten minutes unless an explicit
    * long-running streaming operation raises this ceiling. */
@@ -1327,6 +1329,7 @@ export class MicroiClient {
       const fetchResponse = await fetch(url, {
         method,
         headers,
+        ...(options.redirect ? { redirect: options.redirect } : {}),
         signal: controller.signal,
         ...(jsonBody !== undefined ? { body: jsonBody } : {}),
       });
@@ -2023,6 +2026,14 @@ export class MicroiClient {
 
   async getAdministrativeCapabilities(): Promise<ApiResponse> {
     return this.get(API.GET_ADMINISTRATIVE_CAPABILITIES);
+  }
+
+  async manageSaasMinio(input: { action: 'Inspect' | 'Probe' | 'Save'; expectedRevision?: string;
+    confirmExecution?: string; configuration?: Record<string, unknown> }): Promise<ApiResponse> {
+    return this.post('/api/V8Engine/ManageSaasMinio', {
+      Action: input.action, ExpectedRevision: input.expectedRevision,
+      ConfirmExecution: input.confirmExecution, Configuration: input.configuration,
+    }, { timeoutMs: this.writeRequestTimeoutMs, operationName: 'SaaS MinIO configuration', allowNativeFallback: false, redirect: 'error' });
   }
 
   async administerTableData(input: {

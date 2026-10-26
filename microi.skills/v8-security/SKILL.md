@@ -53,12 +53,19 @@ Preview 和确认均重验当前客户端、回调及 Scope；账号变化通过
 同一 Managed 会话接口包含本人初始化与敏感管理动作时，精确 `ApiRole` 不能代替动作级鉴权。SaaS v8.4.26 / `platform-sys-user-session` v1.0.5 对已归一化的 `GetSysUserPassword`，先拒绝匿名和访问密钥，再以可信 `V8.CurrentUser`、`V8.Db` 主库的本人活动状态/等级及有效管理员角色核验后调用原可信原子；不读取密码字段做授权，不使用 `DbRead`、客户端身份字段或角色名判断。标准角色授权可用于只读账号的本人会话初始化，不能把整引擎授权解释成敏感动作许可。负例使用预先确认不存在的固定用户 Id：普通账号必须先被管理员门拒绝，管理员仅验证合法路径返回不存在，禁止为验收读取任何真实密码。
 
 <!-- microi-progressive:begin -->
-<!-- microi-progressive:chunk id=v8-security-000 sha256=a6a4311b1a799ea4ed005b22c01cb8230509aaf09aeead5a17c8c46da74772c8 -->
+<!-- microi-progressive:chunk id=v8-security-000 sha256=0dfa03a03298161e6aa29dff18f68fdb00e4f0865cb7562fec090dcadd745c43 -->
 ## 0. 租户动态系统设置与密钥边界
 
 **AI 默认处理路径：** 用户交付第三方 Secret 并授权配置时，优先调用 `microi_manage_server_private_secret`：List 只确认 Key/HasSecret；Save 使用 `confirmExecution=SAVE:<ConfigKey>`，固定 `IsSecret=true / IsPublic=false` 并自动脱敏回读。例如畅捷通使用 `Integration.Changjet.AppSecret`，后端从 `V8.SysConfig.ServerPrivateSettings` 使用。不要仅拒绝硬编码后停止，也不要因为 `OsClientModel` 不暴露密钥而误判服务端 V8 无法调用第三方。工具不提供原文揭示；更换已有 Key 前回读现状，超时只回读、不盲目重写。
 
 第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。公开的租户配置必须建成当前租户 `sys_config` 的实体字段；敏感或仅供后端使用的租户业务配置保存到 `mci_system_setting`。数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。
+
+MinIO 部署凭据使用专用 `microi_manage_saas_minio`，不能误存到普通第三方业务 Secret，
+也不能为此放宽 `microi_admin_table_data` 的秘密字段限制。先 Inspect 当前主租户及运行分区，
+再以其 Revision 和 `SAVE_MINIO:<tenant>:<revision>` 确认保存；省略凭据保留，候选先探测、
+事务行锁 CAS、提交后缓存刷新及运行回读。只返回 HasAccessKey/HasSecretKey，拒绝子租户和
+访问密钥会话，不修改 HDFS/OSS 或桶权限。超时和 Persisted=true 的失败先 Inspect/Probe，
+不能盲重放；旧后端不支持时升级正式后端，禁止用 SQL、普通表单或临时 V8 绕过。
 
 能力是否启用、入口是否显示、公开交互模式等 Bool/Enum 配置即使属于登录或第三方集成，也必须放在 `sys_config`；API Key、ClientSecret、RP ID、Origin、Issuer、Scope、供应商地址等后端参数才放在 `mci_system_setting`。禁止给同一个新配置双写两张表。迁移旧开关时采用“新 `sys_config` 显式值 → 旧私密 Key → 存量安全默认”的只读回退，并从私密设置的列表、保存和删除入口移除旧 Key。
 
