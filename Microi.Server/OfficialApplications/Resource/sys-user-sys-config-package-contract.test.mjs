@@ -111,7 +111,7 @@ test('system-account package exclusively owns admin, preferences, profile and it
   const packageModel = readPackage(packageName)
   assert.equal(packageModel.PackageInfo?.Name, '系统账号')
   assert.equal(packageModel.PackageInfo?.Version, 'v8.4.13')
-  assert.equal(packageModel.PackageInfo?.ServerMinVersion, '8.7.5')
+  assert.equal(packageModel.PackageInfo?.ServerMinVersion, '8.7.4')
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
     ?.includes('V8.Method.RepairPlatformPasswordEncoding'))
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
