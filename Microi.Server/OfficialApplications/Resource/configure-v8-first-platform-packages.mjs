@@ -51,7 +51,7 @@ export const packageDefinitions = Object.freeze([
     capabilities: [
       'ApiEngine:platform-user-update-preferences@v1.1.7',
       'ApiEngine:platform-user-update-profile@v1.0.1',
-      'ApiEngine:platform-sys-user-admin@v1.0.2',
+      'ApiEngine:platform-sys-user-admin@v1.0.5',
       'ApiEngine:platform-user-custom-hook@v1.0.0',
       'V8.Method.PrepareCurrentUserProfileUpdate',
       'V8.Method.ManageSysUserAdmin',
@@ -60,6 +60,7 @@ export const packageDefinitions = Object.freeze([
       'ServerField:sys_apiengine.ApiRoutes',
       'ServerField:sys_user.HomeUsageStats',
       'ApiEngine:platform-home-overview@v1.0.0',
+      'V8.Method.RepairPlatformPasswordEncoding',
     ],
     exactEngineKeys: [
       'platform-user-update-preferences',

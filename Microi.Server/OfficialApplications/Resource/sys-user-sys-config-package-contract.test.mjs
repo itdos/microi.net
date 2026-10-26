@@ -115,7 +115,7 @@ test('system-account package exclusively owns admin, preferences, profile and it
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
     ?.includes('V8.Method.RepairPlatformPasswordEncoding'))
   assert.ok(packageModel.PackageInfo?.RequiredPlatformCapabilities
-    ?.includes('ApiEngine:platform-sys-user-admin@v1.0.2'))
+    ?.includes('ApiEngine:platform-sys-user-admin@v1.0.5'))
 
   for (const key of ['platform-user-update-preferences', 'platform-user-update-profile', 'platform-sys-user-admin']) {
     const engine = assertOwnedEngine(packageName, key, {
