@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import test from 'node:test';
 import {inspectNugetPackage,inspectNugetSet,captureDockerPlan,recheckDockerPlan,inspectDockerRemote,confirmDockerPublication,writeDockerPublicationReceipt} from '../../tools/release-remote-collision.mjs';
 
@@ -120,20 +120,38 @@ test('actual Docker confirmation writes its receipt only after verification and 
 }));
 
 for(const scenario of ['success','digest-mismatch','readback-timeout','push-failed'])test(`actual platform Docker loop requires post-push confirmation before completion: ${scenario}`,()=>fixture(root=>{
- const script=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
+ const scriptFile=fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url));
+ const script=fs.readFileSync(scriptFile,'utf8');
  const start=script.indexOf('docker_push_plan() {'),end=script.indexOf('\nif [ ${#SELECTED_API_PLANS',start);
  assert.ok(start>0&&end>start);const loop=script.slice(start,end);
+ const guardStart=script.indexOf('validate_publish_artifacts() {'),guardEnd=script.indexOf('\n}',guardStart)+2;
+ assert.ok(guardStart>0&&guardEnd>guardStart);const artifactGuard=script.slice(guardStart,guardEnd);
+ const template=fs.readFileSync(path.join(path.dirname(scriptFile),'Microi.Server/Microi.net.Api/appsettings.json'));
+ fs.mkdirSync(path.join(root,'fixture'),{recursive:true});
+ fs.mkdirSync(path.join(root,'Microi.Server/Microi.net.Api'),{recursive:true});
+ fs.writeFileSync(path.join(root,'Microi.Server/Microi.net.Api/appsettings.json'),template);
+ fs.writeFileSync(path.join(root,'fixture/appsettings.json'),template);
+ for(const name of ['Microi.net.Api.dll','Microi.net.Api.deps.json','Microi.net.Api.runtimeconfig.json'])fs.writeFileSync(path.join(root,'fixture',name),'fixture');
+ const imageAdapter=path.join(root,'verify-fixture-image.mjs');
+ fs.writeFileSync(imageAdapter,`import fs from 'node:fs';import {verifyPublishedImage} from ${JSON.stringify(pathToFileURL(path.join(path.dirname(scriptFile),'Microi.Server/tools/release-smoke-config.mjs')).href)};
+ const [image,template,published]=process.argv.slice(2);
+ const run=(_command,args)=>{if(args[0]==='image')return 'sha256:'+'a'.repeat(64);if(args[0]==='create')return 'b'.repeat(64);if(args[0]==='cp'){fs.copyFileSync(published,args.at(-1));return '';}if(args[0]==='rm')return '';throw Error('Unexpected Docker operation');};
+ console.log(JSON.stringify(verifyPublishedImage(image,template,run)));`);
+ const shellQuote=value=>"'"+value.replaceAll('\\','/').replaceAll("'","'\\''")+"'";
  fs.mkdirSync(path.join(root,'Microi.Server/Microi.net.Api/bin/Release'),{recursive:true});
  const git=process.platform==='win32'?spawnSync('git',['--exec-path'],{encoding:'utf8'}):null;
  const bash=git?path.resolve(git.stdout.trim(),'../../..','bin/bash.exe'):'bash';
  const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:root,encoding:'utf8',timeout:15000,input:`set -e
 MICROI_RELEASE_GATE_DIR="$PWD"; MICROI_RELEASE_CANDIDATE=fixture; PUBLISH_DIR=fixture; MICROI_ENCRYPTION_RECEIPT=fixture
+MICROI_RELEASE_WORKSPACE="$PWD"; MICROI_SMOKE_CONFIG_TOOL=${shellQuote(path.join(path.dirname(scriptFile),'Microi.Server/tools/release-smoke-config.mjs'))}; REAL_NODE=${shellQuote(process.execPath)}; IMAGE_FIXTURE=${shellQuote(imageAdapter)}
 COMMAND_LOG="$PWD/budget-calls.txt"
 PUBLISH_BACKEND=true; BUILD_CLIENT=false; HAS_ENCRYPT=true; DOCKER_REGISTRY=registry.test; DOCKER_NAMESPACE=team
 print_step(){ :; }; print_info(){ :; }; print_warning(){ :; }; print_fail(){ printf 'FAILED=%s\\n' "$*"; exit 17; }; print_success(){ printf 'COMPLETE=%s\\n' "$*"; }
 run_release_command(){ printf 'BUDGET=%s\\n' "$*" >> "$COMMAND_LOG"; "$@"; }
 node(){
- if [ "$2" = docker-confirm ]; then
+ if [ "$1" = "$MICROI_SMOKE_CONFIG_TOOL" ]; then
+  if [ "$2" = image ]; then "$REAL_NODE" "$IMAGE_FIXTURE" "$3" "$4" "$PUBLISH_DIR/appsettings.json"; else "$REAL_NODE" "$@"; fi
+ elif [ "$2" = docker-confirm ]; then
   printf 'CONFIRM=%s\\n' "$4"
   ${scenario==='digest-mismatch'?'return 1':scenario==='readback-timeout'?'return 124':':' }
   printf 'verified' > "$5"
@@ -142,6 +160,7 @@ node(){
 docker(){
  if [ "$1" = push ]; then printf 'PUSH=%s\\n' "$2"; ${scenario==='push-failed'?'return 42':':'}; fi
 }
+${artifactGuard}
 ${loop}
 docker_push_plan 'fixture|api|local|api:{latest},api:{version}' 8.6.4
 `});

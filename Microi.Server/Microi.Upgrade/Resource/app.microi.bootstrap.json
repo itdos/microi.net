@@ -36207,7 +36207,7 @@
       "SchemaVersion": 2,
       "ApplicationType": "MicroService",
       "IncludeSource": false,
-      "VersionNo": "v2.0.30",
+      "VersionNo": "v2.0.31",
       "EntryPath": "index.html",
       "Application": {
         "Id": "01KX83R13GPCHWW8JZ0B7RS0DP",
@@ -36220,9 +36220,9 @@
         "Category": "tools",
         "PublisherType": "官方应用",
         "Description": "吾码平台内置微服务，包含系统日志/监控、系统设置、通知中心、AI 治理与应用商城等平台能力。",
-        "CurrentVersion": 89,
+        "CurrentVersion": 90,
         "EntryPath": "index.html",
-        "BuildVersion": "v2.0.30"
+        "BuildVersion": "v2.0.31"
       },
       "PackageAssets": {
         "SchemaVersion": 2,
@@ -36230,15 +36230,15 @@
         "AppKey": "microi-platform-service",
         "AppName": "吾码平台内置微服务",
         "ApplicationType": "MicroService",
-        "PackageVersion": "v2.0.30",
+        "PackageVersion": "v2.0.31",
         "IncludeSource": false,
-        "PreparedTime": "2026-10-26 03:31:58"
+        "PreparedTime": "2026-10-26 05:56:46"
       },
       "MicroService": {
         "Id": "01KX7M4M9F1KTKBT7YNTP4VH17",
         "ParentId": null,
         "CreateTime": "2026-07-11 11:39:34",
-        "UpdateTime": "2026-10-26 03:31:58",
+        "UpdateTime": "2026-10-26 05:56:46",
         "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
         "UserName": "管理员",
         "IsDeleted": 0,
@@ -36250,14 +36250,14 @@
         "IsEnable": 1,
         "StorageMode": "db",
         "Runtime": "micro-app",
-        "BuildVersion": "v2.0.30",
+        "BuildVersion": "v2.0.31",
         "EntryPath": "index.html",
-        "AssetManifestJson": "{\"SchemaVersion\":2,\"MsKey\":\"microi-platform-service\",\"BuildVersion\":\"v2.0.30\",\"EntryPath\":\"index.html\",\"StorageMode\":\"db\",\"PublishStatus\":\"Published\",\"VerificationStatus\":\"Verified\",\"RequestId\":\"e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839\",\"DeliveryBatchId\":\"database-e2df41a2b2cc5977f2deafc8\",\"SourceManifestHash\":\"918eaa71734c265bd49a497011d7c90db793a0453cee5e8eca466823e7fb9f5c\",\"RuntimeManifestHash\":\"e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839\",\"VerifiedAt\":\"2026-10-25T19:31:58.396Z\",\"PublishedAt\":\"2026-10-25T19:31:58.396Z\",\"Assets\":[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-D430wMWI.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/index-D430wMWI.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-D430wMWI.js\",\"Sha256\":\"a9c6a9f5cf7cdf933d5c20487129e29468a41e7ebe6f00c248311fb1933e6778\",\"Size\":639119,\"IsEntry\":false},{\"Path\":\"assets/index-SVQmpC2m.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/index-SVQmpC2m.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-SVQmpC2m.css\",\"Sha256\":\"f2bfa604f32947bcea4265f6468a860ac78eb64d742e41aee2d43f8c690b4ce1\",\"Size\":254755,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"6958cc30de5e2a5949c481c48ffa346dbe65bafae156966069cb00ea2fdd36d6\",\"Size\":383,\"IsEntry\":true}]}",
-        "AssetsJson": "[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-D430wMWI.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/index-D430wMWI.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-D430wMWI.js\",\"Sha256\":\"a9c6a9f5cf7cdf933d5c20487129e29468a41e7ebe6f00c248311fb1933e6778\",\"Size\":639119,\"IsEntry\":false},{\"Path\":\"assets/index-SVQmpC2m.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/index-SVQmpC2m.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-SVQmpC2m.css\",\"Sha256\":\"f2bfa604f32947bcea4265f6468a860ac78eb64d742e41aee2d43f8c690b4ce1\",\"Size\":254755,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"6958cc30de5e2a5949c481c48ffa346dbe65bafae156966069cb00ea2fdd36d6\",\"Size\":383,\"IsEntry\":true}]",
+        "AssetManifestJson": "{\"SchemaVersion\":2,\"MsKey\":\"microi-platform-service\",\"BuildVersion\":\"v2.0.31\",\"EntryPath\":\"index.html\",\"StorageMode\":\"db\",\"PublishStatus\":\"Published\",\"VerificationStatus\":\"Verified\",\"RequestId\":\"e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839\",\"DeliveryBatchId\":\"database-e2df41a2b2cc5977f2deafc8\",\"SourceManifestHash\":\"7a67c647b8d703d616eb6b3a2a0fca3ec64bd8f4a6b877454bbca769f000be82\",\"RuntimeManifestHash\":\"e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839\",\"VerifiedAt\":\"2026-10-25T21:56:46.925Z\",\"PublishedAt\":\"2026-10-25T21:56:46.925Z\",\"Assets\":[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-D430wMWI.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/index-D430wMWI.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-D430wMWI.js\",\"Sha256\":\"a9c6a9f5cf7cdf933d5c20487129e29468a41e7ebe6f00c248311fb1933e6778\",\"Size\":639119,\"IsEntry\":false},{\"Path\":\"assets/index-SVQmpC2m.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/index-SVQmpC2m.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-SVQmpC2m.css\",\"Sha256\":\"f2bfa604f32947bcea4265f6468a860ac78eb64d742e41aee2d43f8c690b4ce1\",\"Size\":254755,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"6958cc30de5e2a5949c481c48ffa346dbe65bafae156966069cb00ea2fdd36d6\",\"Size\":383,\"IsEntry\":true}]}",
+        "AssetsJson": "[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-D430wMWI.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/index-D430wMWI.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-D430wMWI.js\",\"Sha256\":\"a9c6a9f5cf7cdf933d5c20487129e29468a41e7ebe6f00c248311fb1933e6778\",\"Size\":639119,\"IsEntry\":false},{\"Path\":\"assets/index-SVQmpC2m.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/index-SVQmpC2m.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-SVQmpC2m.css\",\"Sha256\":\"f2bfa604f32947bcea4265f6468a860ac78eb64d742e41aee2d43f8c690b4ce1\",\"Size\":254755,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"6958cc30de5e2a5949c481c48ffa346dbe65bafae156966069cb00ea2fdd36d6\",\"Size\":383,\"IsEntry\":true}]",
         "DistHash": "e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839",
         "AssetCount": 4,
         "TotalSize": "915566",
-        "PublishTime": "2026-10-26 03:31:58",
+        "PublishTime": "2026-10-26 05:56:46",
         "SourceDirName": "microi-platform-service",
         "Description": "吾码平台内置微服务，包含系统日志/监控、系统设置、通知中心、AI 治理与应用商城等平台能力。",
         "ApplicationType": "MicroService",
@@ -36267,15 +36267,15 @@
         "DeliveryBatchId": "saas-diagnostics-20260908",
         "RequestId": "saas-diagnostics-runtime-20260908",
         "RequestFingerprint": "f8eb1905fa362a2ebc7f3403092c272d66967c68223e7a69e3c689580d61d76c",
-        "RouteSnapshotJson": "[{\"Id\":\"mcimp-4d6a83fb5b62e2fdf7166643e0aa8f\",\"CreateTime\":\"2026-08-17 04:18:15\",\"UpdateTime\":\"2026-10-26 03:31:58\",\"UserId\":\"c74d669c-a3d4-11e5-b60d-b870f43edd03\",\"UserName\":\"管理员\",\"IsDeleted\":0,\"MicroServiceId\":\"01KX7M4M9F1KTKBT7YNTP4VH17\",\"MicroServiceKey\":\"microi-platform-service\",\"PageKey\":\"marketplace\",\"PageName\":\"marketplace\",\"PageTitle\":\"全能应用商城\",\"RoutePath\":\"/marketplace\",\"EntryPath\":\"index.html\",\"MenuUrl\":\"/micro-app/microi-platform-service/marketplace\",\"Sort\":80,\"IsHome\":0,\"IsEnable\":1,\"BuildVersion\":\"v2.0.30\",\"RouteMetaJson\":\"{\\\"LegacyMenuUrls\\\":[\\\"/microi-store\\\"]}\",\"SourceDirName\":\"microi-platform-service\",\"LegacyMenuUrls\":[\"/microi-store\"]}]",
-        "RouteSnapshotHash": "7a8461e53de21cc76f0235c13583e1c3a57a75f0e51da9ddc9803722d24a51bc",
+        "RouteSnapshotJson": "[{\"Id\":\"mcimp-4d6a83fb5b62e2fdf7166643e0aa8f\",\"CreateTime\":\"2026-08-17 04:18:15\",\"UpdateTime\":\"2026-10-26 05:56:46\",\"UserId\":\"c74d669c-a3d4-11e5-b60d-b870f43edd03\",\"UserName\":\"管理员\",\"IsDeleted\":0,\"MicroServiceId\":\"01KX7M4M9F1KTKBT7YNTP4VH17\",\"MicroServiceKey\":\"microi-platform-service\",\"PageKey\":\"marketplace\",\"PageName\":\"marketplace\",\"PageTitle\":\"全能应用商城\",\"RoutePath\":\"/marketplace\",\"EntryPath\":\"index.html\",\"MenuUrl\":\"/micro-app/microi-platform-service/marketplace\",\"Sort\":80,\"IsHome\":0,\"IsEnable\":1,\"BuildVersion\":\"v2.0.31\",\"RouteMetaJson\":\"{\\\"LegacyMenuUrls\\\":[\\\"/microi-store\\\"]}\",\"SourceDirName\":\"microi-platform-service\",\"LegacyMenuUrls\":[\"/microi-store\"]}]",
+        "RouteSnapshotHash": "849f89fd5d9a164991419c37be7aabe998652e88bb9c48af142c2445dda23546",
         "RouteCount": 1
       },
       "Routes": [
         {
           "Id": "mcimp-4d6a83fb5b62e2fdf7166643e0aa8f",
           "CreateTime": "2026-08-17 04:18:15",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -36290,7 +36290,7 @@
           "Sort": 80,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{\"LegacyMenuUrls\":[\"/microi-store\"]}",
           "SourceDirName": "microi-platform-service",
           "LegacyMenuUrls": [
