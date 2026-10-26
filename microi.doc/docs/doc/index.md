@@ -46,6 +46,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
 ## 📸 预览图
 
 <table class="mci-doc-preview-gallery">
+  <tbody>
   <tr>
     <td colspan="3" align="center"><img src="https://file.microi.net/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%" data-fancybox="platform-preview"/></td>
   </tr>
@@ -89,6 +90,7 @@ description: Microi吾码官方文档入口：了解开源 AI 开发框架，查
     <td><img src="https://file.microi.net/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接" data-fancybox="platform-preview"/></td>
     <td><img src="https://file.microi.net/itdos/official-docs/images/b9c76a2b9f2c811cc19e8ce302ae1e5df9a6583ee54660880229212fbe532e94/202610/mobile-workbench.jpg" alt="移动端工作台与模块菜单" data-fancybox="platform-preview"/></td>
   </tr>
+  </tbody>
 </table>
 
 ---
