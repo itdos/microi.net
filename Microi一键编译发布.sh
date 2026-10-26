@@ -133,6 +133,8 @@ MICROI_COMPLETE_PLATFORM_RELEASE=false
 MICROI_PLATFORM_FRONTEND_TESTS=false
 MICROI_REQUESTED_RELEASE_VERSION=""
 MICROI_RELEASE_VERSION_EXPLICIT=false
+MICROI_RELEASE_RESUME=""
+MICROI_RELEASE_SESSION=""
 if [ "${1:-}" = "--full-only" ]; then
     MICROI_FULL_ONLY=true
 fi
@@ -142,6 +144,12 @@ if [ "${1:-}" = "--docker-only-hotfix" ]; then
 fi
 for _release_argument in "$@"; do
     case "$_release_argument" in
+        --resume=*)
+            [ -z "$MICROI_RELEASE_RESUME" ] || { echo "--resume 只能指定一次。" >&2; exit 1; }
+            MICROI_RELEASE_RESUME="${_release_argument#--resume=}"
+            [ -n "$MICROI_RELEASE_RESUME" ] || { echo "--resume 必须指定原发布会话 JSON。" >&2; exit 1; }
+            MICROI_COMPLETE_PLATFORM_RELEASE=true ;;
+        --resume) echo "请使用 --resume=<原发布会话JSON>；不要截取或改写原脚本续发。" >&2; exit 1 ;;
         --full-only) MICROI_FULL_ONLY=true ;;
         --platform-frontend-tests) MICROI_PLATFORM_FRONTEND_TESTS=true ;;
         --docker-only-hotfix) MICROI_DOCKER_ONLY_HOTFIX=true ;;
@@ -500,6 +508,10 @@ print_fail() {
     echo -e "  ${RED}${BOLD}发布流程已中止！请修复上述错误后重新执行。${NC}"
     echo -e "  ${RED}════════════════════════════════════════════════════════════${NC}"
     check_release_budget
+    if [ -n "$MICROI_RELEASE_SESSION" ]; then
+        echo "  保留本轮候选、测试、制品和已发布回执。修复后执行："
+        printf '  bash %q --resume=%q\n' "$0" "$MICROI_RELEASE_SESSION"
+    fi
     exit 1
 }
 
@@ -513,6 +525,27 @@ print_info() {
 
 print_divider() {
     echo -e "  ${DIM}────────────────────────────────────────────────────────${NC}"
+}
+
+# 同一正式入口原生恢复，不 source JSON、不 eval 命令，也不截取脚本后半段。
+MICROI_RELEASE_SESSION_TOOL="$PWD/Microi.Server/tools/release-session.mjs"
+if [ -n "$MICROI_RELEASE_RESUME" ]; then
+    MICROI_RELEASE_SESSION="$MICROI_RELEASE_RESUME"
+    _session_version=$(node "$MICROI_RELEASE_SESSION_TOOL" get "$MICROI_RELEASE_SESSION" version) || print_fail "无法读取原发布会话。"
+    if [ -n "$MICROI_REQUESTED_RELEASE_VERSION" ] && [ "$MICROI_REQUESTED_RELEASE_VERSION" != "$_session_version" ]; then print_fail "--resume 不能切换成另一个发布版本。"; fi
+    MICROI_REQUESTED_RELEASE_VERSION="$_session_version"
+    MICROI_RELEASE_GATE_DIR=$(node "$MICROI_RELEASE_SESSION_TOOL" get "$MICROI_RELEASE_SESSION" gate) || print_fail "原发布目录无效。"
+fi
+release_stage_needed() {
+    [ -n "$MICROI_RELEASE_SESSION" ] || return 0
+    local decision
+    decision=$(node "$MICROI_RELEASE_SESSION_TOOL" decision "$MICROI_RELEASE_SESSION" "$1") || print_fail "原步骤证据失效：$1；禁止静默重跑或覆盖已发布内容。"
+    if [ "$decision" = reuse ]; then print_info "核验并复用已完成步骤: $1" >&2; return 1; fi
+    [ "$decision" = run ] || print_fail "未知步骤状态：$1"
+}
+release_stage_seal() {
+    [ -n "$MICROI_RELEASE_SESSION" ] || return 0
+    node "$MICROI_RELEASE_SESSION_TOOL" seal "$MICROI_RELEASE_SESSION" "$@" || print_fail "无法保存本步骤的成功证据。"
 }
 
 # 发布进程专用输出目录。空间紧张时可指向其它盘的绝对路径；不进入生产 API 配置。
@@ -1198,11 +1231,32 @@ sleep 1
 # 开始执行
 # ══════════════════════════════════════════════════════════════
 START_TIME=$(date +%s)
+if [ -n "$MICROI_RELEASE_RESUME" ]; then
+    START_TIME=$(node "$MICROI_RELEASE_SESSION_TOOL" get "$MICROI_RELEASE_SESSION" started) || print_fail "原累计起点无效。"
+fi
 if [ "$MICROI_FULL_ONLY" != true ]; then
     MICROI_RELEASE_DEADLINE=$((START_TIME + 1800))
     MICROI_RELEASE_TIMING_FILE="$MICROI_RELEASE_GATE_DIR/release-timing-${START_TIME}-$$.jsonl"
+    if [ -n "$MICROI_RELEASE_RESUME" ]; then
+        MICROI_RELEASE_TIMING_FILE=$(node "$MICROI_RELEASE_SESSION_TOOL" get "$MICROI_RELEASE_SESSION" timing) || print_fail "原计时回执无效。"
+        MICROI_RELEASE_PHASE="断点恢复（含上次退出后的修复或等待）"
+    fi
     if is_windows_shell; then MICROI_RELEASE_TIMING_FILE=$(cygpath -m "$MICROI_RELEASE_TIMING_FILE"); fi
     print_info "普通发布耗时目标 30 分钟；超过后告警并继续，阶段耗时记录: $MICROI_RELEASE_TIMING_FILE"
+fi
+
+if [ "$MICROI_COMPLETE_PLATFORM_RELEASE" = true ]; then
+    # 仅摘要配置与渠道，不把 ApiKey/DockerPassword 等秘密写入会话或命令行。
+    _session_config_hash=$(node -e 'const fs=require("node:fs"),c=require("node:crypto");process.stdout.write(c.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"))' "$CONFIG_FILE")
+    _session_plan="$_session_config_hash|$VERSION|${SELECTED_API_PLANS[*]}|${SELECTED_CLIENT_PLANS[*]}|$PUBLISH_DOC|$MICROI_PLATFORM_FRONTEND_TESTS|$CLIENT_BUILD_OUTPUT_LABEL"
+    if [ -n "$MICROI_RELEASE_RESUME" ]; then
+        node "$MICROI_RELEASE_SESSION_TOOL" plan "$MICROI_RELEASE_SESSION" "$_session_plan" || print_fail "原发布渠道或配置已变化。"
+        _resume_candidate=$(node "$MICROI_RELEASE_SESSION_TOOL" get "$MICROI_RELEASE_SESSION" candidate) || print_fail "原候选无效。"
+    else
+        MICROI_RELEASE_SESSION="$MICROI_RELEASE_GATE_DIR/session-${START_TIME}-$$.json"
+        node "$MICROI_RELEASE_SESSION_TOOL" init "$MICROI_RELEASE_SESSION" "$PWD" "$VERSION" "$START_TIME" "$MICROI_RELEASE_TIMING_FILE" "$MICROI_RELEASE_GATE_DIR" "$_session_plan" || print_fail "无法建立本轮发布会话。"
+    fi
+    print_info "发布会话（续发沿用版本、渠道和累计起点）: $MICROI_RELEASE_SESSION"
 fi
 
 # 按所选产品取得锁；Full 构建使用本次结果目录隔离，服务保持运行供业务回归。
@@ -1236,6 +1290,8 @@ if [ "$PUBLISH_DOC" = true ]; then
     run_release_command node microi.doc/scripts/check-account-portal.mjs --require-committed
     # 链接错误应在测试、编译和渠道上传前发现，避免推送 API/PC 后才返工官网。
     (cd microi.doc && run_release_command node scripts/check-open-source-links.mjs)
+    # 只核对分发输入，不执行 Agent 产品测试；缺件必须在整套回归前暴露。
+    run_release_command node --test --test-name-pattern='workspace Skills and the packaged Codex plugin carry the same rules' microi.doc/tests/microservice-docs.test.mjs
 fi
 
 # 前端资源预检必须发生在版本号、升级资源和其它源码变更之前。
@@ -1249,7 +1305,7 @@ if [ "$BUILD_CLIENT" = true ]; then
 fi
 
 # ─── 阶段（条件）: 更新版本号 ─────────────────────────────
-if [ "$BUMP_VERSION" = true ]; then
+if [ "$BUMP_VERSION" = true ] && [ -z "${_resume_candidate:-}" ]; then
     if [ "$CURRENT_VERSION" = "$VERSION" ]; then
         print_phase "确认版本号（前后端统一继续发布: ${VERSION}）"
     else
@@ -1317,7 +1373,7 @@ fi
 
 # 先把官网三方合并和包版本推进完成，再冻结并测试最终正文；否则测试后自动
 # 升版会使已验收候选失效。此阶段只准备本地文件，不写官网或共同基线。
-if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ] && [ "$MICROI_FULL_ONLY" != true ]; then
+if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ] && [ "$MICROI_FULL_ONLY" != true ] && [ -z "${_resume_candidate:-}" ]; then
     print_phase "准备官方应用资源发布候选（仅本地合并）"
     if ! run_release_command node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --prepare-candidate --allow-verified-offline; then
         print_fail "官方应用资源候选准备失败；尚未开始整套测试或写入官网，请先解决资源合并问题。"
@@ -1329,6 +1385,15 @@ fi
 # 真实付费 AI、JUNCHI/XJY 客户数据、SQL Server 及独立应用源码验收属于独立专项，不进入默认平台发布。
 # 显式 Full 保留真实业务深度验收；两种范围分别冻结和验证，失败均停止发布。
 if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "${PLATFORM_DOCKER_SELECTED:-false}" = true ]; then
+    _resume_candidate=""
+    if [ -n "$MICROI_RELEASE_RESUME" ]; then
+        _resume_candidate=$(node "$MICROI_RELEASE_SESSION_TOOL" get "$MICROI_RELEASE_SESSION" candidate) || print_fail "原候选记录无效。"
+    fi
+    if [ -n "$_resume_candidate" ]; then
+        MICROI_RELEASE_CANDIDATE="$_resume_candidate"
+        export MICROI_RELEASE_CANDIDATE
+        run_release_command node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "源码或配置变化，不能复用原发布候选。"
+    else
     # bin/Release/Dockerfile 是已跟踪的 Docker 构建配方投影。必须在冻结候选前
     # 从单一事实源同步，否则 Docker 阶段再复制会导致 Full 后候选漂移。
     if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] && [ -f "Microi.Server/Microi.net.Api/Dockerfile.runtime" ]; then
@@ -1349,6 +1414,11 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
     if ! run_release_command node Microi.Server/tools/release-candidate.mjs capture "$MICROI_RELEASE_CANDIDATE"; then
         print_fail "无法记录所选产品范围的候选源码；已停止发布。"
     fi
+    if [ -n "$MICROI_RELEASE_SESSION" ]; then
+        node "$MICROI_RELEASE_SESSION_TOOL" bind "$MICROI_RELEASE_SESSION" "$MICROI_RELEASE_CANDIDATE" "$CLIENT_VERSION" || print_fail "无法绑定冻结候选。"
+    fi
+    fi
+    if release_stage_needed tests; then
     if command -v pwsh >/dev/null 2>&1; then
         _test_powershell="pwsh"
     elif command -v powershell.exe >/dev/null 2>&1; then
@@ -1387,11 +1457,16 @@ if [ "$MICROI_FULL_ONLY" = true ] || [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_
       MICROI_RELEASE_TEST_RECEIPT="$_full_test_results/platform-release-result.json"
       if is_windows_shell; then MICROI_RELEASE_TEST_RECEIPT=$(cygpath -m "$MICROI_RELEASE_TEST_RECEIPT"); fi
       export MICROI_RELEASE_TEST_RECEIPT
+      release_stage_seal tests "$MICROI_RELEASE_TEST_RECEIPT"
     fi
     if ! run_release_command node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE"; then
         print_fail "验收期间源码发生变化；必须对最终候选重新执行所选范围的测试。"
     fi
     print_success "Microi.Tests ${MICROI_RELEASE_TEST_POLICY} 冻结候选回归通过"
+    else
+        MICROI_RELEASE_TEST_RECEIPT=$(node "$MICROI_RELEASE_SESSION_TOOL" get "$MICROI_RELEASE_SESSION" tests) || print_fail "缺少原始测试回执。"
+        export MICROI_RELEASE_TEST_RECEIPT
+    fi
 fi
 
 # 插件发行修复等需要复验 Full，但不能重新生成或覆盖已成功发布的不可变平台制品。
@@ -1419,10 +1494,23 @@ if [ "$PUBLISH_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
         print_fail "当前版本源码尚未通过所选范围测试；请用最终候选重跑发布。Microi.Ops 保持独立版本。"
     fi
 fi
+# 524 可能发生在服务端已提交之后。原同步器先回读全部资源，再仅写差异并做 CAS；
+# 只在这个有幂等回读语义的动作上恢复一次，不能给所有发布命令加盲目重试。
+publish_resources_with_readback() {
+    local log="$MICROI_RELEASE_SCRATCH/resources-publish.log"
+    if run_release_command node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate 2>&1 | tee "$log"; then return 0; fi
+    if grep -Eq 'HTTP[^0-9]{0,8}524|status[^0-9]{0,8}524' "$log"; then
+        print_warning "官方资源返回 524；先回读实际状态，仅恢复差异，不重做测试或本地候选准备。"
+        run_release_command node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate
+    else
+        return 1
+    fi
+}
+
 # 后端发布产物会把 Resource 下的基础应用打入程序集，因此必须在编译前校验资源。
 # 常规流程会同步并写回 iTdos；正式发布可显式延后官方应用写回，先完成平台渠道。
 # 延后模式要求发布前已完成只读三方预合并，渠道成功后再按远端哈希并发保护写回。
-if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ]; then
+if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ] && release_stage_needed resources; then
     print_phase "同步 iTdos 官网与后端内置升级资源"
     if ! command -v node >/dev/null 2>&1; then
         print_fail "未找到 Node.js，无法执行升级资源三方同步"
@@ -1432,15 +1520,16 @@ if [ "$PUBLISH_BACKEND" = true ] && [ "$MICROI_DOCKER_ONLY_HOTFIX" != true ]; th
             print_fail "内置升级资源校验失败；已阻止后端发布"
         fi
         print_info "官方应用写回已安排在平台渠道与插件成功后执行；本阶段仅校验本地候选。"
-    elif ! run_release_command node Microi.Server/OfficialApplications/Resource/refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate; then
+    elif ! publish_resources_with_readback; then
         print_fail "升级资源同步失败；已阻止后端发布，避免官网与内置应用商城互相覆盖"
     fi
     print_success "升级资源安全检查已完成（实时同步或已验证离线基线，详见上方明细）"
+    release_stage_seal resources
 fi
 
 # 前端优先于 .NET 全量编译执行，避免后端编译产生的文件缓存和短期内存占用
 # 挤压 Vite 启动空间；Chrome 49 兼容包只在显式选择后生成。
-if [ "$BUILD_CLIENT" = true ]; then
+if [ "$BUILD_CLIENT" = true ] && release_stage_needed client; then
     print_phase "编译前端 Microi.Client"
 
     if [ "$BUILD_CLIENT_LEGACY" = true ]; then
@@ -1457,6 +1546,9 @@ if [ "$BUILD_CLIENT" = true ]; then
     cd ..
     echo ""
     print_success "前端编译成功"
+    if [ -n "$MICROI_RELEASE_SESSION" ]; then
+        node "$MICROI_RELEASE_SESSION_TOOL" seal-tree "$MICROI_RELEASE_SESSION" client "$PWD/Microi.Client/bin/Release/dist" || print_fail "无法保存前端构建证据。"
+    fi
 fi
 
 # Windows 并行编译时文件锁竞争问题，强制单线程（macOS/Linux 不需要）
@@ -1465,6 +1557,10 @@ if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
     _BUILD_EXTRA_ARGS="-m:1 -nodeReuse:false -p:UseSharedCompilation=false"
 fi
 
+PUBLISH_DIR="Microi.Server/Microi.net.Api/bin/Release/publish"
+DLL_ENCRYPTED=false
+NUPKG_REPLACED=false
+if release_stage_needed backend; then
 # ─── 阶段（条件）: 编译后端解决方案 ──────────────────────
 if [ "$BUILD_BACKEND" = true ]; then
     print_phase "编译后端解决方案"
@@ -1500,9 +1596,6 @@ if [ "$BUILD_BACKEND" = true ]; then
 fi
 
 # ─── 阶段（条件）: 发布 + 冒烟 + 加密 ────────────────────
-PUBLISH_DIR="Microi.Server/Microi.net.Api/bin/Release/publish"
-DLL_ENCRYPTED=false
-
 if [ "$PUBLISH_BACKEND" = true ]; then
     print_phase "发布 Microi.net.Api"
 
@@ -1866,6 +1959,21 @@ if [ "$DLL_ENCRYPTED" = true ] && { [ "$PUSH_NUGET" = true ] || [ "$DEPLOY_MODE"
     NUPKG_REPLACED=true
 fi
 
+if [ -n "$MICROI_RELEASE_SESSION" ] && [ "$PUBLISH_BACKEND" = true ]; then
+    run_release_command node Microi.Server/tools/release-artifact.mjs capture api "$MICROI_RELEASE_CANDIDATE" "$MICROI_RELEASE_GATE_DIR/api-artifact.json" || print_fail "最终后端制品未通过绑定核验。"
+    _backend_packages="$MICROI_RELEASE_GATE_DIR/backend-packages.nul"
+    find Microi.Server -path "*/bin/Release/*.$VERSION.nupkg" -not -name "*.symbols.nupkg" -print0 > "$_backend_packages"
+    node "$MICROI_RELEASE_SESSION_TOOL" seal-backend "$MICROI_RELEASE_SESSION" "$MICROI_RELEASE_GATE_DIR/api-artifact.json" "$_backend_packages" || print_fail "后端制品断点保存失败。"
+fi
+else
+    run_release_command node Microi.Server/tools/release-artifact.mjs verify api "$MICROI_RELEASE_CANDIDATE" "$MICROI_RELEASE_GATE_DIR/api-artifact.json" || print_fail "已完成后端制品发生变化。"
+    if [ "$HAS_ENCRYPT" = true ]; then
+        run_release_command node Microi.Server/tools/release-encryption.mjs final "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" || print_fail "最终 DLL 不匹配加密回执。"
+        DLL_ENCRYPTED=true
+        NUPKG_REPLACED=true
+    fi
+fi
+
 # ─── 阶段（条件）: NuGet 推送 ─────────────────────────────
 if [ "$PUSH_NUGET" = true ]; then
 
@@ -1909,8 +2017,20 @@ if [ "$PUSH_NUGET" = true ]; then
         fi
         # 先查完整远端集合，避免推到一半才发现另一个候选已占用同版；未知读取也停止。
         _nuget_remote_receipt="$MICROI_RELEASE_GATE_DIR/nuget-remote-${VERSION}-${RANDOM}-${RANDOM}.json"
-        run_release_command node Microi.Server/tools/release-remote-collision.mjs nuget-preflight Microi.Server "$VERSION" "$_nupkg_list_file" "$CONFIG_FILE" "$_nuget_remote_receipt" || print_fail "远端 NuGet 同版本包不同或无法确认；禁止上传本轮包。"
+        _nupkg_pending_file="$_nupkg_list_file"
+        if [ -n "$MICROI_RELEASE_SESSION" ]; then
+            _nupkg_pending_file="$MICROI_RELEASE_GATE_DIR/nuget-pending-${VERSION}.nul"
+            node "$MICROI_RELEASE_SESSION_TOOL" pending-packages "$MICROI_RELEASE_SESSION" "$_nupkg_list_file" "$_nupkg_pending_file" || print_fail "不能确定哪些包已经接受。"
+        fi
+        if [ -s "$_nupkg_pending_file" ]; then
+            run_release_command node Microi.Server/tools/release-remote-collision.mjs nuget-preflight Microi.Server "$VERSION" "$_nupkg_list_file" "$CONFIG_FILE" "$_nuget_remote_receipt" || print_fail "远端 NuGet 同版本包不同或无法确认；禁止上传本轮包。"
+        fi
+        _reuse_package_count=0
         while IFS= read -r -d '' _nupkg; do
+            if ! release_stage_needed "nuget:$(basename "$_nupkg")"; then
+                _reuse_package_count=$((_reuse_package_count + 1))
+                continue
+            fi
             run_release_command node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "当前 NuGet 上传前候选源码发生变化；禁止上传。"
             if [ "$HAS_ENCRYPT" = true ]; then
                 run_release_command node Microi.Server/tools/release-encryption.mjs package-cas "$PUBLISH_DIR" "$MICROI_ENCRYPTION_RECEIPT" "$VERSION" "$_nupkg" || print_fail "当前 NuGet 包未经核验或字节发生变化；禁止上传。"
@@ -1920,11 +2040,13 @@ if [ "$PUSH_NUGET" = true ]; then
             if ! run_release_command node Microi.Server/tools/secure-nuget-push.mjs push "$_nupkg" "$CONFIG_FILE"; then
                 print_fail "NuGet 推送失败: $(basename "$_nupkg")"
             fi
+            release_stage_seal "nuget:$(basename "$_nupkg")" "$_nupkg"
             print_success "$(basename "$_nupkg")"
             ((_push_count++)) || true
         done < "$_nupkg_list_file"
         echo ""
         print_success "共推送 $_push_count 个 NuGet 包"
+        print_info "本次新接受 $_push_count 个；复用原已接受 $_reuse_package_count 个，不等待公共索引传播。"
     fi
 fi
 
@@ -2051,6 +2173,13 @@ docker_push_plan() {
     local plan_type=$(echo "$plan" | cut -d'|' -f2)
     local local_image=$(echo "$plan" | cut -d'|' -f3)
     local remote_images=$(echo "$plan" | cut -d'|' -f4)
+    [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || print_fail "发布版本为空或格式错误，尚未构建镜像。"
+    local image_key="image:$(printf '%s' "$plan" | node -e 'let x="";process.stdin.on("data",c=>x+=c);process.stdin.on("end",()=>process.stdout.write(require("node:crypto").createHash("sha256").update(x).digest("hex")))')"
+    local image_reused=false
+    if ! release_stage_needed "$image_key"; then
+        local_image=$(node "$MICROI_RELEASE_SESSION_TOOL" image "$MICROI_RELEASE_SESSION" "$image_key") || print_fail "原镜像实际身份无效。"
+        image_reused=true
+    fi
 
     print_step "执行方案: $plan_name"
 
@@ -2071,6 +2200,7 @@ docker_push_plan() {
     if { [ "$plan_type" = api ] && [ "$PUBLISH_BACKEND" = true ]; } || { [ "$plan_type" = client ] && [ "$BUILD_CLIENT" = true ]; }; then
         receipt_mode=capture
     fi
+    if [ "$image_reused" = true ] || { [ -n "$MICROI_RELEASE_SESSION" ] && [ "$plan_type" = api ]; }; then receipt_mode=verify; fi
     if ! run_release_command node Microi.Server/tools/release-artifact.mjs "$receipt_mode" "$plan_type" "$MICROI_RELEASE_CANDIDATE" "$receipt"; then
         print_fail "构建产物没有与 ${MICROI_RELEASE_TEST_POLICY} 测试通过的源码绑定；禁止发布旧产物。"
     fi
@@ -2079,6 +2209,7 @@ docker_push_plan() {
     # 当前镜像仓库不接受 Buildx 默认证明清单的 OCI empty manifest，构建时关闭证明附件。
     # 优先检查基础镜像更新；远端 Registry 短暂不可达时重试，最终只允许回退到
     # Docker 已缓存且能被本地解析的基础镜像，避免一次 TLS 超时中断整轮发布。
+    if [ "$image_reused" != true ]; then
     print_step "构建镜像: $local_image"
     local _docker_build_ok=false
     local _docker_build_attempt=1
@@ -2103,6 +2234,11 @@ docker_push_plan() {
             print_fail "Docker 镜像构建失败，远端拉取和本地缓存均不可用: $local_image"
         fi
     fi
+    if [ -n "$MICROI_RELEASE_SESSION" ]; then
+        node "$MICROI_RELEASE_SESSION_TOOL" seal-image "$MICROI_RELEASE_SESSION" "$image_key" "$local_image" || print_fail "不能记录实际 Docker ImageID。"
+        local_image=$(node "$MICROI_RELEASE_SESSION_TOOL" image "$MICROI_RELEASE_SESSION" "$image_key") || print_fail "新镜像实际身份不可读。"
+    fi
+    fi
 
     # 固定版本标签在任何 latest 推送之前先全量核对；不能覆盖另一候选。
     local collision_receipt="$MICROI_RELEASE_GATE_DIR/${plan_type}-remote-${version}-${RANDOM}-${RANDOM}.json"
@@ -2124,6 +2260,7 @@ docker_push_plan() {
         # 替换占位符
         _img_tag=$(echo "$_img_tag" | sed "s/{latest}/latest/g" | sed "s/{version}/v${version}/g")
         local full_tag="${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${_img_tag}"
+        if ! release_stage_needed "docker:$full_tag"; then continue; fi
         _published_index=$((_published_index + 1))
         _published_receipt="${collision_receipt%.json}-published-${_published_index}.json"
         # 镜像名可能和本地镜像名不同，需要 tag
@@ -2143,6 +2280,7 @@ docker_push_plan() {
         if [ "$_remote_digest" = "$_local_published_digest" ] && [ -n "$_remote_digest" ]; then
             run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-recheck "$collision_receipt" "$full_tag" || print_fail "远端 Docker 标签在验收后变化，已停止发布。"
             run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-confirm "$collision_receipt" "$full_tag" "$_published_receipt" || print_fail "复用镜像的远端摘要未能确认，不能报告发布完成。"
+            if [ -n "$MICROI_RELEASE_SESSION" ]; then node "$MICROI_RELEASE_SESSION_TOOL" seal-tag "$MICROI_RELEASE_SESSION" "$full_tag" "$_published_receipt" || print_fail "镜像回读断点保存失败。"; fi
             print_info "已回读相同 digest，复用远端标签: $full_tag ($_remote_digest)"
             continue
         fi
@@ -2153,6 +2291,7 @@ docker_push_plan() {
         # 新推送与断点复用都须读回实际标签；本地 RepoDigest 与远端相同才落成功回执。
         # 发布后校验计入同一耗时目标；超过 30 分钟仍执行校验，真实失败不能报告成功。
         run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-confirm "$collision_receipt" "$full_tag" "$_published_receipt" || print_fail "Docker 已推送，但远端摘要尚未确认；本标签不能报告发布完成，请查看回执后再重试。"
+        if [ -n "$MICROI_RELEASE_SESSION" ]; then node "$MICROI_RELEASE_SESSION_TOOL" seal-tag "$MICROI_RELEASE_SESSION" "$full_tag" "$_published_receipt" || print_fail "镜像回读断点保存失败。"; fi
     done
 
     print_success "$plan_name 推送及远端摘要回读完成"
@@ -2228,6 +2367,7 @@ if [ "$PUBLISH_DOC" = true ]; then
     fi
     run_release_command node microi.doc/scripts/check-account-portal.mjs --require-committed
 
+    if release_stage_needed docs; then
     # 依赖版本以官网声明/既有锁为准；禁止全局 pnpm 升级时重写发布锁文件。
     DOC_PNPM_VERSION="$(node --input-type=module -e '
       import fs from "node:fs";
@@ -2266,6 +2406,13 @@ if [ "$PUBLISH_DOC" = true ]; then
     DOC_IMAGE_TAG="microi.doc:docs-$(git rev-parse --short=12 HEAD)-$(date +%s)-$$"
     (cd microi.doc/docs/.vitepress && run_release_command docker build --provenance=false --sbom=false -t "$DOC_IMAGE_TAG" .)
     print_success "Docker 镜像构建完成"
+    if [ -n "$MICROI_RELEASE_SESSION" ]; then
+        node "$MICROI_RELEASE_SESSION_TOOL" seal-tree "$MICROI_RELEASE_SESSION" docs "$PWD/microi.doc/docs/.vitepress/dist" "$DOC_IMAGE_TAG" || print_fail "官网构建断点保存失败。"
+    fi
+    else
+        DOC_IMAGE_TAG=$(node "$MICROI_RELEASE_SESSION_TOOL" image "$MICROI_RELEASE_SESSION" docs) || print_fail "已完成官网镜像不可复用。"
+        run_release_command node microi.doc/scripts/check-account-portal.mjs --dist --require-committed
+    fi
 
     # 官方网站文档镜像仓库登录：仅更新配置所属地域，另一仓库沿用其受保护的 Docker 凭据。
     case "${DOCKER_USERNAME:-}" in
@@ -2288,6 +2435,7 @@ if [ "$PUBLISH_DOC" = true ]; then
     _doc_targets=(registry.cn-beijing.aliyuncs.com/itdos/microi.doc:latest registry.cn-hangzhou.aliyuncs.com/microios/microi-doc:latest)
     _doc_remote_plans=()
     for _doc_target in "${_doc_targets[@]}"; do
+        if ! release_stage_needed "docker:$_doc_target"; then _doc_remote_plans+=(""); continue; fi
         if ! run_release_command docker manifest inspect "$_doc_target" >/dev/null; then
             print_fail "官方网站文档仓库读取失败：$_doc_target，请检查该地域已有 Docker 凭据和权限"
         fi
@@ -2302,6 +2450,7 @@ if [ "$PUBLISH_DOC" = true ]; then
     for _doc_index in "${!_doc_targets[@]}"; do
         _doc_target="${_doc_targets[$_doc_index]}"
         _doc_receipt="${_doc_remote_plans[$_doc_index]}"
+        [ -n "$_doc_receipt" ] || continue
         if [ -n "${MICROI_RELEASE_CANDIDATE:-}" ]; then
             run_release_command node Microi.Server/tools/release-candidate.mjs verify "$MICROI_RELEASE_CANDIDATE" || print_fail "官网推送前候选已变化，禁止继续。"
         fi
@@ -2310,6 +2459,7 @@ if [ "$PUBLISH_DOC" = true ]; then
         run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-recheck "$_doc_receipt" "$_doc_target" || print_fail "官网远端标签在验收后变化，禁止继续。"
         run_release_command docker push "$_doc_target"
         run_release_command node Microi.Server/tools/release-remote-collision.mjs docker-confirm "$_doc_receipt" "$_doc_target" "${_doc_receipt%.json}-published.json" || print_fail "官网镜像已推送，但摘要回读未通过，不能报告官网发布完成。"
+        if [ -n "$MICROI_RELEASE_SESSION" ]; then node "$MICROI_RELEASE_SESSION_TOOL" seal-tag "$MICROI_RELEASE_SESSION" "$_doc_target" "${_doc_receipt%.json}-published.json" || print_fail "官网渠道断点保存失败。"; fi
         print_success "$_doc_target（远端摘要已确认）"
     done
 

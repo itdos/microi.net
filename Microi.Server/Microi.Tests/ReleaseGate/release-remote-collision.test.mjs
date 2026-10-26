@@ -123,7 +123,9 @@ for(const scenario of ['success','digest-mismatch','readback-timeout','push-fail
  const scriptFile=fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url));
  const script=fs.readFileSync(scriptFile,'utf8');
  const start=script.indexOf('docker_push_plan() {'),end=script.indexOf('\nif [ ${#SELECTED_API_PLANS',start);
- assert.ok(start>0&&end>start);const loop=script.slice(start,end);
+ assert.ok(start>0&&end>start);
+ const sessionFunctions=script.slice(script.indexOf('release_stage_needed() {'),script.indexOf('# 发布进程专用输出目录'));
+ const loop=sessionFunctions+'\n'+script.slice(start,end);
  const guardStart=script.indexOf('validate_publish_artifacts() {'),guardEnd=script.indexOf('\n}',guardStart)+2;
  assert.ok(guardStart>0&&guardEnd>guardStart);const artifactGuard=script.slice(guardStart,guardEnd);
  const template=fs.readFileSync(path.join(path.dirname(scriptFile),'Microi.Server/Microi.net.Api/appsettings.json'));

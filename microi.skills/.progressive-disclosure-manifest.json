@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-25T19:19:33.973Z",
+  "generatedAt": "2026-10-26T01:11:09.164Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -763,7 +763,7 @@
       ]
     },
     "microi-system-delivery": {
-      "originalSha256": "ed452a8b65fdba633372d154acf62454d97cc9dfe718153af25d2fe8d80f589d",
+      "originalSha256": "43de2a6e3c3a9d6fc65168dc5dda01eee7ecb50be82fbc1de36c6ed661b4d5d8",
       "originalLines": 716,
       "prefixSha256": "b6b97e8df68678ea61b8d67ad14057c0deb0c09a3834e8b77994d20aaeb92e7e",
       "prefixBytes": 6666,
@@ -821,7 +821,7 @@
           "id": "microi-system-delivery-006",
           "ordinal": 4,
           "destination": "microi-system-delivery/references/progressive-02-自动化测试必须覆盖的坑.md",
-          "sha256": "4980374a6dd1a9af6c5061bc04f350a06e2f0774b0af2f1a85415d3cf28191f2",
+          "sha256": "30d24447c0ee767e09df1fb2ecb91b146da5afc0a100dcb2c5ba310b27bd9f7d",
           "lines": 153,
           "heading": "自动化测试必须覆盖的坑"
         },
@@ -2259,11 +2259,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "82c72e59c8049a90da70452b14f628a159dfb5c97016e31f575732f8f2699f8c",
-      "originalLines": 698,
-      "prefixSha256": "5b42e3b11954bc1de401574a135c2fee80ef12201bdbaa0271377fb06843baf4",
-      "prefixBytes": 19947,
-      "entryLines": 277,
+      "originalSha256": "fd6861d3cb03da6b637a9ba121d5747d96ea35a63de9c45e0e108f4161ec39aa",
+      "originalLines": 700,
+      "prefixSha256": "f48498030cbd3737919132045f906096cc118c04342ea4630c633f36acbd916b",
+      "prefixBytes": 20644,
+      "entryLines": 279,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -3241,18 +3241,18 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "c35bf0ca6dec2adf710fdc82621825d9e920cedb78a6cd33359186b13a98ad33",
-      "originalLines": 730,
+      "originalSha256": "f38521daa43ae0d1b017f8a1e9cc13b22f3a5aec31e4f01482f2db0acbc35542",
+      "originalLines": 732,
       "prefixSha256": "f42cd32cfd8ff7bbe7ac8892aeba19f0806657f9fe9e6f45ecc95831071e6a60",
       "prefixBytes": 19369,
-      "entryLines": 191,
+      "entryLines": 193,
       "chunks": [
         {
           "id": "workspace-conventions-000",
           "ordinal": 0,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "200a4f0de556b3002f1ee858dfc501c52ffa9cb526753c8a863f0f386499b127",
-          "lines": 60,
+          "sha256": "31990746b27d29d6f3a471dc800c843f1ddcc08b09a8444efdbf5c04cbde5503",
+          "lines": 62,
           "heading": "任务启动前 Skill 读取规则（强制）"
         },
         {
@@ -3555,7 +3555,7 @@
           "id": "workspace-conventions-038",
           "ordinal": 38,
           "destination": "workspace-conventions/references/progressive-03-cli-与-ide-插件错版共存约定.md",
-          "sha256": "1b65652abc8ca096a22d79a62b32c74557e5fc3daa7d81f3c192c4b9e37e4665",
+          "sha256": "8c9a110528e81ace24313833ab2085efa9a69705566be5c2f700b76dbc91f207",
           "lines": 30,
           "heading": "CLI 与 IDE 插件错版共存约定"
         },
