@@ -82,6 +82,43 @@ jobs:
           if-no-files-found: warn
           include-hidden-files: false
           retention-days: 90
+  full-mcp:
+    name: MCP 完整离线回归 / Ubuntu / Node 24
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NODE_OPTIONS: --max-old-space-size=512
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 / Node 24
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 / Node 24
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: 确认真实 TLS 回归的 OpenSSL 前置
+        run: openssl version
+      - name: 按锁文件安装公开 MCP 的测试依赖
+        working-directory: microi.mcp
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: MCP TypeScript 检查
+        working-directory: microi.mcp
+        run: npm run typecheck
+      - name: 自动发现并串行执行全部 MCP 测试（含本机 HTTP 和 TLS 夹具）
+        env:
+          FULL_REPORT_PATH: ${{ runner.temp }}/microi-full-evidence/full-mcp.json
+        # 仅上传输入清单、哈希、环境与计数；运行器不输出原始测试、业务或模型日志。
+        run: >-
+          node -e "const fs=require('node:fs'); const path=require('node:path'); const {spawnSync}=require('node:child_process'); const report=process.env.FULL_REPORT_PATH; fs.mkdirSync(path.dirname(report),{recursive:true}); const result=spawnSync(process.execPath,['microi.benchmarks/manifest-delivery/verify.mjs','--suite','full','--out',report],{stdio:'inherit'}); process.exit(result.status ?? 1);"
+      - name: 保存完整回归的脱敏结果（失败也保留）
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2 / Node 24
+        with:
+          name: full-mcp-ubuntu-node24-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/microi-full-evidence/full-mcp.json
+          if-no-files-found: warn
+          include-hidden-files: false
+          retention-days: 90
   dependency-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 5

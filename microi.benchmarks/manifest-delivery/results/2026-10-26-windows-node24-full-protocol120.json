@@ -1,0 +1,671 @@
+{
+  "protocolVersion": "1.2.0",
+  "suite": "full",
+  "evidenceKind": "public-mcp-offline",
+  "startedAt": "2026-10-26T05:22:57.092Z",
+  "completedAt": "2026-10-26T05:23:51.231Z",
+  "environment": {
+    "node": "v24.19.0",
+    "os": "win32",
+    "osRelease": "10.0.26200",
+    "arch": "x64"
+  },
+  "testReporter": "tap",
+  "runner": {
+    "file": "microi.benchmarks/manifest-delivery/verify.mjs",
+    "rawSha256": "0f6ac053f4312e767e6f2d5c10b41307f2a42005b9d977d7d7a22bc09e0d1fb8",
+    "lfSha256": "0f6ac053f4312e767e6f2d5c10b41307f2a42005b9d977d7d7a22bc09e0d1fb8"
+  },
+  "testFiles": [
+    "administrative-data-tools.test.ts",
+    "advanced-tools-validation-envelope.test.ts",
+    "application-gate-diagnostic.test.ts",
+    "application-stream-gate-transition.test.ts",
+    "application-stream-publish.test.ts",
+    "background-task.test.ts",
+    "blueprint-versioning.test.ts",
+    "context-reading.test.ts",
+    "data-source-migration.test.ts",
+    "database-backup.test.ts",
+    "dependency-security.test.ts",
+    "design-engine-presentation.test.ts",
+    "email-tools.test.ts",
+    "file-cabinet-office-tools.test.ts",
+    "file-upload-config.test.ts",
+    "form-banner-defaults.test.ts",
+    "form-layout-defaults.test.ts",
+    "form-read-primary.test.ts",
+    "game-delivery-tools.test.ts",
+    "job-runtime-tools.test.ts",
+    "localhost-tls.test.ts",
+    "manifest-context.test.ts",
+    "manifest-efficiency-benchmark.test.ts",
+    "manifest-field-relations.test.ts",
+    "manifest-microservice-module.test.ts",
+    "manifest-preflight.test.ts",
+    "mcp-did.test.ts",
+    "mcp-label.test.ts",
+    "mcp-role-form-data.test.ts",
+    "message-notification-tools.test.ts",
+    "microi-chat.test.ts",
+    "microi-client-recovery.test.ts",
+    "microi-client-tenant-tuple.test.ts",
+    "microservice-scaffold.test.ts",
+    "microservice-source-directory.test.ts",
+    "microservice-source-stream.test.ts",
+    "minimax-image-tools.test.ts",
+    "minimax-music3-fallback.test.ts",
+    "ocr-tools.test.ts",
+    "operation-progress.test.ts",
+    "page-versioning.test.ts",
+    "redis-tenant-scope.test.ts",
+    "server-codex-router.test.ts",
+    "server-private-settings-tools.test.ts",
+    "source-integrity.test.ts",
+    "stdio-buffer.test.ts",
+    "store-application-task.test.ts",
+    "store-sparse-selection-tools.test.ts",
+    "system-observability-tools.test.ts",
+    "token-utils.test.ts",
+    "tool-metrics.test.ts",
+    "translate-tools.test.ts",
+    "user-access-key-tools.test.ts",
+    "v8-unlimited.test.ts",
+    "v8-version.test.ts",
+    "view-schema.test.ts",
+    "workflow-package.test.ts",
+    "workspace-protected-credentials.test.ts"
+  ],
+  "minimumTests": 355,
+  "sourceTree": {
+    "fileCount": 89,
+    "rawSha256": "c53b5b9f07b6e10208051392987c47b852d858f59faacfdc3d3c080dc8df349a",
+    "lfSha256": "1a3204640561a06d4b96aa8e98d801124dda1bbe8bee119c01775b5e61b1a748"
+  },
+  "sources": {
+    "administrative-data-tools.test.ts": {
+      "bytes": 4413,
+      "rawSha256": "f9c6f8c5028ff2468f6931d869ee36bf1f3d242f99a7fa54ce65a03d56e7a563",
+      "lfSha256": "287920026563eb010dfbcc26623543217fde883cf6e4624d1167001b75524a55"
+    },
+    "advanced-tools-validation-envelope.test.ts": {
+      "bytes": 9715,
+      "rawSha256": "fa90155b3fdbf33fdc187686b4b03d7de0027cae14daa5b68d1bbbe0cb8e4fb8",
+      "lfSha256": "c08d7090d67074a2850295647d21dd19b8aa295bc8657434bfd2b3bba89066e5"
+    },
+    "advanced-tools.ts": {
+      "bytes": 220245,
+      "rawSha256": "8d120f3b8af7ff6574b73757d8b2af8de959ef9273fd53d4d94ed7f4dde0419b",
+      "lfSha256": "8d120f3b8af7ff6574b73757d8b2af8de959ef9273fd53d4d94ed7f4dde0419b"
+    },
+    "api-paths.ts": {
+      "bytes": 8325,
+      "rawSha256": "636a928cca22f255518e19f0a5200331ae67f952a03a1bcbb82a2cf17ebe291c",
+      "lfSha256": "fe0c437814fbca899b016744b45d51adef82250c548ed76a78c7b4066f901ac5"
+    },
+    "application-gate-diagnostic.test.ts": {
+      "bytes": 3285,
+      "rawSha256": "abe25e3a801a435d32508e2fe1d3415fb886ec8da703973a171d1ce7faab0cc7",
+      "lfSha256": "960af87eceec916860ead7b68ea97ee06b4f6e1ac4f21514f141bbbd7b425ece"
+    },
+    "application-gate-diagnostic.ts": {
+      "bytes": 1631,
+      "rawSha256": "eb18527013e007357c471088ee1998fafcf13eec8207ebc7c9d657af6c9968a0",
+      "lfSha256": "eb18527013e007357c471088ee1998fafcf13eec8207ebc7c9d657af6c9968a0"
+    },
+    "application-stream-gate-transition.test.ts": {
+      "bytes": 11102,
+      "rawSha256": "8e7c5477ad194c2f6f470b6406b7968296b4a85863eab9570c8c785a31cef38c",
+      "lfSha256": "57a59bedeb85b39241cd4da63fc747b6187ae3143a27743a5efce733ee881cfa"
+    },
+    "application-stream-publish.test.ts": {
+      "bytes": 81000,
+      "rawSha256": "6ddd1d23ae76877231e5e032cf7471a941f1c9d9cedcc852a25c82a78929c533",
+      "lfSha256": "39ea227c01578447f4412ea7105755c8bc70da65a7a1ecadfde13bcf46023cc1"
+    },
+    "background-task.test.ts": {
+      "bytes": 7322,
+      "rawSha256": "7193e2531ef782ceed1866114b60c88b25abaab5dd0bb6a2649f03b116d422d4",
+      "lfSha256": "8c397e8ff00db4193e09a92504427f59508f0b68fb1e9c6a536203da796a5752"
+    },
+    "blueprint-smoke-test.ts": {
+      "bytes": 8287,
+      "rawSha256": "cfd7e132fa917b2e2ef31f75512cda5e9b6e996a084f8063b8614a5757cafe23",
+      "lfSha256": "45d6766deb2c7414e79d146350ddb4f6ad4aca5e4f0c960d6af62fe38a70b8b0"
+    },
+    "blueprint-tools.ts": {
+      "bytes": 12656,
+      "rawSha256": "bfc4d066ad014b05b632b7c4aaab3f15555e1de959dbe146591d06b4341ff21f",
+      "lfSha256": "5a90134e7f85c01505593bf065eee953cd606654432e3220b07388ce7aac8d69"
+    },
+    "blueprint-versioning.test.ts": {
+      "bytes": 5674,
+      "rawSha256": "2e56b347d156524866314760ecadead4d9f404076f25091cd24c7ef598a8283d",
+      "lfSha256": "a27616ffe34d467495881274e136b51a8bbb669eb14796505b4e0c2e1846d6f9"
+    },
+    "context-reading.test.ts": {
+      "bytes": 20633,
+      "rawSha256": "8af3603485741c6a37e78de9e6c9370860defa10bac58f646348cd5ab4f85461",
+      "lfSha256": "8af3603485741c6a37e78de9e6c9370860defa10bac58f646348cd5ab4f85461"
+    },
+    "context-reading.ts": {
+      "bytes": 13114,
+      "rawSha256": "2a19733d71c66191237119d3e4da4ced0ae4b7ece7d5d3ab0ab1a1e1c36fdc52",
+      "lfSha256": "2a19733d71c66191237119d3e4da4ced0ae4b7ece7d5d3ab0ab1a1e1c36fdc52"
+    },
+    "data-source-migration.test.ts": {
+      "bytes": 1451,
+      "rawSha256": "8a092f958aa05a5fbff70ee877a23c4ddea0c4718fd6f32ba6d35db4af9f98cf",
+      "lfSha256": "660390c6b3e6c85392d913ce40c309eca35ae8132d81ca7287839d250478da03"
+    },
+    "database-backup.test.ts": {
+      "bytes": 3768,
+      "rawSha256": "4c70bd74c2d5ac7fdcd7eb6d01378e1a69eec5720100360e75abbc25f6733ff3",
+      "lfSha256": "2f4f48fb2105e6343b208ec903b340b6c08eafb98a755003f4a14e6a9331e7be"
+    },
+    "dependency-security.test.ts": {
+      "bytes": 3120,
+      "rawSha256": "cf93e7a6f1161b1304bf448ec3bffaa9fa5fe1decdebc5915d426ec8337b7d54",
+      "lfSha256": "cf93e7a6f1161b1304bf448ec3bffaa9fa5fe1decdebc5915d426ec8337b7d54"
+    },
+    "design-engine-presentation.test.ts": {
+      "bytes": 2321,
+      "rawSha256": "8a59cf01d98bd44da06c6a5345eee3243c781918c5c0860ef474010aba0f6e6e",
+      "lfSha256": "2bc903caffdd54d1bb8a132a38c55f04c4ab23da40c060faf680e953163572b5"
+    },
+    "design-engine.ts": {
+      "bytes": 45357,
+      "rawSha256": "f2288ef2a48cd4de4fedfe04d74c28d3ece6a3fe152732227c942d57478ba509",
+      "lfSha256": "c2dd9a5ec689ce0e22110bf2f91cbda7682645fb13b8a35dfc8aef8fd3f51613"
+    },
+    "design-tools.ts": {
+      "bytes": 15400,
+      "rawSha256": "ba00ab9109f9fb35dffa668c85ff71a9f6c0576619168b983e42f26b16131a61",
+      "lfSha256": "8351e72b02c5f263b85304e8cc4f2659cdbec80089546e286c575328fbbeaeef"
+    },
+    "document-inputs.ts": {
+      "bytes": 11378,
+      "rawSha256": "2721b0b9567a0c5f83bd7d1cf5ad7b77ff8f541f8230f1ffa61e0deeb0bd9c8c",
+      "lfSha256": "979bcbe3157ef1380b320bc58d92e96ca8995dd32fac9ef64d8a447fa4ad04f3"
+    },
+    "email-tools.test.ts": {
+      "bytes": 5194,
+      "rawSha256": "2807baf284ca3f074f124e51f56ef377925e6b2a0ef3439358ba6688bd666001",
+      "lfSha256": "0b8a4c4e6ed0e149fe6c70f9d7865a0dcb53a0ba45d2405364af7458bf110992"
+    },
+    "email-tools.ts": {
+      "bytes": 7904,
+      "rawSha256": "78a56656141b751bfae5cad7cfa3782de18c5561272c5cd269b2fc321225dcd2",
+      "lfSha256": "9a5dbd04c52bb493001f1d0fbd19b56e6bfa61f5c245ffdfcbd97393b3732844"
+    },
+    "file-cabinet-office-tools.test.ts": {
+      "bytes": 6892,
+      "rawSha256": "cdbceb70f4d3adef034f2cbec4b255e0562e61a04da8b6a6c51218830dddc1dd",
+      "lfSha256": "d845c928d13b5db83dbed02d6f2d9f591b0930b17ee30246bb4f7898fc70e2d6"
+    },
+    "file-upload-config.test.ts": {
+      "bytes": 1105,
+      "rawSha256": "6d5d6362df1a156892fb7f3846a7df9a5b413fe19cb042aed5ca0806e6690b29",
+      "lfSha256": "7e5e73a1c5a2a5485e2d4c7f7e594affee0e013815845442905fcfd4277d8382"
+    },
+    "file-upload-config.ts": {
+      "bytes": 1087,
+      "rawSha256": "9e00d9a85c0a270f6e2ac3d0cc0df0ad8f8f266a2e5acb68ab30933b77c45ca3",
+      "lfSha256": "f343c20d807c15d9ef947fcdd3f1519421f94fdc0c0a4ef52c79a529d1530101"
+    },
+    "form-banner-defaults.test.ts": {
+      "bytes": 5533,
+      "rawSha256": "87d8fcdc7795136ee0ba99d67f8a770b4b1246de2924648db2378fc0e6ec9e2c",
+      "lfSha256": "531678e250a328a68fcf2ba72dc2d6bc3e53edc77f2b13d00f2968e38d462240"
+    },
+    "form-layout-defaults.test.ts": {
+      "bytes": 1617,
+      "rawSha256": "ffa00e998b0dd919adb2a151844706520172116e0f4503597cf5118578aa2c35",
+      "lfSha256": "1f091be9896ec2a4bb15e129afa7edc9b79f9da431f65ad44a3051df6b2898c6"
+    },
+    "form-read-primary.test.ts": {
+      "bytes": 3756,
+      "rawSha256": "19d45c43d6da1590bf66026442d78a0354a65d11e8b6963995665dc4f1a0072c",
+      "lfSha256": "0630d16c03e62808dcb4a65fb617f20ba6f81552b64ea6fba1199f222dc98a3d"
+    },
+    "game-delivery-tools.test.ts": {
+      "bytes": 4352,
+      "rawSha256": "2c3600765c5bebc623e1ac1ce116231051ce58f0ff5e6dd7335c3b63ee9cdce6",
+      "lfSha256": "0082602b696faf4868e972461abbffa43e41f6ce9fd5f1673ad032504838458c"
+    },
+    "index.ts": {
+      "bytes": 12430,
+      "rawSha256": "81764b3fb0d1c84fe92753f08ca4eee9d21e4a9502302ac8455045ebd6d65550",
+      "lfSha256": "553a228939a8081fc90302d654a6498e52cd02ea8c6589dccd7bc38a633afc62"
+    },
+    "job-runtime-tools.test.ts": {
+      "bytes": 2103,
+      "rawSha256": "7e7088b813d0c93b573a3fe8a0db70525bbbd62e38c50205bc4cde9171e1c9d1",
+      "lfSha256": "241458a3afb22812e908041565281361da85778e830a4bf900245543074a7843"
+    },
+    "localhost-tls.test.ts": {
+      "bytes": 4264,
+      "rawSha256": "6887c5a411bcf18f642028925598b7e927ecca7154449c4a08301db21a091a76",
+      "lfSha256": "01e061084b9ac3b47e620c45132a4cc9e57e0725841ff2d96058e0da66a07f02"
+    },
+    "manifest-context-fixtures.ts": {
+      "bytes": 6566,
+      "rawSha256": "6841c57c55cd81400368e84d5a360b4b422063f140b086a278d03f15183f5d33",
+      "lfSha256": "6841c57c55cd81400368e84d5a360b4b422063f140b086a278d03f15183f5d33"
+    },
+    "manifest-context.test.ts": {
+      "bytes": 15733,
+      "rawSha256": "920271c6a808167080c2233f5acc274fcc9965215379fe3ee076b70d6034ee1a",
+      "lfSha256": "c0672ae042cd2cf0e730d2fb77c6dd59efcc65f1f03870af5afd82fcbd1d5b49"
+    },
+    "manifest-context.ts": {
+      "bytes": 14276,
+      "rawSha256": "391cb7ffb136ba56d4d2a65fe8669a1fbaa4f299d2ab712cf0f8237808dc072c",
+      "lfSha256": "391cb7ffb136ba56d4d2a65fe8669a1fbaa4f299d2ab712cf0f8237808dc072c"
+    },
+    "manifest-efficiency-benchmark.test.ts": {
+      "bytes": 1161,
+      "rawSha256": "e5128d00b8cc91295dbc86221f2f2720e3ef5f82a50dc0b4d1d0e462bbcb8ab4",
+      "lfSha256": "e5128d00b8cc91295dbc86221f2f2720e3ef5f82a50dc0b4d1d0e462bbcb8ab4"
+    },
+    "manifest-efficiency-benchmark.ts": {
+      "bytes": 6226,
+      "rawSha256": "5c89f409206f7dfe027d368a1ca79f978ad19b44ebbf4fcaf9be4fc76f6a57f8",
+      "lfSha256": "5c89f409206f7dfe027d368a1ca79f978ad19b44ebbf4fcaf9be4fc76f6a57f8"
+    },
+    "manifest-field-relations.test.ts": {
+      "bytes": 6880,
+      "rawSha256": "151b8c3e072234b4eb64ba6534b6342c82ec19bd4c98dc3d203771eda5de1944",
+      "lfSha256": "52d582bb7efd629e4be1f115e6e27ec66c3f9adae2f8fe83ba0d58d4ab1e11c3"
+    },
+    "manifest-microservice-module.test.ts": {
+      "bytes": 6945,
+      "rawSha256": "dc89a4a58234c694a00b9b1eeb7613d786890bb34c673e828435552b5644385e",
+      "lfSha256": "dc89a4a58234c694a00b9b1eeb7613d786890bb34c673e828435552b5644385e"
+    },
+    "manifest-preflight.test.ts": {
+      "bytes": 7365,
+      "rawSha256": "87218b6356cfc522ab756860e61ec1feb3252d74cf88cd01b131e897f071629a",
+      "lfSha256": "87218b6356cfc522ab756860e61ec1feb3252d74cf88cd01b131e897f071629a"
+    },
+    "manifest-preflight.ts": {
+      "bytes": 3659,
+      "rawSha256": "81594f78472030b7f4b3f58311eeb4a86fd23f947322f80b8946ad5f8954845e",
+      "lfSha256": "81594f78472030b7f4b3f58311eeb4a86fd23f947322f80b8946ad5f8954845e"
+    },
+    "mcp-did.test.ts": {
+      "bytes": 1310,
+      "rawSha256": "c8dac490fef3cbcdab35576b1c7cd5ea8c488c5e2664b05f7f2806d923600317",
+      "lfSha256": "b782de769efed928410c4e2c1e3c1d2f4bc3ed62212330d00930f26f76bf87e4"
+    },
+    "mcp-did.ts": {
+      "bytes": 1014,
+      "rawSha256": "edba99cf6324523008aa23422577bdb3a62428da98e88fceb478122a1fabca12",
+      "lfSha256": "b964e9e6bc6a7eb0dbd4b2fc6912bbd709b3ed77cdee19db2ca19cafbf2b4b98"
+    },
+    "mcp-label.test.ts": {
+      "bytes": 712,
+      "rawSha256": "18d0d37be76c6fa3a77984695aaf158dc68718186b86b8f4931bb2d64075ccad",
+      "lfSha256": "271c6bd8fdea96baa9fdb71a137797234f1c9d1c39863a1af0a659790a530601"
+    },
+    "mcp-label.ts": {
+      "bytes": 1014,
+      "rawSha256": "3f88acc5db1dc3e8fe62198fee6e648666578c8e4d4dfa04a14fcce920246aa1",
+      "lfSha256": "ed36969b6e3ed0f7e1d3bfed2efedeb2e872a27c134eb7ca7a35af6e77172433"
+    },
+    "mcp-role-form-data.test.ts": {
+      "bytes": 1243,
+      "rawSha256": "e0d7dd97027cede3125a22b0f965891c860300793a4ead05bcad144cc80328f3",
+      "lfSha256": "e0d7dd97027cede3125a22b0f965891c860300793a4ead05bcad144cc80328f3"
+    },
+    "message-notification-tools.test.ts": {
+      "bytes": 9238,
+      "rawSha256": "6e03f8e8f9f3f509b0f20a24124e5e6ea7f5bf3755688020a3f768abfe80443a",
+      "lfSha256": "27914c90677bd7d4fd584020deeba8bbc55530e3459addefc3ee8a9504b7df7a"
+    },
+    "message-notification-tools.ts": {
+      "bytes": 12919,
+      "rawSha256": "f0591d0dcae5043bba9644f0ff01f7e22ecf4f387f9abe6a80ad0ca9c521aaef",
+      "lfSha256": "7b2fc874a2676d80d06c820937b1b48d9949b764b2fc9f37919b9f1c7bdf909c"
+    },
+    "microi-chat.test.ts": {
+      "bytes": 3254,
+      "rawSha256": "ce68cdea3da18e08b2fbdae243816117410c7447b34389e0f3d6090bd2a57361",
+      "lfSha256": "74d7844663b24a6f980919b5a606b37bb80aae36e111b2ac783ffa5323e8c036"
+    },
+    "microi-client-recovery.test.ts": {
+      "bytes": 35773,
+      "rawSha256": "d53174065122146af5741db5e93bec44134092a6c81d1506341ef290d45e6a2e",
+      "lfSha256": "57fbe3f7e3d7bbb33b3452a3dc3b0d1a3bfb9d7f4c8896ea39f3b66579f09485"
+    },
+    "microi-client-tenant-tuple.test.ts": {
+      "bytes": 14117,
+      "rawSha256": "c7987003d167b2e39668f529bc8d0242ce485a51879b80c809003b56d57b7d70",
+      "lfSha256": "21dffd7a061e9195beea2b71f39f3c064c8137468c53251454532e8823224e7e"
+    },
+    "microi-client.ts": {
+      "bytes": 161049,
+      "rawSha256": "09873ca1af4c1b67ebe15588b6bbc9204f60835c66cad006285cd4f7e88e9920",
+      "lfSha256": "64c4dc0422348e5c386b91074193845ee2d87edbf2aee5124df7ac8ec487f5a3"
+    },
+    "microservice-scaffold.test.ts": {
+      "bytes": 9506,
+      "rawSha256": "4f1ce0a0d39cd7cfe1ea211f3c7f33f3d94380213b618532c2e3cd3d31fe95fe",
+      "lfSha256": "fe6abaa5fe85f29993b3851e91c46b3756652cc69ce531e34086d48d22889e69"
+    },
+    "microservice-scaffold.ts": {
+      "bytes": 48040,
+      "rawSha256": "5e3027a4ac74a32017af6956158fac233a646e6c9ca68036f98c48347cbf5599",
+      "lfSha256": "2eb29ef1c4996f4c46a4856713f613d685f7d7b01b37f37a262f22c9188cbd9a"
+    },
+    "microservice-source-directory.test.ts": {
+      "bytes": 5141,
+      "rawSha256": "a99381aa714177b41bddc67ff2dc2bc61495ce59d989308e78830cb404da5b23",
+      "lfSha256": "69e2174958c0a78a048d8aab97f8ce768da2b85cbb53899f4b1f79430cfefa7d"
+    },
+    "microservice-source-stream.test.ts": {
+      "bytes": 20884,
+      "rawSha256": "35f473731de30ac36509586b6ace5e8dcf1907e0ebd231bf0b575b8139e3735a",
+      "lfSha256": "8e43a6c0915b3b562bd08a64fb9ac48f312d151fbdf9ae008f63b9672b8d25c2"
+    },
+    "minimax-image-tools.test.ts": {
+      "bytes": 7549,
+      "rawSha256": "9c28d7c6d37fb9b8c9707957f004c43dca16d5cf1a810b9db85b057b4b34e3ad",
+      "lfSha256": "69251d3b0b0b95ea7614e26894fc2e345951b75469bb13b29fc0ff1e7155900b"
+    },
+    "minimax-music3-fallback.test.ts": {
+      "bytes": 1136,
+      "rawSha256": "a5e119372c2335a72194fdf086c3789838f02ee74981394e997e5702a9db018d",
+      "lfSha256": "f3ffe48d993989ec3d0a176b2632d51eeca7c69d5e42b3c82d293e4d41b8f637"
+    },
+    "minimax-music3-fallback.ts": {
+      "bytes": 9355,
+      "rawSha256": "c6cb16d4eace74b0560219a2a44b18a27851b2dc7c1d052410f3577789ba9ebc",
+      "lfSha256": "1dc7892b4f2e8f77cecde1d0aa9997ddcffd63d37cf7d9a67bf94f431d1ff418"
+    },
+    "ocr-tools.test.ts": {
+      "bytes": 5943,
+      "rawSha256": "477c8e4ab98e95e8febcfb0397e0693998e10225b58b0902df27ee43235a3f62",
+      "lfSha256": "6d4b90fc445096ec49ebe1d5d00d24c5f0f229df2cc382128c33ea3dd0f41621"
+    },
+    "operation-progress.test.ts": {
+      "bytes": 10796,
+      "rawSha256": "8d59841f8dbb1493eb511bcb2a79943c1b82faf19b4e5d0071469d4646ca461d",
+      "lfSha256": "8d59841f8dbb1493eb511bcb2a79943c1b82faf19b4e5d0071469d4646ca461d"
+    },
+    "operation-progress.ts": {
+      "bytes": 3620,
+      "rawSha256": "3d3df0cb845fe1e393398121fa3208a93c3ae16dbcf0afd6d793f18080c2a3e0",
+      "lfSha256": "3d3df0cb845fe1e393398121fa3208a93c3ae16dbcf0afd6d793f18080c2a3e0"
+    },
+    "page-versioning.test.ts": {
+      "bytes": 5411,
+      "rawSha256": "975829d4aa9259251f07e3e7b3695c5b33e0907169d49cf8ca6551da4f79a832",
+      "lfSha256": "a5bbae626d0e487dd0c1746790af171aa1a2929acac95789560d4f4d2c8c71c8"
+    },
+    "probe-diytable.ts": {
+      "bytes": 1082,
+      "rawSha256": "8a452d73138e69d36dadd20b4e7dc30ffb371128f8d6b9003703c0787d954863",
+      "lfSha256": "24156a46c8cf9d3a42cc2159f3c6dc4a4af65800cdc5c3390874c1901091e824"
+    },
+    "redis-tenant-scope.test.ts": {
+      "bytes": 2610,
+      "rawSha256": "0b6b35fc96e5c080b649411b81e52b933b873f94db8011f19cf50d13a5d45d25",
+      "lfSha256": "0b6b35fc96e5c080b649411b81e52b933b873f94db8011f19cf50d13a5d45d25"
+    },
+    "server-codex-router.test.ts": {
+      "bytes": 24665,
+      "rawSha256": "c3ab77cb8a343e3b1afa8719ee88eace35a1fbfbca2a92517b813e454edea506",
+      "lfSha256": "c3ab77cb8a343e3b1afa8719ee88eace35a1fbfbca2a92517b813e454edea506"
+    },
+    "server-private-settings-tools.test.ts": {
+      "bytes": 2574,
+      "rawSha256": "0f90214760c47caa516b81e6c6fd786f4b99d3d6953153357156a702f3b1b899",
+      "lfSha256": "9f2f0826858ca618e957f60312cc6512a7cd7af066ddef4e4d2efaf573df34f0"
+    },
+    "server-private-settings-tools.ts": {
+      "bytes": 3294,
+      "rawSha256": "2a0d92740f6735efa109aa930121b3e04275ad74606465ed1a2f3d3e071cc197",
+      "lfSha256": "083fb4e47300c7dd288683406e2a1c19dbabe84c1edce0c3ddd7681e3157f05e"
+    },
+    "server.ts": {
+      "bytes": 496345,
+      "rawSha256": "cc2f144d88934227c6201f751fc9785043a4400e321fda4320e68d6498d14bab",
+      "lfSha256": "411ffe269387c31a44c1588bc3ea1b524dfa556232f5f24288b7d85342f49045"
+    },
+    "source-integrity.test.ts": {
+      "bytes": 2114,
+      "rawSha256": "1b2ed4f0849650ae620bf7f19c9b7bf77a5e38a81d17bbc4930c1442ec5d044b",
+      "lfSha256": "46c4eb5c0fe4d6fdf38e26b43d44d315f404e39c44d455e2da5649cf09fd644e"
+    },
+    "source-integrity.ts": {
+      "bytes": 2840,
+      "rawSha256": "83498ae2ba2a1ab8a99e7dfb6d7723bb97f317a173794f2ed485b421bae03258",
+      "lfSha256": "c1c40a50de95c990363df0a22cfe2c2f1841b9073da1e3972b0f59491e6107ef"
+    },
+    "stdio-buffer.test.ts": {
+      "bytes": 6145,
+      "rawSha256": "aacee93a93d5634fcdb3bffcf96d7416a98e0358c1cc2d9df453a8a2ba7cb9ca",
+      "lfSha256": "93ead542857838b31cdff76456ae953ea99d944ddfb6c29790864b40b7ae552b"
+    },
+    "store-application-task.test.ts": {
+      "bytes": 2765,
+      "rawSha256": "85c529b90c12e6fc38aae12037769e9cbb32f201409b1d30b3d0a9a3bb3be116",
+      "lfSha256": "e474a7a46869a61bca1f28dda77881b21586d1ac7d23761e610fb66b382190f7"
+    },
+    "store-sparse-selection-tools.test.ts": {
+      "bytes": 2013,
+      "rawSha256": "28ac4e76173fe122dce4cf1bfb02d266d7e0c7870670430598a6b8eb25030b24",
+      "lfSha256": "4076e0564d83fde165052a5dba76d079e907f45a383ac34b0897742dfe836ccd"
+    },
+    "system-observability-tools.test.ts": {
+      "bytes": 16040,
+      "rawSha256": "a1257c0a92213c87c93a90cc616faa1b5bf3336d5fb20e37860dd41f4f14348e",
+      "lfSha256": "1f4616d61767458145132e4920ac6a0d5ae85638085c032e86a1a5afa0256eea"
+    },
+    "token-utils.test.ts": {
+      "bytes": 1825,
+      "rawSha256": "06b1729cf9dc5abf8e642be35309aa8e1113be173f44ef38cc00e9007a1ea785",
+      "lfSha256": "5fb8f136705ac510eee1e014d1ee13e5757d424f439d4afbc43d8529de3b3cfb"
+    },
+    "token-utils.ts": {
+      "bytes": 3036,
+      "rawSha256": "bdc550435eff403af0e78fb6d6fe4bcd5d19999823a86d22b658124f7f2182e4",
+      "lfSha256": "773ddf64d6c7e7aa46faa2f6853be509f3cc6f4ef312b535be312c01d69dbb20"
+    },
+    "tool-metrics.test.ts": {
+      "bytes": 2867,
+      "rawSha256": "1aa1567e0f42b1ab4802d08b0d98a372ecaa4073afb1c356c8fee82073e40d17",
+      "lfSha256": "1aa1567e0f42b1ab4802d08b0d98a372ecaa4073afb1c356c8fee82073e40d17"
+    },
+    "tool-metrics.ts": {
+      "bytes": 1976,
+      "rawSha256": "92447f6c0dc6421ae279a363b761542b1363b78182a59cc66bcfab2f2c1fcc4b",
+      "lfSha256": "92447f6c0dc6421ae279a363b761542b1363b78182a59cc66bcfab2f2c1fcc4b"
+    },
+    "translate-tools.test.ts": {
+      "bytes": 7499,
+      "rawSha256": "2003b01861a29027c3ca9efa60e12f239244e98077ff5f14d73c66c13b5e3bd0",
+      "lfSha256": "5c9987588f6b7dec68fa49990e4494fd61d7f05e556ef70711c430dbd2fbf264"
+    },
+    "user-access-key-tools.test.ts": {
+      "bytes": 6782,
+      "rawSha256": "b6bd5183aaa231817bfd6ee84f5a6b60e2fd1a1ce6fc289a7e885ac7c423a4c0",
+      "lfSha256": "a33be6f0d69d747336a858ceb794a00a39537db36c8b9ff6fbe3acffc6a279c8"
+    },
+    "v8-unlimited.test.ts": {
+      "bytes": 3680,
+      "rawSha256": "80c65884a14c3bdc78c4130e5db7019e49314bedf620f782dffab6b5f919e775",
+      "lfSha256": "908a326b8b946b642f349830f322efdfd832a54465333f8afdc45d2004dc81f7"
+    },
+    "v8-version.test.ts": {
+      "bytes": 2349,
+      "rawSha256": "bdcf830323456ace19d1950d838b4e7e8c088f6e304a723dfedfac37a15f4c46",
+      "lfSha256": "0021f0c9b7e4898689dcdfe614aebf8234e68665debda1086dfdb7d82ef8cf69"
+    },
+    "v8-version.ts": {
+      "bytes": 6920,
+      "rawSha256": "95fdff2dd2c7d818dca95a8a26de31c8117d2a51775b0385ec899deaddc6638e",
+      "lfSha256": "454a08e99a68fb9f689a90139c563c9b420a4bfce539a38cefbb051dc55c54f1"
+    },
+    "view-schema.test.ts": {
+      "bytes": 8201,
+      "rawSha256": "7bb52013e47e6ad793ac59ca19ea379a66084db3bbac3ff4f135b5ab7214c0ed",
+      "lfSha256": "20bb4a103a0b762d5b7b2e3a2ff0370f879b6015531f8126717155dbedbe3109"
+    },
+    "workflow-package.test.ts": {
+      "bytes": 12701,
+      "rawSha256": "3db4c032b43f21483b6991551b1ce379b7980b1c36a86c1a61ce0975c82621ea",
+      "lfSha256": "185d10676e5c425754c21ca24fa5fe88a2325d09a065f331072900c28d8e97da"
+    },
+    "workspace-protected-credentials.test.ts": {
+      "bytes": 9184,
+      "rawSha256": "0e3d3b90332a49082ec59661e26c116a865455b076fe8d75f33b05bcbd20a723",
+      "lfSha256": "a0a581babfc656621131acda006444e0b3256fd4db0d4bb15cdc261edfad78b0"
+    },
+    "workspace-protected-credentials.ts": {
+      "bytes": 10253,
+      "rawSha256": "b26f1e452252fde843e825e297a3537c493d925837a9405a1a921b14692c76ca",
+      "lfSha256": "048cdca8f4592724370e0c94f34f30926170d6c40bd51b1e8c0c1daf83686fc2"
+    }
+  },
+  "dependencyInputs": {
+    "package.json": {
+      "bytes": 3112,
+      "rawSha256": "176b024aecf024e558e2bdf61eeb27540b6c2210c4030385347bec4275c566c1",
+      "lfSha256": "fc118be7c22090aaeda27284d3955ad9518d2745497adfb11ba19ba325caf30d"
+    },
+    "package-lock.json": {
+      "bytes": 80727,
+      "rawSha256": "0ae4d665f6dab0f502f29181b9bc73092ddc221e949d858a7b87b212c8865fe8",
+      "lfSha256": "5b01f4bfcfd35f16771d1b49943f87dfd637b22a99b91794511452c58c10efd3"
+    }
+  },
+  "compilerInputs": {
+    "tsconfig.json": {
+      "bytes": 469,
+      "rawSha256": "3d63368c132cfa0dd6da46a3d5eb1d4da982b36723c129b915144f0ecc74e9c1",
+      "lfSha256": "1bb94b88f1e9154f1e65bebf05916f94f63ab33ecfec98587db7d46b57374d4f"
+    }
+  },
+  "inputFiles": [
+    "microi.benchmarks/manifest-delivery/verify.mjs",
+    "microi.mcp/package-lock.json",
+    "microi.mcp/package.json",
+    "microi.mcp/src/administrative-data-tools.test.ts",
+    "microi.mcp/src/advanced-tools-validation-envelope.test.ts",
+    "microi.mcp/src/advanced-tools.ts",
+    "microi.mcp/src/api-paths.ts",
+    "microi.mcp/src/application-gate-diagnostic.test.ts",
+    "microi.mcp/src/application-gate-diagnostic.ts",
+    "microi.mcp/src/application-stream-gate-transition.test.ts",
+    "microi.mcp/src/application-stream-publish.test.ts",
+    "microi.mcp/src/background-task.test.ts",
+    "microi.mcp/src/blueprint-smoke-test.ts",
+    "microi.mcp/src/blueprint-tools.ts",
+    "microi.mcp/src/blueprint-versioning.test.ts",
+    "microi.mcp/src/context-reading.test.ts",
+    "microi.mcp/src/context-reading.ts",
+    "microi.mcp/src/data-source-migration.test.ts",
+    "microi.mcp/src/database-backup.test.ts",
+    "microi.mcp/src/dependency-security.test.ts",
+    "microi.mcp/src/design-engine-presentation.test.ts",
+    "microi.mcp/src/design-engine.ts",
+    "microi.mcp/src/design-tools.ts",
+    "microi.mcp/src/document-inputs.ts",
+    "microi.mcp/src/email-tools.test.ts",
+    "microi.mcp/src/email-tools.ts",
+    "microi.mcp/src/file-cabinet-office-tools.test.ts",
+    "microi.mcp/src/file-upload-config.test.ts",
+    "microi.mcp/src/file-upload-config.ts",
+    "microi.mcp/src/form-banner-defaults.test.ts",
+    "microi.mcp/src/form-layout-defaults.test.ts",
+    "microi.mcp/src/form-read-primary.test.ts",
+    "microi.mcp/src/game-delivery-tools.test.ts",
+    "microi.mcp/src/index.ts",
+    "microi.mcp/src/job-runtime-tools.test.ts",
+    "microi.mcp/src/localhost-tls.test.ts",
+    "microi.mcp/src/manifest-context-fixtures.ts",
+    "microi.mcp/src/manifest-context.test.ts",
+    "microi.mcp/src/manifest-context.ts",
+    "microi.mcp/src/manifest-efficiency-benchmark.test.ts",
+    "microi.mcp/src/manifest-efficiency-benchmark.ts",
+    "microi.mcp/src/manifest-field-relations.test.ts",
+    "microi.mcp/src/manifest-microservice-module.test.ts",
+    "microi.mcp/src/manifest-preflight.test.ts",
+    "microi.mcp/src/manifest-preflight.ts",
+    "microi.mcp/src/mcp-did.test.ts",
+    "microi.mcp/src/mcp-did.ts",
+    "microi.mcp/src/mcp-label.test.ts",
+    "microi.mcp/src/mcp-label.ts",
+    "microi.mcp/src/mcp-role-form-data.test.ts",
+    "microi.mcp/src/message-notification-tools.test.ts",
+    "microi.mcp/src/message-notification-tools.ts",
+    "microi.mcp/src/microi-chat.test.ts",
+    "microi.mcp/src/microi-client-recovery.test.ts",
+    "microi.mcp/src/microi-client-tenant-tuple.test.ts",
+    "microi.mcp/src/microi-client.ts",
+    "microi.mcp/src/microservice-scaffold.test.ts",
+    "microi.mcp/src/microservice-scaffold.ts",
+    "microi.mcp/src/microservice-source-directory.test.ts",
+    "microi.mcp/src/microservice-source-stream.test.ts",
+    "microi.mcp/src/minimax-image-tools.test.ts",
+    "microi.mcp/src/minimax-music3-fallback.test.ts",
+    "microi.mcp/src/minimax-music3-fallback.ts",
+    "microi.mcp/src/ocr-tools.test.ts",
+    "microi.mcp/src/operation-progress.test.ts",
+    "microi.mcp/src/operation-progress.ts",
+    "microi.mcp/src/page-versioning.test.ts",
+    "microi.mcp/src/probe-diytable.ts",
+    "microi.mcp/src/redis-tenant-scope.test.ts",
+    "microi.mcp/src/server-codex-router.test.ts",
+    "microi.mcp/src/server-private-settings-tools.test.ts",
+    "microi.mcp/src/server-private-settings-tools.ts",
+    "microi.mcp/src/server.ts",
+    "microi.mcp/src/source-integrity.test.ts",
+    "microi.mcp/src/source-integrity.ts",
+    "microi.mcp/src/stdio-buffer.test.ts",
+    "microi.mcp/src/store-application-task.test.ts",
+    "microi.mcp/src/store-sparse-selection-tools.test.ts",
+    "microi.mcp/src/system-observability-tools.test.ts",
+    "microi.mcp/src/token-utils.test.ts",
+    "microi.mcp/src/token-utils.ts",
+    "microi.mcp/src/tool-metrics.test.ts",
+    "microi.mcp/src/tool-metrics.ts",
+    "microi.mcp/src/translate-tools.test.ts",
+    "microi.mcp/src/user-access-key-tools.test.ts",
+    "microi.mcp/src/v8-unlimited.test.ts",
+    "microi.mcp/src/v8-version.test.ts",
+    "microi.mcp/src/v8-version.ts",
+    "microi.mcp/src/view-schema.test.ts",
+    "microi.mcp/src/workflow-package.test.ts",
+    "microi.mcp/src/workspace-protected-credentials.test.ts",
+    "microi.mcp/src/workspace-protected-credentials.ts",
+    "microi.mcp/tsconfig.json"
+  ],
+  "sourceUnchanged": true,
+  "dependencyUnchanged": true,
+  "compilerUnchanged": true,
+  "counters": {
+    "tests": 356,
+    "pass": 356,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "passed": true
+  },
+  "exitCode": 0,
+  "timedOut": false,
+  "outputLimitExceeded": false,
+  "rawTapSha256": "20de0bae347144c5552f852a7c9c415714e018fc2be57744886d9e7b4f19c41c",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "passed": true,
+  "boundaries": {
+    "realProviderCalls": 0,
+    "remoteBusinessWrites": 0,
+    "databaseExecutionVerified": false,
+    "browserVerified": false,
+    "certification": false
+  }
+}
