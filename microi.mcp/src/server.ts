@@ -8,6 +8,7 @@ import { isIP } from 'node:net';
 import path from 'node:path';
 import { z } from 'zod';
 import { registerServerPrivateSettingsTools } from './server-private-settings-tools.js';
+import { registerSaasMinioTools } from './saas-minio-tools.js';
 import {
   applicationSummary, buildSchemaRead, buildSourceRead, createContextReadScope, createReadIdentityGuard,
   exactNames, isTextSourceFile, readPage, record, sortedRecords, sourceFileMetadata,
@@ -8648,6 +8649,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // 统一通知工具只通过当前租户固定接口维护配置，保存与实际发布分别授权并回读。
   registerMessageNotificationTools(server, client, context);
   registerServerPrivateSettingsTools(server, client);
+  registerSaasMinioTools(server, client, context.osClient);
 
   toolRegistry.flush(context.codexMode ? ['microi_codex'] : undefined);
   return server;

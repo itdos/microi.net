@@ -126,5 +126,8 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 - 推送前先做远端差异检查。写请求超时只表示结果不确定，使用对应 get 工具短超时回读，禁止盲目重复创建或覆盖。
 - 配置和 Token 文件使用现有原子写与锁协议；不要手工拼接或清空用户已有 MCP 配置。
 - Codex Plugin 路由器只选择连接，业务行为必须继续走原 MCP bundle。
+- SaaS MinIO 的部署凭据使用 `microi_manage_saas_minio`；先 Inspect 取得 Revision，
+  Save 以 `SAVE_MINIO:<tenant>:<revision>` 确认，Probe 验证已保存绑定。通用表密钥禁写
+  继续保留；不会修改 HDFS/OSS，不通过普通第三方 Secret 工具错存，不用临时 V8 绕过。
 
 完整 VS Code 命令覆盖关系见插件根目录 `assets/feature-matrix.json`。
