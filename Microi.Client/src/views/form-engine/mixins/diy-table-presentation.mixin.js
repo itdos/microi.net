@@ -425,6 +425,12 @@ export default {
                     && templateValue !== "";
             }
             if (!hasRawValue && field.Component === "Switch" && hasSwitchNullValueEnabled(field)) return true;
+            // 仅选项类字段按格式化结果隐藏 []/"[]" 等空选择。上传、地图、子表和
+            // 自定义组件可能没有文本但仍有可渲染内容，继续保留原来的原值判断。
+            const optionComponents = ["Select", "MultipleSelect", "Radio", "Checkbox", "Autocomplete", "Cascader", "SelectTree", "Department", "Transfer"];
+            if (hasRawValue && optionComponents.includes(field.Component)) {
+                return String(this.GetPresentationFieldValue(row, field) ?? "").trim() !== "";
+            }
             return hasRawValue;
         },
         HasAnyPresentationFieldValue(row, fields) {

@@ -332,9 +332,9 @@ export default {
             var minColumnWidth = typeof self.GetActionMinColumnWidth === 'function'
                 ? self.GetActionMinColumnWidth()
                 : 56;
-            // MaxRowActionContentWidth 已是单行真实可见按钮总宽，只需再加
-            // Element Plus .cell 与按钮角标的安全区，避免重复叠加不在同一行的按钮。
-            var automaticWidth = Math.max(
+            // 首帧沿用旧估算；DOM 就绪后以真实尺寸为准，密度/翻译变长与切页变短都能自适应。
+            var measuredWidth = Number(self.MeasuredActionColumnWidth) || 0;
+            var automaticWidth = measuredWidth > 0 ? measuredWidth : Math.max(
                 minColumnWidth,
                 Math.ceil((Number(self.MaxRowActionContentWidth) || 0) + cellReserveWidth)
             );
