@@ -2,7 +2,7 @@
 
 Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Claude Code、Trae 等 AI 工具连接真实的 Microi 服务器与 OsClient。它不是只读文档搜索器，也不是绕过权限的万能数据库接口：每个工具围绕平台业务对象设计，继续执行参数校验、当前身份、租户隔离、写入确认、审计与远端回读。
 
-源码随主仓库开放：[GitHub](https://github.com/itdos/microi.net/tree/master/microi.mcp) / [Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.mcp)。普通用户推荐通过 [VS Code 插件或 CLI](/doc/v8-engine/vs-code-plugin) 使用内置版本，无需单独克隆。
+源码随主仓库开放：[GitHub](https://github.com/itdos/microi.net/tree/master/microi.mcp) / [Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.mcp)。普通用户推荐通过 [VS Code 插件或 CLI](/doc/v8-engine/microi-agent) 使用内置版本，无需单独克隆。
 
 本文的精确读取、Manifest 会话引用及上下文载荷计量需要开发工具 **5.9.7 或以上**。升级后由新启动的 MCP 进程接管；正在运行的旧进程继续当前工作。以实际工具发现结果核对参数，完整系统和局部修改都继续执行相应质量与验收规范。
 
@@ -160,9 +160,22 @@ AI 生成的 JSON 能解析，不代表能够安全落地。新增的声明预�
 
 ### 权限引用与验收结果
 
-公开源码的权限预检与独立验收共同防止“计划可解析但实际授权错误”以及“回包不完整却报告通过”。
+开发工具 **6.1.7** 的权限预检与独立验收共同防止“计划可解析但实际授权错误”以及“回包不完整却报告通过”。
 具体回归可从[声明交付检查](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/manifest-delivery)复跑；
 安装包与已加载的 MCP 进程必须包含相同变更，源码测试不代表旧进程自动升级。
+
+升级 CLI 时使用官方 npm 渠道；VS Code 用户通过扩展市场更新吾码插件：
+
+```bash
+npm install -g @microi.net/cli@latest --registry=https://registry.npmjs.org/
+microi version --json
+microi doctor
+```
+
+`microi version` 显示已安装 CLI；Codex 单入口 `action=profiles` 的
+`toolchain.loadedVersion` 显示本次连接实际加载的 MCP。两者应分别核对，
+已有任务保持运行，新任务或宿主自然重启后再检查已加载版本。更新工具本身不会
+修改租户数据库，也不能代替当前租户的独立验收。
 
 | 情况 | 处理 |
 |---|---|
@@ -176,8 +189,9 @@ AI 生成的 JSON 能解析，不代表能够安全落地。新增的声明预�
 省略权限声明与显式清空菜单权限是不同操作，写入前确认目标。
 权限解析失败可能发生在角色、菜单已保存之后；返回已有步骤供回读，不能把停止权限写入解释成跨资源自动回滚。
 
-该能力由 MCP 工具实现，需使用包含 `declarationPreflight.version=1` 的新版工具；
-可从 `microi_get_manifest_schema` 发现。已经运行的旧 MCP 进程不会因官网更新而自动获得能力。
+该能力由 MCP 工具实现，权限引用与严格验收修复需要 **6.1.7 或以上**；
+`microi_get_manifest_schema` 的 `declarationPreflight.version=1` 表示声明预检协议，
+不能单独代替工具发行版本判断。已经运行的旧 MCP 进程不会因官网更新而自动获得能力。
 它不代替服务端权限、跨资源事务或写后回读；执行阶段失败仍须核对实际状态。
 可复现源码与检查入口见[声明交付证据](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/manifest-delivery)
 （[GitHub](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/manifest-delivery)）。

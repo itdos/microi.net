@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import childProcess from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import { protectSessionToken, unprotectSessionToken } from './workspace-protected-credentials.js';
 import {
   buildMicroAppEntryUrl,
@@ -13,7 +14,35 @@ import {
   MicroiClient,
 } from './microi-client.js';
 
-test('token rotation preserves each connection format independently in a mixed token file', () => {
+/** 当前测试的内存 Secret Service；只模拟 OS 边界，不访问开发机或 CI 用户钥匙环。 */
+function isolateLinuxSessionStore(t: TestContext): void {
+  if (process.platform !== 'linux') return;
+  const values = new Map<string, string>();
+  t.mock.method(childProcess, 'spawnSync', ((command: string, args: string[], options: { input?: string }) => {
+    assert.equal(command, '/usr/bin/secret-tool');
+    const store = args[0] === 'store';
+    assert.ok(store || args[0] === 'lookup');
+    const attributes = args.slice(store ? 2 : 1);
+    assert.deepEqual(attributes.slice(0, 3), ['service', 'net.microi.cli.session.v1', 'account']);
+    assert.equal(attributes.length, 4);
+    const account = attributes[3];
+    assert.match(account, /^[a-f0-9]{64}$/);
+    if (store) {
+      assert.equal(args[1], '--label=Microi CLI credentials');
+      assert.equal(typeof options.input, 'string');
+      const encoded = options.input!;
+      const token = Buffer.from(encoded, 'base64').toString('utf8');
+      assert.equal(crypto.createHash('sha256').update(token).digest('hex'), account);
+      assert.ok(!args.join(' ').includes(token), 'session secret stays out of argv');
+      values.set(account, encoded);
+    }
+    const stdout = store ? '' : values.get(account) || '';
+    return { pid: 0, output: [null, stdout, ''], stdout, stderr: '', status: store || values.has(account) ? 0 : 1, signal: null };
+  }) as typeof childProcess.spawnSync);
+}
+
+test('token rotation preserves unrelated connections and required platform protection', t => {
+  isolateLinuxSessionStore(t);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-mixed-session-'));
   const file = path.join(dir, 'tokens.json');
   const [own] = buildTokenFileLookupKeys('http://127.0.0.1:8888', 'fixture', '', '');
@@ -24,7 +53,11 @@ test('token rotation preserves each connection format independently in a mixed t
     const client = new MicroiClient({ apiBaseUrl: 'http://127.0.0.1:8888', osClient: 'fixture', username: '', password: '', token: 'rotated-session', tokenFilePath: file });
     (client as unknown as { writeTokenToFile(): void }).writeTokenToFile();
     let result = JSON.parse(fs.readFileSync(file, 'utf8'));
-    assert.equal(result[own], 'rotated-session');
+    assert.equal(unprotectSessionToken(result[own]), 'rotated-session');
+    if (process.platform === 'linux') {
+      assert.match(result[own], /^secretservice-session-v1:[a-f0-9]{64}$/);
+      assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /rotated-session|other-session/);
+    } else assert.equal(result[own], 'rotated-session');
     assert.equal(result[unrelated], otherCipher);
     result[own] = protectSessionToken('previous-session');
     fs.writeFileSync(file, JSON.stringify(result));
@@ -289,7 +322,8 @@ test('MCP requests credential-free VS Code recovery and reloads the rotated toke
   }
 });
 
-test('MCP escalates to VS Code recovery when a refresh-issued token is immediately rejected', async () => {
+test('MCP escalates to VS Code recovery when a refresh-issued token is immediately rejected', async t => {
+  isolateLinuxSessionStore(t);
   const originalFetch = globalThis.fetch;
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-mcp-rejected-refresh-'));
   const tokenFilePath = path.join(tempDir, 'tokens.json');
@@ -347,7 +381,7 @@ test('MCP escalates to VS Code recovery when a refresh-issued token is immediate
       // 真实 VS Code broker 会先同步扩展宿主已持有的不同 Token；
       // 若该 Token 也被后端拒绝，第二个请求的哈希与宿主当前 Token 一致，才会触发重登。
       const brokerToken = recoveryPayloads.length === 1 ? extensionHeldToken : recoveredToken;
-      fs.writeFileSync(tokenFilePath, JSON.stringify({ [tokenKey]: brokerToken }));
+      fs.writeFileSync(tokenFilePath, JSON.stringify({ [tokenKey]: process.platform === 'linux' ? protectSessionToken(brokerToken) : brokerToken }));
       for (const request of requests) fs.rmSync(path.join(recoveryDir, request), { force: true });
     }, 25);
 
@@ -379,7 +413,11 @@ test('MCP escalates to VS Code recovery when a refresh-issued token is immediate
       'a rejected extension-held token must trigger the broker relogin branch in the same bounded request',
     );
     const storedTokens = JSON.parse(fs.readFileSync(tokenFilePath, 'utf8')) as Record<string, string>;
-    assert.equal(storedTokens[tokenKey], recoveredToken);
+    assert.equal(unprotectSessionToken(storedTokens[tokenKey]), recoveredToken);
+    if (process.platform === 'linux') {
+      assert.match(storedTokens[tokenKey], /^secretservice-session-v1:[a-f0-9]{64}$/);
+      assert.ok(!fs.readFileSync(tokenFilePath, 'utf8').includes(recoveredToken));
+    }
   } finally {
     if (brokerTimer) clearInterval(brokerTimer);
     globalThis.fetch = originalFetch;

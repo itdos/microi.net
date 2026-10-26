@@ -439,6 +439,11 @@ Passkey、设备生物识别、严格人脸、改密步进验证和自定义 V8 
 （3 个高危、2 个中危）。已将 MCP SDK 最低版本提升到 1.32.0、Zod 提升到 4.6.7，
 更新相关传递依赖并迁移正式工具 Schema；同日复核返回 0 个公告项。
 公开 CI 同时执行依赖检查、四组系统/Node 合约以及大集合提前拒绝和真实工具发现回归。
+完整离线作业另在 Ubuntu / Node 24 自动发现并串行执行全部 MCP 测试文件，包含本机
+HTTP/TLS 夹具；报告绑定完整源码成员、依赖锁文件、编译配置与运行器哈希，执行期间
+输入改变、计数缺失或存在失败/跳过均不能通过。实际作业与脱敏结果见
+[公开回归工作流](https://github.com/itdos/microi.net/actions/workflows/public-evidence.yml)，
+复跑入口见[声明交付检查](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/manifest-delivery)。
 原始问题、版本、锁文件摘要、扫描边界和复跑命令见
 [依赖核验记录](https://gitee.com/ITdos/microi.net/tree/master/microi.benchmarks/compatibility)
 （[GitHub 镜像](https://github.com/itdos/microi.net/tree/master/microi.benchmarks/compatibility)）。

@@ -52,6 +52,10 @@ Preview 和确认均重验当前客户端、回调及 Scope；账号变化通过
 
 同一 Managed 会话接口包含本人初始化与敏感管理动作时，精确 `ApiRole` 不能代替动作级鉴权。SaaS v8.4.26 / `platform-sys-user-session` v1.0.5 对已归一化的 `GetSysUserPassword`，先拒绝匿名和访问密钥，再以可信 `V8.CurrentUser`、`V8.Db` 主库的本人活动状态/等级及有效管理员角色核验后调用原可信原子；不读取密码字段做授权，不使用 `DbRead`、客户端身份字段或角色名判断。标准角色授权可用于只读账号的本人会话初始化，不能把整引擎授权解释成敏感动作许可。负例使用预先确认不存在的固定用户 Id：普通账号必须先被管理员门拒绝，管理员仅验证合法路径返回不存在，禁止为验收读取任何真实密码。
 
+登录密码的 `Pwd` 与 `PwdEncode` 必须成组更新；不能在 PBKDF2 账号上只写 DES 密文，也不能在验证失败时自动降级为 DES。官网短信重置使用固定 `official_password_reset` 调用 `V8.Method.ResetPlatformSmsPassword({Phone,SmsCode,NewPassword,ConfirmPassword,_Lang})`，由可信后端完成一次性验证码消费、原始密码哈希和会话撤销。历史编码不一致只由 `platform-sys-user-admin` 的 `RepairPasswordEncoding` 动作调用 V8.Method.RepairPlatformPasswordEncoding 可信修复原子：默认 `DryRun=true`，最多 20 个用户，写入需显式 `DryRun=false` 与 `ConfirmExecution='REPAIR_PASSWORD_ENCODING'`；不进入租户 Hook，不返回密码材料。两原子最低后端 8.7.4，应用包最低 SaaS v8.6.13 / 系统账号 v8.4.13，先确认运行版本再安装或调用。
+
+密码注册、重置与登录要保留相同原始输入，不能在单个环节独自 `trim`。登录及重置包装器把 `_Lang`（无值时沿用 `lang` Header，再默认 `cn`）传至认证内核；缓存未预热也应返回本地化错误而不是内部 Key。手机号作为登录别名时精确账号优先，手机号重复则拒绝；验证后的身份只按认证结果 Id 回读。账号必须 `State=1` 且未删除；历史 `State=2` 是禁用，不能为了排障绕过或自动启用。
+
 <!-- microi-progressive:begin -->
 <!-- microi-progressive:chunk id=v8-security-000 sha256=a6a4311b1a799ea4ed005b22c01cb8230509aaf09aeead5a17c8c46da74772c8 -->
 ## 0. 租户动态系统设置与密钥边界
