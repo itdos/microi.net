@@ -128,6 +128,17 @@ FontWeight/DisplayStyle`。运行时会把引用字段并入 `_SelectFields`；�
 返回这些字段。多字段模板沿用对应 `diy_field.V8TmpEngineTable`，不在 ViewSchema 内保存
 可执行脚本。
 
+桌面采用卡片模式时，优先使用 PC/All 的 Card 视图，没有匹配视图时复用 Mobile Card；
+移动端也保留相反终端的兼容回退。`Fields` 解析到字段时作为正文来源，否则兼容
+`MobileListFields`。标题、头像、顶部、副标题、右侧、正文、Meta 与底部按现有运行时规则
+去重，空值隐藏；不要凭“字段元数据存在”判断已展示，还须检查查询响应与实际页面。
+核心正文建议配置 2~4 个可读业务字段及 `ShowLabel=true`，秘密和内部 Id 不作为装饰信息。
+副标题保留 `ShowLabel/Icon`，正文支持 `ShowLabel=false`；空白与空多选在展示态隐藏，
+`0/false` 仍显示，行内编辑空字段继续可录入。普通与树形列表的显式 `_SelectFields`
+都须补齐视图依赖字段；未配置或 `*` 的全列查询不能因补字段而被窄化。
+操作区必须保留行外按钮、权限与显隐逻辑，【更多】使用本地化文字与展开图标；
+密度切换、长文本、多个按钮和移动断点下不得溢出或只剩难以辨认的图标。
+
 PC 复合列的常规高度上限是两行：`Field` 占主行，`Lines` 通常只放 1 项。多个信息组拆成
 多个两行复合列；只有确有层级价值且完成桌面截图验收后，才允许在同一列放第 2 个
 `Lines`。`TrailingFields` 位于右侧，不应被误用成增加纵向信息层级。
@@ -158,6 +169,12 @@ Hero 必须在 PageTabs 上方渲染。PC 无指标/含指标头部分别为 `44
 
 按钮对象必须有稳定唯一 Id、Sort、Name、显隐逻辑和动作。后台任务按钮还要配置
 ApiEngineKey、Workload、幂等字段、并发 Key、业务状态/任务 Id/进度/ETA 字段。
+
+PC 操作列使用当前页每行已渲染按钮、图标、间距、角标与单元格边界的实际宽度，取最宽行；
+`TableActionFixedWidth` 为安全最小值，不能用它截断动态内容。隐藏/未完成首帧测量时才保留
+兼容估算；显示后按实际布局校准。DOM 文本/子节点/样式变化、密度/主题/语言变化、字体加载
+与窗口尺寸变化合帧重测，停用和卸载时清理观察器。回归应覆盖异步翻译、按钮显隐、角标、
+最多与最少按钮行以及卡片切回表格，不能只按中文字符数验证。
 
 `PageTabs` 与五类按钮共用统计字段：`BadgeEnabled`、`BadgeApiEngineKey`、`BadgeValuePath`、`BadgeField`、
 `BadgeTone`、`BadgeColor`、`BadgeMax`、`BadgeShowZero`、`BadgeRefreshSeconds`。接口一次接收当前页 `Ids` 与

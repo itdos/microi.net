@@ -108,6 +108,21 @@ test("configured action width is a safe minimum and cannot crop wider button con
     assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 600);
 });
 
+test("rendered action measurement replaces the fixed-font estimate and can shrink after a page change", function () {
+    const context = {
+        SysMenuModel: { TableActionFixedWidth: 200 },
+        MaxRowActionContentWidth: 1000,
+        MeasuredActionColumnWidth: 344,
+        GetActionCellReserveWidth() { return 30; },
+        GetActionMinColumnWidth() { return 56; }
+    };
+    assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 344);
+    context.MeasuredActionColumnWidth = 178;
+    assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 200);
+    context.SysMenuModel.TableActionFixedWidth = 0;
+    assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 178);
+});
+
 test("the last visible content column flex-fills remaining width before the fixed action column", function () {
     const uiMethods = tableUiMixin.methods;
     const fields = [

@@ -917,7 +917,7 @@
                             <span>{{ scope.row.UpdateTime }}</span>
                         </template>
                     </el-table-column>
-                    <!-- 操作列按每行真实可见按钮计算宽度，取最宽行并统一右对齐 -->
+                    <!-- 操作列测量每行真实渲染尺寸，密度、翻译、按钮显隐变化后自动重算 -->
                     <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class-name="row-last-op" align="right" header-align="left" :width="GetActionWidth">
                         <template #header>
                             <div
@@ -1104,8 +1104,8 @@
                                 role="button"
                                 tabindex="0"
                                 @click="CardItemClick(item)"
-                                @keydown.enter.prevent="CardItemClick(item)"
-                                @keydown.space.prevent="CardItemClick(item)"
+                                @keydown.enter.self.prevent="CardItemClick(item)"
+                                @keydown.space.self.prevent="CardItemClick(item)"
                             >
                                 <div
                                     :class="GetCardContentLayoutClass()"
@@ -1148,7 +1148,7 @@
                                                 <span v-else-if="!PresentationCardConfig || !PresentationCardConfig.HideIndex" class="card-index-badge">{{ getCardIndex(index) }}</span>
                                             </template>
                                             <div class="card-title-main">
-                                                <div class="card-title-tags" v-if="CardTopFieldList.length > 0">
+                                                <div class="card-title-tags" v-if="HasAnyPresentationFieldValue(item, CardTopFieldList)">
                                                     <template v-for="tagField in CardTopFieldList" :key="'title-tag-' + tagField.Id">
                                                         <template v-if="HasPresentationFieldValue(item, tagField)">
                                                             <span v-if="isMuban(tagField, { row: item })" v-safe-html:template="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
@@ -1170,7 +1170,7 @@
                                                         </template>
                                                     </template>
                                                 </div>
-                                                <div class="card-title-text">
+                                                <div class="card-title-text" :title="GetPresentationFieldValue(item, CardPrimaryField)">
                                                     <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(CardPrimaryField.Id) && CardPrimaryField.Component !== 'DevComponent' && !IsSpecialTableField(CardPrimaryField)">
                                                         <div class="card-inline-edit-item" @click.stop>
                                                             <div class="card-inline-edit-control">
@@ -1211,7 +1211,9 @@
                                                 </div>
                                                 <div v-if="HasAnyPresentationFieldValue(item, CardSubtitleFieldList)" class="card-subtitle-row">
                                                     <template v-for="subtitleField in CardSubtitleFieldList" :key="'subtitle-' + subtitleField.Id">
-                                                        <template v-if="HasPresentationFieldValue(item, subtitleField)">
+                                                        <span v-if="HasPresentationFieldValue(item, subtitleField)" class="card-subtitle-item">
+                                                            <fa-icon v-if="subtitleField.Icon" :icon="subtitleField.Icon" aria-hidden="true" />
+                                                            <span v-if="subtitleField.ShowLabel" class="card-subtitle-label">{{ subtitleField.Label }}</span>
                                                             <span v-if="isMuban(subtitleField, { row: item })" v-safe-html:template="item[subtitleField.Name + '_TmpEngineResult']"></span>
                                                             <DiyTableSpecialCell
                                                                 v-else-if="IsSpecialTableField(subtitleField)"
@@ -1225,7 +1227,7 @@
                                                                 @open-detail="OpenSpecialCellDetail"
                                                             />
                                                             <span v-else :style="GetPresentationFieldStyle(subtitleField)">{{ GetPresentationFieldValue(item, subtitleField) }}</span>
-                                                        </template>
+                                                        </span>
                                                     </template>
                                                 </div>
                                             </div>
@@ -1290,11 +1292,11 @@
                                             </template>
                                             <!-- V8TmpEngineTable 模板引擎 -->
                                             <template v-else-if="isMuban(field, { row: item })">
-                                                <span class="card-field-label">{{ field.Label }}</span>
+                                                <span v-if="field.ShowLabel !== false" class="card-field-label"><fa-icon v-if="field.Icon" :icon="field.Icon" aria-hidden="true" />{{ field.Label }}</span>
                                                 <span class="card-field-value" :style="GetPresentationFieldStyle(field)" v-safe-html:template="item[field.Name + '_TmpEngineResult']"></span>
                                             </template>
                                             <template v-else-if="IsSpecialTableField(field)">
-                                                <span class="card-field-label">{{ field.Label }}</span>
+                                                <span v-if="field.ShowLabel !== false" class="card-field-label"><fa-icon v-if="field.Icon" :icon="field.Icon" aria-hidden="true" />{{ field.Label }}</span>
                                                 <DiyTableSpecialCell
                                                     class="card-field-value"
                                                     compact
@@ -1309,7 +1311,7 @@
                                             </template>
                                             <!--普通字段-->
                                             <template v-else>
-                                                <span class="card-field-label">{{ field.Label }}</span>
+                                                <span v-if="field.ShowLabel !== false" class="card-field-label"><fa-icon v-if="field.Icon" :icon="field.Icon" aria-hidden="true" />{{ field.Label }}</span>
                                                 <span class="card-field-value" :style="GetPresentationFieldStyle(field)">{{ GetColValue({ row: item }, field) }}</span>
                                             </template>
                                         </div>
@@ -1399,10 +1401,10 @@
                                                     v-if="ShouldShowMobileCardMoreAction(item)"
                                                     type="button"
                                                     class="card-mobile-more"
-                                                    aria-label="更多操作"
+                                                    :aria-label="$t('Msg.More')"
                                                     @click.stop="showMoreMenu($event, item)"
                                                 >
-                                                    <el-icon><MoreFilled /></el-icon><span>更多</span>
+                                                    <el-icon><MoreFilled /></el-icon><span>{{ $t('Msg.More') }}</span>
                                                 </button>
                                                 <button
                                                     v-if="PropsTableType !== 'OpenTable' && ShouldShowRowDetailAction(item)"
@@ -1484,7 +1486,7 @@
                                         <fa-icon icon="far fa-clipboard-check" />
                                         去处理
                                     </el-button>
-                                    <!-- 更多操作（三点菜单） -->
+                                    <!-- 保留明确文字入口；操作名称随当前语言变化，宽度由内容决定。 -->
                                     <el-dropdown
                                         v-if="!IsTrashMode && (
                                             (item._RowMoreBtnsIn && item._RowMoreBtnsIn.some(btn => btn.IsVisible) && !TableChildField.Readonly) ||
@@ -1493,9 +1495,10 @@
                                         trigger="click"
                                         @click.stop
                                     >
-                                        <el-button class="card-action-btn card-action-btn-more" size="small" plain aria-label="更多" @click.stop>
+                                        <el-button class="card-action-btn card-action-btn-more" size="small" plain :aria-label="$t('Msg.More')" @click.stop>
                                             <el-icon><MoreFilled /></el-icon>
-                                            <span class="card-action-more-label">更多</span>
+                                            <span class="card-action-more-label">{{ $t('Msg.More') }}</span>
+                                            <el-icon class="card-action-more-arrow"><ArrowDown /></el-icon>
                                         </el-button>
                                         <template #dropdown>
                                             <el-dropdown-menu>
@@ -2130,6 +2133,7 @@ import {
     runV8ButtonVisibilityCodeAsync
 } from "@/utils/v8-button-visibility";
 import bodyBgSvg from "@/assets/img/body-bg.svg";
+import diyTableActionWidthMixin from "./mixins/diy-table-action-width.mixin.js";
 // Mixins
 import {
     tableUtilsMixin,
@@ -2174,6 +2178,7 @@ export default {
         diyTableUiMixin,
         diyTableActionsMixin,
         diyTableStateMixin,
+        diyTableActionWidthMixin,
         diyTablePresentationMixin,
         diyTableSchemaMixin,
         diyTableDataMixin,
