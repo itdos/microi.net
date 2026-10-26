@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { tapResult } from './verify.mjs';
+import { tapResult, failureDiagnostics, failureAnnotations } from './verify.mjs';
 const full = '# tests 60\n# pass 60\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
 test('完整成功总账与 CRLF 可解析', () => { assert.equal(tapResult(full, 0).passed, true); assert.equal(tapResult(full.replaceAll('\n', '\r\n'), 0).passed, true); });
 test('退出失败、计数丢失或双总账不能伪装成功', () => { assert.equal(tapResult(full, 1).passed, false); assert.equal(tapResult(full.replace('# skipped 0\n', ''), 0).passed, false); assert.equal(tapResult(full + full, 0).passed, false); });
@@ -51,6 +51,14 @@ if (operation === 'compiler') fs.writeFileSync('tsconfig.json', '{"compilerOptio
 for(let i=0;i<12;i++) test('fixture '+i,()=>{});
 `);
   await writeFile(path.join(directory, 'microi.mcp/src/job-runtime-tools.test.ts'), `import test from 'node:test'; const count=process.env.MICROI_TEST_SUITE_COUNT==='355'?295:0; for(let i=0;i<count;i++) test('full fixture '+i,()=>{});\n`);
+  await writeFile(path.join(directory, 'microi.mcp/src/manifest-context.test.ts'), `
+import test from 'node:test';
+for(let i=0;i<12;i++) test('fixture '+i,()=>{});
+if(process.env.MICROI_TEST_EVIDENCE_FAILURES){
+  test('known failure for evidence',()=>{throw new Error('fixture-secret-error-token');});
+  test('dynamic '+process.env.MICROI_TEST_EVIDENCE_FAILURES,()=>{throw new Error('fixture-secret-error-token');});
+}
+`);
   return { directory, runner };
 }
 
@@ -105,4 +113,45 @@ test('完整离线范围不能借60项子集冒充通过；未知选项与已有
   await writeFile(output, 'keep existing\n');
   assert.notEqual((await invokeFixture(created, ['--out', output])).exitCode, 0);
   assert.equal(await readFile(output, 'utf8'), 'keep existing\n');
+});
+
+test('真实失败只公开已知测试文件与静态标题，动态标题和错误正文不落证据', async t => {
+  const created = await fixture(t);
+  const result = await invokeFixture(created, [], { MICROI_TEST_EVIDENCE_FAILURES: 'fixture-secret-dynamic-token', GITHUB_ACTIONS: 'true' });
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.report.counters.fail, 2);
+  assert.deepEqual(result.report.failedTestDiagnostics, {
+    total: 2, omitted: 0,
+    items: [
+      { file: 'microi.mcp/src/manifest-context.test.ts', title: 'known failure for evidence' },
+      { file: 'microi.mcp/src/manifest-context.test.ts' },
+    ],
+  });
+  assert.equal(result.stdout.includes('fixture-secret'), false);
+  assert.equal(result.stdout.includes(created.directory), false);
+  assert.ok(result.stderr.includes('::error title=MCP regression::microi.mcp/src/manifest-context.test.ts: known failure for evidence'));
+  assert.equal(result.stderr.includes('fixture-secret'), false);
+  assert.equal(result.stderr.includes(created.directory), false);
+});
+
+test('失败诊断限20项和200字符，未知路径、动态标题、堆栈与错误正文不回显', () => {
+  const title = 'public static title '.repeat(20);
+  const source = `test('${title}',()=>{}); test('dynamic '+secret,()=>{});`;
+  const tap = Array.from({ length: 23 }, (_, index) => `not ok ${index + 1} - ${index === 0 ? title : 'secret-dynamic-value'}\n  ---\n  location: '/private/source/microi.mcp/src/known.test.ts:3:1'\n  message: 'secret-error-value'\n  stack: '/private/home/token'\n  ...\n`).join('');
+  const result = failureDiagnostics(tap, { 'known.test.ts': source });
+  assert.equal(result.total, 23);
+  assert.equal(result.omitted, 3);
+  assert.equal(result.items.length, 20);
+  assert.equal(result.items[0].title.length, 200);
+  assert.ok(result.items.every(item => item.file === 'microi.mcp/src/known.test.ts'));
+  assert.equal(JSON.stringify(result).includes('secret'), false);
+  assert.equal(JSON.stringify(result).includes('/private'), false);
+  assert.deepEqual(failureDiagnostics('not ok 1 - private-title\n  location: /private/unknown.ts:1:1\n', {}), { total: 1, omitted: 0, items: [{ file: null }] });
+});
+
+test('GitHub失败注解保留原失败状态且转义命令控制字符', () => {
+  assert.deepEqual(failureAnnotations({ items: [{ file: 'microi.mcp/src/known.test.ts', title: '100%\r\n::warning::injected' }, { file: null }] }), [
+    '::error title=MCP regression::microi.mcp/src/known.test.ts: 100%25%0D%0A::warning::injected',
+    '::error title=MCP regression::Unmapped test failure',
+  ]);
 });

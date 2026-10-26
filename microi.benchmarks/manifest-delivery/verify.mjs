@@ -20,6 +20,27 @@ export function tapResult(text, exitCode, minimumTests = 60) {
   const complete = Object.values(result).every(Number.isSafeInteger);
   return { ...result, passed: complete && exitCode === 0 && Number.isSafeInteger(minimumTests) && minimumTests > 0 && result.tests >= minimumTests && result.tests === result.pass && ['fail', 'cancelled', 'skipped', 'todo'].every(key => result[key] === 0) };
 }
+/** 诊断只使用已绑定的公开源文件名和静态测试标题；动态值、错误正文和堆栈不回显。 */
+export function failureDiagnostics(tap, testSources) {
+  const known = Object.entries(testSources).map(([name, source]) => ({
+    file: `microi.mcp/src/${name}`,
+    titles: new Set([...source.matchAll(/\b(?:test|it)\s*\(\s*(['"])([^'"\r\n\\]*)\1\s*,/gu)].map(match => match[2])),
+  }));
+  const failed = [...tap.matchAll(/^\s*not ok \d+ - (.+)\r?$/gm)];
+  const items = failed.slice(0, 20).map((match, index) => {
+    const title = match[1].replace(/\r$/, '');
+    const block = tap.slice(match.index + match[0].length, Math.min(failed[index + 1]?.index ?? tap.length, match.index + 8192));
+    const location = block.match(/^\s+location:\s*(.+)\r?$/m)?.[1]?.trim().replace(/^['"]|['"]$/g, '').replace(/\\+/g, '/').replace(/:\d+(?::\d+)?$/, '');
+    const file = known.find(candidate => location?.endsWith('/' + candidate.file) || title.replace(/\\+/g, '/').endsWith('/' + candidate.file))
+      ?? known.find(candidate => candidate.titles.has(title));
+    return file ? { file: file.file, ...(file.titles.has(title) ? { title: title.slice(0, 200) } : {}) } : { file: null };
+  });
+  return { total: failed.length, omitted: failed.length - items.length, items };
+}
+export function failureAnnotations(diagnostics) {
+  const escape = value => value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+  return diagnostics.items.slice(0, 20).map(item => `::error title=MCP regression::${escape(item.file ? item.file + (item.title ? ': ' + item.title : '') : 'Unmapped test failure')}`);
+}
 function hashBytes(bytes) {
   return { bytes: bytes.length, rawSha256: sha256(bytes), lfSha256: sha256(bytes.toString('utf8').replaceAll('\r\n', '\n')) };
 }
@@ -60,6 +81,7 @@ export async function verify({ suite = 'manifest' } = {}) {
   if (!selectedTests.length || selectedTests.some(name => !Object.hasOwn(before, name))) throw new Error('MissingTestInput');
   const dependencyInputs = await hashes(['package.json', 'package-lock.json']);
   const compilerInputs = await hashes(['tsconfig.json']);
+  const testSources = Object.fromEntries(await Promise.all(selectedTests.map(async name => [name, await readFile(path.join(root, 'microi.mcp/src', name), 'utf8')])));
   const runnerBefore = await readFile(fileURLToPath(import.meta.url));
   const require = createRequire(path.join(root, 'microi.mcp/package.json'));
   const loader = pathToFileURL(require.resolve('tsx')).href;
@@ -83,13 +105,14 @@ export async function verify({ suite = 'manifest' } = {}) {
   const compilerUnchanged = JSON.stringify(compilerInputs) === JSON.stringify(await hashes(['tsconfig.json']));
   const counters = tapResult(run.stdout, run.code, minimumTests);
   return {
-    protocolVersion: '1.2.0', suite, evidenceKind: suite === 'full' ? 'public-mcp-offline' : 'registered-handler-contract', startedAt, completedAt: new Date().toISOString(),
+    protocolVersion: '1.2.1', suite, evidenceKind: suite === 'full' ? 'public-mcp-offline' : 'registered-handler-contract', startedAt, completedAt: new Date().toISOString(),
     environment: { node: process.version, os: os.platform(), osRelease: os.release(), arch: os.arch() },
     testReporter: 'tap', runner: { file: 'microi.benchmarks/manifest-delivery/verify.mjs', rawSha256: sha256(runnerBefore), lfSha256: sha256(runnerBefore.toString('utf8').replaceAll('\r\n', '\n')) },
     testFiles: selectedTests, minimumTests, sourceTree: treeDigest(before), sources: before, dependencyInputs, compilerInputs,
     inputFiles: ['microi.benchmarks/manifest-delivery/verify.mjs', ...Object.keys(before).map(name => `microi.mcp/src/${name}`), ...Object.keys(dependencyInputs).map(name => `microi.mcp/${name}`), ...Object.keys(compilerInputs).map(name => `microi.mcp/${name}`)].sort(),
     sourceUnchanged, dependencyUnchanged, compilerUnchanged, counters, exitCode: run.code, timedOut: run.timedOut, outputLimitExceeded: run.outputLimitExceeded,
     rawTapSha256: sha256(run.stdout), stderrSha256: sha256(run.stderr),
+    failedTestDiagnostics: failureDiagnostics(run.stdout, testSources),
     passed: sourceUnchanged && dependencyUnchanged && compilerUnchanged && counters.passed && !run.timedOut && !run.outputLimitExceeded,
     boundaries: { realProviderCalls: 0, remoteBusinessWrites: 0, databaseExecutionVerified: false, browserVerified: false, certification: false },
   };
@@ -110,6 +133,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const report = await verify({ suite });
     if (options['--out']) await writeFile(options['--out'], JSON.stringify(report, null, 2) + '\n');
     console.log(JSON.stringify(report, null, 2));
+    // 公共 check-run 注解可直接定位失败；不依赖需要登录下载的原始日志或 Artifact。
+    if (process.env.GITHUB_ACTIONS === 'true' && !report.passed)
+      for (const annotation of failureAnnotations(report.failedTestDiagnostics)) console.error(annotation);
     process.exitCode = report.passed ? 0 : 1;
   } catch { console.error('声明检查未完成；检查依赖、参数与本地记录。未连接业务或模型服务。'); process.exitCode = 1; }
 }
