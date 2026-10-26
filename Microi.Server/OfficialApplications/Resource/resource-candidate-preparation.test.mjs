@@ -161,6 +161,7 @@ if (process.argv[2] === '--probe') {
     const capture = release.indexOf('release-candidate.mjs capture');
     const publication = release.indexOf('refresh-resources.mjs --publish --allow-verified-offline --require-unchanged-candidate');
     assert.ok(preparation > 0 && preparation < capture && capture < publication);
-    assert.match(release.slice(preparation - 350, preparation), /if \[ "\$PUBLISH_BACKEND" = true \] && \[ "\$MICROI_DOCKER_ONLY_HOTFIX" != true \] && \[ "\$MICROI_FULL_ONLY" != true \]; then/);
+    assert.match(release.slice(preparation - 350, preparation), /if \[ "\$PUBLISH_BACKEND" = true \] && \[ "\$MICROI_DOCKER_ONLY_HOTFIX" != true \] && \[ "\$MICROI_FULL_ONLY" != true \] && \[ -z "\$\{_resume_candidate:-\}" \]; then/);
+    assert.match(release, /if \[ "\$PUBLISH_BACKEND" = true \] && \[ "\$MICROI_DOCKER_ONLY_HOTFIX" != true \] && release_stage_needed resources; then/);
   });
 }
