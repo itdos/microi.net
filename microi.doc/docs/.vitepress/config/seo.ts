@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { SITE_URL, canonicalPath, isIndexablePage, breadcrumbsFor } from './seo-policy.mjs'
+import { SITE_URL, canonicalPath, isIndexablePage, breadcrumbsFor, discoveryTextPath } from './seo-policy.mjs'
 import { serviceContactPoint, serviceNetworkDescription } from './service-network.mjs'
 import { sourceIsIndexable } from './seo-source.mjs'
 
@@ -117,6 +117,7 @@ export function createSeoHead(context) {
   const keywords = unique([title, ...headerKeywords, ...pathKeywords, ...(en ? EN_BASE_KEYWORDS : ZH_BASE_KEYWORDS)]).join(',')
   const isDoc = /(^|\/)doc\//.test(String(pageData.relativePath || ''))
   const indexable = isIndexablePage(context.page, pageData)
+  const textPath = indexable ? discoveryTextPath(context.page) : ''
   const robots = indexable ? 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' : 'noindex, follow'
   const about = en
     ? ['Open-source AI development framework', 'AI low-code', 'Microservices', 'V8 Engine', '30+ mature engines']
@@ -168,6 +169,7 @@ export function createSeoHead(context) {
     ['meta', { name: 'keywords', content: keywords }],
     ['meta', { name: 'robots', content: robots }],
     ['link', { rel: 'canonical', href: canonical }],
+    ...(textPath ? [['link', { rel: 'alternate', type: 'text/plain', title: en ? 'Document text' : '文档纯文本', href: `${SITE_URL}${textPath}` }]] : []),
     ...(indexable ? alternatePages(pageData, context) : []),
     ['meta', { property: 'og:type', content: isDoc ? 'article' : 'website' }],
     ['meta', { property: 'og:site_name', content: 'Microi吾码' }],

@@ -29,12 +29,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 / Node 24
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 / Node 24
         with:
           node-version: '20'
+          package-manager-cache: false
       - name: 合成数据与源码盘点测试（不连接数据库或模型）
         run: node --max-old-space-size=256 --test --test-concurrency=1 microi.benchmarks/ecosystem/collect.test.mjs microi.benchmarks/compatibility/inspect.test.mjs microi.benchmarks/case-evidence/summarize-saas-registry.test.mjs microi.benchmarks/ai-quality/run.test.mjs microi.benchmarks/manifest-delivery/verify.test.mjs microi.doc/tests/indexnow.test.mjs
   manifest:
@@ -49,12 +50,13 @@ jobs:
     env:
       NODE_OPTIONS: --max-old-space-size=512
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 / Node 24
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 / Node 24
         with:
           node-version: ${{ matrix.node }}
+          package-manager-cache: false
       - name: 按锁文件安装公开 MCP 的测试依赖
         working-directory: microi.mcp
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -62,20 +64,35 @@ jobs:
         working-directory: microi.mcp
         run: npm run typecheck
       - name: 正式处理器与声明交付合约（无业务或模型连接）
-        run: node microi.benchmarks/manifest-delivery/verify.mjs
+        env:
+          CONTRACT_REPORT_PATH: ${{ runner.temp }}/microi-manifest-evidence/manifest-contract.json
+        # 输出仅含计数、环境与摘要；独立临时目录避免把工作区和原始日志上传。
+        run: >-
+          node -e "const fs=require('node:fs'); const path=require('node:path'); const {spawnSync}=require('node:child_process'); const report=process.env.CONTRACT_REPORT_PATH; fs.mkdirSync(path.dirname(report),{recursive:true}); const result=spawnSync(process.execPath,['microi.benchmarks/manifest-delivery/verify.mjs','--out',report],{stdio:'inherit'}); process.exit(result.status ?? 1);"
       - name: 依赖升级后的输入边界与真实 MCP 发现
         working-directory: microi.mcp
         run: node --import tsx --test --test-reporter=tap src/dependency-security.test.ts
+      - name: 保存各平台合约结果（失败也保留）
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2 / Node 24
+        with:
+          name: manifest-contract-${{ matrix.os }}-node${{ matrix.node }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/microi-manifest-evidence/manifest-contract.json
+          # 检查尚未开始时不伪造结果；已有失败 JSON 则照常保存，原失败状态不改变。
+          if-no-files-found: warn
+          include-hidden-files: false
+          retention-days: 90
   dependency-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 / Node 24
         with:
           persist-credentials: false
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0 / Node 24
         with:
           node-version: '22'
+          package-manager-cache: false
       - name: 按锁文件安装公开 MCP 依赖
         working-directory: microi.mcp
         run: npm ci --ignore-scripts --no-audit --no-fund

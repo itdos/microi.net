@@ -1,6 +1,7 @@
-import { readFile, readdir, writeFile } from 'node:fs/promises'
-import { join, relative } from 'node:path'
-import { SITE_URL, canonicalPath, isIndexablePage } from '../docs/.vitepress/config/seo-policy.mjs'
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { dirname, join, relative } from 'node:path'
+import { SITE_URL, canonicalPath, isIndexablePage, discoveryTextPath } from '../docs/.vitepress/config/seo-policy.mjs'
+import { readableAsset } from './seo-readable.mjs'
 
 export async function htmlFiles(dir) {
   const result = []
@@ -54,6 +55,7 @@ export async function writeDiscoveryIndex(siteConfig) {
   // 从本次真正发布的 HTML 生成索引，避免手工维护另一套过时说明或暴露原始脚本。
   const groups = new Map([['中文文档', []], ['联系与服务', []], ['English documentation', []], ['案例 / Case studies', []]])
   const published = new Map()
+  const documents = []
   for (const file of await htmlFiles(siteConfig.outDir)) {
     const path = canonicalPath(relative(siteConfig.outDir, file))
     if (!isIndexablePage(path) || !/\/(doc|case|contact)\//.test(path)) continue
@@ -66,7 +68,13 @@ export async function writeDiscoveryIndex(siteConfig) {
     const group = path.includes('/case/') ? '案例 / Case studies' : path.startsWith('/en/') ? 'English documentation' : path.startsWith('/contact/') ? '联系与服务' : '中文文档'
     const revision = pageRevision(html, `${SITE_URL}${path}`)
     const revisionLabel = path.startsWith('/en/') ? 'Page revision' : '页面修订'
-    const entry = `- [${escape(title)}](${SITE_URL}${path}): ${escape(description)}${revision ? ` · ${revisionLabel}: ${revision}` : ''}`
+    const textPath = discoveryTextPath(path)
+    const asset = readableAsset({ html, canonical: `${SITE_URL}${path}`, title, description, revision, textUrl: `${SITE_URL}${textPath}` })
+    const textFile = join(siteConfig.outDir, textPath.slice(1))
+    await mkdir(dirname(textFile), { recursive: true })
+    await writeFile(textFile, asset.text, 'utf8')
+    documents.push(asset.metadata)
+    const entry = `- [${escape(title)}](${SITE_URL}${path}): ${escape(description)}${revision ? ` · ${revisionLabel}: ${revision}` : ''} · [纯文本](${SITE_URL}${textPath})`
     groups.get(group).push(entry)
     published.set(path, entry)
   }
@@ -78,13 +86,16 @@ export async function writeDiscoveryIndex(siteConfig) {
   const evidence = evidencePaths.filter(path => published.has(path)).map(path => published.get(path))
   const questions = discoveryQuestions.filter(([, path]) => published.has(path)).map(([question, path]) => `- [${question}](${SITE_URL}${path})`)
   const content = ['# Microi吾码官方文档', '', '> Microi吾码是开源 AI 开发框架。此索引帮助开发者和 AI 工具找到官方说明，具体功能、版本与限制以链接页面为准。', '',
-    `官网: ${SITE_URL}/`, `站点地图: ${SITE_URL}/sitemap.xml`, '',
+    `官网: ${SITE_URL}/`, `站点地图: ${SITE_URL}/sitemap.xml`, `机器可读文档清单: ${SITE_URL}/ai-docs/index.json`, '',
     '这是可选的文档发现入口，不是搜索引擎收录或 AI 引用的保证。', '',
     '索引由本次发布的可索引 HTML 自动生成，标题与摘要来自各页面。页面修订日期沿用该页的版本记录，不等于功能验收或第三方认证日期；服务地区、联系方式与统计快照的核实日期和来源见正文。未知日期不填入构建日期。', '',
+    '逐页纯文本来自同次发布的服务端渲染正文，保留代码、表格和绝对链接，排除全站导航、脚本、隐藏内容与源码注释。清单提供规范页面地址、正文地址、实际修订日期（已知时）及 UTF-8 文本 SHA-256；引用以规范页面为准。', '',
     '## 按问题查找资料', '', ...questions, '',
     '## 功能、授权与验收资料', '',
     '各文档分别说明能力、许可、版本、使用方法和验收边界。传输字节、模型 Token、交付耗时是不同指标；源码支持、运行测试、第三方认证也应分别核验。价格以当前授权页为准，历史注释和更新记录不构成当前报价。', '',
     ...evidence, '',
     ...[...groups].flatMap(([name, lines]) => [`## ${name}`, '', ...lines, ''])].join('\n')
   await writeFile(join(siteConfig.outDir, 'llms.txt'), content, 'utf8')
+  await mkdir(join(siteConfig.outDir, 'ai-docs'), { recursive: true })
+  await writeFile(join(siteConfig.outDir, 'ai-docs/index.json'), `${JSON.stringify({ schemaVersion: 1, source: 'published-ssr', canonicalSite: SITE_URL, documents }, null, 2)}\n`, 'utf8')
 }

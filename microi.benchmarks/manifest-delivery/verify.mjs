@@ -19,7 +19,7 @@ export function tapResult(text, exitCode) {
     result[key] = values.length === 1 ? Number(values[0][1]) : null;
   }
   const complete = Object.values(result).every(Number.isSafeInteger);
-  return { ...result, passed: complete && exitCode === 0 && result.tests >= 54 && result.tests === result.pass && ['fail', 'cancelled', 'skipped', 'todo'].every(key => result[key] === 0) };
+  return { ...result, passed: complete && exitCode === 0 && result.tests >= 60 && result.tests === result.pass && ['fail', 'cancelled', 'skipped', 'todo'].every(key => result[key] === 0) };
 }
 async function hashes() {
   const result = {};
@@ -63,7 +63,7 @@ export async function verify() {
   const dependencyUnchanged = JSON.stringify(dependencyInputs) === JSON.stringify(await dependencyHashes());
   const counters = tapResult(run.stdout, run.code);
   return {
-    protocolVersion: '1.0.2', evidenceKind: 'registered-handler-contract', startedAt, completedAt: new Date().toISOString(),
+    protocolVersion: '1.1.0', evidenceKind: 'registered-handler-contract', startedAt, completedAt: new Date().toISOString(),
     environment: { node: process.version, os: os.platform(), osRelease: os.release(), arch: os.arch() },
     testReporter: 'tap', runner: { file: 'microi.benchmarks/manifest-delivery/verify.mjs', rawSha256: sha256(runnerBefore), lfSha256: sha256(runnerBefore.toString('utf8').replaceAll('\r\n', '\n')) },
     testFiles, sources: before, dependencyInputs, sourceUnchanged, dependencyUnchanged, counters, exitCode: run.code, timedOut: run.timedOut,

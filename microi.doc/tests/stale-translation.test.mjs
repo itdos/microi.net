@@ -106,7 +106,7 @@ test('withdrawn pages are excluded from sitemap and reciprocal hreflang', async 
   const html = (context, language) => {
     const description = 'Synthetic content for verifying the publication metadata policy.'
     const head = createSeoHead({ ...context, description }).map(([tag, attrs, content]) => `<${tag} ${Object.entries(attrs).map(([key, value]) => `${key}="${String(value).replaceAll('&','&amp;').replaceAll('"','&quot;')}"`).join(' ')}>${content || ''}${tag === 'script' ? '</script>' : ''}`).join('')
-    return `<html lang="${language}"><head><title>${context.pageData.title}</title><meta name="description" content="${description}">${head}</head><body>Synthetic document</body></html>`
+    return `<html lang="${language}"><head><title>${context.pageData.title}</title><meta name="description" content="${description}">${head}</head><body><main><div class="vp-doc"><h1>${context.pageData.title}</h1><p>Synthetic document</p></div></main></body></html>`
   }
   writeFileSync(resolve(outDir, 'case/example.html'), html(ctx, 'zh-CN'))
   writeFileSync(resolve(outDir, 'en/case/example.html'), html(en, 'en-US'))

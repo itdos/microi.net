@@ -3,7 +3,7 @@ import { registerAdvancedTools } from './advanced-tools.js';
 export const engineManifest = { name: '业务局部修改', engines: [{ apiEngineKey: 'biz-check', code: 'return { Code: 1, Data: "准确结果" };' }] };
 export const toolJson = (result: any) => JSON.parse(result.content[0].text);
 
-export function harness(options: { identity?: string; legacy?: boolean; failedValidation?: boolean; failWrite?: boolean; unknownWrite?: boolean; missingBanner?: boolean; switchIdentityAt?: string } = {}) {
+export function harness(options: { identity?: string; legacy?: boolean; failedValidation?: boolean; failWrite?: boolean; unknownWrite?: boolean; missingBanner?: boolean; missingRoleId?: boolean; missingModuleId?: boolean; switchIdentityAt?: string } = {}) {
   const handlers = new Map<string, (input: any) => Promise<any>>();
   const calls: Array<{ method: string; value: any }> = [];
   const tables: any[] = [];
@@ -41,8 +41,8 @@ export function harness(options: { identity?: string; legacy?: boolean; failedVa
     },
     getDbSchema: async () => success('getDbSchema', {}, { Tables: tables.map(table => ({ ...table, _Fields: fields.filter(field => field.TableId === table.Id) })) }),
     getMicroService: async (key: string) => success('getMicroService', key, { Service: { Id: `service:${key}`, MsKey: key }, Pages: [{ Id: `page:${key}:overview`, RoutePath: '/overview' }] }),
-    saveRole: async (value: any) => success('saveRole', value, { ...value, Id: `role:${value.Name}` }),
-    createModule: async (value: any) => success('createModule', value, { ...value, Id: `module:${value.Name}` }),
+    saveRole: async (value: any) => success('saveRole', value, { ...value, ...(options.missingRoleId ? {} : { Id: `role:${value.Name}` }) }),
+    createModule: async (value: any) => success('createModule', value, { ...value, ...(options.missingModuleId ? {} : { Id: `module:${value.Name}` }) }),
     setRolePermission: async (roleId: string, menuIds: string[]) => success('setRolePermission', { roleId, menuIds }),
     saveDataSource: async (value: any) => success('saveDataSource', value, value),
     saveEventCode: async (formEngineKey: string, eventType: string, code: string) => success('saveEventCode', { formEngineKey, eventType, code }),

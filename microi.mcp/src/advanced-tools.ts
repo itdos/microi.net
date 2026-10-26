@@ -644,7 +644,7 @@ export function buildGenerateSystemValidationPayload(
   validation: ApiResponse,
 ): JsonRecord {
   return {
-    ok: validation.Code === 1 && asRecord(validation.Data).Passed !== false,
+    ok: isSuccessfulSystemValidation(validation),
     results,
     validation: {
       Code: validation.Code,
@@ -652,6 +652,13 @@ export function buildGenerateSystemValidationPayload(
       Data: validation.Data ?? null,
     },
   };
+}
+
+function isSuccessfulSystemValidation(validation: ApiResponse): boolean {
+  const data = asRecord(validation.Data);
+  // HTTP/业务调用成功不等于资源验收通过；缺失或矛盾的报告不能给 AI 成功结论。
+  return validation.Code === 1 && data.Passed === true
+    && (!Object.hasOwn(data, 'Errors') || (Array.isArray(data.Errors) && data.Errors.length === 0));
 }
 
 function getEngineV8Limit(record: JsonRecord): boolean | undefined {
@@ -1742,7 +1749,41 @@ export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: strin
     }
     plan.push(`create_or_update_module ${getString(item, 'name', 'Name')}`);
   });
-  permissions.forEach((item) => plan.push(`set_permission ${getString(item, 'roleId', 'RoleId') || 'admin'}`));
+  permissions.forEach((item, permissionIndex) => {
+    const path = `permissions[${permissionIndex}]`;
+    // 名称只能指向本次声明且唯一的资源；现有租户资源须显式传 Id，不能猜测或回退管理员。
+    const roleId = getString(item, 'roleId', 'RoleId');
+    const roleName = getString(item, 'roleName', 'RoleName', 'name', 'Name');
+    const menuIds = getStringArray(item, 'menuIds', 'MenuIds');
+    const moduleNames = getStringArray(item, 'moduleNames', 'ModuleNames');
+    const checkAliasTypes = (keys: string[], isList: boolean) => {
+      const present = keys.filter(key => Object.hasOwn(item, key));
+      for (const key of present) {
+        const raw = item[key];
+        const valid = typeof raw === 'string' || (isList && Array.isArray(raw)
+          && raw.every(value => typeof value === 'string' ? !!value.trim()
+            : !!getString(asRecord(value), 'name', 'Name', 'id', 'Id')));
+        if (!valid) errors.push(`${path}.${keys[0]} 必须是${isList ? '名称/Id 数组或分隔字符串，不能包含无效成员' : '字符串'}`);
+      }
+      const values = present.map(key => isList ? JSON.stringify(getStringArray(item, key)) : getString(item, key));
+      if (values.some(value => value !== values[0])) errors.push(`${path}.${keys[0]} 的属性别名冲突`);
+    };
+    checkAliasTypes(['roleId', 'RoleId'], false);
+    checkAliasTypes(['roleName', 'RoleName', 'name', 'Name'], false);
+    checkAliasTypes(['menuIds', 'MenuIds'], true);
+    checkAliasTypes(['moduleNames', 'ModuleNames'], true);
+    if (!roleId && roleName && roles.filter(role => getString(role, 'name', 'Name').toLowerCase() === roleName.toLowerCase()).length !== 1) {
+      errors.push(`${path}.roleName 必须唯一匹配本次 roles 声明；现有角色请使用 roleId`);
+    }
+    if (!menuIds.length) {
+      moduleNames.forEach((name, index) => {
+        if (modules.filter(module => getString(module, 'name', 'Name').toLowerCase() === name.toLowerCase()).length !== 1) {
+          errors.push(`${path}.moduleNames[${index}] 必须唯一匹配本次 modules 声明；现有菜单请使用 menuIds`);
+        }
+      });
+    }
+    plan.push(`set_permission ${roleId || roleName || 'admin'}`);
+  });
   pages.forEach((item, pageIndex) => {
     const normalizedPage = normalizePageJsonObj(item.json ?? item.JsonObj ?? item.JsonStr ?? item);
     errors.push(...normalizedPage.errors.map((error) => `pages[${pageIndex}]: ${error}`));
@@ -2447,6 +2488,14 @@ async function validateSystemWithBanner(client: MicroiClient, manifest: JsonReco
   const validation = await client.validateLowCodeSystem(manifest);
   if (validation.Code !== 1) return validation;
   const data = asRecord(validation.Data);
+  if (typeof data.Passed !== 'boolean' || (Object.hasOwn(data, 'Errors') && !Array.isArray(data.Errors))) {
+    // 保留原始协议回包以便诊断；不能用 Banner 单项回读补成完整系统验收成功。
+    const message = '系统验收响应不完整：需要布尔 Passed，Errors 如存在必须是数组；请核对后端版本和验收接口。';
+    return {
+      ...validation, Code: 0, Msg: message,
+      Data: { Passed: false, Errors: [message], ServerValidation: validation },
+    };
+  }
   const errors: unknown[] = Array.isArray(data.Errors) ? [...data.Errors] : [];
   const tables = getArray(manifest, 'tables', 'Tables');
   // 每批有界，使用实际表名条件；不能以未筛选或分页截断的回读证明配置存在。
@@ -3263,7 +3312,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
 
   server.tool(
     'microi_validate_system',
-    `真实回读验收生成系统，支持同会话 manifestRef/hash，仍检查 Banner 和服务端完整验收结果；Passed=false 为失败。OsClient: ${osClient}`,
+    `真实回读验收生成系统，支持同会话 manifestRef/hash，仍检查 Banner 和服务端完整验收结果；只有明确 Passed=true 且无验收错误才通过，缺失或无效响应为失败。OsClient: ${osClient}`,
     manifestInputSchema,
     async (input) => withManifest(input, async (manifest, client) => {
       try {
@@ -3278,7 +3327,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
         }
         const result = await validateSystemWithBanner(client, manifest);
         if ((input.detail ?? (input.manifestRef ? 'summary' : 'full')) === 'summary') {
-          const ok = result.Code === 1 && asRecord(result.Data).Passed !== false;
+          const ok = isSuccessfulSystemValidation(result);
           return textResult(JSON.stringify({ ok, validation: result }), !ok);
         }
         return apiText('Low-Code System Validation', result);
@@ -3588,14 +3637,28 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
           populateFieldLookupFromSchema(fieldLookup, relationSchemaResponse.Data, tableIdByName);
         }
 
+        const permissionPayloads: Array<{ permission: JsonRecord; roleId: string; menuIds: string[] }> = [];
+        // 先解析整批权限，再执行第一笔权限写入。保存资源返回成功但缺 Id 时，
+        // 必须保留既有权限，不能把未解析角色换成 admin 或静默丢弃菜单。
         for (const permission of getArray(manifest, 'permissions', 'Permissions')) {
           const roleName = getString(permission, 'roleName', 'RoleName', 'name', 'Name');
-          const roleId = getString(permission, 'roleId', 'RoleId') || (roleName ? roleIdByName.get(roleName.toLowerCase()) : '') || 'admin';
+          const roleId = getString(permission, 'roleId', 'RoleId') || (roleName ? roleIdByName.get(roleName.toLowerCase()) : 'admin');
           const explicitMenuIds = getStringArray(permission, 'menuIds', 'MenuIds');
           const moduleNames = getStringArray(permission, 'moduleNames', 'ModuleNames');
           const menuIds = explicitMenuIds.length
             ? explicitMenuIds
-            : moduleNames.map((name) => moduleIdByName.get(name.toLowerCase()) || '').filter(Boolean);
+            : moduleNames.map((name) => moduleIdByName.get(name.toLowerCase()) || '');
+          if (!roleId || menuIds.some(id => !id)) {
+            return textResult(JSON.stringify({
+              ok: false, failedAt: 'resolvePermissionReferences',
+              permissionIndex: permissionPayloads.length,
+              error: '角色或菜单保存结果未返回可解析 Id；已停止整批权限写入，请回读已保存资源后处理。',
+              results,
+            }, null, 2), true);
+          }
+          permissionPayloads.push({ permission, roleId, menuIds });
+        }
+        for (const { permission, roleId, menuIds } of permissionPayloads) {
           const response = await client.setRolePermission(roleId, menuIds);
           results.push({ step: 'setRolePermission', roleId, menuIds, response });
           if (response.Code !== 1) return textResult(JSON.stringify({ ok: false, failedAt: 'setRolePermission', permission, response, results }, null, 2), true);

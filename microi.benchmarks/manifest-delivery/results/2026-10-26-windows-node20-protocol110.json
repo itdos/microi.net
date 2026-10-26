@@ -1,0 +1,107 @@
+{
+  "protocolVersion": "1.1.0",
+  "evidenceKind": "registered-handler-contract",
+  "startedAt": "2026-10-26T02:48:03.011Z",
+  "completedAt": "2026-10-26T02:48:06.498Z",
+  "environment": {
+    "node": "v20.20.1",
+    "os": "win32",
+    "osRelease": "10.0.26200",
+    "arch": "x64"
+  },
+  "testReporter": "tap",
+  "runner": {
+    "file": "microi.benchmarks/manifest-delivery/verify.mjs",
+    "rawSha256": "4770f93155c4a349b8dc49713116b0904d93561e618173dc6d0a88fb2101cd51",
+    "lfSha256": "5eeae6af4bd3c268dce6ed6192cd84939c806e774ee05d797d6ce5572269efc4"
+  },
+  "testFiles": [
+    "manifest-preflight.test.ts",
+    "manifest-context.test.ts",
+    "manifest-field-relations.test.ts",
+    "manifest-microservice-module.test.ts",
+    "advanced-tools-validation-envelope.test.ts"
+  ],
+  "sources": {
+    "advanced-tools.ts": {
+      "bytes": 224179,
+      "rawSha256": "496d27b2af806cf7e77d45c40cea1deddd7968e0c359d6289eb3b43463709301",
+      "lfSha256": "8d120f3b8af7ff6574b73757d8b2af8de959ef9273fd53d4d94ed7f4dde0419b"
+    },
+    "manifest-preflight.ts": {
+      "bytes": 3722,
+      "rawSha256": "de571f7ede2d200fa4a6782679bb965bbe52ef7c480c8c9d0796cc4f76cd06b4",
+      "lfSha256": "81594f78472030b7f4b3f58311eeb4a86fd23f947322f80b8946ad5f8954845e"
+    },
+    "manifest-context.ts": {
+      "bytes": 14529,
+      "rawSha256": "33ff3bb5ac8685c46080c3f7b18bec54fd93ee5410e7409cd7861ad56037b719",
+      "lfSha256": "391cb7ffb136ba56d4d2a65fe8669a1fbaa4f299d2ab712cf0f8237808dc072c"
+    },
+    "manifest-context-fixtures.ts": {
+      "bytes": 6655,
+      "rawSha256": "60fb442b83ec70c7e71de5a4cf7e180a6522768682c965a7e58f49e07565278d",
+      "lfSha256": "6841c57c55cd81400368e84d5a360b4b422063f140b086a278d03f15183f5d33"
+    },
+    "manifest-preflight.test.ts": {
+      "bytes": 7475,
+      "rawSha256": "5211c7485739398a8da344cbe04fb568540e03f4b4ec063ace1761bded39ce15",
+      "lfSha256": "87218b6356cfc522ab756860e61ec1feb3252d74cf88cd01b131e897f071629a"
+    },
+    "manifest-context.test.ts": {
+      "bytes": 15733,
+      "rawSha256": "920271c6a808167080c2233f5acc274fcc9965215379fe3ee076b70d6034ee1a",
+      "lfSha256": "c0672ae042cd2cf0e730d2fb77c6dd59efcc65f1f03870af5afd82fcbd1d5b49"
+    },
+    "manifest-field-relations.test.ts": {
+      "bytes": 6880,
+      "rawSha256": "151b8c3e072234b4eb64ba6534b6342c82ec19bd4c98dc3d203771eda5de1944",
+      "lfSha256": "52d582bb7efd629e4be1f115e6e27ec66c3f9adae2f8fe83ba0d58d4ab1e11c3"
+    },
+    "manifest-microservice-module.test.ts": {
+      "bytes": 7083,
+      "rawSha256": "471680da7bcf1a4ac2fcd7a67768b0a65adcc10a46ac2f4e3c81a3c9dacd6111",
+      "lfSha256": "dc89a4a58234c694a00b9b1eeb7613d786890bb34c673e828435552b5644385e"
+    },
+    "advanced-tools-validation-envelope.test.ts": {
+      "bytes": 9715,
+      "rawSha256": "fa90155b3fdbf33fdc187686b4b03d7de0027cae14daa5b68d1bbbe0cb8e4fb8",
+      "lfSha256": "c08d7090d67074a2850295647d21dd19b8aa295bc8657434bfd2b3bba89066e5"
+    }
+  },
+  "dependencyInputs": {
+    "package.json": {
+      "bytes": 3141,
+      "rawSha256": "e76589f7bcdb6d0b88fb79c131c0c8c649938a7134f26c2b5b5ebc2045a8c7e8",
+      "lfSha256": "d86db060c74cfb9bfc60478ff6a82668d6f81773207e6d721aecda0fa0efa42d"
+    },
+    "package-lock.json": {
+      "bytes": 80727,
+      "rawSha256": "0ae4d665f6dab0f502f29181b9bc73092ddc221e949d858a7b87b212c8865fe8",
+      "lfSha256": "5b01f4bfcfd35f16771d1b49943f87dfd637b22a99b91794511452c58c10efd3"
+    }
+  },
+  "sourceUnchanged": true,
+  "dependencyUnchanged": true,
+  "counters": {
+    "tests": 60,
+    "pass": 60,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "passed": true
+  },
+  "exitCode": 0,
+  "timedOut": false,
+  "rawTapSha256": "57a9a2ceff6653f545789ac9b011ec51969609d2048a94bc08c7339d41e96f60",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "passed": true,
+  "boundaries": {
+    "realProviderCalls": 0,
+    "remoteBusinessWrites": 0,
+    "databaseExecutionVerified": false,
+    "browserVerified": false,
+    "certification": false
+  }
+}

@@ -56,3 +56,55 @@ test('错误信息只含安全路径，不回显无效资源正文', () => {
   assert.ok(result.errors.length > 0);
   assert.ok(!JSON.stringify(result.errors).includes(marker));
 });
+
+test('权限中的未知角色或菜单名称在任何资源写入前拒绝', async () => {
+  await checkBlocked({ ...valid(), permissions: [{ roleName: '未声明角色', menuIds: ['existing-menu'] }] }, 'permissions[0].roleName');
+  await checkBlocked({ ...valid(), permissions: [{ moduleNames: ['未声明菜单'] }] }, 'permissions[0].moduleNames');
+});
+
+test('权限引用同名角色或菜单时拒绝歧义，不能选择最后一次写入', async () => {
+  await checkBlocked({ roles: [{ name: 'Operators' }, { name: 'OPERATORS' }], permissions: [{ roleName: 'operators', menuIds: ['existing-menu'] }] }, 'permissions[0].roleName');
+  await checkBlocked({ modules: [{ name: 'Orders', openType: 'SecondMenu' }, { name: 'ORDERS', openType: 'SecondMenu' }], permissions: [{ moduleNames: ['orders'] }] }, 'permissions[0].moduleNames');
+});
+
+test('权限声明中的无效引用不能被兼容过滤后写成空权限或管理员权限', async () => {
+  await checkBlocked({ ...valid(), permissions: [{ roleName: {}, menuIds: ['existing-menu'] }] }, 'permissions[0].roleName');
+  await checkBlocked({ ...valid(), permissions: [{ menuIds: ['existing-menu', null] }] }, 'permissions[0].menuIds');
+  await checkBlocked({ modules: [{ name: 'Orders', openType: 'SecondMenu' }], permissions: [{ moduleNames: ['Orders', null] }] }, 'permissions[0].moduleNames');
+  await checkBlocked({ roles: [{ name: 'Operators' }], permissions: [{ roleName: 'Operators', RoleName: 'Other', menuIds: ['existing-menu'] }] }, 'permissions[0].roleName');
+  await checkBlocked({ permissions: [{ menuIds: ['one'], MenuIds: ['other'] }] }, 'permissions[0].menuIds');
+});
+
+test('资源保存未返回角色或菜单 Id 时，整批权限写入前失败关闭', async () => {
+  for (const missing of [{ missingRoleId: true }, { missingModuleId: true }]) {
+    const run = harness(missing);
+    const result = await run.call('microi_generate_system', { manifest: {
+      roles: [{ name: 'Operators' }], modules: [{ name: 'Orders', openType: 'SecondMenu' }],
+      permissions: [{ roleId: 'existing-role', menuIds: ['existing-menu'] }, { roleName: 'Operators', moduleNames: ['Orders'] }],
+    }, dryRun: false, confirmExecution: 'tenant' });
+    assert.equal(result.isError, true);
+    assert.equal(toolJson(result).ok, false);
+    assert.equal(toolJson(result).failedAt, 'resolvePermissionReferences');
+    assert.equal(run.calls.filter(call => call.method === 'setRolePermission').length, 0);
+  }
+});
+
+test('权限保留省略角色默认管理员、显式外部 Id 和大小写名称引用兼容', async () => {
+  const run = harness();
+  const result = await run.call('microi_generate_system', { manifest: {
+    roles: [{ name: 'Operators' }], modules: [{ name: 'Orders', openType: 'SecondMenu' }],
+    permissions: [
+      { moduleNames: ['orders'] },
+      { roleId: 'external-role', roleName: '外部显示名', menuIds: ['external-menu'], moduleNames: ['外部显示名'] },
+      { roleName: 'operators', moduleNames: 'Orders' },
+      { roleId: 'explicit-clear', menuIds: [] },
+    ],
+  }, dryRun: false, confirmExecution: 'tenant' });
+  assert.equal(result.isError, false, result.content[0].text);
+  assert.deepEqual(run.calls.filter(call => call.method === 'setRolePermission').map(call => call.value), [
+    { roleId: 'admin', menuIds: ['module:Orders'] },
+    { roleId: 'external-role', menuIds: ['external-menu'] },
+    { roleId: 'role:Operators', menuIds: ['module:Orders'] },
+    { roleId: 'explicit-clear', menuIds: [] },
+  ]);
+});
