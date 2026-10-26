@@ -323,6 +323,8 @@ for(const mode of ['success','after-scan-byte-drift','after-scan-added-package',
   if(mode==='candidate-rejected')fs.appendFileSync(probe,' changed before first upload');
   const source=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
   const budgetFunctions=source.slice(source.indexOf('# 从交互选项完成开始计时'),source.indexOf('# Windows (Git Bash) 下'));
+  // NuGet 正式入口依赖原生断点函数；夹具必须加载真实定义，避免缺函数掩盖安全断言。
+  const sessionFunctions=source.slice(source.indexOf('release_stage_needed() {'),source.indexOf('# 发布进程专用输出目录'));
   const begin=source.indexOf('# ─── 阶段（条件）: NuGet 推送'),end=source.indexOf('# ─── 阶段（条件）: 推送 Docker 镜像',begin);
   assert.ok(begin>0&&end>begin);
   const quote=value=>"'"+value.replaceAll('\\','/').replaceAll("'","'\\''")+"'";
@@ -330,9 +332,10 @@ for(const mode of ['success','after-scan-byte-drift','after-scan-added-package',
   const bash=process.platform==='win32'?path.resolve(gitExec,'../../..','bin/bash.exe'):'bash';
   const extra=path.join(path.dirname(f.files[0]),'Extra Product.8.5.2.nupkg');
   const run=spawnSync(bash,['--noprofile','--norc','-s'],{cwd:f.root,env:environment,encoding:'utf8',input:`
-print_phase(){ :; }; print_step(){ :; }; print_success(){ :; }; print_warning(){ :; }
+print_phase(){ :; }; print_step(){ :; }; print_success(){ :; }; print_warning(){ :; }; print_info(){ :; }
 print_fail(){ printf '%s\\n' "$*" >&2; exit 17; }
 ${budgetFunctions}
+${sessionFunctions}
 PUSH_NUGET=true; HAS_ENCRYPT=true; DLL_ENCRYPTED=true; NUPKG_REPLACED=true
 VERSION=8.5.2; PUBLISH_DIR=${quote(f.directory)}; MICROI_ENCRYPTION_RECEIPT=${quote(f.file)}
 MICROI_RELEASE_GATE_DIR="$PWD/.tmp/microi-release-gate"
