@@ -75,7 +75,7 @@ test('AI discovery prioritizes published evidence without inventing pages or exp
   t.after(() => rmSync(outDir, { recursive: true }))
   mkdirSync(resolve(outDir, 'doc/about'), { recursive: true })
   mkdirSync(resolve(outDir, 'contact'), { recursive: true })
-  const html = (title, robots = 'index, follow') => `<head><title>${title} | Microi吾码</title><meta name="description" content="功能范围、当前授权与可重复验收说明"><meta name="robots" content="${robots}"></head><body><nav>GLOBAL_NAV</nav><main><div class="vp-doc"><h1>${title}</h1><p>功能正文</p></div></main></body>`
+  const html = (title, robots = 'index, follow') => `<head><title>${title} | Microi吾码</title><meta name="description" content="功能范围、当前授权与可重复验收说明"><meta name="robots" content="${robots}"></head><body><nav>GLOBAL_NAV</nav><main><div class="vp-doc"><h1>${title}</h1><p>功能正文 <a href="/doc/index.html#intro">平台</a> <a href="/assets/diagram?version=1">资源</a></p></div></main></body>`
   writeFileSync(resolve(outDir, 'doc/index.html'), html('产品能力'))
   writeFileSync(resolve(outDir, 'doc/edition-comparison.html'), html('当前授权'))
   writeFileSync(resolve(outDir, 'contact/index.html'), html('服务商与合作联系'))
@@ -101,6 +101,8 @@ test('AI discovery prioritizes published evidence without inventing pages or exp
     assert.equal(item.sha256, createHash('sha256').update(text).digest('hex'))
     assert.equal(item.dateModified, undefined)
     assert.match(text.toString(), /功能正文/)
+    assert.ok(text.toString().includes('https://microi.net/doc/#intro'))
+    assert.ok(text.toString().includes('https://microi.net/assets/diagram?version=1'))
     assert.doesNotMatch(text.toString(), /GLOBAL_NAV|PRIVATE_MARKER/)
     assert.ok(index.includes(`](${item.textUrl})`))
   }
@@ -108,7 +110,7 @@ test('AI discovery prioritizes published evidence without inventing pages or exp
 
 test('published text keeps headings, table relationships, code and absolute source links without site chrome', () => {
   const html = `<body><nav>OUTSIDE_NAV</nav><main><div class="vp-doc custom"><h1>公开能力<a class="header-anchor" href="#公开能力">ANCHOR_UI</a></h1><p>正文 &amp; 边界 <a href="../v8-engine/v8-server.md#query">API</a> <a href="https://example.org/report">证据</a></p><table><tr><th>能力</th><th>范围</th></tr><tr><td>隔离</td><td>当前租户</td></tr></table><pre><code>if (x &lt; 2) {\n  return '&lt;script&gt;';\n}\n{{literal}}</code></pre><details><summary>展开证据</summary><p>折叠中的真实正文</p></details><img src="/diagram.svg" alt="能力架构"><!-- PRIVATE_COMMENT --><script>PRIVATE_SCRIPT</script><style>.PRIVATE_STYLE{}</style><div hidden>PRIVATE_HIDDEN</div><p aria-hidden="true">ARIA_HIDDEN</p><div style="display: none">DISPLAY_HIDDEN</div><button>COPY_BUTTON</button><aside>INSIDE_ASIDE</aside></div></main><footer>FOOTER</footer></body>`
-  const text = readableDocument(html, 'https://microi.net/doc/more/security.html')
+  const text = readableDocument(html, 'https://microi.net/doc/more/security.html', { documentUrls: new Set(['https://microi.net/doc/v8-engine/v8-server.html']) })
   assert.match(text, /# 公开能力/)
   assert.match(text, /正文 & 边界/)
   assert.match(text, /API \(https:\/\/microi\.net\/doc\/v8-engine\/v8-server\.html#query\)/)
@@ -119,6 +121,16 @@ test('published text keeps headings, table relationships, code and absolute sour
   assert.match(text, /折叠中的真实正文/)
   assert.match(text, /能力架构: https:\/\/microi\.net\/diagram\.svg/)
   assert.doesNotMatch(text, /OUTSIDE_NAV|ANCHOR_UI|PRIVATE_|ARIA_HIDDEN|DISPLAY_HIDDEN|COPY_BUTTON|INSIDE_ASIDE|FOOTER/)
+})
+
+test('readable links normalize only confirmed document pages while assets, APIs and anchors retain URL meaning', () => {
+  const canonical = 'https://microi.net/doc/more/security.html'
+  const documentUrls = new Set(['https://microi.net/', 'https://microi.net/en/', 'https://microi.net/contact/', 'https://microi.net/doc/v8-engine/v8-server.html'])
+  const html = `<div class="vp-doc"><img src="/assets/diagram?version=1#view" alt="diagram"><img src="/doc/v8-engine/v8-server.md" alt="source asset"><a href="/api/download?id=1#part">API</a><a href="/downloads/release?os=win#latest">Download</a><a href="/doc/unknown#test">Unknown</a><a download href="/doc/v8-engine/v8-server.md">Source download</a><a href="/doc/v8-engine/v8-server.md?view=1#query">Document</a><a href="/index.html#top">Home</a><a href="/#top">Home anchor</a><a href="/en/index.html#top">English home</a><a href="#current-section">Section</a><a href="/contact/index#service">Contact</a></div>`
+  const text = readableDocument(html, canonical, { documentUrls })
+  for (const url of ['https://microi.net/assets/diagram?version=1#view', 'https://microi.net/doc/v8-engine/v8-server.md', 'https://microi.net/api/download?id=1#part', 'https://microi.net/downloads/release?os=win#latest', 'https://microi.net/doc/unknown#test', 'https://microi.net/doc/v8-engine/v8-server.html?view=1#query', 'https://microi.net/#top', 'https://microi.net/en/#top', `${canonical}#current-section`, 'https://microi.net/contact/#service']) assert.ok(text.includes(url), url)
+  assert.doesNotMatch(text, /diagram\.html|download\.html|release\.html|unknown\.html|index\.html/)
+  assert.match(readableDocument('<div class="vp-doc"><a href="/doc/unknown">Unknown</a></div>', canonical), /https:\/\/microi\.net\/doc\/unknown\)/)
 })
 
 test('readable documents fail closed on missing, ambiguous, malformed or empty document bodies', () => {

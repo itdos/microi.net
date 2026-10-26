@@ -7,12 +7,18 @@ const blocks = new Set(['div', 'section', 'article', 'p', 'blockquote', 'details
 const attr = (node, name) => node.props?.find(prop => prop.type === 6 && prop.name === name)?.value?.content
 const classes = node => (attr(node, 'class') || '').split(/\s+/)
 
-function publicUrl(value, canonical) {
+function publicUrl(value, canonical, documentUrls, normalizeDocument = false) {
   if (!value) return ''
   try {
     const url = new URL(value, canonical)
     if (!['https:', 'http:', 'mailto:', 'tel:'].includes(url.protocol)) return ''
-    if (url.origin === SITE_URL) url.pathname = canonicalPath(url.pathname)
+    // 同源不等于文档：无后缀的图片、下载/API 路由不能补 .html。
+    // 只规范已在本次 HTML 产物中确认存在的阅读页/首页；query 与锚点由 URL 原样保留。
+    if (normalizeDocument && url.origin === SITE_URL) {
+      const path = canonicalPath(url.pathname)
+      const readingPage = /^\/(?:en\/)?(?:doc|case|contact)\//.test(path) || ['/', '/en/'].includes(path)
+      if (readingPage && documentUrls?.has(`${SITE_URL}${path}`)) url.pathname = path
+    }
     return url.href
   } catch { return '' }
 }
@@ -23,7 +29,7 @@ function hidden(node) {
     classes(node).some(name => ['header-anchor', 'line-numbers-wrapper', 'copy'].includes(name))
 }
 
-export function readableDocument(html, canonical) {
+export function readableDocument(html, canonical, { documentUrls } = {}) {
   // 只遍历已发布 SSR 的正文 AST，不执行组件或读取原始 Markdown；注释、脚本与全站导航不能进入副本。
   // 历史正文可能包含未转义的 HTML 示例；取最外层最后一个 body 结束，避免被示例提前截断。
   const body = html.match(/<body\b[^>]*>([\s\S]*)<\/body>/i)?.[1] || html
@@ -55,7 +61,8 @@ export function readableDocument(html, canonical) {
     if (pre) return content
     if (/^h[1-6]$/.test(node.tag)) return `\n\n${'#'.repeat(Number(node.tag[1]))} ${content.trim()}\n\n`
     if (node.tag === 'a') {
-      const href = publicUrl(attr(node, 'href'), canonical)
+      const download = node.props.some(prop => prop.type === 6 && prop.name === 'download')
+      const href = publicUrl(attr(node, 'href'), canonical, documentUrls, !download)
       return href && content.trim() ? `${content.trim()} (${href})` : content
     }
     if (node.tag === 'img') {
@@ -76,8 +83,8 @@ export function readableDocument(html, canonical) {
   return text
 }
 
-export function readableAsset({ html, canonical, title, description, revision, textUrl }) {
-  const body = readableDocument(html, canonical)
+export function readableAsset({ html, canonical, title, description, revision, textUrl, documentUrls }) {
+  const body = readableDocument(html, canonical, { documentUrls })
   const text = [`Title: ${title}`, `Canonical: ${canonical}`, ...(revision ? [`Page-Modified: ${revision}`] : []),
     'Source: published HTML document body; page revision is not a capability verification date.', '', body, ''].join('\n')
   const bytes = Buffer.from(text, 'utf8')
