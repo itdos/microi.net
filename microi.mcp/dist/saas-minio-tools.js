@@ -11,7 +11,7 @@ export function registerSaasMinioTools(server, client, tenant) {
         }).strict().optional() }, async (input) => {
         const failure = (message) => ({ content: [{ type: 'text', text: message }], isError: true });
         if (input.action === 'Save' && (!input.configuration || !input.expectedRevision
-            || input.confirmExecution !== `SAVE_MINIO:${tenant}:${input.expectedRevision}`))
+            || input.confirmExecution?.toLowerCase() !== `SAVE_MINIO:${tenant}:${input.expectedRevision}`.toLowerCase()))
             return failure('先 Inspect；Save 必须提供 configuration、expectedRevision 和 SAVE_MINIO:<tenant>:<revision>。');
         if (input.action !== 'Save' && (input.configuration || input.expectedRevision || input.confirmExecution))
             return failure('Inspect/Probe 只读取已保存配置，不接受配置或写入参数。');

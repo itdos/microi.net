@@ -20,6 +20,19 @@ function zip(file,id='Example',version='8.6.4'){
  fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,Buffer.concat([local,name,data,central,name,end]));return fs.readFileSync(file);
 }
 async function fixture(run){const root=fs.mkdtempSync(path.join(os.tmpdir(),'microi-remote-collision-'));try{return await run(root);}finally{fs.rmSync(root,{recursive:true});}}
+// 给真实静态镜像校验提供 USTAR 字节；不以容器命令替身绕过 layer/config 摘要检查。
+function staticImageTar(entries){
+ const parts=[];
+ for(const [name,data]of entries){
+  const body=Buffer.from(data),header=Buffer.alloc(512);
+  header.write(name,0,100);header.write('0000644\0',100,8);header.write('0000000\0',108,8);header.write('0000000\0',116,8);
+  header.write(body.length.toString(8).padStart(11,'0')+'\0',124,12);header.write('00000000000\0',136,12);
+  header.fill(32,148,156);header.write('0',156,1);header.write('ustar\0',257,6);header.write('00',263,2);
+  header.write(header.reduce((sum,byte)=>sum+byte,0).toString(8).padStart(6,'0')+'\0 ',148,8);
+  parts.push(header,body,Buffer.alloc((512-body.length%512)%512));
+ }
+ return Buffer.concat([...parts,Buffer.alloc(1024)]);
+}
 
 for(const state of ['absent','same','different','unauthorized','forbidden','server-error','network-unknown','truncated'])test(`actual NuGet identity and complete bytes: ${state}`,()=>fixture(async root=>{
  const file=path.join(root,'filename-is-not-identity.nupkg'),bytes=zip(file),calls=[];
@@ -134,10 +147,15 @@ for(const scenario of ['success','digest-mismatch','readback-timeout','push-fail
  fs.writeFileSync(path.join(root,'Microi.Server/Microi.net.Api/appsettings.json'),template);
  fs.writeFileSync(path.join(root,'fixture/appsettings.json'),template);
  for(const name of ['Microi.net.Api.dll','Microi.net.Api.deps.json','Microi.net.Api.runtimeconfig.json'])fs.writeFileSync(path.join(root,'fixture',name),'fixture');
+ const digest=bytes=>'sha256:'+createHash('sha256').update(bytes).digest('hex');
+ const layer=staticImageTar([['app/appsettings.json',template]]);
+ const config=Buffer.from(JSON.stringify({rootfs:{type:'layers',diff_ids:[digest(layer)]}}));
+ const imageId=digest(config),imageArchive=path.join(root,'fixture-image.tar');
+ fs.writeFileSync(imageArchive,staticImageTar([['manifest.json',JSON.stringify([{Config:'config.json',Layers:['layer.tar']}])],['config.json',config],['layer.tar',layer]]));
  const imageAdapter=path.join(root,'verify-fixture-image.mjs');
  fs.writeFileSync(imageAdapter,`import fs from 'node:fs';import {verifyPublishedImage} from ${JSON.stringify(pathToFileURL(path.join(path.dirname(scriptFile),'Microi.Server/tools/release-smoke-config.mjs')).href)};
  const [image,template,published]=process.argv.slice(2);
- const run=(_command,args)=>{if(args[0]==='image')return 'sha256:'+'a'.repeat(64);if(args[0]==='create')return 'b'.repeat(64);if(args[0]==='cp'){fs.copyFileSync(published,args.at(-1));return '';}if(args[0]==='rm')return '';throw Error('Unexpected Docker operation');};
+ const run=(_command,args)=>{if(args[0]==='image'&&args[1]==='inspect')return JSON.stringify({Id:${JSON.stringify(imageId)}});if(args[0]==='image'&&args[1]==='save'){if(args.at(-1)!==${JSON.stringify(imageId)})throw Error('Image identity changed');fs.copyFileSync(${JSON.stringify(imageArchive)},args[3]);return '';}throw Error('Container creation or unexpected Docker operation');};
  console.log(JSON.stringify(verifyPublishedImage(image,template,run)));`);
  const shellQuote=value=>"'"+value.replaceAll('\\','/').replaceAll("'","'\\''")+"'";
  fs.mkdirSync(path.join(root,'Microi.Server/Microi.net.Api/bin/Release'),{recursive:true});

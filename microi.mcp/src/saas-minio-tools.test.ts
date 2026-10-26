@@ -27,7 +27,7 @@ test('SaaS MinIO tool requires a revision, preserves private credentials and sup
     const denied = await call({ action: 'Save', configuration: { secretKey: 'fixture-secret' } });
     assert.equal(denied.isError, true); assert.equal(calls.length, 1);
     const saved = await call({ action: 'Save', expectedRevision: 'a'.repeat(64),
-      confirmExecution: 'SAVE_MINIO:itdos:' + 'a'.repeat(64), configuration: { accessKey: 'fixture-access', secretKey: 'fixture-secret' } });
+      confirmExecution: 'SAVE_MINIO:iTdos:' + 'a'.repeat(64), configuration: { accessKey: 'fixture-access', secretKey: 'fixture-secret' } });
     assert.notEqual(saved.isError, true); assert.equal(calls.length, 2);
     assert.equal(calls[1].configuration.secretKey, 'fixture-secret');
     assert.doesNotMatch(JSON.stringify(saved), /fixture-secret|fixture-access/);
