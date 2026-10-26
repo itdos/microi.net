@@ -315,6 +315,17 @@ test('AI regeneration retains existing physical column order and appends a missi
   assert.deepEqual(configurePackageModel(structuredClone(regenerated), aiDefinition), regenerated);
 });
 
+test('system-account generation requires the password repair runtime even from an older bootstrap', () => {
+  const source = JSON.parse(fs.readFileSync(path.join(resourceRoot, sysUserDefinition.file), 'utf8'));
+  for (const minimum of [undefined, '8.6.3']) {
+    const model = structuredClone(source);
+    model.PackageInfo.ServerMinVersion = minimum;
+    assert.equal(configurePackageModel(model, sysUserDefinition).PackageInfo.ServerMinVersion, '8.7.4');
+  }
+  source.PackageInfo.ServerMinVersion = '8.8.1';
+  assert.equal(configurePackageModel(source, sysUserDefinition).PackageInfo.ServerMinVersion, '8.8.1');
+});
+
 test('account regeneration preserves equivalent source bytes and replaces changed managed code', () => {
   const source = JSON.parse(fs.readFileSync(path.join(resourceRoot, sysUserDefinition.file), 'utf8'));
   const key = 'platform-user-update-preferences';

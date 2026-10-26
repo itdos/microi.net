@@ -1604,6 +1604,11 @@ test('官网发布接口接受十个官方应用包并拒绝 AI 与首页资源�
   );
 
   const sysUser = JSON.parse(await readFile(resolve(testDirectory, 'app.microi.sys_user.json'), 'utf8'));
+  assert.doesNotThrow(() => validatePublishResource('app.microi.sys_user.json', JSON.stringify(sysUser)), '当前更高版本的管理员能力声明应通过最低契约');
+  const oldAdminCapability = structuredClone(sysUser);
+  oldAdminCapability.PackageInfo.RequiredPlatformCapabilities = oldAdminCapability.PackageInfo.RequiredPlatformCapabilities
+    .map(value => value.startsWith('ApiEngine:platform-sys-user-admin@') ? 'ApiEngine:platform-sys-user-admin@v1.0.1' : value);
+  assert.throws(() => validatePublishResource('app.microi.sys_user.json', JSON.stringify(oldAdminCapability)), /Managed v1\.0\.2/);
   const oldSysUser = structuredClone(sysUser);
   oldSysUser.PackageInfo.Version = 'v6.3.1';
   assert.throws(

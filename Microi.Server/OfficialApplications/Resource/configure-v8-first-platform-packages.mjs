@@ -39,6 +39,7 @@ export const packageDefinitions = Object.freeze([
   Object.freeze({
     file: 'app.microi.sys_user.json',
     name: '系统账号',
+    serverMinVersion: '8.7.4',
     version: 'v7.6.5',
     bootstrapUrl: 'https://static.itdos.com/itdos/microi-store/packages/01kmfcf8yg0g580n111sbemdcv/202608/app_microi_sys_user-v6_2_9-d1ab1bb18468b39c.json',
     bootstrapSha256: 'd1ab1bb18468b39cde4cd9987acb226d6f32092025c729fa9f8aa2e5032f3e92',
@@ -51,7 +52,7 @@ export const packageDefinitions = Object.freeze([
     capabilities: [
       'ApiEngine:platform-user-update-preferences@v1.1.7',
       'ApiEngine:platform-user-update-profile@v1.0.1',
-      'ApiEngine:platform-sys-user-admin@v1.0.5',
+      'ApiEngine:platform-sys-user-admin@v1.0.2',
       'ApiEngine:platform-user-custom-hook@v1.0.0',
       'V8.Method.PrepareCurrentUserProfileUpdate',
       'V8.Method.ManageSysUserAdmin',
@@ -61,6 +62,7 @@ export const packageDefinitions = Object.freeze([
       'ServerField:sys_user.HomeUsageStats',
       'ApiEngine:platform-home-overview@v1.0.0',
       'V8.Method.RepairPlatformPasswordEncoding',
+      'ApiEngine:platform-sys-user-admin@v1.0.5',
     ],
     exactEngineKeys: [
       'platform-user-update-preferences',
