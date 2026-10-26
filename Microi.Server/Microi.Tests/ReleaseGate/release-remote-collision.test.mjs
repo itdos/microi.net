@@ -122,7 +122,9 @@ test('actual Docker confirmation writes its receipt only after verification and 
 for(const scenario of ['success','digest-mismatch','readback-timeout','push-failed'])test(`actual platform Docker loop requires post-push confirmation before completion: ${scenario}`,()=>fixture(root=>{
  const script=fs.readFileSync(fileURLToPath(new URL('../../../Microi一键编译发布.sh',import.meta.url)),'utf8');
  const start=script.indexOf('docker_push_plan() {'),end=script.indexOf('\nif [ ${#SELECTED_API_PLANS',start);
- assert.ok(start>0&&end>start);const loop=script.slice(start,end);
+ assert.ok(start>0&&end>start);
+ const sessionFunctions=script.slice(script.indexOf('release_stage_needed() {'),script.indexOf('# 发布进程专用输出目录'));
+ const loop=sessionFunctions+'\n'+script.slice(start,end);
  fs.mkdirSync(path.join(root,'Microi.Server/Microi.net.Api/bin/Release'),{recursive:true});
  const git=process.platform==='win32'?spawnSync('git',['--exec-path'],{encoding:'utf8'}):null;
  const bash=git?path.resolve(git.stdout.trim(),'../../..','bin/bash.exe'):'bash';

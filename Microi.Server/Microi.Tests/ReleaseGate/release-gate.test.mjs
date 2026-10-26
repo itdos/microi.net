@@ -11,8 +11,10 @@ const begin=source.indexOf('# 选定版本已准备；在官方资源写入、Nu
 const end=source.indexOf('# 发布只清理所选范围的开发服务',begin);
 assert.ok(begin>0&&end>begin,'The release script must contain the actual scoped test gate');
 const gate=source.slice(begin,end);
-const policy=source.slice(source.indexOf('MICROI_FULL_ONLY=false'),source.indexOf('# Windows (Git Bash) 下'));
-const budgetFunctions=source.slice(source.indexOf('# 从交互选项完成开始计时'),source.indexOf('# Windows (Git Bash) 下'));
+// 回放原生阶段函数；局部入口没有会话，仍须执行而不能被缺少函数误当成缓存命中。
+const sessionFunctions=source.slice(source.indexOf('release_stage_needed() {'),source.indexOf('# 发布进程专用输出目录'));
+const policy=source.slice(source.indexOf('MICROI_FULL_ONLY=false'),source.indexOf('# Windows (Git Bash) 下'))+'\n'+sessionFunctions;
+const budgetFunctions=source.slice(source.indexOf('# 从交互选项完成开始计时'),source.indexOf('# Windows (Git Bash) 下'))+'\n'+sessionFunctions;
 const gitExec=process.platform==='win32'?execFileSync('git',['--exec-path'],{encoding:'utf8'}).trim():'';
 const bash=process.platform==='win32'?path.resolve(gitExec,'../../..','bin/bash.exe'):'bash';
 
@@ -198,7 +200,7 @@ test('same-version Docker hotfix keeps scoped gates and excludes version and rem
  assert.match(source,/if \[ "\$\{1:-\}" = "--docker-only-hotfix" \]/);
  const hotfix=source.slice(source.indexOf('if [ "$MICROI_DOCKER_ONLY_HOTFIX" = true ]'),source.indexOf('if [ "$MICROI_DOCKER_ONLY_HOTFIX" = true ]')+750);
  for(const marker of ['VERSION="$CURRENT_VERSION"','BUMP_VERSION=false','PUSH_NUGET=false']) assert.ok(hotfix.includes(marker),marker);
- assert.match(source,/if \[ "\$PUBLISH_BACKEND" = true \] && \[ "\$MICROI_DOCKER_ONLY_HOTFIX" != true \]; then[\s\S]*?refresh-resources\.mjs --publish/);
+ assert.match(source,/if \[ "\$PUBLISH_BACKEND" = true \] && \[ "\$MICROI_DOCKER_ONLY_HOTFIX" != true \] && release_stage_needed resources; then[\s\S]*?publish_resources_with_readback/);
  assert.match(gate,/-Mode "\$MICROI_RELEASE_TEST_POLICY" -Configuration Release/);
  assert.doesNotMatch(gate,/MICROI_DOCKER_ONLY_HOTFIX/);
  assert.ok(gate.includes('-SolutionPath "$SLN_FILE"'),'The gate must use the detected solution in an isolated checkout');
