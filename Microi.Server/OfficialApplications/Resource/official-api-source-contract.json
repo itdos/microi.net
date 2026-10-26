@@ -387,8 +387,8 @@
       "Kind": "ApiEngine",
       "SourceRole": "CanonicalReleaseSource",
       "File": "OfficialApiSources/official_sms_login.js",
-      "Version": "v1.1.7",
-      "Sha256": "7f51da0303bc3b841b4775037c649dbec26a2e1a6d8e18c0bf261cf96912de8d",
+      "Version": "v1.1.8",
+      "Sha256": "27bc2271fd8e5970e48c828cac986d88151fdc8da5d07408cb6cfa45eb7791a3",
       "Package": "app.microi.saas-engine.json"
     },
     {

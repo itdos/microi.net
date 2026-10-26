@@ -13,17 +13,26 @@ const member = { Id: 'member-id', Account: 'legacy-member', Phone: phone, Name: 
 function login(options = {}) {
   const users = options.users || [member];
   const calls = [], tokenChecks = [], issued = [];
+  const responseHeaders = {};
   let authenticatedUser;
   const V8 = {
     OsClient: 'iTdos', Header: options.header || {},
+    HttpContext: { Response: { Headers: responseHeaders } },
     Param: { Action: 'login', LoginType: 'password', Account: phone, Pwd: 'fixture-only-password', ...options.param },
     TranslateEngine: { GetLang: (key, lang) => `${lang}:${key}` },
     ApiEngine: { Run(key, param) {
       calls.push({ key, param });
-      if (options.authResult) return options.authResult;
       const user = users.find(row => row.Account === param.Account || (key === 'platform_auth_sms_login' && row.Phone === param.Phone));
-      authenticatedUser = user;
-      return user ? { Code: 1, Data: { ...user }, DataAppend: { Token: 'fixture-only-token' } } : { Code: 0, Msg: `${param._Lang}:AccountOrPwdError` };
+      authenticatedUser = options.authResult?.Data || user;
+      if (options.responseToken !== undefined) responseHeaders.authorization = options.responseToken;
+      if (options.authResult) return options.authResult;
+      if (!user) return { Code: 0, Msg: `${param._Lang}:AccountOrPwdError` };
+      // SysUserSessionRuntime 的密码登录正文不含 Token；Token 仅写当前 HTTP 响应头。
+      if (key === 'platform-sys-user-session') {
+        responseHeaders.authorization = { ToString: () => 'fixture-only-token' };
+        return { Code: 1, Data: { ...user }, DataAppend: { SysMenuHomePage: null, SysConfig: {} } };
+      }
+      return { Code: 1, Data: { ...user }, DataAppend: { Token: 'fixture-only-token' } };
     } },
     FormEngine: {
       GetFormData(table, param) {
@@ -131,10 +140,39 @@ test('内层认证成功后短信重置撤销会话，官网不得重签使旧�
 });
 
 test('认证结果缺失Token时失败关闭，不通过重新签发填补', () => {
-  const result = login({ authResult: { Code: 1, Data: member } });
+  const result = login({ authResult: { Code: 1, Data: member }, header: { authorization: 'untrusted-request-token' } });
   assert.equal(result.result.Code, 0);
   assert.deepEqual(result.issued, []);
   assert.equal(result.tokenChecks.length, 0);
+});
+
+test('密码登录兼容当前响应头中的 CLR StringValues Token，保持原 Token 且不重签', () => {
+  const result = login();
+  assert.equal(result.result.Code, 1, result.result.Msg);
+  assert.equal(result.result.Data.Authorization, 'fixture-only-token');
+  assert.deepEqual(result.tokenChecks, [{ token: 'fixture-only-token', osClient: 'iTdos' }]);
+  assert.deepEqual(result.issued, []);
+});
+
+for (const [label, append, data] of [
+  ['DataAppend.Token', { Token: 'body-issued-token' }, member],
+  ['Data.Authorization', {}, { ...member, Authorization: 'body-issued-token' }]
+]) {
+  test(`已有 ${label} 优先于响应头，继续复用可信正文 Token`, () => {
+    const result = login({ authResult: { Code: 1, Data: data, DataAppend: append }, responseToken: 'other-response-token' });
+    assert.equal(result.result.Code, 1, result.result.Msg);
+    assert.equal(result.result.DataAppend.Token, 'body-issued-token');
+    assert.deepEqual(result.tokenChecks, [{ token: 'body-issued-token', osClient: 'iTdos' }]);
+    assert.deepEqual(result.issued, []);
+  });
+}
+
+test('内层认证失败时即使响应头存在Token也不得继续会话校验或登录', () => {
+  const result = login({ authResult: { Code: 0, Msg: 'authentication rejected' }, responseToken: 'previous-response-token' });
+  assert.equal(result.result.Code, 0);
+  assert.equal(result.result.Msg, 'authentication rejected');
+  assert.deepEqual(result.tokenChecks, []);
+  assert.deepEqual(result.issued, []);
 });
 
 for (const state of [0, 2, -1, '', null]) {

@@ -10,7 +10,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: official_sms_login
- * Version: v1.1.7
+ * Version: v1.1.8
  * Function:
  * - 官网密码及短信登录、基于平台密码哈希的短信注册、新账号邀请绑定和独立官网登录时间；兼容唯一手机号别名并透传请求语言，认证后及角色补齐后按已验证用户Id回读，保持DiyToken会话体系。
  */
@@ -291,6 +291,15 @@ if (!verifiedUserId) return failIdentityReadback('VerifiedIdentityMissing', veri
 // 解析和认证之间账号可能被并发修改；别名映射不能把密码验证成功的其它身份当成原账号。
 if (passwordUserId && passwordUserId !== verifiedUserId) return fail(V8.TranslateEngine.GetLang('AccountOrPwdError', requestLang));
 var verifiedToken = text(getValue(verified.DataAppend, 'Token') || getValue(verified.Data, 'Authorization'));
+if (!verifiedToken) {
+  // 平台密码登录将已签发 Token 写入当前 HTTP 响应头，正文仅返回用户和系统配置。
+  // 此处仅在内层认证成功后读取响应头，禁止使用客户端请求头或重新签发会话。
+  try {
+    var responseToken = V8.HttpContext.Response.Headers['authorization'];
+    verifiedToken = text(responseToken && typeof responseToken.ToString === 'function' ? responseToken.ToString() : responseToken);
+  } catch (ex) {
+  }
+}
 if (!verifiedToken) return failIdentityReadback('VerifiedTokenMissing', verified);
 var isNewUser = action === 'register' && !!(verified.DataAppend && verified.DataAppend.IsNewUser);
 if (action === 'register' && !isNewUser) return fail('手机号已注册，请直接登录。');

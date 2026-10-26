@@ -7,14 +7,12 @@ const directory = path.dirname(fileURLToPath(import.meta.url));
 const releaseTime = '2026-10-26 12:00:00';
 export const passwordAuthReleases = [
   {
-    file: 'app.microi.saas-engine.json', previous: 'v8.6.12', version: 'v8.6.13',
-    content: '官网短信重置通过可信原子同时更新密码哈希与编码标识并撤销会话；密码登录支持唯一手机号别名、透传语言并保持已验证用户Id。仅State=1可登录；需后端8.7.4。',
+    file: 'app.microi.saas-engine.json', previous: 'v8.6.13', version: 'v8.6.14',
+    content: '官网登录兼容平台密码登录仅在当前HTTP响应头返回Token的协议；继续优先复用正文Token并校验原会话租户与用户Id，已撤销会话不得重新签发。需后端8.7.4。',
     engines: [
-      { key: 'official_sms_login', version: 'v1.1.7', id: '01KWTB17DXX1SEQ6KPK0QEWDFK' },
-      { key: 'platform_auth_sms_login', version: 'v1.0.4', id: '76000000-1000-4000-8000-000000000001' },
-      { key: 'official_password_reset', version: 'v1.0.1', id: '01KXNQH47N7WWYSREPC300N39Q' }
+      { key: 'official_sms_login', version: 'v1.1.8', id: '01KWTB17DXX1SEQ6KPK0QEWDFK' }
     ],
-    capabilities: ['V8.Method.ResetPlatformSmsPassword', 'ApiEngine:official_sms_login@v1.1.7', 'ApiEngine:platform_auth_sms_login@v1.0.4', 'ApiEngine:official_password_reset@v1.0.1']
+    capabilities: ['ApiEngine:official_sms_login@v1.1.8']
   },
   {
     file: 'app.microi.sys_user.json', previous: 'v8.4.12', version: 'v8.4.13',
@@ -29,7 +27,7 @@ function prepend(history, line) {
   return `${[line, ...lines.filter(item => item !== line)].join('\n')}\n`;
 }
 
-// 只投影本修复拥有的四个接口；其它字段、安装种子和嵌入应用保持原样。
+// 只投影本次发行声明的接口；其它字段、安装种子和嵌入应用保持原样。
 export function configurePasswordAuthPackage(pkg, release, sources) {
   if (![release.previous, release.version].includes(pkg.PackageInfo.Version)) {
     throw new Error(`${release.file}版本已变化，须重新选择发行版本，禁止覆盖并行发行。`);

@@ -16,7 +16,7 @@ function safeLoginHookTemplate(source) {
 const specs = [
   {
     id: '01KWTB17DXX1SEQ6KPK0QEWDFK', key: 'official_sms_login',
-    name: '[官网]短信登录注册', version: 'v1.1.7',
+    name: '[官网]短信登录注册', version: 'v1.1.8',
     allowAnonymous: 1, stopHttp: 0, ownership: 'Platform', policy: 'Managed'
   },
   {

@@ -14,9 +14,16 @@ function run(options = {}) {
   const users = (options.users || [demo, admin]).map(u => ({ ...u }));
   const authenticated = options.authenticated || users.find(u => u.Id === admin.Id) || admin;
   const calls = [], logs = [], updates = [], tokens = [];
+  const responseHeaders = {};
   const V8 = {
     OsClient: 'iTdos', Param: { Action: 'login', LoginType: 'password', Account: 'admin', Pwd: 'test-only-password', ...options.param }, Header: { did: 'test-only-device' },
-    ApiEngine: { Run(key, param) { calls.push({ type: 'authenticate', key, param }); return options.authResult || { Code: 1, Data: { ...authenticated }, DataAppend: options.authAppend || { Token: 'test-only-token' } }; } },
+    HttpContext: { Response: { Headers: responseHeaders } },
+    ApiEngine: { Run(key, param) {
+      calls.push({ type: 'authenticate', key, param });
+      if (options.authResult) return options.authResult;
+      responseHeaders.authorization = { ToString: () => 'test-only-token' };
+      return { Code: 1, Data: { ...authenticated }, DataAppend: options.authAppend || { SysMenuHomePage: null, SysConfig: {} } };
+    } },
     FormEngine: {
       GetFormData(table, param) {
         calls.push({ type: 'read', table, param });
