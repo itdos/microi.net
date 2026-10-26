@@ -27,7 +27,7 @@ public sealed class McpLibraryMigrationTests
     {
         var actions = typeof(V8EngineController).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
             .Where(m => m.GetCustomAttributes<HttpMethodAttribute>().Any()).ToArray();
-        Assert.Equal(116, actions.Length);
+        Assert.Equal(117, actions.Length);
         foreach (var action in actions)
         {
             var implementation = typeof(V8McpEndpointService).GetMethod(action.Name);

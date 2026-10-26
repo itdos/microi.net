@@ -25,7 +25,7 @@ public sealed class V8McpAuthorizationTests
             .Where(method => method.GetCustomAttributes<HttpMethodAttribute>(true).Any())
             .ToArray();
 
-        Assert.Equal(116, actions.Length);
+        Assert.Equal(117, actions.Length);
         Assert.Equal(actions.Length, Microi.net.McpRoleActionCatalog.Scopes.Count);
         foreach (var action in actions)
         {
