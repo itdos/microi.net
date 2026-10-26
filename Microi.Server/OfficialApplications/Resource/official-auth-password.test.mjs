@@ -258,7 +258,7 @@ for (const release of passwordAuthReleases) {
   test(`${release.file}定向生成幂等并保留所有无关资源`, () => {
     const input = structuredClone(release.file.includes('saas-engine') ? pkg : userPackage);
     input.PackageInfo.Version = release.previous;
-    input.PackageInfo.ServerMinVersion = '8.7.4';
+    input.PackageInfo.ServerMinVersion = '8.7.3';
     input.TenantFixture = { setting: 'preserve', rows: [1, 2] };
     input.SysApiEngines.push({ ApiEngineKey: 'fixture_unrelated_hook', ApiV8Code: 'return {Code:1};', Version: 'v9.0.0' });
     const before = structuredClone(input);
@@ -274,7 +274,7 @@ for (const release of passwordAuthReleases) {
       const newEngine = generated.SysApiEngines.find(item => item.ApiEngineKey === spec.key);
       for (const key of Object.keys(oldEngine).filter(key => !['ApiV8Code', 'Version', 'UpdateTime', 'ChangeHistory'].includes(key))) assert.deepEqual(newEngine[key], oldEngine[key], `${spec.key}.${key}`);
     }
-    assert.equal(generated.PackageInfo.ServerMinVersion, '8.7.5');
+    assert.equal(generated.PackageInfo.ServerMinVersion, '8.7.4');
     const newerPrerequisite = structuredClone(input);
     newerPrerequisite.PackageInfo.ServerMinVersion = '8.8.1';
     assert.equal(configurePasswordAuthPackage(newerPrerequisite, release, sources).PackageInfo.ServerMinVersion, '8.8.1');

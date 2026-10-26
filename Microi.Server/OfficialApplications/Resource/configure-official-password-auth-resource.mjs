@@ -8,7 +8,7 @@ const releaseTime = '2026-10-26 12:00:00';
 export const passwordAuthReleases = [
   {
     file: 'app.microi.saas-engine.json', previous: 'v8.6.12', version: 'v8.6.13',
-    content: '官网短信重置通过可信原子同时更新密码哈希与编码标识并撤销会话；密码登录支持唯一手机号别名、透传语言并保持已验证用户Id。仅State=1可登录；需后端8.7.5。',
+    content: '官网短信重置通过可信原子同时更新密码哈希与编码标识并撤销会话；密码登录支持唯一手机号别名、透传语言并保持已验证用户Id。仅State=1可登录；需后端8.7.4。',
     engines: [
       { key: 'official_sms_login', version: 'v1.1.7', id: '01KWTB17DXX1SEQ6KPK0QEWDFK' },
       { key: 'platform_auth_sms_login', version: 'v1.0.4', id: '76000000-1000-4000-8000-000000000001' },
@@ -18,7 +18,7 @@ export const passwordAuthReleases = [
   },
   {
     file: 'app.microi.sys_user.json', previous: 'v8.4.12', version: 'v8.4.13',
-    content: '系统账号管理增加历史密码编码不一致的管理员修复入口；可信原子复核主库管理员、限定用户与编码类型，支持只读预览并禁止进入租户Hook；需后端8.7.5。',
+    content: '系统账号管理增加历史密码编码不一致的管理员修复入口；可信原子复核主库管理员、限定用户与编码类型，支持只读预览并禁止进入租户Hook；需后端8.7.4。',
     engines: [{ key: 'platform-sys-user-admin', version: 'v1.0.5', id: '019d2a01-9d63-7f91-8c02-000000000009' }],
     capabilities: ['V8.Method.RepairPlatformPasswordEncoding', 'ApiEngine:platform-sys-user-admin@v1.0.5']
   }
@@ -62,7 +62,7 @@ export function configurePasswordAuthPackage(pkg, release, sources) {
   const info = output.PackageInfo;
   info.Version = release.version;
   const current = String(info.ServerMinVersion || '0').replace(/^v/, '').split('.').map(Number);
-  if (current[0] < 8 || (current[0] === 8 && (current[1] < 7 || (current[1] === 7 && (current[2] || 0) < 5)))) info.ServerMinVersion = '8.7.5';
+  if (current[0] < 8 || (current[0] === 8 && (current[1] < 7 || (current[1] === 7 && (current[2] || 0) < 4)))) info.ServerMinVersion = '8.7.4';
   info.ApiEngineCount = output.SysApiEngines.length;
   info.RequiredPlatformCapabilities = [...new Set([...(info.RequiredPlatformCapabilities || []), ...release.capabilities])];
   info.ChangeHistory = prepend(info.ChangeHistory, `2026-10-26 ${release.version} ${release.content}`);
