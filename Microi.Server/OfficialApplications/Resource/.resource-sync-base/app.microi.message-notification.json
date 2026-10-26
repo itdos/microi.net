@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "消息通知",
-    "Version": "v8.6.11",
+    "Version": "v8.6.12",
     "CreateTime": "2026-08-23T01:02:13.744Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -37,13 +37,13 @@
       "ServerField:sys_apiengine.ApiRoutes",
       "ApiEngineChatDelivery:v1"
     ],
-    "ChangeHistory": "2026-10-26 v8.6.11 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。接通公开热点的完整日采集、MinIO可恢复复制和实际NAS下载选择，支持运行状态及暂停恢复；只在当前公开版本副本完整校验后分流。\n2026-10-25 v8.6.10 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。新增当前租户管理员热点资源目录、备用地址及可配置的1GiB/24小时策略诊断；自动流量采集、复制与运行分流未接通，保持关闭。\n2026-10-25 v8.6.9 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。CDN与OSS分产品账单及真实计费用量、访问日志诊断、流量站内告警、多域订阅与安全封禁边界；商城详情和安装分片按SHA/大小/可信指针缓存，减少反复下载。 支持跨月跨年游标历史与显式单租户索引维护；规范索引激活后，重复发送沿用原始消息，历史与未读数使用同一消息事实。维护要求全部服务节点升级、真实写入排空；冲突或未知状态不自动放行。不移动原聊天正文，不自动迁移其它租户，保留平台提醒配置与个性化 Hook。\n2026-10-24 v8.3.25 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。CDN与OSS分产品账单及真实计费用量、访问日志诊断、流量站内告警、多域订阅与安全封禁边界；商城详情和安装分片按SHA/大小/可信指针缓存，减少反复下载。\n2026-10-23 v8.3.25 聊天历史按游标跨月跨年读取；未知未读数不广播为零。新增超级管理员单租户历史定位维护入口，显式排空写入后分批建立规范索引，保留原消息和冲突。所有服务节点需先升级宿主准入能力，安装应用不会自动迁移租户；未迁移租户继续兼容旧协议。保留既有平台提醒与租户 Hook。\n2026-10-22 v8.3.24 聊天消息按租户、年份数据库和月份集合保存；历史查询兼容旧年度集合，采用有界游标异步分页，跨月和跨年不中断。PC 与移动端滚动保留阅读位置，SignalR 仅向请求者回传历史。需配套 Core、MongoDB、API 与前端新版，应用包本身不替换二进制或清空历史数据。\n2026-10-21 v8.3.23 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。使用唯一源码与锁定依赖重新构建平台内置微服务，修复版本、源码清单、运行资产和启动恢复投影不一致，保留官方域名迁移、现有页面和历史路由。\n2026-10-20 v8.3.22 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。官方应用源和认证桥迁移到 api.microi.net；商城代理兼容旧官方域名并保留真实失败状态。\n2026-10-19 v8.3.21 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。个人中心首屏资料精简与页签按需加载，修复头像文件服务器地址\n2026-10-18 v8.3.20 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。同步平台微服务 v2.0.24 的完整源码回归修复与同源运行清单；运行界面与 v2.0.23 一致。\n2026-10-18 v8.3.19 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。个人中心修复顶部样式冲突，跟随宿主主题色、明暗模式和界面密度；SaaS 角色授权与连接弹窗共用 MCP 范围、创建修改、删除开关及并发版本，需 API/PC 8.5.13 与新版 MCP 工具。\n2026-10-17 v8.3.18 同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。\n2026-10-13 v8.3.17 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。个人中心外部账号增加 Microi 官方账号标识与绑定入口说明，复用第三方账号绑定、解绑与安全回调契约。\n2026-10-09 v8.3.16 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。新增顶部加侧边导航偏好及框架修改密码弹窗，统一复用个人中心强身份校验流程\n2026-10-06 v8.3.15 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。推广中心正文、状态提示、选中菜单和按钮按真实明暗主题保持可读性，保留用户主色；通过真实平台主题控件验收。\n2026-10-06 v8.3.14 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。新增SaaS推广中心、真实子租户用量与登录统计、团队转化和试用跟进；推荐链接支持匿名验证码开通标准空库及幂等任务恢复。\n2026-09-30 v8.3.13 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。个人设置支持跟随系统的边角风格、导航位置和菜单子级展开方式；首页采用紧凑原生工作台。\n2026-09-29 v8.3.12 修复编辑已发布系统公告时保存草稿报 ToString 非函数，恢复保存后发布新版提醒的操作。\n2026-09-28 v8.3.11 官方开源版欢迎公告向每位有效 Level >= 9999 用户独立投递；接收资格不要求指定管理员角色，维护公告配置仍保留严格管理员权限。\n2026-09-28 v8.3.10 开源版缺失授权期限时不再将 0001-01-01 识别为企业版已到期；保留官方开源版欢迎公告按每次后端重启向各超级管理员分别投递。\n2026-09-26 v8.3.9 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。系统日志新增关键事故 MySQL 确认状态、等待阶段、峰值和线程池现场；保持既有长业务超时。\n2026-09-26 v8.3.8 官方和主租户授权提醒均按 UTC 显示到期日期，兼容带毫秒的授权；保留可配置提前天数、文案和每次登录回执。\n2026-09-26 v8.3.7 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。完善授权到期提醒设置的输入控件与加载互斥；保留官方和主租户分层策略及子租户授权字段。\n2026-09-26 v8.3.6 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。授权到期提醒支持官方与主租户分别配置个人版、企业版文案和提前天数；子租户授权版本与到期时间由主租户设置并受主授权约束。\n2026-09-14 v8.3.5 管理员每次新登录时提醒七天内到期或已到期的服务器授权；提醒与登录会话绑定，续签 Token 不重复弹出，并保留平台原有通知与阅读回执。\n2026-09-13 v1.1.4 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。同步平台微服务 v2.0.10；CDN 12类报表遵循各自参数协议，增加区域范围并完成真实接口验收。\n2026-09-13 v1.1.3 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。同步平台微服务 v2.0.9 与 CDN 实时日志兼容修复的源码快照；运行界面包含移动端分页优化。\n2026-09-13 v1.1.2 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。共享平台微服务更新至 v2.0.8，完善 CDN 监控与安全模块的移动端分页布局。\n2026-09-13 v1.1.1 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。共享平台微服务升级 v2.0.7，系统日志/监控新增 CDN 分析与安全；其他页面保持兼容。\n2026-09-10 v1.1.0 保留系统公告、业务通知、投递记录统一入口；修复真实 HTTP/MCP 的 JObject 通道适配器与 Jint 日期投影兼容，确保原 mic_msgset 新增、编辑、版本冲突和租户权限闭环。\n2026-09-10 v1.0.19 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。统一消息通知配置、系统公告与发送记录；保留原消息表，支持跨租户帐号范围、MCP 配置及 API 重启后首次登录提醒。\n2026-09-10 v1.0.18 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。系统提醒统一到系统引擎，移除 SaaS 提醒按钮、Tab 与嵌入组件，升级自动清理旧布局入口。\n2026-09-10 v1.0.17 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。新增平台提醒管理页，包含 SaaS 表单内嵌、行/页面/批量入口及 SDK 兼容。\n2026-09-05 v1.0.16 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-02 v1.0.15 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v1.0.14 聊天 Managed 运行时改为自包含时间能力，不再依赖租户全局 V8 中的 DateNow。\n2026-08-30 v1.0.13 完成 /api/DiyChat/SendSystemMessage 多路由、事务提交后实时投递与官方包追加式发布历史闭包。\n2026-08-30 v1.0.12 将 /api/DiyChat/SendSystemMessage 收入 platform-chat-system-message 多路由，并保留提交后实时投递契约。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
+    "ChangeHistory": "2026-10-26 v8.6.12 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。修复 NAS 实际分流管理接口的宿主元数据和旧版占位参数适配，保留严格业务参数与可信后端鉴权。\n2026-10-26 v8.6.11 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。接通公开热点的完整日采集、MinIO可恢复复制和实际NAS下载选择，支持运行状态及暂停恢复；只在当前公开版本副本完整校验后分流。\n2026-10-25 v8.6.10 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。新增当前租户管理员热点资源目录、备用地址及可配置的1GiB/24小时策略诊断；自动流量采集、复制与运行分流未接通，保持关闭。\n2026-10-25 v8.6.9 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。CDN与OSS分产品账单及真实计费用量、访问日志诊断、流量站内告警、多域订阅与安全封禁边界；商城详情和安装分片按SHA/大小/可信指针缓存，减少反复下载。 支持跨月跨年游标历史与显式单租户索引维护；规范索引激活后，重复发送沿用原始消息，历史与未读数使用同一消息事实。维护要求全部服务节点升级、真实写入排空；冲突或未知状态不自动放行。不移动原聊天正文，不自动迁移其它租户，保留平台提醒配置与个性化 Hook。\n2026-10-24 v8.3.25 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。CDN与OSS分产品账单及真实计费用量、访问日志诊断、流量站内告警、多域订阅与安全封禁边界；商城详情和安装分片按SHA/大小/可信指针缓存，减少反复下载。\n2026-10-23 v8.3.25 聊天历史按游标跨月跨年读取；未知未读数不广播为零。新增超级管理员单租户历史定位维护入口，显式排空写入后分批建立规范索引，保留原消息和冲突。所有服务节点需先升级宿主准入能力，安装应用不会自动迁移租户；未迁移租户继续兼容旧协议。保留既有平台提醒与租户 Hook。\n2026-10-22 v8.3.24 聊天消息按租户、年份数据库和月份集合保存；历史查询兼容旧年度集合，采用有界游标异步分页，跨月和跨年不中断。PC 与移动端滚动保留阅读位置，SignalR 仅向请求者回传历史。需配套 Core、MongoDB、API 与前端新版，应用包本身不替换二进制或清空历史数据。\n2026-10-21 v8.3.23 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。使用唯一源码与锁定依赖重新构建平台内置微服务，修复版本、源码清单、运行资产和启动恢复投影不一致，保留官方域名迁移、现有页面和历史路由。\n2026-10-20 v8.3.22 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。官方应用源和认证桥迁移到 api.microi.net；商城代理兼容旧官方域名并保留真实失败状态。\n2026-10-19 v8.3.21 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。个人中心首屏资料精简与页签按需加载，修复头像文件服务器地址\n2026-10-18 v8.3.20 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。同步平台微服务 v2.0.24 的完整源码回归修复与同源运行清单；运行界面与 v2.0.23 一致。\n2026-10-18 v8.3.19 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。个人中心修复顶部样式冲突，跟随宿主主题色、明暗模式和界面密度；SaaS 角色授权与连接弹窗共用 MCP 范围、创建修改、删除开关及并发版本，需 API/PC 8.5.13 与新版 MCP 工具。\n2026-10-17 v8.3.18 同步模块评论、日志和版本 Tab 自定义标题的三个可空物理列，保持共享表快照一致；不覆盖租户标题或其它业务配置。\n2026-10-13 v8.3.17 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。个人中心外部账号增加 Microi 官方账号标识与绑定入口说明，复用第三方账号绑定、解绑与安全回调契约。\n2026-10-09 v8.3.16 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。新增顶部加侧边导航偏好及框架修改密码弹窗，统一复用个人中心强身份校验流程\n2026-10-06 v8.3.15 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。推广中心正文、状态提示、选中菜单和按钮按真实明暗主题保持可读性，保留用户主色；通过真实平台主题控件验收。\n2026-10-06 v8.3.14 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。新增SaaS推广中心、真实子租户用量与登录统计、团队转化和试用跟进；推荐链接支持匿名验证码开通标准空库及幂等任务恢复。\n2026-09-30 v8.3.13 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。个人设置支持跟随系统的边角风格、导航位置和菜单子级展开方式；首页采用紧凑原生工作台。\n2026-09-29 v8.3.12 修复编辑已发布系统公告时保存草稿报 ToString 非函数，恢复保存后发布新版提醒的操作。\n2026-09-28 v8.3.11 官方开源版欢迎公告向每位有效 Level >= 9999 用户独立投递；接收资格不要求指定管理员角色，维护公告配置仍保留严格管理员权限。\n2026-09-28 v8.3.10 开源版缺失授权期限时不再将 0001-01-01 识别为企业版已到期；保留官方开源版欢迎公告按每次后端重启向各超级管理员分别投递。\n2026-09-26 v8.3.9 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。系统日志新增关键事故 MySQL 确认状态、等待阶段、峰值和线程池现场；保持既有长业务超时。\n2026-09-26 v8.3.8 官方和主租户授权提醒均按 UTC 显示到期日期，兼容带毫秒的授权；保留可配置提前天数、文案和每次登录回执。\n2026-09-26 v8.3.7 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。完善授权到期提醒设置的输入控件与加载互斥；保留官方和主租户分层策略及子租户授权字段。\n2026-09-26 v8.3.6 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。授权到期提醒支持官方与主租户分别配置个人版、企业版文案和提前天数；子租户授权版本与到期时间由主租户设置并受主授权约束。\n2026-09-14 v8.3.5 管理员每次新登录时提醒七天内到期或已到期的服务器授权；提醒与登录会话绑定，续签 Token 不重复弹出，并保留平台原有通知与阅读回执。\n2026-09-13 v1.1.4 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。同步平台微服务 v2.0.10；CDN 12类报表遵循各自参数协议，增加区域范围并完成真实接口验收。\n2026-09-13 v1.1.3 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。同步平台微服务 v2.0.9 与 CDN 实时日志兼容修复的源码快照；运行界面包含移动端分页优化。\n2026-09-13 v1.1.2 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。共享平台微服务更新至 v2.0.8，完善 CDN 监控与安全模块的移动端分页布局。\n2026-09-13 v1.1.1 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。共享平台微服务升级 v2.0.7，系统日志/监控新增 CDN 分析与安全；其他页面保持兼容。\n2026-09-10 v1.1.0 保留系统公告、业务通知、投递记录统一入口；修复真实 HTTP/MCP 的 JObject 通道适配器与 Jint 日期投影兼容，确保原 mic_msgset 新增、编辑、版本冲突和租户权限闭环。\n2026-09-10 v1.0.19 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。统一消息通知配置、系统公告与发送记录；保留原消息表，支持跨租户帐号范围、MCP 配置及 API 重启后首次登录提醒。\n2026-09-10 v1.0.18 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。系统提醒统一到系统引擎，移除 SaaS 提醒按钮、Tab 与嵌入组件，升级自动清理旧布局入口。\n2026-09-10 v1.0.17 平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。新增平台提醒管理页，包含 SaaS 表单内嵌、行/页面/批量入口及 SDK 兼容。\n2026-09-05 v1.0.16 修复导出器无条件混入未使用的工作流物理字段，基础应用在未安装工作流的旧租户也能独立安装；导入器兼容旧包，实际工作流资源和显式表依赖继续严格校验。发布前自动阻止同类未使用插件依赖。\n2026-09-02 v1.0.15 将 WebOS 菜单图标升级为 320×320 真透明 WebP，按系统、AI、表单、模块等语义分类交付，单图约 23–39KB；菜单默认优先显示图片并保留内置离线兜底，修复图标未居中、暗色底板和主题切换失真。\n2026-09-01 v1.0.14 聊天 Managed 运行时改为自包含时间能力，不再依赖租户全局 V8 中的 DateNow。\n2026-08-30 v1.0.13 完成 /api/DiyChat/SendSystemMessage 多路由、事务提交后实时投递与官方包追加式发布历史闭包。\n2026-08-30 v1.0.12 将 /api/DiyChat/SendSystemMessage 收入 platform-chat-system-message 多路由，并保留提交后实时投递契约。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.11 补齐 msg_event 依赖的微信模板消息 Managed 适配器；公众号密钥只在当前租户可信宿主读取，并在发送前调用 CreateIfMissing 个性化 Hook。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-26 v1.0.10 将全部官方 Managed 消息接口归一为 Platform 所有权，避免内置包重放时发生所有权降级冲突。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.9 修复 SignalR Hub 调用 StopHttp=1 聊天运行时被误判为 HTTP；Hub 使用绑定租户、固定 Key 和权威当前用户的一次性可信协议上下文，V8 原子消费后执行。\n2026-08-25 v1.0.8 修复聊天运行时与 AI 运行时跨应用稳定 Id 冲突；继续由 Managed V8 统一编排普通聊天消息、联系人、未读、历史、已读与删除。\n2026-08-25 v1.0.7 普通聊天消息、联系人、未读、历史、已读与删除业务迁入固定 Managed V8 运行时；旧 Hub/Controller 仅保留认证连接、协议与尽力投递。\n2026-08-25 v1.0.6 平台系统消息业务校验迁入 Managed V8 接口，并提供消息通知个性化 Hook。\n",
     "ChangeLog": {
-      "Version": "v8.6.11",
+      "Version": "v8.6.12",
       "Title": "通用平台提醒与 SaaS 系统提醒",
       "ChangeType": "Feature",
-      "Content": "平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。接通公开热点的完整日采集、MinIO可恢复复制和实际NAS下载选择，支持运行状态及暂停恢复；只在当前公开版本副本完整校验后分流。",
-      "ReleaseTime": "2026-10-26 03:17:09"
+      "Content": "平台提醒支持公告、试用到期、定时重复、单个/选中/全部子租户、当前租户用户及官方产品版本范围；内置管理界面、发布撤回与关闭回执随包交付。修复 NAS 实际分流管理接口的宿主元数据和旧版占位参数适配，保留严格业务参数与可信后端鉴权。",
+      "ReleaseTime": "2026-10-26 05:56:46"
     },
     "Description": "统一消息通知：系统公告、邮件/短信/微信/平台内部业务通知与投递记录；保留原配置，支持 MCP、跨租户帐号范围及后端重启后首次登录提醒。需要平台接收协议 2。",
     "JobCount": 1,
@@ -9023,7 +9023,7 @@
       "SchemaVersion": 2,
       "ApplicationType": "MicroService",
       "IncludeSource": false,
-      "VersionNo": "v2.0.30",
+      "VersionNo": "v2.0.31",
       "EntryPath": "index.html",
       "Application": {
         "Id": "01KX83R13GPCHWW8JZ0B7RS0DP",
@@ -9036,9 +9036,9 @@
         "Category": "tools",
         "PublisherType": "官方应用",
         "Description": "吾码平台内置微服务，包含系统日志/监控、系统设置、通知中心、AI 治理与应用商城等平台能力。",
-        "CurrentVersion": 89,
+        "CurrentVersion": 90,
         "EntryPath": "index.html",
-        "BuildVersion": "v2.0.30"
+        "BuildVersion": "v2.0.31"
       },
       "PackageAssets": {
         "SchemaVersion": 2,
@@ -9046,15 +9046,15 @@
         "AppKey": "microi-platform-service",
         "AppName": "吾码平台内置微服务",
         "ApplicationType": "MicroService",
-        "PackageVersion": "v2.0.30",
+        "PackageVersion": "v2.0.31",
         "IncludeSource": false,
-        "PreparedTime": "2026-10-26 03:31:58"
+        "PreparedTime": "2026-10-26 05:56:46"
       },
       "MicroService": {
         "Id": "01KX7M4M9F1KTKBT7YNTP4VH17",
         "ParentId": null,
         "CreateTime": "2026-07-11 11:39:34",
-        "UpdateTime": "2026-10-26 03:31:58",
+        "UpdateTime": "2026-10-26 05:56:46",
         "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
         "UserName": "管理员",
         "IsDeleted": 0,
@@ -9066,14 +9066,14 @@
         "IsEnable": 1,
         "StorageMode": "db",
         "Runtime": "micro-app",
-        "BuildVersion": "v2.0.30",
+        "BuildVersion": "v2.0.31",
         "EntryPath": "index.html",
-        "AssetManifestJson": "{\"SchemaVersion\":2,\"MsKey\":\"microi-platform-service\",\"BuildVersion\":\"v2.0.30\",\"EntryPath\":\"index.html\",\"StorageMode\":\"db\",\"PublishStatus\":\"Published\",\"VerificationStatus\":\"Verified\",\"RequestId\":\"e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839\",\"DeliveryBatchId\":\"database-e2df41a2b2cc5977f2deafc8\",\"SourceManifestHash\":\"918eaa71734c265bd49a497011d7c90db793a0453cee5e8eca466823e7fb9f5c\",\"RuntimeManifestHash\":\"e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839\",\"VerifiedAt\":\"2026-10-25T19:31:58.396Z\",\"PublishedAt\":\"2026-10-25T19:31:58.396Z\",\"Assets\":[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-D430wMWI.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/index-D430wMWI.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-D430wMWI.js\",\"Sha256\":\"a9c6a9f5cf7cdf933d5c20487129e29468a41e7ebe6f00c248311fb1933e6778\",\"Size\":639119,\"IsEntry\":false},{\"Path\":\"assets/index-SVQmpC2m.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/index-SVQmpC2m.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-SVQmpC2m.css\",\"Sha256\":\"f2bfa604f32947bcea4265f6468a860ac78eb64d742e41aee2d43f8c690b4ce1\",\"Size\":254755,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"6958cc30de5e2a5949c481c48ffa346dbe65bafae156966069cb00ea2fdd36d6\",\"Size\":383,\"IsEntry\":true}]}",
-        "AssetsJson": "[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-D430wMWI.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/index-D430wMWI.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-D430wMWI.js\",\"Sha256\":\"a9c6a9f5cf7cdf933d5c20487129e29468a41e7ebe6f00c248311fb1933e6778\",\"Size\":639119,\"IsEntry\":false},{\"Path\":\"assets/index-SVQmpC2m.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/assets/index-SVQmpC2m.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-SVQmpC2m.css\",\"Sha256\":\"f2bfa604f32947bcea4265f6468a860ac78eb64d742e41aee2d43f8c690b4ce1\",\"Size\":254755,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.30/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"6958cc30de5e2a5949c481c48ffa346dbe65bafae156966069cb00ea2fdd36d6\",\"Size\":383,\"IsEntry\":true}]",
+        "AssetManifestJson": "{\"SchemaVersion\":2,\"MsKey\":\"microi-platform-service\",\"BuildVersion\":\"v2.0.31\",\"EntryPath\":\"index.html\",\"StorageMode\":\"db\",\"PublishStatus\":\"Published\",\"VerificationStatus\":\"Verified\",\"RequestId\":\"e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839\",\"DeliveryBatchId\":\"database-e2df41a2b2cc5977f2deafc8\",\"SourceManifestHash\":\"7a67c647b8d703d616eb6b3a2a0fca3ec64bd8f4a6b877454bbca769f000be82\",\"RuntimeManifestHash\":\"e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839\",\"VerifiedAt\":\"2026-10-25T21:56:46.925Z\",\"PublishedAt\":\"2026-10-25T21:56:46.925Z\",\"Assets\":[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-D430wMWI.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/index-D430wMWI.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-D430wMWI.js\",\"Sha256\":\"a9c6a9f5cf7cdf933d5c20487129e29468a41e7ebe6f00c248311fb1933e6778\",\"Size\":639119,\"IsEntry\":false},{\"Path\":\"assets/index-SVQmpC2m.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/index-SVQmpC2m.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-SVQmpC2m.css\",\"Sha256\":\"f2bfa604f32947bcea4265f6468a860ac78eb64d742e41aee2d43f8c690b4ce1\",\"Size\":254755,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"6958cc30de5e2a5949c481c48ffa346dbe65bafae156966069cb00ea2fdd36d6\",\"Size\":383,\"IsEntry\":true}]}",
+        "AssetsJson": "[{\"Path\":\"assets/identity-tech-banner-y2L2yjQI.jpg\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/identity-tech-banner-y2L2yjQI.jpg\",\"StableFilePathName\":\"database://microi-platform-service/assets/identity-tech-banner-y2L2yjQI.jpg\",\"Sha256\":\"dee5a936e38fddea1d1b5b7ed0a25c4ecca37af00f2730a14e043a9e2ecd4470\",\"Size\":21309,\"IsEntry\":false},{\"Path\":\"assets/index-D430wMWI.js\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/index-D430wMWI.js\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-D430wMWI.js\",\"Sha256\":\"a9c6a9f5cf7cdf933d5c20487129e29468a41e7ebe6f00c248311fb1933e6778\",\"Size\":639119,\"IsEntry\":false},{\"Path\":\"assets/index-SVQmpC2m.css\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/assets/index-SVQmpC2m.css\",\"StableFilePathName\":\"database://microi-platform-service/assets/index-SVQmpC2m.css\",\"Sha256\":\"f2bfa604f32947bcea4265f6468a860ac78eb64d742e41aee2d43f8c690b4ce1\",\"Size\":254755,\"IsEntry\":false},{\"Path\":\"index.html\",\"FilePathName\":\"database://microi-platform-service/v2.0.31/index.html\",\"StableFilePathName\":\"database://microi-platform-service/index.html\",\"Sha256\":\"6958cc30de5e2a5949c481c48ffa346dbe65bafae156966069cb00ea2fdd36d6\",\"Size\":383,\"IsEntry\":true}]",
         "DistHash": "e2df41a2b2cc5977f2deafc80eb0295e1a3e4496ebb88c45d30d5def3bf47839",
         "AssetCount": 4,
         "TotalSize": "915566",
-        "PublishTime": "2026-10-26 03:31:58",
+        "PublishTime": "2026-10-26 05:56:46",
         "SourceDirName": "microi-platform-service",
         "Description": "吾码平台内置微服务，包含系统日志/监控、系统设置、通知中心、AI 治理与应用商城等平台能力。",
         "ApplicationType": "MicroService",
@@ -9091,7 +9091,7 @@
         {
           "Id": "01KX7MMJ87YGBR5EGDCQFTAV4F",
           "CreateTime": "2026-07-11 11:48:16",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9106,14 +9106,14 @@
           "Sort": 0,
           "IsHome": 1,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "01M1GNGE3Y1FC6AZW5VZ40SRAV",
           "CreateTime": "2026-09-02 16:59:26",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9128,14 +9128,14 @@
           "Sort": 5,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "01KX97ZHMHX2N0FXKNGRN23EA0",
           "CreateTime": "2026-07-12 02:45:33",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9150,14 +9150,14 @@
           "Sort": 10,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "01KXABNS7FXQJA9RXS0YZQVPWD",
           "CreateTime": "2026-07-12 13:09:22",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9172,14 +9172,14 @@
           "Sort": 20,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "01KXFKK980Z5R7ZZ0YC9FW8NNR",
           "CreateTime": "2026-07-14 14:04:01",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9194,14 +9194,14 @@
           "Sort": 30,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "01KXZVECA6K94XGMPR34PHM1GB",
           "CreateTime": "2026-07-20 21:28:59",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9216,14 +9216,14 @@
           "Sort": 40,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "01KYYXF1K4DT636M8PG5JMG3JX",
           "CreateTime": "2026-08-01 23:00:46",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9238,14 +9238,14 @@
           "Sort": 50,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "01KZE1QMR9ECSKD6SSH9BGN7J8",
           "CreateTime": "2026-08-07 20:03:58",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9260,14 +9260,14 @@
           "Sort": 60,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "01M0Q426CH7C2QE05B1703FEB4",
           "CreateTime": "2026-08-23 18:53:33",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9282,7 +9282,7 @@
           "Sort": 70,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{\"LegacyMenuUrls\":[\"/syslog\",\"/mic-system-monitor\"],\"RetireLegacyMenus\":true}",
           "SourceDirName": "microi-platform-service",
           "LegacyMenuUrls": [
@@ -9294,7 +9294,7 @@
         {
           "Id": "mcimp-4d6a83fb5b62e2fdf7166643e0aa8f",
           "CreateTime": "2026-08-17 04:18:15",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9309,7 +9309,7 @@
           "Sort": 80,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{\"LegacyMenuUrls\":[\"/microi-store\"]}",
           "SourceDirName": "microi-platform-service",
           "LegacyMenuUrls": [
@@ -9319,7 +9319,7 @@
         {
           "Id": "mcimp-316005bd6c6da9f1dd6f154b8d9368",
           "CreateTime": "2026-09-06 15:24:39",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9334,14 +9334,14 @@
           "Sort": 90,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "CDD88892FE52FE2A73C09FEFD4",
           "CreateTime": "2026-09-10 10:23:30",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9356,7 +9356,7 @@
           "Sort": 100,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{\"LegacyMenuUrls\":[\"/xiaoxitongzhisz\"],\"RetireLegacyMenus\":true,\"SourceFile\":\"src/PlatformReminders.vue\"}",
           "SourceDirName": "microi-platform-service",
           "LegacyMenuUrls": [
@@ -9367,7 +9367,7 @@
         {
           "Id": "34B2312CB68063853977DD0FFC",
           "CreateTime": "2026-10-06 01:35:30",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9382,14 +9382,14 @@
           "Sort": 110,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{\"SourceFile\":\"src/SaasPromotion.vue\"}",
           "SourceDirName": "microi-platform-service"
         },
         {
           "Id": "439499DA2B58356E5880CC09B0",
           "CreateTime": "2026-10-06 01:35:30",
-          "UpdateTime": "2026-10-26 03:31:58",
+          "UpdateTime": "2026-10-26 05:56:46",
           "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
           "UserName": "管理员",
           "IsDeleted": 0,
@@ -9404,7 +9404,7 @@
           "Sort": 120,
           "IsHome": 0,
           "IsEnable": 1,
-          "BuildVersion": "v2.0.30",
+          "BuildVersion": "v2.0.31",
           "RouteMetaJson": "{\"Anonymous\":true,\"SourceFile\":\"src/SaasPublicTrial.vue\"}",
           "SourceDirName": "microi-platform-service"
         }
