@@ -5,14 +5,14 @@ import {readFile,readdir,mkdir,writeFile,stat} from 'node:fs/promises';
 import {resolve,dirname,relative,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {freemem,totalmem} from 'node:os';
-import {fingerprintPanelSource,verifyPanelGate,legacyScripts,sha256,compareGeneratedEndpoints} from './panel-gate-contract.mjs';
+import {fingerprintPanelSource,verifyPanelGate,verifyHostNginxEvidence,verifyLinuxInstallEvidence,verifySecurityEvidence,securitySourcePaths,hostNginxSourcePaths,legacyScripts,sha256,compareGeneratedEndpoints} from './panel-gate-contract.mjs';
 import {discoverTests,assertTestSummary} from '../run-node-regressions.mjs';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../../..');
 const parameters=new Map();
 for(let i=2;i<process.argv.length;i+=2){assert(process.argv[i]?.startsWith('--')&&process.argv[i+1],'Every gate option requires a value');parameters.set(process.argv[i].slice(2),process.argv[i+1]);}
 const stage=(parameters.get('stage')||'verify').toLowerCase();
-assert(['bind','unit','core','acme','plugins','legacy','linux','verify'].includes(stage),'Unknown Panel gate stage');
+assert(['bind','unit','core','acme','security','plugins','legacy','linux','verify'].includes(stage),'Unknown Panel gate stage');
 const directory=resolve(parameters.get('results')||resolve(root,'.tmp/panel-acceptance/gate'));
 assert(directory.startsWith(resolve(root,'.tmp')+sep),'Panel gate output must stay in the workspace .tmp directory');
 await mkdir(directory,{recursive:true});
@@ -30,15 +30,17 @@ assert.equal(image.Config.Labels['io.microi.panel.controller'],'true');
 const imageId=image.Id;
 const fingerprint=await fingerprintPanelSource(root);
 const bindingFile=resolve(directory,'candidate-binding.json');
-let binding;
+const hostNginxBindings=['linux','verify'].includes(stage)
+ ?Object.fromEntries(await Promise.all(Object.entries(hostNginxSourcePaths).map(async([key,path])=>[key,sha256(await readFile(resolve(root,path)))]))):null;
+let binding,securityBindings;
 
 function stopTree(child){
  if(!child.pid)return;
  if(process.platform==='win32')execFileSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});
  else process.kill(-child.pid,'SIGTERM');
 }
-async function run(name,file,args,{cwd=root,env={}}={}){
- assert(freemem()>reserve+384*1024**2,'Insufficient physical memory for the next serial gate process');
+async function run(name,file,args,{cwd=root,env={},extraMemory=384*1024**2}={}){
+ assert(freemem()>reserve+extraMemory,'Insufficient physical memory for the next serial gate process');
  const path=resolve(directory,name+'.log'),stream=createWriteStream(path);
  const child=spawn(file,args,{cwd,env:{...process.env,...env},windowsHide:true,detached:process.platform!=='win32'});
  let output='',reason='',checking=false;
@@ -102,6 +104,13 @@ if(stage==='bind'){
  await save(bindingFile,binding);console.log('PASS candidate code/assets match freshly compiled source: '+files.length+' files; generated timestamp manifests: '+generatedTimestamps.length);process.exit(0);
 }
 binding=await json(bindingFile);assert.equal(binding.completed,true);assert.equal(binding.sourceHash,fingerprint.sha256,'Candidate source changed; bind/retest the new candidate');assert.equal(binding.imageId,imageId,'Different candidate image');
+if(['security','verify'].includes(stage)){
+ const files=(await readdir(resolve(root,securitySourcePaths.guard))).filter(name=>name.endsWith('.py')).sort();
+ const guardHashes=Object.fromEntries(await Promise.all(files.map(async name=>[name,sha256(await readFile(resolve(root,securitySourcePaths.guard,name)))])));
+ const imageHashes=Object.fromEntries(binding.files.filter(file=>/^AuthGuard\/[^/]+\.py$/.test(file.path)).map(file=>[file.path.slice('AuthGuard/'.length),file.sha256]));
+ assert.deepEqual(guardHashes,imageHashes,'Authentication suite must execute the exact AuthGuard bytes exported from the bound candidate image');
+ securityBindings={guardHashes,runnerSha256:sha256(await readFile(resolve(root,securitySourcePaths.runner)))};
+}
 const environment={PANEL_TEST_IMAGE:imageId,PANEL_TEST_RESULTS:directory,PANEL_RUN_ID:runId,PANEL_MATRIX_RUN_ID:runId,PANEL_LEGACY_RUN_ID:runId};
 if(stage==='unit'){
  const trx=resolve(directory,'panel-unit.trx');
@@ -119,7 +128,11 @@ if(stage==='unit'){
  const guard=await run('unit-auth-guard',parameters.get('python')||(process.platform==='win32'?'python':'python3'),['-B','-m','unittest','discover','-s','Microi.Server/Microi.Panel/AuthGuard/tests','-p','test_*.py'],{env:{PYTHONUTF8:'1'}});
  const guardCount=Number(guard.output.match(/Ran (\d+) tests? in /)?.[1]);assert(guardCount>0&&/^OK\s*$/m.test(guard.output));
  assert(!/skipped=|expected failures=|unexpected successes=/i.test(guard.output),'AuthGuard unit suite has skipped or non-passing outcomes');
- await receipt({checks:values.total+nodeCounts.tests+legacyCount+securityCount+guardCount,counts:{csharp:values.total,node:nodeCounts.tests,legacy:legacyCount,security:securityCount,authGuard:guardCount}},[trx,nodeResult.path,legacy.path,security.path,guard.path]);
+ // 独立清理服务的保留、容量与失败语义属于正式候选门禁，不能只在交付时手工单跑。
+ const maintenance=await run('unit-host-maintenance',parameters.get('python')||(process.platform==='win32'?'python':'python3'),['-B','-m','unittest','discover','-s','Microi.Server/Microi.Panel/HostMaintenance/tests','-p','test_*.py'],{env:{PYTHONUTF8:'1'}});
+ const maintenanceCount=Number(maintenance.output.match(/Ran (\d+) tests? in /)?.[1]);assert(maintenanceCount>0&&/^OK\s*$/m.test(maintenance.output));
+ assert(!/skipped=|expected failures=|unexpected successes=/i.test(maintenance.output),'Host maintenance suite has skipped or non-passing outcomes');
+ await receipt({checks:values.total+nodeCounts.tests+legacyCount+securityCount+guardCount+maintenanceCount,counts:{csharp:values.total,node:nodeCounts.tests,legacy:legacyCount,security:securityCount,authGuard:guardCount,hostMaintenance:maintenanceCount}},[trx,nodeResult.path,legacy.path,security.path,guard.path,maintenance.path]);
 }else if(stage==='core'){
  const work=resolve(directory,runId);let owner;
  try{
@@ -127,12 +140,32 @@ if(stage==='unit'){
   const context=await json(resolve(work,'context.json'));owner=context.owner;
   await node('core-browser','Microi.Server/Microi.Tests/Panel/panel-browser.e2e.mjs',{...environment,PANEL_BROWSER_CONTEXT:resolve(work,'context.json')});
   const entryDirectory=resolve(directory,runId+'-entry');await node('core-platform-entry','Microi.Server/Microi.Tests/Panel/panel-platform-entry.e2e.mjs',{...environment,PANEL_TEST_RESULTS:entryDirectory});
-  const paths=[resolve(work,'report.json'),await childReport(work,'browser-'),await childReport(entryDirectory,'platform-entry-')];const reports=await Promise.all(paths.map(json));for(const r of reports)assert.equal(r.completed,true);assert.equal(reports[0].panelImageId,imageId);
-  const counts=Object.fromEntries(['docker','browser','platformEntry'].map((key,i)=>[key,reports[i].passed.length]));await receipt({checks:Object.values(counts).reduce((a,b)=>a+b),counts},paths);
+  const hostUiDirectory=resolve(directory,runId+'-host-ui');
+  await node('core-host-nginx-ui','Microi.Server/Microi.Tests/Panel/panel-host-nginx-ui.e2e.mjs',{...environment,PANEL_TEST_RESULTS:hostUiDirectory});
+  const httpSecurityDirectory=resolve(directory,runId+'-http-security');
+  await run('core-http-security',process.execPath,[resolve(root,'Microi.Server/Microi.Panel/Tests/Security/http-security.e2e.mjs'),httpSecurityDirectory],{env:environment});
+  const paths=[resolve(work,'report.json'),await childReport(work,'browser-'),await childReport(entryDirectory,'platform-entry-'),resolve(hostUiDirectory,'report.json'),resolve(httpSecurityDirectory,'http-ui-report.json')];const reports=await Promise.all(paths.map(json));for(const r of reports)assert.equal(r.completed,true);assert.equal(reports[0].panelImageId,imageId);
+  const counts=Object.fromEntries(['docker','browser','platformEntry','hostNginxUi','httpSecurity'].map((key,i)=>[key,(i===4?reports[i].passes:reports[i].passed).length]));await receipt({checks:Object.values(counts).reduce((a,b)=>a+b),counts},paths);
  }finally{if(!owner)try{owner=(await json(resolve(work,'report.json'))).owner;}catch{}await cleanup(runId,owner);}
 }else if(stage==='acme'){
  try{await node('acme','Microi.Server/Microi.Tests/Panel/panel-acme.e2e.mjs',environment);const path=resolve(directory,runId,'report.json'),r=await json(path);assert.equal(r.completed,true);await receipt({checks:r.passed.length},[path]);}
  finally{let owner;try{owner=(await json(resolve(directory,runId,'context.json'))).owner;}catch{}await cleanup(runId,owner);}
+}else if(stage==='security'){
+ // 此阶段是四种真实认证的隔离网络回归；不能替代 Linux 宿主 systemd/重启和双顺序共存验收。
+ const imageFile=parameters.get('security-images');assert(imageFile,'Security requires --security-images with four explicit cached sha256 IDs; no default tools build or pull');
+ const images=await json(resolve(imageFile));assert.deepEqual(Object.keys(images).sort(),['mongodb','mysql','redis','tools']);
+ for(const [kind,id] of Object.entries(images)){
+  assert.match(id,/^sha256:[a-f0-9]{64}$/,'Security requires a full immutable image ID for '+kind);
+  const cached=JSON.parse(docker(['image','inspect',id]))[0];assert.equal(cached.Id,id);assert.equal(cached.Os,'linux');
+ }
+ const work=resolve(directory,runId);await mkdir(work,{recursive:false});
+ await save(resolve(work,'owner.json'),{owner:runId,purpose:'explicit isolated authentication network acceptance',createdAt:new Date().toISOString()});
+ const inputs={imageId,sourceHash:fingerprint.sha256,...securityBindings,images},inputsPath=resolve(work,'security-inputs.json');await save(inputsPath,inputs);
+ const args=['-B',resolve(root,securitySourcePaths.runner),'--scratch',work,'--candidate-binding',inputsPath,'--phases','ssh,redis,mongodb,mysql'];
+ for(const [kind,id] of Object.entries(images))args.push('--'+kind+'-image',id);
+ const result=await run('security-network',parameters.get('python')||(process.platform==='win32'?'python':'python3'),args,{env:{PYTHONUTF8:'1'},extraMemory:2*1024**3});
+ const file=await childReport(work,'lab-'),report=await json(file),verified=verifySecurityEvidence(report,inputs);
+ await receipt({...verified,networkEvidence:{file:relative(root,file).replaceAll('\\','/'),inputsFile:relative(root,inputsPath).replaceAll('\\','/'),inputs,report}},[file,inputsPath,result.path]);
 }else if(stage==='plugins'){
  const ids=parameters.get('plugins');assert(ids,'Specify the exact comma-separated plugin families for this resource-bounded shard');
  try{await node('plugins-'+stamp,'Microi.Server/Microi.Tests/Panel/panel-plugin-matrix.e2e.mjs',{...environment,PANEL_PLUGIN_IDS:ids});
@@ -152,21 +185,42 @@ if(stage==='unit'){
  }await receipt({checks,scripts:legacyScripts},paths);}finally{await cleanup(runId);}
 }else if(stage==='linux'){
  const file=parameters.get('linux-evidence');assert(file,'Linux requires real isolated-host evidence for both installation orders');const inputs=await json(resolve(file));
- assert.equal(inputs.length,2);let checks=0;const paths=[resolve(file)];
+ assert.equal(inputs.length,2);assert.deepEqual(inputs.map(item=>item.order).sort(),['baota-onepanel-panel','panel-baota-onepanel']);let checks=0;const paths=[resolve(file)],hostNginxEvidence=[],installEvidence=[];
  for(const input of inputs){
   const path=resolve(input.report),r=await json(path);paths.push(path);assert(r.runId&&r.baseline);
-  for(const phase of input.order==='panel-baota-onepanel'?['baseline','after-baota','after-1panel','post-reboot']:['baseline','post-reboot']){const p=r.phases[phase];assert.equal(p?.completed,true,phase);assert(binding.repoDigests.some(d=>d.includes(p.state.imageDigest))||p.state.imageDigest===imageId,'Linux ran a different image');checks+=p.passed.length;}
-  for(const browserPath of input.browserReports){const p=await json(resolve(browserPath));assert.equal(p.completed,true);assert.equal(p.runId,r.runId);assert(p.passed.includes('real BaoTa browser login page remains usable'));assert(p.passed.includes('real 1Panel browser login page remains usable'));checks+=p.passed.length;paths.push(resolve(browserPath));}
-  assert(input.browserReports.length>=2,'Require browser before and after reboot');
+  const browsers=[];for(const browserPath of input.browserReports){const absolute=resolve(browserPath);browsers.push({file:relative(root,absolute).replaceAll('\\','/'),report:await json(absolute)});paths.push(absolute);}
+  checks+=verifyLinuxInstallEvidence(r,browsers,{order:input.order,imageId,repoDigests:binding.repoDigests}).checks;
+  installEvidence.push({order:input.order,file:relative(root,path).replaceAll('\\','/'),report:r,browsers});
   if(input.order==='baota-onepanel-panel'){
    const neighborPath=resolve(input.neighborReport),n=await json(neighborPath);for(const phase of ['before-panel','after-panel','post-reboot']){assert.equal(n.phases[phase]?.completed,true);checks+=n.phases[phase].passed.length;}assert.notEqual(n.phases['post-reboot'].state.bootId,n.baseline.bootId);paths.push(neighborPath);
    const upgradePath=resolve(input.upgradeReport),u=await json(upgradePath);assert.equal(u.completed,true);assert.equal(u.originalImageId,imageId);assert.equal(u.finalImageId,imageId);assert(u.passed.length>=4);assert.equal(u.installerSha256,sha256(await readFile(resolve(root,'数据库、案例、文档、资料/install-microi-panel.sh'))));checks+=u.passed.length;paths.push(upgradePath);
   }
+  assert(input.hostNginxReport&&input.externalAcmeReceipt,'Each installation order requires actual hostNginxReport and externalAcmeReceipt files');
+  const hostPath=resolve(input.hostNginxReport),externalPath=resolve(input.externalAcmeReceipt);
+  const report=await json(hostPath),externalAcmeReceipt=await json(externalPath),externalAcmeReceiptSha256=sha256(await readFile(externalPath));
+  const verified=verifyHostNginxEvidence(report,externalAcmeReceipt,{sourceHash:fingerprint.sha256,imageId,...hostNginxBindings},externalAcmeReceiptSha256,r.runId);
+  checks+=verified.checks;paths.push(hostPath,externalPath);
+  hostNginxEvidence.push({order:input.order,runId:r.runId,hostNginxReportFile:relative(root,hostPath).replaceAll('\\','/'),externalAcmeReceiptFile:relative(root,externalPath).replaceAll('\\','/'),report,externalAcmeReceipt,externalAcmeReceiptSha256});
  }
- await receipt({checks,installOrders:inputs.map(x=>x.order),realThirdPartyPanels:true,rebootVerified:true},paths);
+ await receipt({checks,installOrders:inputs.map(x=>x.order),realThirdPartyPanels:true,rebootVerified:true,repoDigests:binding.repoDigests,installEvidence,hostNginxEvidence},paths);
 }else if(stage==='verify'){
  const files=(await readdir(directory)).filter(f=>f.endsWith('-receipt.json'));const receipts=await Promise.all(files.map(f=>json(resolve(directory,f))));
  for(const r of receipts)for(const proof of r.evidence){const bytes=await readFile(resolve(root,proof.file));assert.equal(sha256(bytes),proof.sha256,'Acceptance evidence was modified: '+proof.file);assert.equal(bytes.length,proof.size);}
- const result=verifyPanelGate(receipts,{sourceHash:fingerprint.sha256,imageId,catalog:await json(resolve(directory,'candidate-catalog.json'))});
+ for(const item of receipts.find(r=>r.stage==='linux')?.installEvidence||[]){
+  assert.deepEqual(await json(resolve(root,item.file)),item.report,'Installation report differs from its evidence file');
+  for(const browser of item.browsers)assert.deepEqual(await json(resolve(root,browser.file)),browser.report,'Browser report differs from its evidence file');
+ }
+ for(const item of receipts.find(r=>r.stage==='linux')?.hostNginxEvidence||[]){
+  // 再读原文件，而非信任某次汇总留下的绿灯或手工换入的旧报告正文。
+  assert.deepEqual(await json(resolve(root,item.hostNginxReportFile)),item.report,'Host report differs from the actual evidence file');
+  const bytes=await readFile(resolve(root,item.externalAcmeReceiptFile));assert.equal(sha256(bytes),item.externalAcmeReceiptSha256);
+  assert.deepEqual(JSON.parse(bytes.toString('utf8').replace(/^\uFEFF/,'')),item.externalAcmeReceipt,'External SSL receipt differs from the actual evidence file');
+ }
+ const network=receipts.find(r=>r.stage==='security')?.networkEvidence;
+ if(network){
+  assert.deepEqual(await json(resolve(root,network.file)),network.report,'Authentication network report differs from its actual evidence file');
+  assert.deepEqual(await json(resolve(root,network.inputsFile)),network.inputs,'Authentication frozen inputs differ from their actual evidence file');
+ }
+ const result=verifyPanelGate(receipts,{sourceHash:fingerprint.sha256,imageId,catalog:await json(resolve(directory,'candidate-catalog.json')),hostNginxBindings,securityBindings});
  await save(resolve(directory,'panel-gate-completed.json'),{...result,finishedAt:new Date().toISOString(),binding:await evidence(bindingFile),receipts:await Promise.all(files.map(f=>evidence(resolve(directory,f))))});console.log(JSON.stringify(result));
 }

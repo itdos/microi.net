@@ -3241,9 +3241,9 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "f38521daa43ae0d1b017f8a1e9cc13b22f3a5aec31e4f01482f2db0acbc35542",
+      "originalSha256": "dd5a43a6ca3b0f69c427977926ce2847dea3f94d897954a98692698eba11ba1b",
       "originalLines": 732,
-      "prefixSha256": "f42cd32cfd8ff7bbe7ac8892aeba19f0806657f9fe9e6f45ecc95831071e6a60",
+      "prefixSha256": "00b7ba872178481cebc706075eb04fee8160b9fcad3941c4b65be9780ddbaa75",
       "prefixBytes": 19369,
       "entryLines": 193,
       "chunks": [

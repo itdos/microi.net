@@ -13,6 +13,7 @@ import http.client
 import http.cookiejar
 import json
 import os
+import re
 from pathlib import Path
 import ssl
 import subprocess
@@ -31,7 +32,8 @@ parser.add_argument('--retry-failed', action='store_true')
 args = parser.parse_args()
 assert os.geteuid() == 0, 'This isolated-host test requires root'
 assert Path('/var/lib/panel-acceptance-id').read_text().strip() == args.run_id, 'Lab host identity mismatch'
-assert args.phase.replace('-', '').isalnum(), 'Invalid phase'
+assert args.phase in ('baseline', 'after-baota', 'after-1panel', 'post-reboot'), 'Invalid phase'
+assert re.fullmatch(r'sha256:[a-f0-9]{64}', args.image_digest), 'A complete immutable candidate digest is required'
 root, work = Path(args.root), Path(args.work)
 work.mkdir(parents=True, exist_ok=True, mode=0o700)
 os.chmod(work, 0o700)
@@ -82,7 +84,12 @@ try:
         assert response.status == expected, f'{path}: expected {expected}, got {response.status}: {body[:1200]}'
         return json.loads(body) if body else {}
 
-    assert api('/health')['version'] == '2.0.0'
+    # 版本必须绑定本次实际镜像，不能因旧发行常量阻止新候选，也不能删掉版本验收。
+    controller = json.loads(command('docker', 'inspect', 'microi-panel'))[0]
+    image = json.loads(command('docker', 'image', 'inspect', controller['Image']))[0]
+    expected_version = image.get('Config', {}).get('Labels', {}).get('org.opencontainers.image.version')
+    assert isinstance(expected_version, str) and expected_version.strip(), 'Candidate OCI version label is required'
+    assert api('/health')['version'] == expected_version, 'Running health version differs from the immutable candidate image'
     api('/ops-api/panel/snapshot', expected=401)
     passed('Independent HTTPS validates its installed certificate and rejects anonymous host access')
     csrf = api('/ops-api/session')['csrfToken']
@@ -94,10 +101,9 @@ try:
     assert len(catalog) >= 10
     passed('Generated independent account logs in and reads the real Docker plugin catalog')
 
-    controller = json.loads(command('docker', 'inspect', 'microi-panel'))[0]
-    image = json.loads(command('docker', 'image', 'inspect', controller['Image']))[0]
-    image_digests = [controller['Image'], image['Id'], *image.get('RepoDigests', [])]
-    assert any(args.image_digest in value for value in image_digests), 'Installed image differs from the candidate'
+    image_digests = {controller['Image'], image['Id']}
+    image_digests.update(value.rsplit('@', 1)[-1] for value in image.get('RepoDigests', []) if '@' in value)
+    assert args.image_digest in image_digests, 'Installed image differs from the exact immutable candidate'
     assert controller['Config']['Labels']['io.microi.panel.controller'] == 'true'
     assert controller['State']['Health']['Status'] == 'healthy'
     assert controller['HostConfig']['Memory'] == 512 * 1024 * 1024
@@ -154,7 +160,15 @@ try:
     for step, operation_id in record['operations'].items():
         assert api('/ops-api/panel/operations/' + operation_id)['state'] == 'Succeeded', 'Durable operation history changed: ' + step
     passed('Real Nginx site, persisted file and original operation history remain available')
-    state = {'configHashes': configs, 'dockerEngineId': engine_id, 'controllerId': controller['Id'], 'imageDigest': args.image_digest,
+    boot_id = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+    boot_started = int(next(line.split()[1] for line in Path('/proc/stat').read_text().splitlines() if line.startswith('btime ')))
+    assert re.fullmatch(r'[a-f0-9-]{36}', boot_id)
+    if args.phase == 'post-reboot':
+        assert boot_id != record['baseline']['bootId'], 'Host reboot did not occur'
+        assert boot_started > record['baseline']['bootStartedAt'], 'Host boot timestamp did not advance'
+        passed('Kernel boot identity independently confirms an actual host reboot')
+    state = {'configHashes': configs, 'dockerEngineId': engine_id, 'controllerId': controller['Id'], 'imageDigest': args.image_digest, 'imageId': image['Id'], 'imageVersion': expected_version,
+             'bootId': boot_id, 'bootStartedAt': boot_started,
              'ownerId': latest['ownerId'], 'gatewayId': gateway['Id'], 'fileHash': file['hash'], 'origin': origin,
              'dockerVersion': command('docker', 'version', '--format', '{{.Server.Version}}'), 'composeVersion': command('docker', 'compose', 'version', '--short')}
     if args.phase == 'baseline':

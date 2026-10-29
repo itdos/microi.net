@@ -9,6 +9,8 @@ public static class PanelEndpoints
         api.MapGet("/catalog", () => Results.Ok(PanelCatalog.All));
         api.MapGet("/acme",(PanelRepository repository)=>Results.Ok(repository.AcmeRegistrations().Select(x=>x.Public())));
         api.MapPost("/acme",(PanelAcmeRequest request,PanelAcme acme,HttpContext ctx)=>Results.Accepted(value:acme.Issue(request,ctx.User.Identity!.Name!)));
+        api.MapPost("/acme/external", (PanelExternalAcmeRequest request, PanelAcme acme, HttpContext ctx) =>
+            Results.Accepted(value: acme.ExternalIssue(request, ctx.User.Identity!.Name!)));
         api.MapPost("/acme/{id}/policy",(string id,PanelAcmePolicy request,PanelRepository repository,HttpContext ctx,OpsAudit audit)=>
         {var result=repository.SaveAcmePolicy(id,request);audit.Write("AcmePolicySaved",ctx.User.Identity!.Name!,id+"："+(request.Enabled?"自动续期":"已暂停"));return Results.Ok(result);});
         api.MapGet("/schedules",(PanelRepository repository)=>Results.Ok(repository.Schedules().Select(x=>new {schedule=x,operation=x.LastOperationId.Length==0?null:repository.Operation(x.LastOperationId)})));

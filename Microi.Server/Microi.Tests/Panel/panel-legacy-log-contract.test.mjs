@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {currentPlatformEvent,currentPlatformLog} from '../../Microi.Panel/Tests/platform-log-contract.mjs';
+const event={eventId:'c4d7817e50f549daa2043e97845571a8',deploymentId:'ops-e2e',action:'PlatformConnected',occurredAt:'2026-10-26T16:15:30Z',message:'Connected',success:true};
+const scope={runId:'panel-gate-legacy-20261026160926',deploymentId:'ops-e2e',lastSync:'2026-10-26T16:15:32Z'};
+const persistedId='audit_'+createHash('sha256').update('Microi.Ops|itdos|ops-e2e|'+event.eventId).digest('hex').slice(0,40);
+const row={Id:persistedId,EventId:persistedId,OtherInfo:'OpsEventId='+event.eventId,NodeId:'ops-e2e',Action:'PlatformConnected',Content:'Connected',Success:true,Category:'Operations',Source:'Microi.Ops',Type:'Microi.Ops'};
+test('current run event maps to its exact independent Mongo log row',()=>{assert.equal(currentPlatformEvent([event],scope),event);assert.equal(currentPlatformLog([row],event,'iTdos').persistedId,'audit_65d5088503db78a41d2d34985a484c8ded1792f7');});
+test('earlier run, wrong deployment and unacknowledged events cannot supply current evidence',()=>{for(const bad of [{...event,occurredAt:'2026-10-26T16:00:00Z'},{...event,deploymentId:'other'},{...event,occurredAt:'2026-10-26T16:16:00Z'}])assert.throws(()=>currentPlatformEvent([bad],scope));});
+test('arbitrary historical Ops row cannot satisfy current EventId',()=>assert.throws(()=>currentPlatformLog([{...row,OtherInfo:'OpsEventId='+('a'.repeat(32))}],event,'iTdos')));
+test('wrong tenant digest and duplicate durable rows fail independently',()=>{assert.throws(()=>currentPlatformLog([row],event,'other'));assert.throws(()=>currentPlatformLog([row,row],event,'iTdos'));});
+test('mismatched log source, action, body, success or identity fails',()=>{for(const key of ['Id','EventId','NodeId','Action','Content','Success','Category','Source','Type'])assert.throws(()=>currentPlatformLog([{...row,[key]:key==='Success'?false:'changed'}],event,'iTdos'));});

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue';
-import { MciButton, MciCard, MciFormField, MciModal, MciDataState, MciSkeleton } from '@microi/mci-ui';
+import { MciButton, MciCard, MciFormField, MciModal, MciSkeleton } from '@microi/mci-ui';
+import MciDataState from './PanelDataState.vue';
 import { api, formatBytes, formatTime } from './api.js';
 const emit=defineEmits(['navigate']);
 const resources=ref([]),selected=ref(''),backups=ref([]),busy=ref(false),loading=ref(true),message=ref(''),createOpen=ref(false),restore=ref(null),remove=ref(null),allow=ref(false),maximumGiB=ref(10);

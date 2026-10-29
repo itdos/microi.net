@@ -83,6 +83,14 @@ public sealed class PanelService(PanelRepository repository, DockerEngine docker
             using var hostOperation = await docker.HostOperations.Enter(ct);
             operation.State = "Running"; Progress(operation, "检查目标主机与资源归属");
             await CheckEngine(ct);
+            // 外部网站由宿主适配器验证归属，不能伪造一条吾码受管容器记录来绕过该边界。
+            if (operation.Action is "ExternalAcmeIssue" or "ExternalAcmeRenew")
+            {
+                await acme.ExecuteExternal(operation, ct);
+                operation.State = "Succeeded"; operation.Error = ""; Progress(operation, "证书任务完成并已回读");
+                audit.Write("Panel" + operation.Action + "Succeeded", operation.Actor, "外部实例：" + operation.ResourceId, taskId: operation.Id);
+                return;
+            }
             var resource = repository.Resource(operation.ResourceId);
             if (operation.Action is "Install" or "Reinstall")
             {

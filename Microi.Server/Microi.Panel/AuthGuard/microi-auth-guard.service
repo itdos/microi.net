@@ -23,9 +23,14 @@ ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 # iptables 必须使用与 Docker 共用的 /run/xtables.lock；不可另起私有锁。
-ReadWritePaths=/run /var/lib/microi-auth-guard
+# 宝塔原生 Nginx 的固定站点、验证根和日志；缺失目录不阻止仅 1Panel 的主机启动。
+# 1Panel 自定义安装根通过 Docker 已有 bind 执行有限动作，不把整个宿主文件系统改为可写。
+ReadWritePaths=/run /var/lib/microi-auth-guard -/www/server/panel/vhost -/www/server/nginx/logs -/www/wwwlogs -/www/wwwroot
 # 需要宿主 netfilter 和只读 SSH 日志；不使用 PrivateNetwork 隔离到无效网络命名空间。
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
+# /proc/<已核验的宝塔主进程>/exe 的 readlink 受 ptrace 访问检查；缩减能力的 root 同样需要此能力。
+# 只开放身份回读所需能力，并禁止实际调试和跨进程内存读写系统调用。
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE CAP_CHOWN CAP_FOWNER CAP_SYS_PTRACE
+SystemCallFilter=~ptrace process_vm_readv process_vm_writev
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 LockPersonality=true
 MemoryMax=256M

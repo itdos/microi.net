@@ -1,5 +1,6 @@
 // 真实 Docker 专项验收：只操作本轮标签归属的实例，测试结果不能替代真实第三方面板安装验收。
 import assert from 'node:assert/strict';
+import {diskGuardMount} from '../../Microi.Panel/Tests/disk-guard-fixture.mjs';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -8,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import https from 'node:https';
 import nodeHttp from 'node:http';
+import { redisThroughProxy } from './panel-redis-client.mjs';
 
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const { request } = createRequire(resolve(workspace, 'Microi.Client/package.json'))('@playwright/test');
@@ -89,13 +91,15 @@ try {
   docker(['run','-d','--name',names.fixture,'--label',label,'--memory','128m','-p',`127.0.0.1:${basePort+3}:80`,fixtureImage]);
   const originalFixture = inspect(names.fixture);
   docker(['volume','create','--label',label,run+'-data']); docker(['volume','create','--label',label,run+'-logs']);
-  docker(['run','-d','--name',names.panel,'--label',label,'--memory','512m','--cpus','1','--env-file',resolve(work,'panel.env'),'-p',`127.0.0.1:${basePort}:8080`,'-v','/var/run/docker.sock:/var/run/docker.sock','-v',run+'-data:/microi/ops/data','-v',run+'-logs:/microi/logs/ops',panelImageId]);
+  // TLS 和 Redis 需要实际宿主服务；bind 源缺失即失败，不能临时生成空目录或伪造回执。
+  docker(['run','-d','--name',names.panel,'--label',label,'--memory','512m','--cpus','1','--env-file',resolve(work,'panel.env'),'-p',`127.0.0.1:${basePort}:8080`,'-v','/var/run/docker.sock:/var/run/docker.sock','--mount','type=bind,src=/run/microi-auth-guard,dst=/run/microi-auth-guard,readonly',...diskGuardMount(docker),'-v',run+'-data:/microi/ops/data','-v',run+'-logs:/microi/logs/ops',panelImageId]);
   context = await request.newContext({ baseURL: base, timeout: 15000 });
   await until(async () => { try { return (await context.get('/health')).ok(); } catch { return false; } },'panel did not start');
   await api('panel/snapshot',undefined,401); pass('anonymous host access is rejected');
   csrf = (await api('session')).csrfToken;
   await api('login',{account:admin,password}); csrf=(await api('session')).csrfToken;
   owner=(await api('panel/snapshot')).ownerId;
+  assert.equal((await api('panel/security')).host?.firewall?.verified,true,'Core acceptance requires the real host guard and verified firewall');
   await writeFile(resolve(work,'context.json'),JSON.stringify({run,work,names,base,owner,basePort,panelImage:panelImageId},null,2));
   const forbidden = await context.post('/ops-api/panel/install',{data:{},headers:{Origin:base}}); assert.equal(forbidden.status(),400); pass('mutations require CSRF');
   const crossOrigin = await context.post('/ops-api/panel/install',{data:{},headers:{Origin:'https://untrusted.example.test','X-Ops-CSRF':csrf}}); assert.equal(crossOrigin.status(),403); pass('cross-origin host mutations are rejected');
@@ -163,20 +167,21 @@ try {
   await completed(resume); assert.equal((await api('panel/nginx/gateway/publish',resumeCommand,202)).id,resume.id); assert.equal((await tls(cert.certificatePem)).status,200); pass('panel kill and restart preserves session and resumes the same website task');
   const redis={requestId:randomUUID(),name:'cache',pluginId:'redis',version:'7.4.11',password:randomBytes(24).toString('base64url'),ports:{database:basePort+4},localOnly:true,confirm:'cache'};
   await completed(await api('panel/install',redis,202)); const cache=(await api('panel/snapshot')).resources.find(x=>x.id==='cache');
-  assert.equal(docker(['exec',cache.containerName,'redis-cli','SET','panel-test','persisted']),'OK');
-  await completed(await api('panel/resources/cache/actions',{action:'Restart',requestId:randomUUID(),confirm:'cache'},202)); assert.equal(docker(['exec',cache.containerName,'redis-cli','GET','panel-test']),'persisted'); pass('real Redis restart preserves authenticated data');
+  assert.equal(cache.redisAuthProxy,true);assert.deepEqual(inspect(cache.containerName).HostConfig.PortBindings||{},{});
+  assert.equal(await redisThroughProxy(basePort+4,redis.password,'SET','panel-test','persisted'),'OK');
+  await completed(await api('panel/resources/cache/actions',{action:'Restart',requestId:randomUUID(),confirm:'cache'},202)); assert.equal(await redisThroughProxy(basePort+4,redis.password,'GET','panel-test'),'persisted'); pass('real Redis proxy authenticates and restart preserves data without a direct backend port');
   await api('panel/resources/cache/backups',{requestId:randomUUID(),confirm:'cache',allowInterruption:false,maximumGiB:1},400);
   const backupTask=await api('panel/resources/cache/backups',{requestId:randomUUID(),confirm:'cache',allowInterruption:true,maximumGiB:1},202);await completed(backupTask);
   const backup=(await api('panel/backups')).find(x=>x.id===backupTask.id);assert.equal(backup.state,'Ready');assert(backup.size>0);assert.equal(inspect(cache.containerName).State.Running,true);
   const backupResponse=await context.get('/ops-api/panel/backups/'+backup.id+'/download');assert.equal(backupResponse.status(),200);const backupBytes=await backupResponse.body();assert.equal(createHash('sha256').update(backupBytes).digest('hex'),backup.sha256);
   pass('cold Redis backup downloads with matching hash and original service resumes');
-  docker(['exec',cache.containerName,'redis-cli','SET','panel-test','after-backup']);
+  assert.equal(await redisThroughProxy(basePort+4,redis.password,'SET','panel-test','after-backup'),'OK');
   await completed(await api('panel/resources/cache/restore',{requestId:randomUUID(),backupId:backup.id,confirm:'cache',allowInterruption:true},202));
   const restored=(await api('panel/snapshot')).resources.find(x=>x.id==='cache');assert.notEqual(restored.volumeName,cache.volumeName);assert.notEqual(restored.containerId,cache.containerId);
-  assert.equal(docker(['exec',restored.containerName,'redis-cli','GET','panel-test']),'persisted');assert.equal(inspect(cache.containerId).State.Running,false);assert(JSON.parse(docker(['volume','inspect',cache.volumeName]))[0]);
+  assert.equal(await redisThroughProxy(basePort+4,redis.password,'GET','panel-test'),'persisted');assert.equal(inspect(cache.containerId).State.Running,false);assert(JSON.parse(docker(['volume','inspect',cache.volumeName]))[0]);
   pass('verified restore switches to a new data volume and preserves original container and data');
   const corruptFile=resolve(work,'corrupt-backup.tar');await writeFile(corruptFile,'tampered backup');docker(['cp',corruptFile,names.panel+':/microi/ops/data/backups/'+backup.id+'.tar']);
-  await completed(await api('panel/resources/cache/restore',{requestId:randomUUID(),backupId:backup.id,confirm:'cache',allowInterruption:true},202),false);assert.equal(inspect(restored.containerName).Id,restored.containerId);assert.equal(docker(['exec',restored.containerName,'redis-cli','GET','panel-test']),'persisted');
+  await completed(await api('panel/resources/cache/restore',{requestId:randomUUID(),backupId:backup.id,confirm:'cache',allowInterruption:true},202),false);assert.equal(inspect(restored.containerName).Id,restored.containerId);assert.equal(await redisThroughProxy(basePort+4,redis.password,'GET','panel-test'),'persisted');
   await completed(await api('panel/backups/'+backup.id+'/delete',{requestId:randomUUID(),confirm:backup.id},202));assert(!(await api('panel/backups')).some(x=>x.id===backup.id));
   pass('tampered archive is rejected before switching service and explicit deletion removes only that backup');
   const scheduleCommand={id:'nightly-cache',resourceId:'cache',action:'Backup',enabled:true,intervalHours:24,firstRun:new Date(Date.now()+15000).toISOString(),maximumGiB:1,expectedRevision:'',confirm:'nightly-cache',allowInterruption:true};
@@ -200,7 +205,7 @@ try {
     const offline=await api('panel/snapshot');assert.equal(offline.dockerAvailable,false);assert(offline.resources.some(x=>x.id==='gateway'));assert(offline.operations.length>0);pass('Docker unavailability keeps persistent resources and task history readable');
   } finally {if(inspect(offlineName).Config.Labels[labelKey]!==run)throw Error('Offline test owner mismatch');docker(['stop',offlineName]);docker(['start',names.panel]);}
   await until(async()=>{try{return(await context.get('/health')).ok();}catch{return false;}},'online panel resumed');
-  await writeFile(resolve(workspace,'.tmp/panel-20260910/latest-docker-context.json'),JSON.stringify({run,work,names,base,owner,basePort,panelImage},null,2));
+  // 本轮 context.json 已保存；不覆盖历史任务的共享 latest 指针。
 } finally {
   await writeFile(resolve(work,'report.json'),JSON.stringify({run,passed,completed:passed.length===24,owner,names,base,panelImageId},null,2));
   await context?.dispose();

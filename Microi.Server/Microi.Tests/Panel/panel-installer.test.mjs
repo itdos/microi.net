@@ -12,7 +12,13 @@ assert(bash,'Bash is required to verify the real installer function');
 const quote=value=>"'"+value.replaceAll("'","'\\''")+"'";
 for(const name of ['install-microi.sh','install-microi-offline.sh']){
  const source=readFileSync(resolve(scripts,name),'utf8').replaceAll('\r\n','\n');
- const fn=source.match(/^microi_install_ops\(\) \{[\s\S]*?^\}/m)?.[0];
+ let fn=source.match(/^microi_install_ops\(\) \{[\s\S]*?^\}/m)?.[0];
+ if(!fn && name==='install-microi-offline.sh'){
+  // 新离线入口委托经包校验的在线脚本，不再维护第二份函数；同一保护逻辑仍须执行。
+  assert.match(source,/^bash "\$ROOT\/install-microi\.sh"$/m,'Offline installer must delegate to the validated shared entry');
+  assert.match(source,/python3 -I "\$ROOT\/offline\/verify\.py" "\$ROOT"/);
+  fn=readFileSync(resolve(scripts,'install-microi.sh'),'utf8').replaceAll('\r\n','\n').match(/^microi_install_ops\(\) \{[\s\S]*?^\}/m)?.[0];
+ }
  assert(fn,'Installer entry function was not found');
  for(const label of ['io.microi.panel.controller=true','io.microi.ops.controller=true'])test(`${name}: preserve existing or stopped ${label}`,()=>{
   // 使用真实函数和拒绝所有写命令的 Docker 桩，证明先装面板时不会拉取、初始化或启动第二个实例。

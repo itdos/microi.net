@@ -47,6 +47,30 @@ class FakeFirewall:
 
 
 class GuardTests(unittest.TestCase):
+    def test_legacy_iproute_inventory_exempts_only_verified_host_addresses(self):
+        replies=[SimpleNamespace(returncode=1,stdout=''),SimpleNamespace(returncode=0,stdout='1: lo inet 127.0.0.1/8 scope host lo\n2: eth0 inet 192.0.2.5/24 brd 192.0.2.255 scope global eth0\n2: eth0 inet6 fe80::1234/64 scope link\n')]
+        with patch('daemon.run_command',side_effect=replies) as run:
+            self.guard.load_local_ips()
+        self.assertEqual({'127.0.0.1','192.0.2.5','fe80::1234'},self.guard.local_ips)
+        self.assertEqual(['ip','-o','address','show'],run.call_args_list[1].args[0])
+        self.assertNotIn('192.0.2.255',self.guard.local_ips)
+
+    def test_modern_iproute_inventory_does_not_need_legacy_fallback(self):
+        self.guard.last_error='无法读取本机地址；仅回环与显式白名单自动豁免。'
+        with patch('daemon.run_command',return_value=SimpleNamespace(returncode=0,stdout='[{"addr_info":[{"local":"192.0.2.5"},{"local":"::1"}]}]')) as run:
+            self.guard.load_local_ips()
+        self.assertEqual({'192.0.2.5','::1'},self.guard.local_ips);run.assert_called_once()
+        self.assertEqual('',self.guard.last_error)
+
+    def test_malformed_or_empty_legacy_inventory_preserves_last_verified_addresses(self):
+        for text in ('','2: eth0 inet not-an-address scope global eth0\n','unknown inet 198.51.100.25/24'):
+            with self.subTest(text=text):
+                self.guard.local_ips={'192.0.2.5'}
+                with patch('daemon.run_command',side_effect=[SimpleNamespace(returncode=1,stdout=''),SimpleNamespace(returncode=0,stdout=text)]):
+                    self.guard.load_local_ips()
+                self.assertEqual({'192.0.2.5'},self.guard.local_ips)
+                self.assertIn('无法读取本机地址',self.guard.last_error)
+
     def setUp(self):
         root = pathlib.Path(__file__).resolve().parents[4] / ".tmp"
         root.mkdir(exist_ok=True)
@@ -396,8 +420,12 @@ class GuardTests(unittest.TestCase):
                                    "MESSAGE": "Failed password for user from 198.51.100.25 port 1234 ssh2",
                                    "_UID": "0", "_EXE": "/usr/sbin/sshd"})]
         reported = []
+        def legacy_journal(args, **options):
+            self.assertFalse(any(arg.startswith('--output-fields') for arg in args))
+            self.assertIn('json', args)
+            return SimpleNamespace(returncode=0, stdout=replies.pop(0))
         source = JournalCollector(self.store, lambda *a, **k: reported.append(a),
-                                  lambda *a, **k: SimpleNamespace(returncode=0, stdout=replies.pop(0)))
+                                  legacy_journal)
         source.poll()
         source.poll()
         self.assertEqual(1, len(reported))
@@ -558,6 +586,50 @@ def nft_fixture():
 
 
 class FirewallTests(unittest.TestCase):
+    def anchor_fixture(self, initial, concurrent=False):
+        rules = copy.deepcopy(initial); calls = []
+        def runner(args, input_text=None, check=True):
+            calls.append(args)
+            action = args[3]
+            if action == '-S':
+                return SimpleNamespace(returncode=0, stdout='\n'.join('-A FORWARD ' + ' '.join(rule) for rule in rules))
+            if action == '-I':
+                self.assertEqual(['FORWARD', '1'], args[4:6]); rules.insert(0, args[6:])
+                if concurrent: rules.append(['-j', 'EXTERNAL'])
+            elif action == '-D':
+                self.assertEqual('FORWARD', args[4]); rules.remove(args[5:])
+            else: self.fail('Unexpected firewall command: ' + str(args))
+            return SimpleNamespace(returncode=0, stdout='')
+        return Firewall('iptables', runner=runner), rules, calls
+
+    def test_docker_prepend_reanchors_only_owned_jump_without_replacing_foreign_rules(self):
+        foreign = [['-j', 'DOCKER-USER'], ['-m', 'conntrack', '--ctstate', 'RELATED,ESTABLISHED', '-j', 'ACCEPT']]
+        firewall, rules, calls = self.anchor_fixture(foreign + [['-j', CHAIN]])
+        firewall._iptables_anchor(['iptables', '-w', '5'], 'FORWARD')
+        self.assertEqual(foreign, rules[1:]); self.assertEqual(['-j', CHAIN], rules[0][-2:])
+        self.assertEqual([['-j', CHAIN]], [call[5:] for call in calls if call[3] == '-D'])
+        count = len(calls); firewall._iptables_anchor(['iptables', '-w', '5'], 'FORWARD')
+        self.assertEqual(1, len(calls)-count); self.assertEqual(3, len(rules))
+
+    def test_next_docker_prepend_removes_previous_exact_anchor_without_accumulating_jumps(self):
+        firewall, rules, calls = self.anchor_fixture([['-j', 'DOCKER-USER'], ['-j', CHAIN]])
+        firewall._iptables_anchor(['iptables', '-w', '5'], 'FORWARD'); previous = rules[0][:]
+        rules.insert(0, ['-j', 'NEW-DOCKER'])
+        firewall._iptables_anchor(['iptables', '-w', '5'], 'FORWARD')
+        self.assertNotIn(previous, rules); self.assertEqual(3, len(rules))
+        self.assertEqual([['-j', 'NEW-DOCKER'], ['-j', 'DOCKER-USER']], rules[1:])
+
+    def test_concurrent_unrelated_rule_change_refuses_confirmation_and_deletes_nothing(self):
+        firewall, rules, calls = self.anchor_fixture([['-j', 'DOCKER-USER'], ['-j', CHAIN]], concurrent=True)
+        with self.assertRaises(GuardError): firewall._iptables_anchor(['iptables', '-w', '5'], 'FORWARD')
+        self.assertFalse(any(call[3] == '-D' for call in calls)); self.assertIn(['-j', 'EXTERNAL'], rules)
+
+    def test_conditional_or_foreign_commented_jump_is_never_deleted_as_owned(self):
+        foreign = [['-s', '198.51.100.25', '-j', CHAIN], ['-m', 'comment', '--comment', 'foreign', '-j', CHAIN]]
+        firewall, rules, calls = self.anchor_fixture(foreign)
+        firewall._iptables_anchor(['iptables', '-w', '5'], 'FORWARD')
+        self.assertEqual(foreign, rules[1:]); self.assertFalse(any(call[3] == '-D' for call in calls))
+
     def test_nft_shape_rejects_accept_disguised_with_same_comment(self):
         fixture = nft_fixture()
         firewall = Firewall("nftables")

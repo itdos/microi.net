@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
+export {diskGuardBinding,diskGuardMount} from './disk-guard-fixture.mjs';
 
 // 每轮旧协议回归使用独立名称和目录。禁止再复用历史日期标签清理另一轮容器。
 export const run=process.env.PANEL_LEGACY_RUN_ID;

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {s3Request} from './panel-s3.mjs';
+import {redisThroughProxy} from './panel-redis-client.mjs';
 
 export function createPluginProbe({docker,servicePort}) {
 const s3=(method,path,body,password)=>s3Request(servicePort,password,method,path,body);
@@ -28,7 +29,13 @@ return async function probe(plugin,item,password,mode='read'){
    assert.equal(oracleSql(name,'SELECT value FROM panel_probe WHERE id=1;'),value);
  }
  else if(plugin.id==='mongodb'){if(write||change)mongoSql(name,`db.getSiblingDB('microi').panel_probe.updateOne({_id:1},{$set:{value:'${value}'}},{upsert:true});`);assert.equal(mongoSql(name,"print(db.getSiblingDB('microi').panel_probe.findOne({_id:1}).value)"),value);}
- else if(plugin.id==='redis'){if(write||change)assert.equal(docker(['exec',name,'redis-cli','SET','panel-probe',value]),'OK');assert.equal(docker(['exec',name,'redis-cli','GET','panel-probe']),value);assert.match(docker(['exec','-e','REDISCLI_AUTH=',name,'redis-cli','GET','panel-probe']),/NOAUTH/);}
+ else if(plugin.id==='redis'){
+   const actual=JSON.parse(docker(['inspect',name]))[0];
+   assert.equal(item.redisAuthProxy,true);assert.deepEqual(actual.HostConfig.PortBindings||{},{});
+   if(write||change)assert.equal(await redisThroughProxy(servicePort,password,'SET','panel-probe',value),'OK');
+   assert.equal(await redisThroughProxy(servicePort,password,'GET','panel-probe'),value);
+   if(write)await assert.rejects(redisThroughProxy(servicePort,null,'GET','panel-probe'),/^Error: NOAUTH$/);
+ }
  else if(plugin.id==='minio'){if(write)await s3('PUT','/panel-test','',password);if(write||change)await s3('PUT','/panel-test/probe.txt',value,password);assert.equal(await s3('GET','/panel-test/probe.txt','',password),value);assert.equal((await fetch(`http://127.0.0.1:${servicePort}/panel-test/probe.txt`)).status,403);}
  else if(plugin.id==='translate'){
    const languages=await (await fetch(`http://127.0.0.1:${servicePort}/languages`)).json();

@@ -64,8 +64,9 @@ def read_config(path):
 
 class Guard:
     """串行处理策略/规则更改；对外成功必须包含独立防火墙回读。"""
-    def __init__(self, store, firewall, config=None, proxy=None):
+    def __init__(self, store, firewall, config=None, proxy=None, nginx=None):
         self.store, self.firewall = store, firewall
+        self.nginx = nginx
         self.config = config or {"ssh": {"enabled": False}, "docker": {"enabled": False}, "nativeLogs": []}
         self.lock = threading.RLock()
         self.stop = threading.Event()
@@ -95,12 +96,26 @@ class Guard:
 
     def load_local_ips(self):
         try:
-            result = run_command(["ip", "-j", "address", "show"])
+            result = run_command(["ip", "-j", "address", "show"], check=False)
             ips = set()
-            for interface in json.loads(result.stdout):
-                for address in interface.get("addr_info", []):
-                    ips.add(canonical_ip(address["local"]))
+            if result.returncode == 0:
+                for interface in json.loads(result.stdout):
+                    for address in interface.get("addr_info", []):
+                        ips.add(canonical_ip(address["local"]))
+            else:
+                # CentOS 7 iproute2 predates JSON output. Only accept its fixed
+                # one-line address fields; never treat an interface name as an IP.
+                legacy = run_command(["ip", "-o", "address", "show"])
+                for line in legacy.stdout.splitlines():
+                    fields = line.split()
+                    if len(fields) < 4 or not fields[0].rstrip(":").isdigit() or fields[2] not in ("inet", "inet6"):
+                        raise GuardError("本机地址输出格式无效。", 503)
+                    ips.add(canonical_ip(str(ipaddress.ip_interface(fields[3]).ip)))
+            if not ips:
+                raise GuardError("未读取到本机地址。", 503)
             self.local_ips = ips
+            if self.last_error == "无法读取本机地址；仅回环与显式白名单自动豁免。":
+                self.last_error = ""
         except Exception:
             # 回环始终安全豁免；缺少本机地址盘点明确保留诊断。
             self.last_error = "无法读取本机地址；仅回环与显式白名单自动豁免。"
@@ -193,7 +208,7 @@ class Guard:
                 health = "initializing"
             else:
                 health = "monitoring"
-            return {"protocol": 1, "policy": policy, "health": health, "adapters": list(self.adapters),
+            return {"protocol": 1, "nginx": {"protocol": 1, "available": self.nginx is not None}, "policy": policy, "health": health, "adapters": list(self.adapters),
                     "firewall": firewall, "bans": self.store.bans(), "statistics": self.store.summary(),
                     "observedAt": time.time(), "lastError": self.runtime_error or self.capacity_error or self.last_error,
                     "semantics": "跨服务累计同一来源 IP；windowSeconds=0 表示累计至解封。网络实测另行验收。"}
@@ -208,6 +223,10 @@ class Guard:
         body = {} if body is None else body
         if not isinstance(body, dict):
             raise GuardError("JSON 请求必须为对象。")
+        # 固定宿主动作独立串行，不借登录防护锁阻塞失败上报，也不提供任意 shell 或路径入口。
+        if path.startswith("/nginx/"):
+            if self.nginx is None: raise GuardError("此宿主尚未启用 Nginx 管理能力，请升级完整服务产物。", 503)
+            return self.nginx.dispatch(method, path, body)
         if method == "GET" and path == "/status":
             return self.status()
         if method == "PUT" and path == "/policy":
@@ -314,8 +333,9 @@ class ControlHandler(http.server.BaseHTTPRequestHandler):
             if self.headers.get("Transfer-Encoding") or self.headers.get("Expect"):
                 raise GuardError("不支持分块或 Expect 请求。")
             size = int(self.headers.get("Content-Length", "0"))
-            if not 0 <= size <= 65536:
-                raise GuardError("控制请求超过 64 KiB。", 413)
+            budget = 1024 * 1024 if self.path.split("?", 1)[0] in ("/nginx/config", "/nginx/certificate") else 65536
+            if not 0 <= size <= budget:
+                raise GuardError("控制请求超过该固定动作的正文上限。", 413)
             raw = self.rfile.read(size) if size else b""
             if len(raw) != size:
                 raise GuardError("控制请求未完整接收。")
@@ -446,7 +466,9 @@ def main(argv=None):
                 raise GuardError("控制路径已被非 socket 对象占用。")
             socket_path.unlink()
         store = Store(state / "guard.sqlite3")
-        guard = Guard(store, Firewall(config.get("firewallBackend", "auto")), config)
+        from nginx_adapter import HostNginx, DockerApi
+        guard = Guard(store, Firewall(config.get("firewallBackend", "auto")), config,
+                      nginx=HostNginx(args.state_dir, DockerApi(config.get("docker", {}).get("socketPath", "/var/run/docker.sock"))))
         from redis_proxy import RedisProxyManager
         guard.proxy = RedisProxyManager(guard.failure, guard.is_banned, guard.policy)
         server = ControlServer(args.socket, guard)

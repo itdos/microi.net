@@ -96,6 +96,7 @@ public sealed partial class PanelRepository
             if((current?.Revision??"")!=acmeClaim.ExpectedRevision || (acmeClaim.Automatic && (current==null||!current.AutoRenew||current.NextCheck!=value.NextCheck||current.NextCheck>DateTimeOffset.UtcNow)))throw new OpsException("自动证书设置已变化、尚未到期或已暂停。",409);
             // 克隆避免修改调用方的槽位对象，从而保持重启和重试使用同一确定请求 Id。
             var updated=Decode<PanelAcmeRegistration>(Encode(value));updated.LastOperationId=operation.Id;updated.LastError="";updated.NextCheck=NextAcmeCheck(value.Id);
+            updated.Attempt=(current?.Attempt??0)+1;updated.CompletedAttempt=current?.CompletedAttempt??0;
             cmd.CommandText="INSERT INTO panel_backup_state VALUES($acme,$acmeBody) ON CONFLICT(id) DO UPDATE SET body_cipher=excluded.body_cipher";cmd.Parameters.AddWithValue("$acmeBody",protector.Protect(Encode(updated)));cmd.ExecuteNonQuery();
             cmd.Parameters.RemoveAt("$acme");cmd.Parameters.RemoveAt("$acmeBody");
         }
@@ -162,6 +163,7 @@ public sealed partial class PanelRepository
         cmd.CommandText = "SELECT body FROM panel_operations WHERE id=$id AND state='Failed'"; cmd.Parameters.AddWithValue("$id", id);
         if (cmd.ExecuteScalar() is not string body) throw new OpsException("仅失败任务可继续执行。", 409);
         var operation = Decode<PanelOperation>(body); operation.State = "Queued"; operation.Error = ""; operation.Phase = "等待继续执行"; operation.Updated = DateTimeOffset.UtcNow;
+        AdvanceAcmeAttempt(cmd,operation);
         cmd.CommandText = "UPDATE panel_operations SET state='Queued',body=$body WHERE id=$id"; cmd.Parameters.AddWithValue("$body", Encode(operation));
         try { cmd.ExecuteNonQuery(); tx.Commit(); } catch (SqliteException error) when (error.SqliteErrorCode == 19) { throw new OpsException("该实例已有活动任务。", 409); }
         return operation;

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json.Nodes;
+using Microi.Panel.Panel;
 
 namespace Microi.Panel;
 
@@ -9,12 +10,14 @@ public sealed partial class DockerEngine : IDisposable
 {
     private readonly HttpClient http;
     private readonly OpsOptions options;
+    private readonly HostDiskMaintenanceClient? maintenance;
     private readonly SemaphoreSlim negotiation = new(1, 1);
     public HostOperationGate HostOperations { get; } = new();
     private string prefix = "";
-    public DockerEngine(OpsOptions options)
+    public DockerEngine(OpsOptions options, HostDiskMaintenanceClient? maintenance = null)
     {
         this.options = options;
+        this.maintenance = maintenance;
         var handler = new SocketsHttpHandler
         {
             ConnectCallback = async (_, ct) =>
@@ -91,6 +94,30 @@ public sealed partial class DockerEngine : IDisposable
     {
         await Negotiate(ct);
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct); limit.CancelAfter(TimeSpan.FromMinutes(30));
+        using var monitorStop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var protectionId = "pull-" + Guid.NewGuid().ToString("N");
+        Exception? primary = null, capacityFailure = null;
+        Task? monitor = null;
+        if (maintenance != null)
+        {
+            await maintenance.Protect(protectionId, [image], 2L * 1024 * 1024 * 1024, ct);
+            // 独立监测不依赖 Docker 进度行；沉默的层下载也会在达到保护线时取消本次客户端请求。
+            monitor = Task.Run(async () =>
+            {
+                try
+                {
+                    while (true)
+                    {
+                        await Task.Delay(2000, monitorStop.Token);
+                        await maintenance.Protect(protectionId, [image], 0, monitorStop.Token);
+                    }
+                }
+                catch (OperationCanceledException) when (monitorStop.IsCancellationRequested) { }
+                catch (Exception error) { capacityFailure = error; limit.Cancel(); }
+            }, CancellationToken.None);
+        }
+        try
+        {
         using var request = Request(HttpMethod.Post, prefix + "/images/create?fromImage=" + Uri.EscapeDataString(image), null, image);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, limit.Token);
         if (!response.IsSuccessStatusCode) throw new OpsException("镜像拉取失败，HTTP " + (int)response.StatusCode, 502);
@@ -101,6 +128,22 @@ public sealed partial class DockerEngine : IDisposable
             var item = JsonNode.Parse(line); if (item == null) continue;
             if (item["error"] != null) throw new OpsException("镜像拉取失败：" + Redaction.Clean(item["error"]!.ToString(), 500), 502);
             progress(item);
+        }
+        if (maintenance != null) await maintenance.Protect(protectionId, [image], 0, ct);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested && capacityFailure != null)
+        { primary = capacityFailure; throw capacityFailure; }
+        catch (Exception error) { primary = error; throw; }
+        finally
+        {
+            monitorStop.Cancel();
+            if (monitor != null) await monitor;
+            if (maintenance != null)
+            {
+                using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                try { await maintenance.Complete(protectionId, [], cleanup.Token); }
+                catch (Exception) when (primary != null) { /* 原失败继续上抛；未释放的保护会留在宿主账本，不冒充清理成功。 */ }
+            }
         }
     }
     public async Task<string> Logs(string name, CancellationToken ct, string? since = null)

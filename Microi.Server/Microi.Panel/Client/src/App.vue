@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
-import { MciButton, MciCard, MciFormField, MciModal, MciDataState, MciThemePanel } from '@microi/mci-ui';
+import { MciButton, MciCard, MciFormField, MciModal, MciThemePanel } from '@microi/mci-ui';
+import MciDataState from './PanelDataState.vue';
 import { api, states, formatTime, formatBytes } from './api.js';
 import PanelWorkspace from './PanelWorkspace.vue';
 import NginxWorkspace from './NginxWorkspace.vue';
@@ -8,8 +9,10 @@ import FilesWorkspace from './FilesWorkspace.vue';
 import BackupsWorkspace from './BackupsWorkspace.vue';
 import SchedulesWorkspace from './SchedulesWorkspace.vue';
 import SecurityWorkspace from './SecurityWorkspace.vue';
+import DiskMaintenanceWorkspace from './DiskMaintenanceWorkspace.vue';
 
 const session = ref(null), snapshot = ref(null), error = ref(''), notice = ref(''), busy = ref(false), tab = ref('server');
+const pollingError = ref('');
 const credentials = reactive({ account: '', password: '' });
 const connection = reactive({ account: '', password: '', captchaId: '', captchaValue: '', acceptPrivacy: false });
 const platformConfig = ref(null), captcha = ref(null), entries = ref([]), selected = ref([]), targets = reactive({});
@@ -18,13 +21,14 @@ const policy = reactive({ mode: 'Notify', intervalSeconds: 3600, timeZone: 'Asia
 const policyLoaded = ref(false), log = ref(''), logTitle = ref(''), logOpen = ref(false), restoreTask = ref(null), restoreConfirm = ref(false);
 const watchOpen = ref(false), watchEnabled = ref(false), watchConfirm = ref('');
 const themeOpen = ref(false);
+const nginxDirty = ref(false), pendingNavigation = ref('');
 const taskId = ref(location.hash.slice(1));
 function showTask(id) { taskId.value = id; location.hash = id; }
 function hashChanged() { taskId.value = location.hash.slice(1); }
 let timer, polling = false;
-const nav = [ ['server', '服务器总览'], ['security', '安全防护'], ['market', '插件市场'], ['websites', '网站与反向代理'], ['certificates', 'SSL 证书'], ['files', '网站文件'], ['backups', '备份与恢复'], ['schedules', '计划任务'], ['services', '容器管理'], ['operations', '操作任务'], ['overview', '吾码运行状态'], ['updates', '吾码平台升级'], ['tasks', '升级任务'], ['policy', '自动更新'], ['platform', '平台连接'], ['logs', '运维日志'] ];
+const nav = [ ['server', '服务器总览'], ['disk', '磁盘与安全清理'], ['security', '安全防护'], ['market', '插件市场'], ['websites', '网站与反向代理'], ['certificates', 'SSL 证书'], ['files', '网站文件'], ['backups', '备份与恢复'], ['schedules', '计划任务'], ['services', '容器管理'], ['operations', '操作任务'], ['overview', '吾码运行状态'], ['updates', '吾码平台升级'], ['tasks', '升级任务'], ['policy', '自动更新'], ['platform', '平台连接'], ['logs', '运维日志'] ];
 const modes = { Manual: '仅手动', Notify: '检查并通知', Download: '自动下载', Automatic: '维护窗口自动更新' };
-const isPanelPage = computed(() => ['server','security','market','websites','certificates','files','backups','schedules','services','operations'].includes(tab.value));
+const isPanelPage = computed(() => ['server','disk','security','market','websites','certificates','files','backups','schedules','services','operations'].includes(tab.value));
 const active = computed(() => snapshot.value?.tasks.find(x => ['Queued', 'Running', 'Recovering', 'NeedsAttention'].includes(x.state)));
 const runningCount = computed(() => snapshot.value?.containers.filter(x => x.state === 'running').length || 0);
 const available = computed(() => plan.value?.services.filter(x => x.changed) || []);
@@ -43,7 +47,8 @@ async function refresh() {
     snapshot.value = await api('snapshot');
     if (!policyLoaded.value) { Object.assign(policy, snapshot.value.policy); policyLoaded.value = true; }
     if (tab.value === 'logs') entries.value = await api('events');
-  } catch (e) { error.value = e.message; if (e.status === 401) session.value = await api('session'); }
+    pollingError.value = '';
+  } catch (e) { pollingError.value = e.message; if (e.status === 401) session.value = await api('session'); }
   finally { polling = false; }
 }
 async function login() {
@@ -56,9 +61,15 @@ async function logout() { await act(async () => { await api('logout', {}); snaps
 async function chooseTab(value) {
   // 登录初始化和其它受控操作尚未结束时不切页，避免 act 的忙碌保护吞掉目标页加载。
   if (busy.value) return;
+  if (nginxDirty.value && value !== tab.value) { pendingNavigation.value = value; return; }
   tab.value = value;
   if (value === 'platform' && !platformConfig.value) await loadPlatform();
   if (value === 'logs') await act(async () => { entries.value = await api('events'); });
+}
+async function discardAndNavigate() {
+  const destination = pendingNavigation.value;
+  pendingNavigation.value = ''; nginxDirty.value = false;
+  await chooseTab(destination);
 }
 async function loadPlatform() {
   await act(async () => { platformConfig.value = await api('platform/config'); await renewCaptcha(); });
@@ -103,6 +114,7 @@ onUnmounted(() => { clearInterval(timer); window.removeEventListener('hashchange
   <div class="ops-shell" data-mci-ui-root>
     <header class="topbar"><div class="brand-mark">M</div><div class="brand-copy"><strong>吾码服务器运维面板</strong><small>Microi.Panel · Docker 服务管理</small></div><div class="topbar-actions"><MciButton variant="ghost" @click="themeOpen = true">主题</MciButton><template v-if="session?.authenticated"><span>{{ session.account }}</span><MciButton variant="ghost" @click="logout">退出</MciButton></template></div></header>
     <div v-if="error" class="banner danger" role="alert">{{ error }}<button aria-label="关闭错误提示" @click="error = ''">×</button></div>
+    <div v-if="pollingError" class="banner danger" role="status">状态采样暂不可用：{{ pollingError }}。连接恢复后自动更新。</div>
     <div v-if="notice" class="banner success" role="status">{{ notice }}</div>
     <div v-if="!session" class="loading"><MciDataState title="正在连接运维中心" description="读取独立服务状态…" /></div>
     <main v-else-if="!session.authenticated" class="login-layout">
@@ -118,7 +130,8 @@ onUnmounted(() => { clearInterval(timer); window.removeEventListener('hashchange
           <div class="page-heading"><div><span class="eyebrow">{{ snapshot?.deployment.name || '吾码服务器运维面板' }}</span><h1>{{ nav.find(x => x[0] === tab)?.[1] }}</h1></div><MciButton variant="plain" :disabled="busy" @click="refresh">刷新状态</MciButton></div>
           <PanelWorkspace v-if="['server','market','services','operations'].includes(tab)" :page="tab" @navigate="chooseTab" />
           <SecurityWorkspace v-if="tab === 'security'" />
-          <NginxWorkspace v-if="['websites','certificates'].includes(tab)" :page="tab" @navigate="chooseTab" />
+          <DiskMaintenanceWorkspace v-if="tab === 'disk'" />
+          <NginxWorkspace v-if="['websites','certificates'].includes(tab)" :key="tab" :page="tab" @navigate="chooseTab" @dirty="nginxDirty = $event" />
           <FilesWorkspace v-if="tab === 'files'" @navigate="chooseTab" />
           <BackupsWorkspace v-if="tab === 'backups'" @navigate="chooseTab" />
           <SchedulesWorkspace v-if="tab === 'schedules'" @navigate="chooseTab" />
@@ -152,6 +165,7 @@ onUnmounted(() => { clearInterval(timer); window.removeEventListener('hashchange
     </div>
     <MciModal v-model="planOpen" title="确认更新计划" size="lg" :close-on-mask="false"><template v-if="plan"><p>{{ available.length ? '以下服务将使用已经确认的镜像摘要。' : '当前版本一致，无需重复更新。' }}</p><article v-for="service in plan.services" :key="service.name" class="plan-service"><strong>{{ service.name }} · {{ service.changed ? '有更新' : '无需更新' }}</strong><p class="muted">{{ service.wasRunning ? '运行中的服务会短暂中断' : '当前已停止，更新后保持停止' }}</p><code>{{ service.targetImage }}</code><p class="fine">{{ service.rollbackAllowed ? '部署已声明镜像回退兼容' : '未声明数据兼容，失败时保留现场等待处理' }}</p></article><label class="check"><input v-model="confirmInterruption" type="checkbox" />我已确认目标版本、备份与本次服务中断范围</label><p class="muted fine">此计划 30 分钟内有效。正在下载不代表服务已完成更新。</p></template><template #footer><MciButton variant="plain" :disabled="busy || !available.length" @click="submit(true)">仅下载镜像</MciButton><MciButton :disabled="busy || !confirmInterruption || !available.length" :loading="busy" @click="submit(false)">开始更新</MciButton></template></MciModal>
     <MciModal v-model="themeOpen" title="外观设置" size="sm"><MciThemePanel /></MciModal>
+    <MciModal :model-value="!!pendingNavigation" title="离开未发布的网站配置" @update:model-value="pendingNavigation = ''"><p>当前配置修改尚未发布。离开后将丢弃本次输入，服务器配置不变。</p><template #footer><MciButton variant="plain" @click="pendingNavigation = ''">继续编辑</MciButton><MciButton @click="discardAndNavigate">放弃修改并离开</MciButton></template></MciModal>
     <MciModal v-model="logOpen" :title="logTitle + ' · 最近日志'" size="lg"><pre class="log-content">{{ log }}</pre></MciModal>
     <MciModal :model-value="!!restoreTask" title="恢复原容器" @update:model-value="restoreTask = null"><p>确认恢复所选任务保留的原容器。恢复过程中服务可能中断。</p><label class="check"><input v-model="restoreConfirm" type="checkbox" />我已核对数据库与原镜像的兼容性，知道此操作不会恢复数据库</label><template #footer><MciButton :disabled="busy || !restoreConfirm" @click="restore">确认恢复</MciButton></template></MciModal>
     <MciModal v-model="watchOpen" :title="watchEnabled ? '恢复旧自动更新' : '暂停旧自动更新'"><p>请输入登记的容器名称：{{ snapshot?.deployment.watchtowerName }}</p><MciFormField v-model="watchConfirm" label="Watchtower 容器名" /><template #footer><MciButton :disabled="busy || watchConfirm !== snapshot?.deployment.watchtowerName" @click="watchtower">确认{{ watchEnabled ? '恢复' : '暂停' }}</MciButton></template></MciModal>

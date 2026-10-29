@@ -38,7 +38,7 @@ try { docker(['network', 'inspect', legacy.network]); } catch { docker(['network
 for (const [role, port] of [['api', 61881], ['web', 61882]]) docker(['run', '-d', '--name', names[role], '--label', label, '--memory', '128m', '--cpus', '0.5', '--network', legacy.network, '--restart', 'unless-stopped', '-p', `127.0.0.1:${port}:80`, legacy.fixtureImage('v1')]);
 docker(['exec', names.api, 'sh', '-c', 'echo persistent-value > /data/probe.txt']);
 const oldVolume = inspect(names.api).Mounts.find(x => x.Destination === '/data').Name;
-const startOps = () => docker(['run', '-d', '--name', names.ops, '--label', label, '--memory', '512m', '--cpus', '1', '--env-file', resolve(work, 'ops-test.env'), '--network', legacy.network, '-p', '127.0.0.1:61880:8080', '-v', '/var/run/docker.sock:/var/run/docker.sock', '-v', `${resolve(work, 'deployment.json')}:/etc/microi-ops/deployment.json:ro`, '-v', `${resolve(work, 'data')}:/microi/ops/data`, '-v', `${resolve(work, 'logs')}:/microi/logs/ops`, legacy.image]);
+const startOps = () => docker(['run', '-d', '--name', names.ops, '--label', label, '--memory', '512m', '--cpus', '1', '--env-file', resolve(work, 'ops-test.env'), '--network', legacy.network, '-p', '127.0.0.1:61880:8080', '-v', '/var/run/docker.sock:/var/run/docker.sock',...legacy.diskGuardMount(docker), '-v', `${resolve(work, 'deployment.json')}:/etc/microi-ops/deployment.json:ro`, '-v', `${resolve(work, 'data')}:/microi/ops/data`, '-v', `${resolve(work, 'logs')}:/microi/logs/ops`, legacy.image]);
 startOps();
 const context = await request.newContext({ baseURL: 'http://localhost:61880' });
 let csrf;

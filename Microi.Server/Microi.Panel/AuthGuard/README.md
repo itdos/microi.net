@@ -92,3 +92,19 @@ SQLite 事务保证同一 eventId 仅计一次；跨服务按规范化 IP 累计
 - [Docker iptables](https://docs.docker.com/engine/network/firewall-iptables/)、[Docker nftables](https://docs.docker.com/engine/network/firewall-nftables/)、[nft 官方手册](https://netfilter.org/projects/nftables/manpage.html)
 
 Fail2ban 可以作为经过单独验证的部署替代方案，但默认 INPUT/input action 不覆盖 Docker 转发链；旧 MongoDB filter、Redis ACL LOG 聚合或未开启的 MySQL 日志不能直接兑现这里的逐 IP/逐次语义。本实现不安装第二套 Fail2ban 或修改其 jail。
+
+## 已有 Nginx 网站的受限接入
+
+`manifest.json.nginxProtocol=1` 与 `nginx_adapter.py` 是独立能力契约，防护控制协议仍为 1。新面板通过 `/nginx/instances` 的 `protocol:1` 验证能力；旧宿主、缺失模块、空回执不能显示 Nginx 操作成功。安装器验证声明、文件和 Python 语法后复制模块，同时保留旧版七文件防护服务的安全恢复兼容。
+
+发现使用原生宝塔固定安装路径 `/www/server/nginx/sbin/nginx`、`/www/server/panel/vhost/nginx`，以及 Docker inspect 回读的 OpenResty 现有配置挂载。首次写入前需明确接入实例；路径、容器和命令不由浏览器提供。原生实例的稳定身份绑定程序哈希和配置目录身份，正常进程或主机重启后仍可续期；真实程序/挂载替换要求重新接入。不会停止、重建或删除第三方 Nginx、网站和容器。
+
+所有配置更新带原 SHA-256 和稳定 UUID。保存原配置后执行 CAS、更改、`nginx -t`、平滑重载与新 worker 回读；失败恢复只覆盖本次仍持有的配置哈希，外部后来变化保持原样。同一任务在完整恢复且原版本未变化后可以重试，成功请求重试须再次核验现状。编辑器以支持注释、引号、转义与区块的解析器保护文件路径、include 和脚本；证书与挑战入口通过单独固定动作变更。历史返回最近 100 条备份摘要，不回传私钥。
+
+HTTP-01 在已核验的已有挂载中创建 `.microi-acme-{64位标识}` 专属子目录，只将该子目录交给 ACME helper。保留已知静态验证模板的原 CA 文件回退；自定义代理、动态路径和歧义路由会明确拒绝，不能覆盖他人的现用验证流程。每次准备按当前网站域名和实际 HTTP listen 端口回读随机挑战探针；这仅证明本机 Nginx 路由，公网 80、DNS 和 CA 验证仍由真正 ACME 流程判断。证书先验证配对/域名/有效期，以全新私有版本目录部署，仅改对应 TLS 区块，再核验实际 SNI 叶证书 DER SHA-256 与 HTTPS 响应及本站重定向循环。失败保留旧证书和原配置。
+
+systemd 保留 `ProtectSystem=strict`。原生宝塔仅增加固定 vhost、Nginx 日志、站点日志和 `/www/wwwroot` 的可写边界；其它原生站点根使用配置挂载内的专属挑战目录及原文件回退。1Panel 自定义安装根由 Docker inspect 的既有读写 bind 映射确定，并经 Docker 固定动作写入，不将整个宿主设为可写。网站或祖先存在符号链接、非普通文件、未知挂载时停止相应操作。Unix HTTP 仅 `/nginx/config` 和 `/nginx/certificate` 接收最多 1 MiB JSON，配置原文仍限制 128 KiB，其余控制动作保持 64 KiB。
+
+`tests/test_host_nginx.py` 使用受控 Docker/进程/网络替身验证事务和安全边界，不代替实际 BaoTa/1Panel 安装、Linux systemd 权限、主机重启或公网 ACME 验收。第三方行为参考官方源码版本，未复制其实现代码。
+
+交给 helper 的挑战目录及全部宿主祖先必须由 root 持有、无组/其它写权限且不经符号链接。网站账号可写的 webroot 不满足这一条件时，改在 root 持有的配置挂载中创建专属子目录，并保留原 CA 文件回退；不修改第三方目录归属或权限。这样网站进程不能在检查后通过重命名父目录把 Docker bind 转向其它宿主路径。

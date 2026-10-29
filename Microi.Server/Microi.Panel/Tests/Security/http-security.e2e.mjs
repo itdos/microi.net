@@ -67,6 +67,13 @@ try {
   assert.equal((await b.call('/ops-api/login', { account: 'security-test', password: secret })).status, 200);
   await b.call('/ops-api/session');
   passed('untrusted forwarded header is ignored and a second IP can still log in');
+  // 新宿主管理入口必须沿用现有独立会话，不能因添加第三方适配器而漏掉鉴权或 CSRF。
+  const anonymous = client('127.0.0.3'); await anonymous.call('/ops-api/session');
+  assert.equal((await anonymous.call('/ops-api/panel/host-nginx/instances')).status, 401);
+  assert.equal((await anonymous.call('/ops-api/panel/acme/external', {})).status, 401);
+  assert.equal((await b.call('/ops-api/panel/host-nginx/attach', { instanceId: 'baota', expectedFingerprint: 'a'.repeat(64), confirm: 'baota' }, { noCsrf: true })).status, 400);
+  assert.equal((await b.call('/ops-api/panel/host-nginx/instances')).status, 503);
+  passed('existing-site and external SSL APIs enforce authentication/CSRF and report unavailable host honestly');
   const state = (await b.call('/ops-api/panel/security')).json;
   assert.equal(state.currentIp, '127.0.0.2'); assert.equal(state.host, null);
   assert(state.panel.entries.some(x => x.ip === '192.0.2.11' && x.banned));

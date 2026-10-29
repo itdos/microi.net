@@ -54,8 +54,10 @@ builder.Services.AddSingleton<PlatformConnection>();
 builder.Services.AddSingleton<UpdateCoordinator>();
 builder.Services.AddSingleton<PanelRepository>();
 builder.Services.AddSingleton<PanelAuthGuardClient>();
+builder.Services.AddSingleton<HostDiskMaintenanceClient>();
 builder.Services.AddHostedService<PanelSecuritySync>();
 builder.Services.AddSingleton<NginxService>();
+builder.Services.AddSingleton<HostNginxService>();
 builder.Services.AddSingleton<PanelFiles>();
 builder.Services.AddSingleton<PanelHostMonitor>();
 builder.Services.AddSingleton<PanelBackups>();
@@ -139,24 +141,27 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseRateLimiter();
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "Microi.Panel", version = "2.0.1" }));
-app.MapGet("/ready", async (OpsStore store, PanelRepository repository, DockerEngine docker, PanelAuthGuardClient guard, CancellationToken ct) =>
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "Microi.Panel", version = "2.0.2" }));
+app.MapGet("/ready", async (OpsStore store, PanelRepository repository, DockerEngine docker, PanelAuthGuardClient guard, HostDiskMaintenanceClient maintenance, CancellationToken ct) =>
 {
     _ = store.Get<string>("panel-owner-id");
     _ = repository.Resources(); // Reads the durable ledger and validates persisted DataProtection keys.
     var engine = await docker.Info(ct);
     var protection = await guard.Status(ct);
+    var diskMaintenance = await maintenance.Status(ct);
     var engineId = engine?["ID"]?.ToString();
     var enrolledEngine = store.Get<string>("docker-engine-id");
     var ready = !string.IsNullOrWhiteSpace(engineId) && (enrolledEngine == null || enrolledEngine == engineId)
         && (options.Deployment.DockerEngineId.Length == 0 || options.Deployment.DockerEngineId == engineId)
-        && protection?["firewall"]?["verified"]?.GetValue<bool>() == true;
+        && protection?["firewall"]?["verified"]?.GetValue<bool>() == true
+        && diskMaintenance["monitoringFresh"]?.GetValue<bool>() == true && string.IsNullOrEmpty(diskMaintenance["error"]?.ToString())
+        && diskMaintenance["snapshot"]?["capacity"]?["storageHealthy"]?.GetValue<bool>() == true;
     return Results.Json(new { service = "Microi.Panel", status = ready ? "ready" : "not-ready" }, statusCode: ready ? 200 : 503);
 });
 app.MapGet("/ops-api/session", (HttpContext ctx, IAntiforgery antiforgery) => Results.Ok(new
 {
     authenticated = ctx.User.Identity?.IsAuthenticated == true, account = ctx.User.Identity?.Name,
-    csrfToken = antiforgery.GetAndStoreTokens(ctx).RequestToken, publicUrl = options.PublicUrl.ToString(), version = "2.0.1"
+    csrfToken = antiforgery.GetAndStoreTokens(ctx).RequestToken, publicUrl = options.PublicUrl.ToString(), version = "2.0.2"
 }));
 app.MapPost("/ops-api/login", async (OpsLogin request, HttpContext ctx, OpsAudit audit, PanelLoginSecurity security, PanelAuthGuardClient guard) =>
 {
@@ -188,6 +193,8 @@ app.MapPost("/ops-api/login", async (OpsLogin request, HttpContext ctx, OpsAudit
 var api = app.MapGroup("/ops-api").RequireAuthorization();
 api.MapPanel();
 api.MapPanelSecurity();
+api.MapHostNginx();
+api.MapHostDiskMaintenance();
 api.MapPost("/logout", async (HttpContext ctx, OpsAudit audit, PanelLoginSecurity security) =>
 {
     // 服务端先撤销，退出后的Cookie副本也不能继续访问Docker权限入口。

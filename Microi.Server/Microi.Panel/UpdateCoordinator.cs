@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace Microi.Panel;
 
-public sealed class UpdateCoordinator(OpsOptions options, OpsStore store, DockerEngine docker, OpsAudit audit, IDataProtectionProvider protection) : BackgroundService
+public sealed class UpdateCoordinator(OpsOptions options, OpsStore store, DockerEngine docker, OpsAudit audit, IDataProtectionProvider protection, Panel.HostDiskMaintenanceClient? maintenance = null) : BackgroundService
 {
     private readonly IDataProtector protector = protection.CreateProtector("microi.ops.container-snapshot.v1");
     private readonly SemaphoreSlim planning = new(1, 1);
@@ -164,6 +164,27 @@ public sealed class UpdateCoordinator(OpsOptions options, OpsStore store, Docker
             if (plan.EngineId != await CheckEngine(ct) || plan.DeploymentFingerprint != DeploymentHash) throw new OpsException("引擎或部署清单变化，已停止执行。", 409);
             task.State = "Running"; Progress(task, "核对计划与运行状态", 1);
             var changed = plan.Services.Where(x => x.Changed).ToArray();
+            var diskImages = changed.SelectMany(x => new[] { x.OldImage, x.TargetImage }).Distinct().ToArray();
+            if (maintenance != null && changed.Length > 0)
+            {
+                // 独立宿主服务统一仲裁容量与镜像保护；失败/恢复中的任务保留保护，不静默绕过。
+                long budget = 2L * 1024 * 1024 * 1024;
+                foreach (var service in changed)
+                {
+                    // Switching 之前已持久登记和保护。重启后旧容器可能已停机或改名，
+                    // 不能重新按未切换基线登记；Replace 继续核对旧 Id 或本任务标签。
+                    if (!task.Steps.ContainsKey(service.Name))
+                    {
+                        var original = await docker.Inspect(service.Name, ct) ?? throw new OpsException("容器已被其它程序改变。", 409);
+                        if (Text(original, "Id") != service.OldId || ConfigHash(original) != service.ConfigHash || Running(original) != service.WasRunning)
+                            throw new OpsException("容器已被其它程序改变，停止维护登记。", 409);
+                        await maintenance.Enroll(service.Name, service.Role == "api" ? "api" : "web", Spec(service.Name).Repository, ct);
+                    }
+                    var old = await docker.Image(service.OldImage, ct);
+                    budget = Math.Max(budget, Math.Min(20L * 1024 * 1024 * 1024, (old?["Size"]?.GetValue<long>() ?? 0) * 2));
+                }
+                await maintenance.Protect(task.Id, diskImages, budget, ct);
+            }
             foreach (var service in changed)
             {
                 if (task.Steps.ContainsKey(service.Name)) continue;
@@ -176,6 +197,7 @@ public sealed class UpdateCoordinator(OpsOptions options, OpsStore store, Docker
             {
                 if (task.Steps.ContainsKey(service.Name)) continue;
                 Progress(task, "准备镜像：" + service.Name, 5);
+                if (maintenance != null) await maintenance.Protect(task.Id, diskImages, 0, ct);
                 if (!service.LocalOnly)
                     await docker.Pull(service.TargetImage, item =>
                     {
@@ -212,10 +234,31 @@ public sealed class UpdateCoordinator(OpsOptions options, OpsStore store, Docker
                 for (var index = 0; index < changed.Length; index++)
                 {
                     var service = changed[index];
-                    if (task.Steps.GetValueOrDefault(service.Name) == "Healthy") continue;
+                    if (task.Steps.GetValueOrDefault(service.Name) == "Healthy")
+                    {
+                        var current = await docker.Inspect(service.Name, ct);
+                        if (current?["Config"]?["Labels"]?["io.microi.ops.task"]?.ToString() != task.Id)
+                            throw new OpsException("已切换的容器归属发生变化，已停止继续更新。", 409);
+                        await Ready(service, ct);
+                        continue;
+                    }
                     Progress(task, "切换容器：" + service.Name, 65 + index * 25 / Math.Max(1, changed.Length));
                     await Replace(task, service, ct);
                 }
+            }
+            if (maintenance != null && changed.Length > 0)
+            {
+                if (task.DownloadOnly)
+                {
+                    var prepared = new List<object>();
+                    foreach (var item in changed)
+                    {
+                        var image = await docker.Image(item.TargetImage, ct) ?? throw new OpsException("预拉取镜像无法回读。", 503);
+                        prepared.Add(new { name = item.Name, imageId = image["Id"]!.ToString() });
+                    }
+                    await maintenance.Prepared(task.Id, prepared, ct);
+                }
+                else await maintenance.Complete(task.Id, changed.Where(x => x.WasRunning).Select(x => x.Name), ct);
             }
             task.EstimatedSeconds = null; task.State = "Succeeded"; Progress(task, task.DownloadOnly ? "镜像已准备，尚未切换服务" : changed.Length == 0 ? "版本一致，无需重复更新" : "更新完成，必要检查已通过", 100);
             audit.Write("UpdateSucceeded", task.Actor, task.Phase, taskId: task.Id);
@@ -374,6 +417,7 @@ public sealed class UpdateCoordinator(OpsOptions options, OpsStore store, Docker
                 await Ready(verify, ct); WriteComposeOverride(Spec(service.Name), service.OldImage);
             }
             task.State = "RolledBack"; task.Phase = "原容器已恢复；数据库未回退"; store.SaveTask(task);
+            if (maintenance != null) await maintenance.Complete(task.Id, store.Plan(task.PlanId).Services.Where(x => x.WasRunning).Select(x => x.Name), ct);
             audit.Write("RestoreSucceeded", task.Actor, task.Phase, taskId: task.Id);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }

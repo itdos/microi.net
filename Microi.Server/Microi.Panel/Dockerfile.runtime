@@ -1,7 +1,7 @@
 # 用已经完成 npm build、dotnet publish 的目录作为构建上下文。
 FROM registry.cn-hangzhou.aliyuncs.com/microios/dotnet-aspnet:10.0
-LABEL io.microi.ops.controller="true" io.microi.panel.controller="true" org.opencontainers.image.title="Microi.Panel" org.opencontainers.image.version="2.0.1"
-LABEL io.microi.panel.authguard.protocol="1"
+LABEL io.microi.ops.controller="true" io.microi.panel.controller="true" org.opencontainers.image.title="Microi.Panel" org.opencontainers.image.version="2.0.2"
+LABEL io.microi.panel.authguard.protocol="1" io.microi.panel.diskguard.protocol="1"
 WORKDIR /app
 COPY . .
 ENV ASPNETCORE_URLS=http://+:8080 OPS_DATA_DIR=/microi/ops/data OPS_LOG_DIR=/microi/logs/ops

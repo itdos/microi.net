@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onUnmounted, reactive, ref, watch } from 'vue';
-import { MciButton, MciCard, MciFormField, MciModal, MciDataState, MciSkeleton } from '@microi/mci-ui';
+import { MciButton, MciCard, MciFormField, MciModal, MciSkeleton } from '@microi/mci-ui';
+import MciDataState from './PanelDataState.vue';
 import { api, formatTime, formatBytes } from './api.js';
 const props = defineProps({ page: { type: String, required: true } });
 const emit = defineEmits(['navigate']);
@@ -14,7 +15,7 @@ const installed = computed(() => snapshot.value?.resources.filter(x => x.state !
 const active = computed(() => snapshot.value?.operations.filter(x => ['Queued', 'Running'].includes(x.state)) || []);
 const selectedVersion = computed(() => install.value?.versions.find(x => x.id === form.version));
 const stateName = value => ({ Queued: '等待执行', Running: '正在执行', Succeeded: '已完成', Failed: '需处理', Installed: '已安装', Pending: '安装中', Stopped: '已停止', Removed: '已卸载，保留数据' }[value] || value);
-const actionName = value => ({ Start: '启动', Stop: '停止', Restart: '重启', Uninstall: '卸载', Reinstall: '重新安装', Install: '安装', NginxPublish: '发布网站配置', AcmeIssue: '申请网站证书', AcmeRenew: '自动续期证书', FileWrite: '保存网站文件', FileMkdir: '创建网站目录', FileTrash: '回收网站文件', FileRestore: '恢复网站文件', Backup: '创建冷备份', RestoreBackup: '恢复完整备份', DeleteBackup: '删除备份文件' }[value] || value);
+const actionName = value => ({ Start: '启动', Stop: '停止', Restart: '重启', Uninstall: '卸载', Reinstall: '重新安装', Install: '安装', NginxPublish: '发布网站配置', AcmeIssue: '申请网站证书', AcmeRenew: '自动续期证书', ExternalAcmeIssue: '申请已有站点证书', ExternalAcmeRenew: '续期已有站点证书', FileWrite: '保存网站文件', FileMkdir: '创建网站目录', FileTrash: '回收网站文件', FileRestore: '恢复网站文件', Backup: '创建冷备份', RestoreBackup: '恢复完整备份', DeleteBackup: '删除备份文件' }[value] || value);
 const isActive = id => active.value.some(x => x.resourceId === id);
 const containerOf = resource => snapshot.value?.containers.find(x => x.id === resource.containerId);
 const gib = value => value == null ? '暂不可用' : (value / 1073741824).toFixed(1) + ' GB';

@@ -12,7 +12,7 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'../../..'),work=reso
 const runStorage=resolve(work,'registry-runs',randomUUID());
 await mkdir(resolve(runStorage,'data'),{recursive:true});await mkdir(resolve(runStorage,'logs'),{recursive:true});
 const {request}=createRequire(resolve(root,'Microi.Client/package.json'))('@playwright/test');
-const ops=legacy.names.ops,web=legacy.names.web,registry=legacy.names.registry,watch=legacy.names.watchtower,label=legacy.label;
+const ops=legacy.names.ops,web=legacy.names.web+'-registry',registry=legacy.names.registry,watch=legacy.names.watchtower,label=legacy.label;
 const repository='127.0.0.1:61884/microi-fixture',docker=args=>execFileSync('docker',args,{encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const inspect=name=>JSON.parse(docker(['inspect',name]))[0];
 function remove(name){let c;try{c=inspect(name);}catch{return;}assert.equal(c.Config.Labels['io.microi.ops.test'],legacy.run);docker(['rm','-f',name]);}
@@ -40,7 +40,7 @@ const originalDeployment=await readFile(resolve(work,'deployment.json'),'utf8');
 const certificateMount=/^OPS_PLATFORM_CERTIFICATE_FILE=/m.test(env)?['-v',`${resolve(work,'platform.cer')}:/etc/microi-ops/platform.cer:ro`]:[];
 const spec={id:'ops-registry-test',name:'Private registry scheduler test',watchtowerName:watch,allowedImageRepositories:[repository],services:[{name:web,role:'web',repository,tag:'v3',requireDockerHealth:true,allowAutomatic:true,imageRollbackCompatible:true,readyTimeoutSeconds:15,stopTimeoutSeconds:2}]};
 function start(original=false){docker(['run','-d','--name',ops,'--label',label,'--memory','512m','--cpus','1','--env-file',resolve(work,'ops-test.env'),'--network',legacy.network,'-p','127.0.0.1:61880:8080',
- '-e','OPS_REGISTRY_CONFIG_FILE='+(original?'':'/etc/microi-ops/registry.json'),'-v','/var/run/docker.sock:/var/run/docker.sock','-v',`${resolve(work,'deployment.json')}:/etc/microi-ops/deployment.json:ro`,...certificateMount,
+ '-e','OPS_REGISTRY_CONFIG_FILE='+(original?'':'/etc/microi-ops/registry.json'),'-v','/var/run/docker.sock:/var/run/docker.sock',...legacy.diskGuardMount(docker),'-v',`${resolve(work,'deployment.json')}:/etc/microi-ops/deployment.json:ro`,...certificateMount,
  '-v',`${resolve(fixture,'ops-registry.json')}:/etc/microi-ops/registry.json:ro`,'-v',`${original?resolve(work,'data'):resolve(runStorage,'data')}:/microi/ops/data`,'-v',`${original?resolve(work,'logs'):resolve(runStorage,'logs')}:/microi/logs/ops`,legacy.image]);}
 const context=await request.newContext({baseURL:'http://localhost:61880'});let csrf;
 async function raw(path,data,method=data?'POST':'GET'){return context.fetch('/ops-api/'+path,{method,data,headers:{'X-Ops-CSRF':csrf||'',Origin:'http://localhost:61880'}});}
@@ -48,6 +48,12 @@ async function api(path,data,method){const r=await raw(path,data,method);assert(
 const passed=[];const pass=s=>{passed.push(s);console.log('PASS '+s);};
 const policy=(mode,start=0,end=0)=>api('policy',{mode,intervalSeconds:60,timeZone:'UTC',windowStartHour:start,windowEndHour:end},'PUT');
 try{
+ // 从本仓库的真实 v2 容器开始，避免把另一已登记仓库的容器冒充私有仓库升级基线。
+ // 本机旧镜像仅增加该显式仓库标签；v3 仍必须经原鉴权仓库实际下载。
+ const baselineImage=legacy.fixtureImage('v2');docker(['tag',baselineImage,repository+':v2']);
+ remove(web);docker(['run','-d','--name',web,'--label',label,'--memory','128m','--cpus','0.5','--network',legacy.network,'--restart','unless-stopped','-p','127.0.0.1:61882:80',repository+':v2']);
+ assert.equal(inspect(web).Image,JSON.parse(docker(['image','inspect',baselineImage]))[0].Id);assert.equal(inspect(web).Config.Image,repository+':v2');
+ const volumeProbe=randomUUID();docker(['exec',web,'sh','-c','printf %s "$1" > /data/private-registry-probe.txt','sh',volumeProbe]);
  remove(registry);docker(['run','-d','--name',registry,'--label',label,'--memory','128m','--cpus','0.5','-p','127.0.0.1:61884:5000','-v',`${fixture}:/registry:ro`,'node:22-bookworm-slim','node','/registry/server.mjs']);
  await writeFile(resolve(work,'deployment.json'),JSON.stringify(spec));remove(ops);start();docker(['start',web]);
  await until(async()=>(await context.get('/health')).ok());csrf=(await api('session')).csrfToken;await api('login',{account:'ops-test',password});csrf=(await api('session')).csrfToken;await policy('Manual');
@@ -68,7 +74,8 @@ try{
  await policy('Automatic');
  await until(async()=>{const s=await api('snapshot');const task=s.tasks.find(x=>x.actor==='scheduler'&&!x.downloadOnly);if(task&&['Failed','NeedsAttention','RolledBack'].includes(task.state))throw new Error(task.error);return task?.state==='Succeeded';},110);
  assert.equal(await(await fetch('http://localhost:61882')).text(),'microi-ops-fixture-private-v3');assert.equal(inspect(web).Mounts.find(x=>x.Destination==='/data').Name,oldVolume);pass('maintenance-window scheduler replaces Web with authenticated pinned image and preserves volume');
+ assert.equal(docker(['exec',web,'cat','/data/private-registry-probe.txt']),volumeProbe);pass('private registry upgrade retains actual persisted application bytes');
  await policy('Manual');docker(['restart',ops]);await until(async()=>(await context.get('/health')).ok());assert.equal((await api('snapshot')).policy.mode,'Manual');
  const noChange=await api('plans',{services:[web],targets:{}});assert.equal(noChange.services[0].changed,false);pass('disabled automation survives restart and pinned current image has no repeat update');
  await writeFile(resolve(work,'registry-scheduler-result.json'),JSON.stringify({passed,targetDigest:descriptor.digest,downloadBytes:prepared.downloadTotals},null,2));
-}finally{await context.dispose();remove(ops);remove(watch);remove(registry);await writeFile(resolve(work,'deployment.json'),originalDeployment);start(true);}
+}finally{await context.dispose();remove(ops);remove(watch);remove(registry);remove(web);await writeFile(resolve(work,'deployment.json'),originalDeployment);start(true);}

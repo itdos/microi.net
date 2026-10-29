@@ -1,6 +1,7 @@
 <script setup>
 import {onMounted,reactive,ref} from 'vue';
-import {MciButton,MciCard,MciFormField,MciModal,MciDataState,MciSkeleton} from '@microi/mci-ui';
+import {MciButton,MciCard,MciFormField,MciModal,MciSkeleton} from '@microi/mci-ui';
+import MciDataState from './PanelDataState.vue';
 import {api,formatTime,states} from './api.js';
 const emit=defineEmits(['navigate']);const loading=ref(true),busy=ref(false),message=ref(''),resources=ref([]),items=ref([]),editor=ref(null),form=reactive({});
 const localTime=date=>new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);

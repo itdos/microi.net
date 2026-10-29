@@ -195,7 +195,8 @@ class JournalCollector:
     def poll(self):
         try:
             cursor = self.store.cursor("ssh:journal")
-            args = ["journalctl", "--no-pager", "-o", "json", "--output-fields=__CURSOR,__REALTIME_TIMESTAMP,MESSAGE,_COMM,_UID,_EXE", "-n", "1000",
+            # systemd 219 supports JSON but not --output-fields; trusted fields are still checked below.
+            args = ["journalctl", "--no-pager", "-o", "json", "-n", "1000",
                     "_SYSTEMD_UNIT=ssh.service", "+", "_SYSTEMD_UNIT=sshd.service", "+", "_COMM=sshd", "+", "_COMM=sshd-session", "+", "_COMM=sshd-auth"]
             # 按时间顺序读取一个有界批次；未读完的 cursor 不推进到末端。
             if cursor:

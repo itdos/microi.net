@@ -70,13 +70,13 @@ internal static class Bootstrap
         if (env.Contains('\r')) throw new OpsException("配置不允许换行注入。");
         File.WriteAllText(envPath, env);
         File.WriteAllText(deploymentPath, JsonSerializer.Serialize(spec, new JsonSerializerOptions(JsonDefaults.Options) { WriteIndented = true }));
-        var volumes = new JsonArray("/var/run/docker.sock:/var/run/docker.sock", configDir + ":/etc/microi-ops:ro", dataDir + ":/microi/ops/data", logs + ":/microi/logs/ops");
+        var volumes = new JsonArray("/var/run/docker.sock:/var/run/docker.sock", configDir + ":/etc/microi-ops:ro", dataDir + ":/microi/ops/data", logs + ":/microi/logs/ops", "/run/microi-disk-guard:/run/microi-disk-guard:ro");
         foreach (var dir in spec.Services.Select(x => x.ComposeDirectory).Where(x => x.Length > 0).Distinct()) volumes.Add(dir + ":" + dir);
         var service = new JsonObject
         {
             ["image"] = image, ["container_name"] = "microi-ops", ["restart"] = "unless-stopped", ["env_file"] = new JsonArray(envPath),
             ["ports"] = new JsonArray("127.0.0.1:" + port + ":8080"), ["volumes"] = volumes, ["networks"] = new JsonArray("platform"),
-            ["mem_limit"] = "512m", ["cpus"] = "1.0", ["security_opt"] = new JsonArray("no-new-privileges:true"),
+            ["mem_limit"] = "512m", ["cpus"] = 1.0, ["security_opt"] = new JsonArray("no-new-privileges:true"),
             ["logging"] = new JsonObject { ["driver"] = "json-file", ["options"] = new JsonObject { ["max-size"] = "10m", ["max-file"] = "3" } }
         };
         var compose = new JsonObject { ["name"] = "microi-ops", ["services"] = new JsonObject { ["microi-ops"] = service }, ["networks"] = new JsonObject { ["platform"] = new JsonObject { ["external"] = true, ["name"] = network } } };

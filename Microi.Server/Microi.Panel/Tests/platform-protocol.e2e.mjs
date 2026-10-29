@@ -62,7 +62,7 @@ function start(fixture) {
     ? ['-e','OPS_PLATFORM_CERTIFICATE_FILE=/etc/microi-ops/platform.cer','-v',`${resolve(work,mount)}:/etc/microi-ops/platform.cer:ro`] : [];
   docker(['run','-d','--name',name,'--label',legacy.label,'--memory','512m','--cpus','1','--env-file',resolve(work,'ops-test.env'),
     ...certificate,'--network',legacy.network,'-p','127.0.0.1:61880:8080',
-    '-v','/var/run/docker.sock:/var/run/docker.sock','-v',`${resolve(work,'deployment.json')}:/etc/microi-ops/deployment.json:ro`,
+    '-v','/var/run/docker.sock:/var/run/docker.sock',...legacy.diskGuardMount(docker),'-v',`${resolve(work,'deployment.json')}:/etc/microi-ops/deployment.json:ro`,
     '-v',`${fixture?resolve(runStorage,'data'):resolve(work,'data')}:/microi/ops/data`,
     '-v',`${fixture?resolve(runStorage,'logs'):resolve(work,'logs')}:/microi/logs/ops`,legacy.image]);
 }

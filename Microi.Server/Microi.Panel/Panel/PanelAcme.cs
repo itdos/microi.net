@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -24,7 +25,19 @@ public sealed class PanelAcmeRegistration
     public DateTimeOffset NextCheck{get;set;}
     public string LastOperationId{get;set;}="";
     public string LastError{get;set;}="";
-    public object Public()=>new{Id,Revision,ResourceId,SiteId,Email,Provider,DirectoryUrl,RootCertificatePem,Domains,AutoRenew,NextCheck,LastOperationId,LastError};
+    public int ConsecutiveFailures{get;set;}
+    public DateTimeOffset? LastChecked{get;set;}
+    public DateTimeOffset? LastRenewed{get;set;}
+    public string LastOutcome{get;set;}="";
+    public string LastCertificateThumbprint{get;set;}="";
+    public string Target{get;set;}="Managed";
+    public string InstanceId{get;set;}="";
+    public string InstanceFingerprint{get;set;}="";
+    public string ConfigurationSha256{get;set;}="";
+    public string ChallengeHostPath{get;set;}="";
+    public long Attempt{get;set;}
+    public long CompletedAttempt{get;set;}
+    public object Public()=>new{Id,Revision,ResourceId,SiteId,Email,Provider,DirectoryUrl,RootCertificatePem,Domains,AutoRenew,NextCheck,LastOperationId,LastError,ConsecutiveFailures,LastChecked,LastRenewed,LastOutcome,LastCertificateThumbprint,Target,InstanceId,InstanceFingerprint,ConfigurationSha256};
 }
 public sealed record AcmeQueueClaim(PanelAcmeRegistration Registration,string ExpectedRevision,bool Automatic);
 public sealed record AcmePayload(PanelAcmeRegistration Registration,string WebsiteRevision);
@@ -35,11 +48,18 @@ public sealed class AcmeExecution
     public string ImageId{get;set;}="";
     public string Stage{get;set;}="Issuing";
     public bool AccountReady{get;set;}
+    public string AccountRecoveryStage{get;set;}="";
+    public string AccountRecoveryHash{get;set;}="";
     public NginxChange? Change{get;set;}
+    public string Outcome{get;set;}="Deployed";
+    public PanelCertificate? Certificate{get;set;}
+    public bool HttpPrepared{get;set;}
+    public string ExternalConfigurationSha256{get;set;}="";
+    public string ChallengeHostPath{get;set;}="";
 }
 
 /// <summary>复用网站 HTTP-01 入口。ACME 客户端运行于隔离 Docker 容器，不监听主机端口或访问 Docker socket。</summary>
-public sealed class PanelAcme(PanelRepository repository,DockerEngine docker,NginxService nginx)
+public sealed partial class PanelAcme(PanelRepository repository,DockerEngine docker,NginxService nginx)
 {
     // 上游 index 内的 OCI 附件不被当前镜像仓库支持；按平台复制原始运行 manifest，摘要逐项保持不变。
     public static string LegoImage(string architecture)=>"registry.cn-hangzhou.aliyuncs.com/microios/lego@"+(architecture switch
@@ -96,8 +116,13 @@ public sealed class PanelAcme(PanelRepository repository,DockerEngine docker,Ngi
         &&account["id"]?.ToString()==registration.Id&&account["server"]?.ToString()==registration.DirectoryUrl;
     public static string[] Command(PanelAcmeRegistration registration)
     {
+        // lego v5将初签和ARI续期合并为run；不强制续签，未进入续期窗口时保留现有证书。
         var args=new List<string>{"run","--path",StatePath(registration),"--account-id",registration.Id,"--cert.name",registration.Id,"--server",registration.DirectoryUrl,"--email",registration.Email,
-            "--http","--http.webroot",NginxConfig.Root+"/acme","--accept-tos","--key-type","EC256","--http-timeout","30","--cert.timeout","120","--no-random-sleep","--user-agent","Microi.Panel/2.0.0"};
+            "--http","--http.webroot",NginxConfig.Root+"/acme","--accept-tos","--key-type","EC256","--http-timeout","30","--cert.timeout","120","--no-random-sleep","--force-cert-domains","--user-agent","Microi.Panel/2.0.0"};
+        // Let's Encrypt 的 IP SAN 只允许 shortlived；初签和自动续期必须使用同一配置。
+        // 自定义 CA 的 profile 名称不受本程序控制，不能把公开 CA 的约束强加到其它机构。
+        if(registration.Provider is "LetsEncrypt" or "LetsEncryptStaging" && registration.Domains.Any(domain=>IPAddress.TryParse(domain,out _)))
+        {args.Add("--profile");args.Add("shortlived");}
         foreach(var domain in registration.Domains){args.Add("--domains");args.Add(domain);}return args.ToArray();
     }
     private void Progress(PanelOperation operation,string phase){operation.Phase=phase;repository.SaveOperation(operation);}
@@ -109,6 +134,12 @@ public sealed class PanelAcme(PanelRepository repository,DockerEngine docker,Ngi
         try
         {
             if(state.Stage=="Complete"){await RemoveHelper(state,resource,operation.Id,ct);return;}
+            if(operation.Action=="AcmeRenew")
+            {
+                var current=repository.AcmeRegistrations().SingleOrDefault(x=>x.Id==registration.Id);
+                if(current==null||!current.AutoRenew||current.Revision!=registration.Revision)
+                    throw new OpsException("自动续期已经暂停或配置已变化，停止旧任务。",409);
+            }
             var site=resource.Websites.Sites.SingleOrDefault(x=>x.Id==registration.SiteId&&x.Enabled)??throw new OpsException("证书对应的网站已停用或移除。",409);
             if(!site.Domains.Select(NginxConfig.Domain).Order().SequenceEqual(registration.Domains.Order()))throw new OpsException("网站域名已经变化，请重新配置自动证书。",409);
             if(resource.ConfigRevision!=payload.WebsiteRevision && resource.ConfigRevision!=state.Change?.Revision)throw new OpsException("网站版本与证书任务不同，请重新核对。",409);
@@ -118,65 +149,95 @@ public sealed class PanelAcme(PanelRepository repository,DockerEngine docker,Ngi
                 Progress(operation,"准备 ACME 客户端并验证 HTTP-01 域名所有权");
                 if(state.Image.Length==0){state.Image=LegoImage((await docker.Info(ct))?["Architecture"]?.ToString()??"");Save();}
                 if(state.ImageId.Length==0){await docker.Pull(state.Image,_=>{},ct);state.ImageId=(await docker.Image(state.Image,ct))!["Id"]!.ToString();Save();}
-                if(!state.AccountReady)
-                {
-                    Progress(operation,"注册或回读 ACME 账号");
-                    var accountHelper=state.Helper+"-account";
-                    try{await RunClient(accountHelper,RegisterCommand(registration),state,registration,resource,operation,ct);}
-                    catch(OpsException error) when(error.Message.Contains("urn:ietf:params:acme:error:accountDoesNotExist",StringComparison.Ordinal))
-                    {
-                        var account=JsonNode.Parse(await ReadText(accountHelper,AccountPath(registration)+"/account.json",ct));
-                        if(account==null||!CanRecoverUnregisteredAccount(error.Message,account,registration))throw;
-                        // v5在首次联网前保存账号文件；只有CA明确证明此密钥尚未注册且本地无注册回执时，
-                        // 才归档未完成的本地账号。未知网络结果、有效注册账号和私钥原件都不会被删除。
-                        var archived=StatePath(registration)+"/unregistered-"+operation.Id;
-                        if(await docker.StatPath(resource.ContainerId,archived,ct)!=null)throw new OpsException("未注册账号已归档但注册仍失败，请核对CA状态后继续原任务。",409);
-                        var moved=await docker.Execute(resource.ContainerId,["mv","--",AccountPath(registration),archived],ct);
-                        if(moved.ExitCode!=0)throw new OpsException("未完成账号归档失败，原文件保持可回读。",409);
-                        await RemoveOneHelper(accountHelper,resource,operation.Id,ct);
-                        await RunClient(accountHelper,RegisterCommand(registration),state,registration,resource,operation,ct);
-                    }
-                    state.AccountReady=true;Save();
-                }
+                await EnsureAccount(state,registration,resource,operation,Save,ct);
                 Progress(operation,"验证 HTTP-01 并申请或续期证书");
                 await RunClient(state.Helper,Command(registration),state,registration,resource,operation,ct);
                 var certificate=PanelCertificate.Import(registration.Id,site.Name+" 自动证书",
                     await ReadText(state.Helper,StatePath(registration)+"/certificates/"+registration.Id+".crt",ct),await ReadText(state.Helper,StatePath(registration)+"/certificates/"+registration.Id+".key",ct));
                 certificate.Source=registration.Provider;certificate.AssertDomains(registration.Domains);
+                var previous=repository.Certificates().GetValueOrDefault(registration.Id);
+                state.Outcome=previous?.Thumbprint==certificate.Thumbprint?"Unchanged":"Deployed";
                 var configuration=JsonSerializer.Deserialize<NginxConfiguration>(JsonSerializer.Serialize(resource.Websites,JsonDefaults.Options),JsonDefaults.Options)!;
                 configuration.Sites.Single(x=>x.Id==registration.SiteId).CertificateId=certificate.Id;
                 var certificates=repository.Certificates();certificates[certificate.Id]=certificate;
                 var used=configuration.Sites.Select(x=>x.CertificateId).Where(x=>x.Length>0).ToHashSet();
                 state.Change=new(){Revision="r"+operation.Id,PreviousRevision=resource.ConfigRevision,Configuration=configuration,Certificates=certificates.Where(x=>used.Contains(x.Key)).ToDictionary()};
-                state.Stage="Deploying";Save();
+                state.Stage=state.Outcome=="Unchanged"&&site.CertificateId==certificate.Id&&previous?.CertificatePem==certificate.CertificatePem?"Verifying":"Deploying";Save();
             }
             Progress(operation,"校验证书 SAN 和私钥并发布到 Nginx");
-            await nginx.Deploy(resource,operation,state.Change!,ct);
+            if(state.Stage=="Verifying")await nginx.VerifyCertificates(resource,state.Change!.Configuration,state.Change.Certificates,ct);
+            else await nginx.Deploy(resource,operation,state.Change!,ct);
             repository.SaveCertificate(state.Change!.Certificates[registration.Id]);
-            repository.CompleteAcme(registration.Id,operation.Id,"");state.Stage="Complete";Save();await RemoveHelper(state,resource,operation.Id,ct);
+            repository.CompleteAcme(registration.Id,operation.Id,"",state.Outcome,state.Change.Certificates[registration.Id].Thumbprint);state.Stage="Complete";Save();await RemoveHelper(state,resource,operation.Id,ct);
         }
         catch(OperationCanceledException) when(ct.IsCancellationRequested){throw;}
         catch(Exception error) when(error is not OutOfMemoryException)
-        {repository.CompleteAcme(registration.Id,operation.Id,error is OpsException?Redaction.Clean(error.Message):"证书操作失败，请查看任务记录。");throw;}
+        {if(state.Stage!="Complete")repository.CompleteAcme(registration.Id,operation.Id,error is OpsException?Redaction.Clean(error.Message):"证书操作失败，请查看任务记录。");throw;}
     }
-    private async Task RunClient(string name,string[] command,AcmeExecution state,PanelAcmeRegistration registration,PanelResource resource,PanelOperation operation,CancellationToken ct)
+    public static string[] AccountArchiveCommand(PanelAcmeRegistration registration,string operationId,string accountHash)
+    {
+        if(!System.Text.RegularExpressions.Regex.IsMatch(operationId,@"^[a-f0-9]{32}$")||!System.Text.RegularExpressions.Regex.IsMatch(accountHash,@"^[a-f0-9]{64}$"))
+            throw new OpsException("未完成账号恢复标识无效。",409);
+        // 只移动同一独占卷中的固定账号目录；重启后只接受具有原摘要的已有归档，绝不覆盖。
+        const string script="if [ -d \"$2\" ] && [ ! -L \"$2\" ]; then actual=$(sha256sum \"$2/account.json\"); test \"${actual%% *}\" = \"$3\"; else test ! -e \"$2\"; test ! -L \"$2\"; test -d \"$1\"; test ! -L \"$1\"; actual=$(sha256sum \"$1/account.json\"); test \"${actual%% *}\" = \"$3\"; mv -n -T -- \"$1\" \"$2\"; test ! -e \"$1\"; test ! -L \"$1\"; fi";
+        return ["-ec",script,"microi-acme-account-archive",AccountPath(registration),StatePath(registration)+"/unregistered-"+operationId,accountHash];
+    }
+    private async Task EnsureAccount(AcmeExecution state,PanelAcmeRegistration registration,PanelResource resource,PanelOperation operation,Action save,CancellationToken ct)
+    {
+        if(state.AccountReady)return;
+        var accountHelper=state.Helper+"-account";var archiveHelper=accountHelper+"-archive";
+        async Task FinishRecovery()
+        {
+            if(state.AccountRecoveryStage=="Requested")
+            {
+                await RunClient(archiveHelper,AccountArchiveCommand(registration,operation.Id,state.AccountRecoveryHash),state,registration,resource,operation,ct,true);
+                var archived=await ReadText(archiveHelper,StatePath(registration)+"/unregistered-"+operation.Id+"/account.json",ct);
+                if(!string.Equals(UpdateCoordinator.Hash(archived),state.AccountRecoveryHash,StringComparison.OrdinalIgnoreCase))throw new OpsException("未完成账号归档回读不一致，保留现场。",409);
+                state.AccountRecoveryStage="Archived";save();
+            }
+            if(state.AccountRecoveryStage=="Archived")
+            {await RemoveOneHelper(accountHelper,resource,operation.Id,ct);state.AccountRecoveryStage="HelperReset";save();}
+        }
+        await FinishRecovery();
+        Progress(operation,"注册或回读 ACME 账号");
+        try{await RunClient(accountHelper,RegisterCommand(registration),state,registration,resource,operation,ct);}
+        catch(OpsException error) when(error.Message.Contains("urn:ietf:params:acme:error:accountDoesNotExist",StringComparison.Ordinal))
+        {
+            if(state.AccountRecoveryStage.Length>0)throw new OpsException("未注册账号恢复后仍失败，请核对CA状态后继续原任务；原材料已保留。",409);
+            var raw=await ReadText(accountHelper,AccountPath(registration)+"/account.json",ct);var account=JsonNode.Parse(raw);
+            if(account==null||!CanRecoverUnregisteredAccount(error.Message,account,registration))throw;
+            state.AccountRecoveryHash=UpdateCoordinator.Hash(raw).ToLowerInvariant();state.AccountRecoveryStage="Requested";save();
+            await FinishRecovery();
+            await RunClient(accountHelper,RegisterCommand(registration),state,registration,resource,operation,ct);
+        }
+        state.AccountReady=true;save();
+    }
+    private async Task RunClient(string name,string[] command,AcmeExecution state,PanelAcmeRegistration registration,PanelResource resource,PanelOperation operation,CancellationToken ct,bool accountArchive=false)
     {
         var helper=await docker.Inspect(name,ct);
         if(helper==null)
         {
             var labels=PanelDockerConfig.Labels(resource);labels[OperationLabel]=operation.Id;
             var env=new JsonArray();if(registration.RootCertificatePem.Length>0)env.Add("LEGO_CA_CERTIFICATES="+StatePath(registration)+"/roots.pem");
-            await docker.Json(HttpMethod.Post,"/containers/create?name="+name,new JsonObject{["Image"]=state.ImageId,["User"]="0:0",["Cmd"]=JsonSerializer.SerializeToNode(command),["Env"]=env,["Labels"]=labels,
-                ["HostConfig"]=new JsonObject{["NetworkMode"]=PanelDockerConfig.Network(resource.OwnerId),["Memory"]=256L*1024*1024,["MemorySwap"]=256L*1024*1024,["PidsLimit"]=64,["NanoCpus"]=1_000_000_000L,["Privileged"]=false,
+            var mounts=new JsonArray(new JsonObject{["Type"]="volume",["Source"]=resource.VolumeName,["Target"]=NginxConfig.Root});
+            if(registration.Target=="External"&&!accountArchive)
+            {
+                ValidateChallengePath(registration.ChallengeHostPath);
+                mounts.Add(new JsonObject{["Type"]="bind",["Source"]=registration.ChallengeHostPath,["Target"]=NginxConfig.Root+"/acme"});
+            }
+            var body=new JsonObject{["Image"]=state.ImageId,["User"]="0:0",["Cmd"]=JsonSerializer.SerializeToNode(command),["Env"]=env,["Labels"]=labels,
+                ["HostConfig"]=new JsonObject{["NetworkMode"]=accountArchive?"none":PanelDockerConfig.Network(resource.OwnerId),["Memory"]=(accountArchive?64L:256L)*1024*1024,["MemorySwap"]=(accountArchive?64L:256L)*1024*1024,["PidsLimit"]=64,["NanoCpus"]=1_000_000_000L,["Privileged"]=false,["ReadonlyRootfs"]=accountArchive,
                     ["CapDrop"]=new JsonArray("ALL"),["SecurityOpt"]=new JsonArray("no-new-privileges:true"),["LogConfig"]=new JsonObject{["Type"]="json-file",["Config"]=new JsonObject{["max-size"]="2m",["max-file"]="2"}},
-                    ["Mounts"]=new JsonArray(new JsonObject{["Type"]="volume",["Source"]=resource.VolumeName,["Target"]=NginxConfig.Root})}},ct);
+                    ["Mounts"]=mounts}};
+            if(accountArchive)body["Entrypoint"]=new JsonArray("/bin/sh");
+            await docker.Json(HttpMethod.Post,"/containers/create?name="+name,body,ct);
             if(registration.RootCertificatePem.Length>0)await docker.PutFiles(name,NginxConfig.Root,[new(StatePath(registration)[(NginxConfig.Root.Length+1)..]+"/roots.pem",Encoding.UTF8.GetBytes(registration.RootCertificatePem))],ct);
             helper=await docker.Inspect(name,ct);
         }
         AssertHelper(helper!,resource,operation.Id);
         if(helper!["State"]?["Running"]?.GetValue<bool>()!=true&&(helper["State"]?["Status"]?.ToString()=="created"||helper["State"]?["ExitCode"]?.GetValue<int>()!=0))
             await docker.Json(HttpMethod.Post,"/containers/"+name+"/start",ct:ct);
-        var deadline=DateTimeOffset.UtcNow.AddMinutes(15);
+        var deadline=DateTimeOffset.UtcNow.AddMinutes(accountArchive?1:15);
         while(true)
         {
             helper=await docker.Inspect(name,ct)??throw new OpsException("证书任务容器丢失。",409);AssertHelper(helper,resource,operation.Id);
@@ -191,7 +252,7 @@ public sealed class PanelAcme(PanelRepository repository,DockerEngine docker,Ngi
     private static void AssertHelper(JsonNode helper,PanelResource resource,string operationId)
     {PanelDockerConfig.AssertOwned(helper,resource);if(helper["Config"]?["Labels"]?[OperationLabel]?.ToString()!=operationId)throw new OpsException("证书任务容器归属不匹配。",409);}
     private async Task RemoveHelper(AcmeExecution state,PanelResource resource,string operationId,CancellationToken ct)
-    {await RemoveOneHelper(state.Helper,resource,operationId,ct);await RemoveOneHelper(state.Helper+"-account",resource,operationId,ct);}
+    {await RemoveOneHelper(state.Helper,resource,operationId,ct);await RemoveOneHelper(state.Helper+"-account",resource,operationId,ct);await RemoveOneHelper(state.Helper+"-account-archive",resource,operationId,ct);}
     private async Task RemoveOneHelper(string name,PanelResource resource,string operationId,CancellationToken ct)
     {var helper=await docker.Inspect(name,ct);if(helper==null)return;AssertHelper(helper,resource,operationId);await docker.Json(HttpMethod.Delete,"/containers/"+name+"?v=false&force=false",ct:ct);}
 }
@@ -204,8 +265,11 @@ public sealed class PanelAcmeScheduler(PanelRepository repository,OpsAudit audit
         {
             try
             {
-                foreach(var registration in repository.AcmeRegistrations().Where(x=>x.AutoRenew&&x.NextCheck<=DateTimeOffset.UtcNow))
+                foreach(var registration in repository.AcmeRegistrations().Where(x=>x.AutoRenew))
                 {
+                    // Docker预检可能在进入ACME执行器前失败；重启后也要补记这一轮失败，不能空等12小时。
+                    if(repository.RecoverAcmePreflightFailure(registration))continue;
+                    if(registration.NextCheck>DateTimeOffset.UtcNow)continue;
                     if(repository.Operations(true).Any(x=>x.ResourceId==registration.ResourceId))continue;
                     try{var operation=repository.EnqueueAcmeRenewal(registration);audit.Write("AcmeRenewalQueued","scheduler",registration.Id,taskId:operation.Id);}
                     catch(OpsException error){repository.CompleteAcme(registration.Id,registration.LastOperationId,Redaction.Clean(error.Message));}

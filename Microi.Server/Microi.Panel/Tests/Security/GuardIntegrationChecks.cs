@@ -26,8 +26,21 @@ internal static class GuardIntegrationChecks
         var handler = new GuardHandler(); using var client = new PanelAuthGuardClient(handler);
         check((await client.Check("198.51.100.8", default))?["banned"]?.GetValue<bool>() == false, "typed guard check reads an actual HTTP response");
         check(handler.Path == "/check" && handler.Body?["ip"]?.ToString() == "198.51.100.8", "guard client submits only typed source-IP data to its fixed route");
-        await client.Failure("198.51.100.8", "event-1", default);
+        check(handler.KnownLengthBeforeRead == handler.Bytes.Length && !handler.Chunked && !handler.ExpectContinue,
+            "guard POST has a known Content-Length before transport reads its body");
+        await client.Failure("198.51.100.8", "中文认证事件-1", default);
         check(handler.Path == "/failures" && handler.Body?["service"]?.ToString() == "panel", "panel failures are attributed to the fixed panel service");
+        check(handler.KnownLengthBeforeRead == handler.Bytes.Length && handler.Body?["eventId"]?.ToString() == "中文认证事件-1"
+            && handler.ContentType == "application/json; charset=utf-8", "Chinese guard event JSON retains its value and exact serialized UTF-8 byte length");
+        await client.SavePolicy(new() { ["expectedRevision"] = "策略版本-1", ["enabled"] = true }, default);
+        check(handler.Path == "/policy" && handler.KnownLengthBeforeRead == handler.Bytes.Length && !handler.Chunked,
+            "guard policy PUT also has explicit body framing");
+        await client.Unban("198.51.100.8", default);
+        check(handler.Path == "/unban" && handler.KnownLengthBeforeRead == handler.Bytes.Length && !handler.Chunked,
+            "guard unban POST also has explicit body framing");
+        await client.Status(default);
+        check(handler.Path == "/status" && handler.KnownLengthBeforeRead == null && handler.Bytes.Length == 0,
+            "guard status GET does not invent a JSON body");
         handler.Status = HttpStatusCode.Conflict;
         var conflict = false; try { await client.SavePolicy(new(), default); } catch (OpsException error) { conflict = error.Status == 409; }
         check(conflict, "guard CAS failure cannot become a successful policy save");
@@ -180,12 +193,22 @@ internal static class GuardIntegrationChecks
         public HttpStatusCode Status = HttpStatusCode.OK;
         public string Response = "{\"banned\":false}";
         public bool Unavailable;
+        public long? KnownLengthBeforeRead;
+        public byte[] Bytes = [];
+        public bool Chunked, ExpectContinue;
+        public string? ContentType;
         public List<(string Path, JsonObject? Body)> Requests { get; } = [];
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             if (Unavailable) throw new HttpRequestException("fixture-unavailable");
             Path = request.RequestUri!.AbsolutePath;
-            Body = request.Content == null ? null : JsonNode.Parse(await request.Content.ReadAsStringAsync(cancellationToken)) as JsonObject;
+            // 必须先读取头；ReadAsByteArrayAsync 会缓冲 JsonContent，之后才检查长度会漏掉真实线上 chunked 缺陷。
+            KnownLengthBeforeRead = request.Content?.Headers.ContentLength;
+            Chunked = request.Headers.TransferEncodingChunked == true;
+            ExpectContinue = request.Headers.ExpectContinue == true;
+            ContentType = request.Content?.Headers.ContentType?.ToString();
+            Bytes = request.Content == null ? [] : await request.Content.ReadAsByteArrayAsync(cancellationToken);
+            Body = request.Content == null ? null : JsonNode.Parse(Bytes) as JsonObject;
             Requests.Add((Path, Body?.DeepClone() as JsonObject));
             return new(Status) { Content = new StringContent(Response) };
         }

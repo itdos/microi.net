@@ -11,6 +11,8 @@ public sealed class PanelBootstrapTests
         var result=PanelBootstrap.Build(new("/microi/panel","https://panel.example.test:61890",61890,PanelBootstrap.DefaultImage,"0.0.0.0"));
         var compose=JsonNode.Parse(result.Compose)!;var service=compose["services"]!["microi-panel"]!;
         Assert.Equal("0.0.0.0:61890:8443",service["ports"]![0]!.ToString());
+        // Older Compose decoders require cpus to be a JSON number, not a numeric string.
+        Assert.Equal(1.0,service["cpus"]!.GetValue<double>());
         Assert.DoesNotContain("microi-install-api",result.Compose);Assert.DoesNotContain(":8080",result.Compose);
         Assert.DoesNotContain("OPS_ADMIN_PASSWORD=",result.Environment);Assert.Contains("OPS_ADMIN_PASSWORD_FILE=",result.Environment);
         using var cert=X509CertificateLoader.LoadPkcs12(result.Certificate,result.CertificatePassword,OperatingSystem.IsMacOS() ? X509KeyStorageFlags.DefaultKeySet : X509KeyStorageFlags.EphemeralKeySet);

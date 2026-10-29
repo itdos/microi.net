@@ -95,7 +95,7 @@ test('downgrade protection runs before guard, bootstrap and Compose mutations',(
 for(const enabled of [0,1]) test(`image override ${enabled ? 'adds a readonly guard socket' : 'retains legacy mounts'}`,()=>{
   // 渲染函数只输出Compose；写入与并发回读另由恢复行为测试覆盖。
   const write=fn('panel_render_image_override');
-  const script=`set -Eeuo pipefail\nPANEL_HAS_AUTH_GUARD=${enabled}\nPANEL_OPERATION_ID=owned-operation\n${write}\npanel_render_image_override ${quote(image)}`;
+  const script=`set -Eeuo pipefail\nPANEL_HAS_AUTH_GUARD=${enabled}\nPANEL_HAS_DISK_GUARD=1\nPANEL_OPERATION_ID=owned-operation\n${write}\npanel_render_image_override ${quote(image)}`;
   const result=spawnSync(bash,['-c',script],{encoding:'utf8',windowsHide:true});
   assert.equal(result.status,0,result.stderr); assert.match(result.stdout,new RegExp('image: '+image));
   assert.match(result.stdout,/installer-operation: "owned-operation"/);
@@ -103,25 +103,28 @@ for(const enabled of [0,1]) test(`image override ${enabled ? 'adds a readonly gu
   else assert.doesNotMatch(result.stdout,/volumes:|microi-auth-guard/);
 });
 const stableImage='registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.0';
+const releaseImage='registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.2';
 const scopeEnd=source.indexOf('\npanel_select_install_scope\n')+'\npanel_select_install_scope\n'.length;
 assert(scopeEnd>'\npanel_select_install_scope\n'.length,'Installation scope must be selected before host operations');
-for(const [title,args,flags,stable]of[
- ['public one-click command keeps the released stable image',[],'CHECK=0 IMAGE=0 LEGACY=0 STABLE=1',true],
- ['legacy opt-in retains the known stable default',['--legacy-panel-only'],'CHECK=0 IMAGE=0 LEGACY=1 STABLE=1',true],
- ['read-only check reports stable scope',['--check'],'CHECK=1 IMAGE=0 LEGACY=0 STABLE=1',true],
- ['explicit local candidate never inherits legacy permission',['--image','microi-panel:fixture-2.0.1','--offline'],'CHECK=0 IMAGE=1 LEGACY=0 STABLE=0',false],
- ['explicit legacy mode remains distinct',['--image',stableImage,'--legacy-panel-only'],'CHECK=0 IMAGE=1 LEGACY=1 STABLE=0',false],
+for(const [title,args,flags,defaultImage]of[
+ ['default release selects protected 2.0.2',[],'CHECK=0 IMAGE=0 LEGACY=0',true],
+ ['legacy opt-in never changes the selected default image',['--legacy-panel-only'],'CHECK=0 IMAGE=0 LEGACY=1',true],
+ ['read-only check reports protected release scope',['--check'],'CHECK=1 IMAGE=0 LEGACY=0',true],
+ ['explicit local candidate never inherits legacy permission',['--image','microi-panel:fixture-2.0.1','--offline'],'CHECK=0 IMAGE=1 LEGACY=0',false],
+ ['explicit legacy mode remains distinct',['--image',stableImage,'--legacy-panel-only'],'CHECK=0 IMAGE=1 LEGACY=1',false],
 ])test('installation scope '+title,()=>{
- const result=spawnSync(bash,['-s','--',...args],{input:source.slice(0,scopeEnd)+'\nprintf "CHECK=%s IMAGE=%s LEGACY=%s STABLE=%s REF=%s" "$PANEL_CHECK" "$PANEL_IMAGE_EXPLICIT" "$PANEL_LEGACY_PANEL_ONLY" "$PANEL_STABLE_DEFAULT" "$PANEL_IMAGE"\n',encoding:'utf8',windowsHide:true});
+ const result=spawnSync(bash,['-s','--',...args],{input:source.slice(0,scopeEnd)+'\nprintf "CHECK=%s IMAGE=%s LEGACY=%s REF=%s" "$PANEL_CHECK" "$PANEL_IMAGE_EXPLICIT" "$PANEL_LEGACY_PANEL_ONLY" "$PANEL_IMAGE"\n',encoding:'utf8',windowsHide:true});
  assert.equal(result.status,0,result.stderr);assert.match(result.stdout,new RegExp(flags));
- if(stable){assert(result.stdout.includes('REF='+stableImage));assert.match(result.stderr,/默认稳定版v2\.0\.0/);assert.match(result.stderr,/仅旧版面板，不含SSH\/数据库认证防护/);}
- else assert.doesNotMatch(result.stderr,/默认稳定版/);
+ if(defaultImage){assert(result.stdout.includes('REF='+releaseImage));assert.match(result.stderr,/默认v2\.0\.2要求主机认证防护与磁盘维护协议1/);assert.match(result.stderr,/累计3次失败封禁24小时/);}
+ assert.doesNotMatch(result.stderr,/默认稳定版v2\.0\.0|仅旧版面板/);
 });
 for(const [title,args,protocol,oldProtocol,allowed]of[
- ['default stable first install',[],'','',true],
- ['default stable upgrade from legacy',['--upgrade'],'','',true],
- ['default stable cannot downgrade protocol 1',['--upgrade'],'','1',false],
- ['default stable rejects unknown protocol',[],'2','',false],
+ ['default release first install requires protection',[],'','',false],
+ ['default release upgrades legacy only with protection',['--upgrade'],'','',false],
+ ['default protected first install',[],'1','',true],
+ ['default protected upgrade from legacy',['--upgrade'],'1','',true],
+ ['default cannot downgrade protocol 1',['--upgrade'],'','1',false],
+ ['default rejects unknown protocol',[],'2','',false],
  ['explicit stable image still requires legacy opt-in',['--image',stableImage],'','',false],
  ['explicit stable image accepts legacy opt-in',['--image',stableImage,'--legacy-panel-only'],'','',true],
  ['explicit candidate enforces protocol 1',['--image','microi-panel:fixture-2.0.1'],'','',false],
@@ -136,22 +139,23 @@ for(const [title,args,protocol,oldProtocol,allowed]of[
  if(protocol==='1'){assert.match(result.stdout,/宿主防护控制面已回读/);assert.doesNotMatch(result.stderr,/默认稳定版/);}
  else{assert.match(result.stdout,/仅旧版面板，不含SSH\/数据库认证防护/);assert.doesNotMatch(result.stdout,/宿主防护控制面已回读/);}
 });
-test('automatic legacy scope cannot extend to an unknown default image',()=>{
- const input=`set -Eeuo pipefail\nfail(){ echo "$*" >&2; exit 1; }\nPANEL_IMAGE_EXPLICIT=0\nPANEL_STABLE_DEFAULT=0\nPANEL_IMAGE=microi-panel:unknown\n${fn('panel_select_install_scope')}\npanel_select_install_scope\nprintf UNEXPECTED_LEGACY`;
+test('unknown default image cannot silently change the selected release',()=>{
+ const input=`set -Eeuo pipefail\nfail(){ echo "$*" >&2; exit 1; }\nPANEL_IMAGE_EXPLICIT=0\nPANEL_IMAGE=microi-panel:unknown\n${fn('panel_select_install_scope')}\npanel_select_install_scope\nprintf UNEXPECTED_LEGACY`;
  const result=spawnSync(bash,['-c',input],{encoding:'utf8',windowsHide:true});
  assert.notEqual(result.status,0);assert.doesNotMatch(result.stdout,/UNEXPECTED_LEGACY/);
 });
 test('explicit candidate pull failure never falls back to the stable image',()=>{
  const start=source.indexOf('if ((PANEL_OFFLINE)); then docker image inspect');
  const end=source.indexOf('\n# 拉取完成再生成配置',start);assert(start>0&&end>start);
- const input=source.slice(0,scopeEnd)+`\ndocker(){ printf 'PULL:%s\\n' "$*"; return 57; }\n`+source.slice(start,end)+'\nprintf UNEXPECTED_FALLBACK\n';
+ const input=source.slice(0,scopeEnd)+`\nmicroi_disk_run(){ "$@"; }\ndocker(){ printf 'PULL:%s\\n' "$*"; return 57; }\n`+source.slice(start,end)+'\nprintf UNEXPECTED_FALLBACK\n';
  const result=spawnSync(bash,['-s','--','--image','microi-panel:fixture-2.0.1'],{input,encoding:'utf8',windowsHide:true});
  assert.equal(result.status,57);assert.match(result.stdout,/PULL:pull microi-panel:fixture-2\.0\.1/);assert.doesNotMatch(result.stdout,/v2\.0\.0|UNEXPECTED_FALLBACK/);
 });
-test('help separates the stable public entry from unpublished 2.0.1 candidate protection',()=>{
+test('release help requires protected 2.0.2 and preserves the explicit legacy opt-in',()=>{
  const result=spawnSync(bash,['-s','--','--help'],{input:source,encoding:'utf8',windowsHide:true});
- assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/v2\.0\.1（源码候选，尚未正式发布）/);assert.match(result.stdout,/--legacy-panel-only/);
- assert.match(result.stdout,/仅旧版面板，不含SSH\/数据库认证防护/);assert.match(result.stdout,/默认稳定版v2\.0\.0/);assert.match(source,/PANEL_IMAGE=.*:v2\.0\.0\n/);
+ assert.equal(result.status,0,result.stderr);assert.match(result.stdout,/安装器 v2\.0\.2\n/);assert.match(result.stdout,/--legacy-panel-only/);
+ assert.match(result.stdout,/仅旧版面板，不含SSH\/数据库认证防护/);assert.match(result.stdout,/安装器核对宿主防护协议，不会自动退回旧版/);assert.match(source,/PANEL_IMAGE=.*:v2\.0\.2\n/);
+ assert.doesNotMatch(source,/PANEL_STABLE_DEFAULT/);
 });
 for(const [guard,legacy,allowed]of[[1,0,true],[0,1,true],[0,0,false]])test(`completion is truthful for guard=${guard}, explicitLegacy=${legacy}`,()=>{
  const script=`set -Eeuo pipefail\nfail(){ echo "$*" >&2; exit 1; }\nPANEL_HAS_AUTH_GUARD=${guard}\nPANEL_LEGACY_PANEL_ONLY=${legacy}\nPANEL_URL=https://example.test:61890\nPANEL_ROOT=/fixture/panel\nPANEL_PORT=61890\n${fn('panel_report_completion')}\npanel_report_completion`;

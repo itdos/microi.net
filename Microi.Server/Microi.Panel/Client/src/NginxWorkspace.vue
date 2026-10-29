@@ -1,14 +1,19 @@
 <script setup>
-import { computed, onUnmounted, reactive, ref, watch } from 'vue';
-import { MciButton, MciCard, MciFormField, MciModal, MciDataState, MciSkeleton } from '@microi/mci-ui';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { MciButton, MciCard, MciFormField, MciModal, MciSkeleton } from '@microi/mci-ui';
+import MciDataState from './PanelDataState.vue';
 import { api, formatTime } from './api.js';
+import HostNginxWorkspace from './HostNginxWorkspace.vue';
 const props = defineProps({ page: { type: String, required: true } });
-const emit = defineEmits(['navigate']);
+const emit = defineEmits(['navigate', 'dirty']);
+const management = ref('managed'), hostDirty = ref(false);
+function hostChanged(value) { hostDirty.value = value; }
 const instances = ref([]), selected = ref(''), config = ref(null), certificates = ref([]), loading = ref(true), busy = ref(false);
 const message = ref(''), editor = ref(null), deleteSite = ref(null), certificateOpen = ref(false), preview = ref(''), publishOpen = ref(false), hasChanges = ref(false);
 const form = reactive({}), certificate = reactive({ id: '', name: '', certificatePem: '', privateKeyPem: '' });
 const automatic=ref([]),acmeOpen=ref(false),acme=reactive({siteId:'',email:'',provider:'LetsEncrypt',directoryUrl:'',rootCertificatePem:'',autoRenew:true,acceptTerms:false,expectedAcmeRevision:''});
 const automaticFor=site=>automatic.value.find(x=>x.resourceId===selected.value&&x.siteId===site.id);
+const renewalState = value => ({ Deployed: '新证书已部署', Unchanged: '当前证书尚无需续签', Failed: '检查或部署失败' })[value] || '等待检查';
 let requestId = '', disposed = false, generation = 0;
 const sites = computed(() => config.value?.configuration.sites || []);
 const validCertificates = computed(() => certificates.value.filter(x => new Date(x.notAfter) > new Date()));
@@ -62,12 +67,22 @@ function openAcme(site){const existing=automaticFor(site);Object.assign(acme,{si
 async function issueAcme(){await act(async()=>{await api('panel/acme',{...acme,requestId,resourceId:selected.value,expectedRevision:config.value.revision,confirm:acme.siteId});acmeOpen.value=false;emit('navigate','operations');});}
 async function toggleAcme(item){await act(async()=>{await api(`panel/acme/${item.id}/policy`,{revision:item.revision,enabled:!item.autoRenew,confirm:item.id});automatic.value=await api('panel/acme');});}
 watch(certificateOpen, value => { if (!value) certificate.privateKeyPem = ''; });
+// 两种网站来源共用离开保护；提交后同步清除脏状态，不能拦住正常进入任务页。
+watch([hasChanges, hostDirty], ([managed, existing]) => emit('dirty', managed || existing), { flush: 'sync' });
+function beforeUnload(event) { if (hasChanges.value || hostDirty.value) { event.preventDefault(); event.returnValue = ''; } }
 watch(() => props.page, refresh, { immediate: true });
-onUnmounted(() => { disposed = true; generation++; certificate.privateKeyPem = ''; });
+onMounted(() => window.addEventListener('beforeunload', beforeUnload));
+onUnmounted(() => { disposed = true; generation++; certificate.privateKeyPem = ''; window.removeEventListener('beforeunload', beforeUnload); emit('dirty', false); });
 </script>
 
 <template>
   <section class="mci-nginx-workspace" data-mci-ui-root>
+    <div v-if="page === 'websites'" class="mci-nginx-sources" aria-label="网站管理来源">
+      <MciButton :variant="management === 'managed' ? 'primary' : 'plain'" :disabled="hostDirty" @click="management = 'managed'">吾码 Nginx</MciButton>
+      <MciButton :variant="management === 'existing' ? 'primary' : 'plain'" :disabled="hasChanges" @click="management = 'existing'">宝塔 / 1Panel 网站</MciButton>
+    </div>
+    <HostNginxWorkspace v-if="page === 'websites' && management === 'existing'" @dirty="hostChanged" @navigate="emit('navigate', $event)" />
+    <template v-else>
     <MciSkeleton v-if="loading" height="240px" />
     <template v-else-if="page === 'websites'">
       <MciCard v-if="!instances.length"><MciDataState title="先安装 Nginx" description="从插件市场选择版本与独立端口，再创建网站或反向代理。" /><MciButton @click="emit('navigate','market')">前往插件市场</MciButton></MciCard>
@@ -85,7 +100,19 @@ onUnmounted(() => { disposed = true; generation++; certificate.privateKeyPem = '
         <div v-if="certificates.length" class="mci-nginx-table-scroll"><table><thead><tr><th>证书</th><th>主体</th><th>有效期</th><th>来源</th><th>操作</th></tr></thead><tbody><tr v-for="item in certificates" :key="item.id"><td><strong>{{ item.name || item.id }}</strong><small>{{ item.id }}</small></td><td>{{ item.subject }}</td><td>{{ formatTime(item.notAfter) }}<small>{{ new Date(item.notAfter) > new Date() ? '有效' : '已过期' }}</small></td><td>{{ item.source === 'Import' ? '手动导入' : item.source }}</td><td><MciButton variant="ghost" @click="openCertificate(); certificate.id = item.id; certificate.name = item.name">更新证书</MciButton></td></tr></tbody></table></div>
         <MciDataState v-else title="暂无证书" description="可以导入 CA 签发的证书，或导入内网使用的自签名证书。" />
       </MciCard>
-          <MciCard v-if="automatic.length"><h2>自动签发与续期</h2><p class="mci-nginx-muted">证书客户端会按证书有效期和 CA 续期指引判断是否续期。暂停后，已经排队的任务继续执行。</p><div class="mci-nginx-table-scroll"><table><thead><tr><th>网站 / 证书</th><th>证书机构</th><th>下次检查</th><th>续期设置</th></tr></thead><tbody><tr v-for="item in automatic" :key="item.id"><td>{{ item.resourceId }} / {{ item.siteId }}<small>{{ item.domains.join('、') }}</small><small v-if="item.lastError">{{ item.lastError }}</small></td><td>{{ item.provider }}</td><td>{{ formatTime(item.nextCheck) }}</td><td><MciButton variant="plain" :disabled="busy" @click="toggleAcme(item)">{{ item.autoRenew ? '暂停自动续期' : '启用自动续期' }}</MciButton></td></tr></tbody></table></div></MciCard>
+      <MciCard v-if="automatic.length">
+        <h2>自动签发与续期</h2>
+        <p class="mci-nginx-muted">按证书有效期和证书机构的续期指引检查。暂停会阻止后续续期，已开始的任务保留处理记录。</p>
+        <div class="mci-nginx-table-scroll"><table><thead><tr><th>网站 / 证书</th><th>证书机构</th><th>最近结果</th><th>下次检查</th><th>续期设置</th></tr></thead><tbody>
+          <tr v-for="item in automatic" :key="item.id">
+            <td>{{ item.target === 'External' ? item.instanceId : item.resourceId }} / {{ item.siteId }}<small>{{ item.domains.join('、') }}</small><small>{{ item.target === 'External' ? '已有面板网站' : '吾码 Nginx' }}</small></td>
+            <td>{{ item.provider }}</td>
+            <td>{{ renewalState(item.lastOutcome) }}<small>最近检查：{{ formatTime(item.lastChecked) }}</small><small>最近换证：{{ formatTime(item.lastRenewed) }}</small><small v-if="item.lastError" class="mci-nginx-error">{{ item.lastError }}</small></td>
+            <td>{{ item.autoRenew ? formatTime(item.nextCheck) : '已暂停' }}</td>
+            <td><MciButton variant="plain" :disabled="busy" @click="toggleAcme(item)">{{ item.autoRenew ? '暂停自动续期' : '启用自动续期' }}</MciButton></td>
+          </tr>
+        </tbody></table></div>
+      </MciCard>
     </template>
 
     <MciModal :model-value="!!editor" :title="editor?.originalId ? '编辑网站' : '创建网站'" size="lg" @update:model-value="value => { if (!value && !busy) editor = null; }">
@@ -111,11 +138,14 @@ onUnmounted(() => { disposed = true; generation++; certificate.privateKeyPem = '
     <MciModal v-model="publishOpen" title="发布网站配置"><p>将在 {{ selected }} 上校验并发布 {{ sites.length }} 个网站的配置，通过后平滑重载。进度可在操作任务中查看。</p><template #footer><MciButton variant="plain" :disabled="busy" @click="publishOpen = false">取消</MciButton><MciButton :loading="busy" :disabled="busy" @click="publish">确认发布</MciButton></template></MciModal>
     <MciModal :model-value="!!deleteSite" title="移除网站配置" @update:model-value="deleteSite = null"><p>从待发布配置移除 {{ deleteSite?.name || deleteSite?.id }}，发布后关闭该域名入口。网站文件保留。</p><template #footer><MciButton variant="plain" @click="deleteSite = null">取消</MciButton><MciButton @click="removeSite">确认移除</MciButton></template></MciModal>
     <MciModal :model-value="!!message" title="操作提示" @update:model-value="message = ''"><p role="alert">{{ message }}</p><template #footer><MciButton @click="message = ''">知道了</MciButton></template></MciModal>
+    </template>
   </section>
 </template>
 
 <style scoped>
 .mci-nginx-workspace { display:grid;gap:22px;min-width:0; }
+.mci-nginx-sources { display:flex;flex-wrap:wrap;gap:12px; }
+.mci-nginx-error { color:var(--mci-color-danger); }
 .mci-nginx-heading,.mci-nginx-toolbar,.mci-nginx-actions { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap; }
 .mci-nginx-toolbar > :first-child { min-width:220px; }.mci-nginx-heading { margin-bottom:18px; }.mci-nginx-heading h2,.mci-nginx-heading h3,.mci-nginx-heading p { margin:0; }
 .mci-nginx-muted,small { color:var(--mci-text-secondary);font-size:13px; }small { display:block; }

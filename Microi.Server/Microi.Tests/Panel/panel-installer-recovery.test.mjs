@@ -20,14 +20,15 @@ function fixture(action){
   rmSync(directory,{recursive:true});
  }
 }
-function run(script){return spawnSync(bash,['-c','set -Eeuo pipefail\nfail(){ echo "$*" >&2; exit 1; }\n'+script],{encoding:'utf8',windowsHide:true,timeout:20000});}
+// 通过 stdin 传递多函数夹具，避免 Windows argv 长度/引号扩展截断脚本末尾的实际断言动作。
+function run(script){return spawnSync(bash,['-s'],{input:'set -Eeuo pipefail\nfail(){ echo "$*" >&2; exit 1; }\n'+script,encoding:'utf8',windowsHide:true,timeout:20000});}
 const image='sha256:'+'a'.repeat(64), nextImage='sha256:'+'b'.repeat(64), operation='01234567-89ab-cdef-0123-456789abcdef';
 const legacy=`services:\n  microi-panel:\n    image: ${image}\n`;
 const modern=legacy+`    labels:\n      io.microi.panel.installer-operation: "${operation}"\n    volumes:\n      - /run/microi-auth-guard:/run/microi-auth-guard:ro\n`;
 const overrideFunctions=['panel_file_receipt','panel_capture_image_override','panel_assert_image_override','panel_render_image_override','panel_write_image_override'].map(fn).join('\n');
 for(const [name,body] of [['new installation',null],['legacy image-only override',legacy],['current installer override',modern]])test('override preserves supported schema: '+name,()=>fixture(directory=>{
  const path=join(directory,'docker-compose.image.yml');if(body!==null)writeFileSync(path,body);
- const result=run(`PANEL_ROOT=${quote(shellPath(directory))}\nPANEL_OPERATION_ID=${quote(operation)}\nPANEL_HAS_AUTH_GUARD=1\n${overrideFunctions}\npanel_capture_image_override\npanel_write_image_override ${quote(nextImage)}\npanel_assert_image_override\n`);
+ const result=run(`PANEL_ROOT=${quote(shellPath(directory))}\nPANEL_OPERATION_ID=${quote(operation)}\nPANEL_HAS_AUTH_GUARD=1\nPANEL_HAS_DISK_GUARD=1\n${overrideFunctions}\npanel_capture_image_override\npanel_write_image_override ${quote(nextImage)}\npanel_assert_image_override\n`);
  assert.equal(result.status,0,result.stderr);assert.match(readFileSync(path,'utf8'),new RegExp(nextImage));assert.match(readFileSync(path,'utf8'),/microi-auth-guard:ro/);
  assert(!readdirSync(directory).some(name=>name.endsWith('.pending')));
 }));
@@ -48,16 +49,16 @@ for(const [name,body] of [
 test('override rejects a later edit even when it still uses an accepted schema',()=>fixture(directory=>{
  const path=join(directory,'docker-compose.image.yml');writeFileSync(path,legacy);
  const changed=legacy.replace(image,nextImage);
- const result=run(`PANEL_ROOT=${quote(shellPath(directory))}\nPANEL_OPERATION_ID=${quote(operation)}\nPANEL_HAS_AUTH_GUARD=1\n${overrideFunctions}\npanel_capture_image_override\nprintf '%s' ${quote(changed)} > "$PANEL_ROOT/docker-compose.image.yml"\npanel_write_image_override ${quote(image)}\n`);
+ const result=run(`PANEL_ROOT=${quote(shellPath(directory))}\nPANEL_OPERATION_ID=${quote(operation)}\nPANEL_HAS_AUTH_GUARD=1\nPANEL_HAS_DISK_GUARD=1\n${overrideFunctions}\npanel_capture_image_override\nprintf '%s' ${quote(changed)} > "$PANEL_ROOT/docker-compose.image.yml"\npanel_write_image_override ${quote(image)}\n`);
  assert.notEqual(result.status,0);assert.match(result.stderr,/外部修改/);assert.equal(readFileSync(path,'utf8'),changed);
 }));
 test('override rejects an external same-content file replacement',()=>fixture(directory=>{
  writeFileSync(join(directory,'docker-compose.image.yml'),legacy);
- const result=run(`PANEL_ROOT=${quote(shellPath(directory))}\nPANEL_OPERATION_ID=${quote(operation)}\nPANEL_HAS_AUTH_GUARD=1\n${overrideFunctions}\npanel_capture_image_override\ncp "$PANEL_ROOT/docker-compose.image.yml" "$PANEL_ROOT/replacement"\nmv -T "$PANEL_ROOT/replacement" "$PANEL_ROOT/docker-compose.image.yml"\npanel_write_image_override ${quote(nextImage)}\n`);
+ const result=run(`PANEL_ROOT=${quote(shellPath(directory))}\nPANEL_OPERATION_ID=${quote(operation)}\nPANEL_HAS_AUTH_GUARD=1\nPANEL_HAS_DISK_GUARD=1\n${overrideFunctions}\npanel_capture_image_override\ncp "$PANEL_ROOT/docker-compose.image.yml" "$PANEL_ROOT/replacement"\nmv -T "$PANEL_ROOT/replacement" "$PANEL_ROOT/docker-compose.image.yml"\npanel_write_image_override ${quote(nextImage)}\n`);
  assert.notEqual(result.status,0);assert.equal(readFileSync(join(directory,'docker-compose.image.yml'),'utf8'),legacy);
 }));
 test('override preflight precedes guard installation and image pull',()=>{
- assert(source.indexOf('\npanel_capture_image_override\n')<source.indexOf('\nelse docker pull "$PANEL_IMAGE"; fi'));
+ assert(source.indexOf('\npanel_capture_image_override\n')<source.indexOf('\nelse microi_disk_run docker pull "$PANEL_IMAGE"; fi'));
  assert(source.indexOf('\npanel_assert_image_override\npanel_install_auth_guard')>0);
 });
 
@@ -71,18 +72,16 @@ function rollbackCase({mutate='',previousActive='active',previousEnabled='enable
   const target=join(directory,'guard'),backup=target+'.before-'+operation,failed=target+'.failed-'+operation,unit=join(directory,'unit.service');
   guardTree(backup,'old',oldReady);guardTree(target,'candidate');writeFileSync(join(target,'.installer-operation'),operation+'\n');copyFileSync(join(target,'microi-auth-guard.service'),unit);
   for(const [file,value]of Object.entries({invocation:'candidate-instance',enabled:'enabled',active:'active',dropins:''}))writeFileSync(join(directory,file),value);
-  const functions=['panel_file_receipt','panel_guard_tree_receipt','panel_guard_service_receipt','panel_guard_assert_rollback_files','panel_guard_wait_ready','panel_guard_rollback'].map(name=>fn(name)
+  const functions=['panel_systemd_property','panel_file_receipt','panel_guard_tree_receipt','panel_guard_service_receipt','panel_guard_assert_rollback_files','panel_guard_wait_ready','panel_guard_rollback'].map(name=>fn(name)
    .replaceAll('/etc/systemd/system/microi-auth-guard.service',shellPath(unit))
    .replaceAll('/opt/microi-auth-guard',shellPath(target))).join('\n');
   const script=`D=${quote(shellPath(directory))}\nPANEL_OPERATION_ID=${quote(operation)}\nPANEL_GUARD_PREVIOUS_ACTIVE=${quote(previousActive)}\nPANEL_GUARD_PREVIOUS_ENABLED=${quote(previousEnabled)}\n`
    +`python3(){ command ${process.platform==='win32'?'python':'python3'} "$@"; }\nsleep(){ :; }\n`
    +`systemctl(){
  case "$1" in
- show) case "$3" in
- --property=FragmentPath) printf '%s' ${quote(shellPath(unit))};;
- --property=DropInPaths) cat "$D/dropins";;
- --property=InvocationID) cat "$D/invocation";;
- *) return 88;; esac;;
+ show) [[ "$3" == --all && "$4" == --no-pager ]] || return 88
+ printf 'FragmentPath=%s\nDropInPaths=' ${quote(shellPath(unit))}; cat "$D/dropins"
+ printf '\nInvocationID='; cat "$D/invocation"; printf '\n';;
  is-enabled) cat "$D/enabled";;
  is-active) cat "$D/active";;
  stop) printf inactive > "$D/active"; echo stop >> "$D/actions";;
@@ -122,7 +121,7 @@ for(const [name,mutate]of[
  ['lost previous ownership receipt',`PANEL_GUARD_PREVIOUS_TREE=''`],
  ['changed backup manifest protocol',`printf '{"protocol":2}' > $BACKUP/manifest.json`],
 ])test('guard rollback refuses '+name+' before stopping any service',()=>{
- const value=rollbackCase({mutate});assert.notEqual(value.result.status,0);assert.equal(value.actions,'');assert(value.backupExists);assert.match(value.target,/# candidate/);assert.doesNotMatch(value.result.stdout,/RESTORED/);
+ const value=rollbackCase({mutate});assert.notEqual(value.result.status,0,JSON.stringify(value.result));assert.equal(value.actions,'');assert(value.backupExists);assert.match(value.target,/# candidate/);assert.doesNotMatch(value.result.stdout,/RESTORED/);
 });
 test('guard rollback reports failure if old service files restore but readiness does not',()=>{
  const value=rollbackCase({oldReady:false});assert.notEqual(value.result.status,0);assert.match(value.target,/# old/);assert(value.failedExists);assert.match(value.result.stderr,/不能报告恢复成功/);assert.doesNotMatch(value.result.stdout,/RESTORED/);
@@ -131,4 +130,25 @@ test('both startup and readiness failure paths retain the installation failure r
  assert.match(fn('panel_install_auth_guard'),/panel_guard_abort '候选宿主防护启动失败'/);
  assert.match(fn('panel_install_auth_guard'),/panel_guard_wait_ready \|\| panel_guard_abort/);
  assert.match(fn('panel_guard_abort'),/panel_guard_rollback/);assert.match(fn('panel_guard_abort'),/本次安装仍记为失败/);
+});
+
+const manifestCheck=source.match(/<<'PANEL_GUARD_MANIFEST'\n([\s\S]*?)\nPANEL_GUARD_MANIFEST/)?.[1];
+assert(manifestCheck,'Guard install must validate the exported manifest');
+for(const [name,nginxProtocol,includeModule,validModule,expected] of [
+ ['legacy guard rollback/install compatibility',undefined,false,true,true],
+ ['new host nginx protocol payload',1,true,true,true],
+ ['declared nginx capability missing module',1,false,true,false],
+ ['unknown nginx protocol',2,true,true,false],
+ ['nginx module syntax error before systemd change',1,true,false,false],
+])test('guard artifact preflight: '+name,()=>fixture(directory=>{
+ const files=[...required,...(includeModule?['nginx_adapter.py']:[])];
+ writeFileSync(join(directory,'manifest.json'),JSON.stringify({protocol:1,nginxProtocol,entrypoint:'daemon.py',files}));
+ for(const file of files)writeFileSync(join(directory,file),file.endsWith('.py')?'# inert test module\n':'fixture\n');
+ if(includeModule&&!validModule)writeFileSync(join(directory,'nginx_adapter.py'),'def broken(:\n');
+ const result=spawnSync(process.platform==='win32'?'python':'python3',['-B','-c',manifestCheck,directory],{encoding:'utf8',windowsHide:true});
+ assert.equal(result.status===0,expected,result.stderr);
+}));
+test('installer deploys and cleans the declared host nginx module',()=>{
+ assert.match(fn('panel_install_auth_guard'),/install -m 600 "\$PANEL_GUARD_STAGE\/nginx_adapter\.py" "\$prepared\/nginx_adapter\.py"/);
+ assert.match(fn('panel_guard_cleanup'),/nginx_adapter\.py/);
 });

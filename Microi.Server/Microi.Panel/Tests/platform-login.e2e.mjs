@@ -15,7 +15,7 @@ const old = JSON.parse(docker(['inspect', name]))[0]; assert.equal(old.Config.La
 const configuredApi = process.env.PANEL_PLATFORM_API_BASE;
 const testedApi = new URL(configuredApi || 'https://localhost:61501');
 assert.equal(testedApi.protocol, 'https:'); assert(!testedApi.username && !testedApi.password && !testedApi.search && !testedApi.hash);
-assert(!configuredApi || testedApi.href === 'https://api.itdos.com/', 'Remote legacy acceptance must match the approved official credential target');
+assert(!configuredApi || testedApi.href === 'https://api.microi.net/', 'Remote legacy acceptance must match the approved official credential target');
 // 远端使用系统信任链验证后再固定证书；只有既有本机开发模式允许读取自签名开发证书。
 const certificate = await new Promise((resolveCert, reject) => {
   const socket = tls.connect({ host: testedApi.hostname, port: Number(testedApi.port || 443), servername: testedApi.hostname, rejectUnauthorized: Boolean(configuredApi) }, () => { const raw = socket.getPeerCertificate().raw; socket.end(); resolveCert(raw); }); socket.setTimeout(15000, () => socket.destroy(Error('Platform certificate timeout'))); socket.on('error', reject);
@@ -29,7 +29,7 @@ env = env.replace(/^OPS_PLATFORM_CERTIFICATE_FILE=.*\n?/gm, '') + 'OPS_PLATFORM_
 await writeFile(resolve(work, 'ops-test.env'), env);
 const password = env.match(/^OPS_ADMIN_PASSWORD=(.*)$/m)[1];
 docker(['rm', '-f', name]);
-docker(['run', '-d', '--name', name, '--label', legacy.label, '--memory', '512m', '--cpus', '1', '--env-file', resolve(work, 'ops-test.env'), '--network', legacy.network, '-p', '127.0.0.1:61880:8080', '-v', '/var/run/docker.sock:/var/run/docker.sock', '-v', `${resolve(work, 'deployment.json')}:/etc/microi-ops/deployment.json:ro`, '-v', `${resolve(work, 'platform.cer')}:/etc/microi-ops/platform.cer:ro`, '-v', `${resolve(work, 'data')}:/microi/ops/data`, '-v', `${resolve(work, 'logs')}:/microi/logs/ops`, legacy.image]);
+docker(['run', '-d', '--name', name, '--label', legacy.label, '--memory', '512m', '--cpus', '1', '--env-file', resolve(work, 'ops-test.env'), '--network', legacy.network, '-p', '127.0.0.1:61880:8080', '-v', '/var/run/docker.sock:/var/run/docker.sock',...legacy.diskGuardMount(docker), '-v', `${resolve(work, 'deployment.json')}:/etc/microi-ops/deployment.json:ro`, '-v', `${resolve(work, 'platform.cer')}:/etc/microi-ops/platform.cer:ro`, '-v', `${resolve(work, 'data')}:/microi/ops/data`, '-v', `${resolve(work, 'logs')}:/microi/logs/ops`, legacy.image]);
 const source = await readFile(resolve(root, 'AI测试要用到的帐号密码.txt'), 'utf8');
 const lines = source.split(/\r?\n/); const hostIndex = lines.findIndex(line => line.includes('api.itdos.com'));
 const line = (hostIndex >= 0 ? lines.slice(hostIndex + 1).find(value => /^帐号/.test(value.trim())) : null) || lines.find(value => /^帐号/.test(value.trim()));

@@ -6,6 +6,45 @@ namespace Microi.Tests.Panel;
 
 public sealed class PanelAcmeTests
 {
+    [Theory]
+    [InlineData("../unrelated", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "../unrelated")]
+    [InlineData("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaA", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    public void AccountRecoveryRejectsUntrustedArchiveIdentity(string operationId,string accountHash)
+        =>Assert.Throws<OpsException>(()=>PanelAcme.AccountArchiveCommand(new(){Id="acme-test",DirectoryUrl="https://ca.example.test/dir"},operationId,accountHash));
+
+    [Fact]
+    public void AccountRecoveryArchiveRemainsInsideTheSameAccountState()
+    {
+        var registration=new PanelAcmeRegistration{Id="acme-test",DirectoryUrl="https://ca.example.test:14000/dir"};
+        var command=PanelAcme.AccountArchiveCommand(registration,new string('a',32),new string('b',64));
+        Assert.Equal(PanelAcme.AccountPath(registration),command[3]);
+        Assert.Equal(PanelAcme.StatePath(registration)+"/unregistered-"+new string('a',32),command[4]);
+        Assert.Equal(new string('b',64),command[5]);
+    }
+    [Theory]
+    [InlineData("LetsEncrypt", "47.97.181.34")]
+    [InlineData("LetsEncryptStaging", "203.0.113.10")]
+    [InlineData("LetsEncrypt", "2001:db8::10")]
+    public void PublicIpCertificatesSelectRequiredShortLivedProfileForIssueAndRenewal(string provider,string address)
+    {
+        // 初签和定时续期共用 run；公开 IP 必须选择 CA 要求的短周期 profile，不能靠默认策略猜测。
+        var registration=new PanelAcmeRegistration{Id="acme-ip",Provider=provider,DirectoryUrl=PanelAcme.Directory(provider,""),Email="panel@example.test",Domains=["site.example.test",address]};
+        var command=PanelAcme.Command(registration);
+        var profile=Array.IndexOf(command,"--profile");
+        Assert.True(profile>=0,"Public IP ACME requests must select the CA shortlived profile");
+        Assert.Equal("shortlived",command[profile+1]);
+        Assert.Equal("run",command[0]);Assert.DoesNotContain("--force",command);
+    }
+    [Theory]
+    [InlineData("LetsEncrypt", "site.example.test")]
+    [InlineData("LetsEncryptStaging", "site.example.test")]
+    [InlineData("Custom", "203.0.113.10")]
+    public void DnsOnlyAndCustomCaRequestsKeepTheirExistingProfilePolicy(string provider,string domain)
+    {
+        var registration=new PanelAcmeRegistration{Id="acme-profile",Provider=provider,DirectoryUrl=provider=="Custom"?"https://ca.example.test/dir":PanelAcme.Directory(provider,""),Email="panel@example.test",Domains=[domain]};
+        Assert.DoesNotContain("--profile",PanelAcme.Command(registration));
+    }
     [Fact]
     public void CaDomainFailureRemainsDiagnosableWhileCredentialsRemainRedacted()
     {
@@ -111,5 +150,131 @@ public sealed class PanelAcmeTests
     {
         var now=DateTimeOffset.UtcNow;var certificate=new PanelCertificate{NotBefore=now,NotAfter=now.AddMinutes(5)};
         var next=PanelRepository.NextAcmeCheck("acme-short",certificate);Assert.InRange((next-now).TotalSeconds,75,84);
+    }
+
+    [Fact]
+    public void RenewalRetryBackoffIsBoundedByExpiryAndChecksAriAtLeastTwiceDaily()
+    {
+        var now=DateTimeOffset.UtcNow;
+        var longLived=new PanelCertificate{NotBefore=now.AddDays(-10),NotAfter=now.AddDays(80)};
+        Assert.InRange((PanelRepository.NextAcmeCheck("ari",longLived,0,now)-now).TotalHours,11,12);
+        var first=PanelRepository.NextAcmeCheck("retry",longLived,1,now);
+        var second=PanelRepository.NextAcmeCheck("retry",longLived,2,now);
+        Assert.InRange((first-now).TotalSeconds,300,330);Assert.InRange((second-now).TotalSeconds,600,660);
+        Assert.InRange((PanelRepository.NextAcmeCheck("retry",longLived,30,now)-now).TotalHours,6,6.6);
+        longLived.NotAfter=now.AddMinutes(2);
+        Assert.InRange((PanelRepository.NextAcmeCheck("retry",longLived,30,now)-now).TotalSeconds,30,33);
+    }
+
+    [Fact]
+    public async Task RestartRetriesSameFailedDeploymentAndRetainsIssuedCertificateCheckpoint()
+    {
+        using var directory=new PanelTestDirectory();var options=new OpsOptions{DataDir=directory.Root,LogDir=directory.Root};
+        using var store=new OpsStore(options);var protection=new EphemeralDataProtectionProvider();
+        var repo=new PanelRepository(options,store,protection);
+        var resource=PanelCatalog.Prepare(new(){Name="gateway",PluginId="nginx",Version="1.30.4"},repo.OwnerId);
+        var install=repo.Enqueue("Install",Guid.NewGuid().ToString(),resource,"tester");install.State="Succeeded";repo.SaveOperation(install);resource.State="Installed";repo.SaveResource(resource);
+        var registration=new PanelAcmeRegistration{Id="acme-retry",Revision="first",ResourceId=resource.Id,AutoRenew=true,NextCheck=DateTimeOffset.UtcNow.AddMinutes(-1)};
+        repo.SaveBackupState("acme:"+registration.Id,registration);
+        var operation=repo.EnqueueAcmeRenewal(registration);operation.State="Failed";repo.SaveOperation(operation);
+        repo.SaveBackupState("acme-execution:"+operation.Id,new AcmeExecution{Stage="Deploying",Change=new(){Revision="r"+operation.Id,PreviousRevision=resource.ConfigRevision}});
+        repo.CompleteAcme(registration.Id,operation.Id,"reload unavailable");
+        var failed=Assert.Single(repo.AcmeRegistrations());Assert.Equal(1,failed.ConsecutiveFailures);Assert.Equal("Failed",failed.LastOutcome);
+        failed.NextCheck=DateTimeOffset.UtcNow.AddSeconds(-1);repo.SaveBackupState("acme:"+failed.Id,failed);
+        var restarted=new PanelRepository(options,store,protection);
+        var due=Assert.Single(restarted.AcmeRegistrations());
+        var retries=await Task.WhenAll(Enumerable.Range(0,8).Select(_=>Task.Run(()=>restarted.EnqueueAcmeRenewal(due))));
+        var retry=retries[0];Assert.All(retries,x=>Assert.Equal(operation.Id,x.Id));
+        Assert.Equal(operation.Id,retry.Id);Assert.Equal("Queued",retry.State);Assert.Single(restarted.Operations(true));
+        Assert.Equal("Deploying",restarted.BackupState<AcmeExecution>("acme-execution:"+retry.Id)!.Stage);
+        restarted.CompleteAcme(failed.Id,retry.Id,"","Deployed","new-fingerprint");
+        var completed=Assert.Single(restarted.AcmeRegistrations());Assert.Equal(0,completed.ConsecutiveFailures);Assert.Equal("new-fingerprint",completed.LastCertificateThumbprint);Assert.NotNull(completed.LastRenewed);
+        var renewed=completed.LastRenewed;
+        restarted.CompleteAcme(failed.Id,retry.Id,"","Unchanged","new-fingerprint");
+        completed=Assert.Single(restarted.AcmeRegistrations());Assert.Equal(renewed,completed.LastRenewed);Assert.Equal("Unchanged",completed.LastOutcome);
+        restarted.CompleteAcme(failed.Id,"older-operation","late failure");
+        Assert.Empty(Assert.Single(restarted.AcmeRegistrations()).LastError);
+    }
+
+    [Fact]
+    public void PausedOrChangedPolicyCannotAutomaticallyResumeAFailedIssuance()
+    {
+        using var directory=new PanelTestDirectory();var options=new OpsOptions{DataDir=directory.Root,LogDir=directory.Root};
+        using var store=new OpsStore(options);var repo=new PanelRepository(options,store,new EphemeralDataProtectionProvider());
+        var resource=PanelCatalog.Prepare(new(){Name="gateway",PluginId="nginx",Version="1.30.4"},repo.OwnerId);
+        var install=repo.Enqueue("Install",Guid.NewGuid().ToString(),resource,"tester");install.State="Succeeded";repo.SaveOperation(install);resource.State="Installed";repo.SaveResource(resource);
+        var registration=new PanelAcmeRegistration{Id="acme-pause",Revision="first",ResourceId=resource.Id,AutoRenew=true,NextCheck=DateTimeOffset.UtcNow.AddMinutes(-1)};
+        repo.SaveBackupState("acme:"+registration.Id,registration);
+        var operation=repo.EnqueueAcmeRenewal(registration);operation.State="Failed";repo.SaveOperation(operation);
+        var stale=Assert.Single(repo.AcmeRegistrations());stale.NextCheck=DateTimeOffset.UtcNow.AddSeconds(-1);repo.SaveBackupState("acme:"+stale.Id,stale);
+        repo.SaveAcmePolicy(stale.Id,new(stale.Revision,false,stale.Id));
+        Assert.Throws<OpsException>(()=>repo.EnqueueAcmeRenewal(stale));Assert.Empty(repo.Operations(true));
+        Assert.Equal("Failed",repo.Operation(operation.Id).State);
+    }
+
+    [Fact]
+    public void PreflightFailureRecoversAfterRestartOncePerDurableAttempt()
+    {
+        using var directory=new PanelTestDirectory();var options=new OpsOptions{DataDir=directory.Root,LogDir=directory.Root};
+        using var store=new OpsStore(options);var protection=new EphemeralDataProtectionProvider();var repo=new PanelRepository(options,store,protection);
+        var registration=new PanelAcmeRegistration{Id="acme-external",Revision="first",ResourceId="host-nginx-test",Target="External",AutoRenew=true,NextCheck=DateTimeOffset.UtcNow.AddSeconds(-1)};
+        repo.SaveBackupState("acme:"+registration.Id,registration);
+        var operation=repo.EnqueueAcmeRenewal(registration);operation.State="Failed";operation.Error="Docker unavailable";repo.SaveOperation(operation);
+        var queued=Assert.Single(repo.AcmeRegistrations());Assert.Equal(1,queued.Attempt);Assert.Equal(0,queued.CompletedAttempt);
+        var restarted=new PanelRepository(options,store,protection);
+        Assert.True(restarted.RecoverAcmePreflightFailure(queued));Assert.False(restarted.RecoverAcmePreflightFailure(queued));
+        var failed=Assert.Single(restarted.AcmeRegistrations());Assert.Equal(1,failed.ConsecutiveFailures);
+        Assert.InRange((failed.NextCheck-DateTimeOffset.UtcNow).TotalSeconds,290,330);
+        var retry=restarted.Retry(operation.Id);Assert.Equal(2,Assert.Single(restarted.AcmeRegistrations()).Attempt);
+        retry.State="Failed";retry.Error="Docker still unavailable";restarted.SaveOperation(retry);
+        Assert.False(restarted.RecoverAcmePreflightFailure(queued));
+        Assert.True(restarted.RecoverAcmePreflightFailure(Assert.Single(restarted.AcmeRegistrations())));
+        Assert.Equal(2,Assert.Single(restarted.AcmeRegistrations()).ConsecutiveFailures);
+        Assert.Empty(restarted.Resources()); // External identity never becomes a managed plugin instance.
+    }
+
+    [Theory]
+    [InlineData("/www/site")]
+    [InlineData("/www/site/.microi-acme-short")]
+    [InlineData("/www/../site/.microi-acme-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("C:\\site\\.microi-acme-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    public void ExternalHelperNeverMountsAnArbitraryOrWholeSiteDirectory(string path)
+        =>Assert.Throws<OpsException>(()=>PanelAcme.ValidateChallengePath(path));
+
+    [Fact]
+    public void ExternalDeploymentRequiresActualFingerprintAndManagedReceiptCoversEverySni()
+    {
+        PanelAcme.ValidateChallengePath("/www/site/.microi-acme-"+new string('a',64));
+        using var key=System.Security.Cryptography.ECDsa.Create();
+        var request=new System.Security.Cryptography.X509Certificates.CertificateRequest("CN=example.test",key,System.Security.Cryptography.HashAlgorithmName.SHA256);
+        var san=new System.Security.Cryptography.X509Certificates.SubjectAlternativeNameBuilder();san.AddDnsName("example.test");request.CertificateExtensions.Add(san.Build());
+        using var leaf=request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1),DateTimeOffset.UtcNow.AddDays(1));
+        var certificate=PanelCertificate.Import("test","test",leaf.ExportCertificatePem(),key.ExportPkcs8PrivateKeyPem());
+        var registration=new PanelAcmeRegistration{InstanceFingerprint=new string('f',64)};
+        var receipt=new System.Text.Json.Nodes.JsonObject{["verified"]=true,["fingerprint"]=registration.InstanceFingerprint,["configSha256"]=new string('c',64),["certificateSha256"]=PanelAcme.CertificateSha256(certificate)};
+        PanelAcme.ValidateExternalDeployment(receipt,registration,certificate);
+        receipt["certificateSha256"]=new string('0',64);Assert.Throws<OpsException>(()=>PanelAcme.ValidateExternalDeployment(receipt,registration,certificate));
+        var expected=new[]{new HostNginxTlsDomain("example.test",new string('a',64)),new HostNginxTlsDomain("second.test",new string('b',64))};
+        var tls=new System.Text.Json.Nodes.JsonObject{["verified"]=true,["certificates"]=new System.Text.Json.Nodes.JsonArray(
+            new System.Text.Json.Nodes.JsonObject{["serverName"]="example.test",["sha256"]=expected[0].CertificateSha256},
+            new System.Text.Json.Nodes.JsonObject{["serverName"]="second.test",["sha256"]=expected[1].CertificateSha256})};
+        NginxService.ValidateCertificateReceipt(tls,expected);
+        tls["certificates"]![1]!["sha256"]=expected[0].CertificateSha256;Assert.Throws<OpsException>(()=>NginxService.ValidateCertificateReceipt(tls,expected));
+        tls["verified"]="true";Assert.Throws<OpsException>(()=>NginxService.ValidateCertificateReceipt(tls,expected));
+    }
+
+    [Fact]
+    public async Task PausingQueuedExternalRenewalStopsBeforeHostOrDockerSideEffects()
+    {
+        using var directory=new PanelTestDirectory();var options=new OpsOptions{DataDir=directory.Root,LogDir=directory.Root};
+        using var store=new OpsStore(options);var repo=new PanelRepository(options,store,new EphemeralDataProtectionProvider());
+        var registration=new PanelAcmeRegistration{Id="acme-pause-external",Revision="first",ResourceId="host-nginx-test",Target="External",AutoRenew=true,NextCheck=DateTimeOffset.UtcNow.AddSeconds(-1)};
+        repo.SaveBackupState("acme:"+registration.Id,registration);
+        var operation=repo.EnqueueAcmeRenewal(registration);
+        repo.SaveAcmePolicy(registration.Id,new(registration.Revision,false,registration.Id));
+        var executor=new PanelAcme(repo,null!,null!);
+        var error=await Assert.ThrowsAsync<OpsException>(()=>executor.ExecuteExternal(operation,CancellationToken.None));
+        Assert.Contains("暂停",error.Message);Assert.False(Assert.Single(repo.AcmeRegistrations()).AutoRenew);
+        Assert.Empty(repo.Resources());Assert.Empty(repo.Certificates());
     }
 }

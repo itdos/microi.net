@@ -26,7 +26,12 @@ public sealed class PanelAuthGuardClient : IDisposable
     private async Task<JsonObject> Send(HttpMethod method, string path, object? body, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(method, path);
-        if (body != null) request.Content = JsonContent.Create(body, options: JsonDefaults.Options);
+        if (body != null)
+        {
+            // root Unix 协议拒绝 chunked/Expect；固定序列化后的 UTF-8 字节长，避免认证请求静默退回本地计数。
+            request.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body, JsonDefaults.Options));
+            request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
+        }
         using var response = await client.SendAsync(request, ct);
         var text = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)

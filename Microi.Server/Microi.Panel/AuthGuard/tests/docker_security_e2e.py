@@ -16,6 +16,7 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import signal
@@ -186,7 +187,7 @@ ENTRYPOINT ["/bin/sh", "-c", "mkdir -p /run/sshd; rsyslogd -n -i /run/rsyslogd.p
 
 
 class Lab:
-    def __init__(self, scratch, keep_image=False, tools_image=None):
+    def __init__(self, scratch, keep_image=False, tools_image=None, candidate=None):
         self.owner = "ag" + uuid.uuid4().hex[:10]
         self.root = scratch / ("lab-" + self.owner)
         self.root.mkdir(parents=True)
@@ -199,8 +200,14 @@ class Lab:
         self.process_handles = []
         self.report = {"owner": self.owner, "startedAt": time.time(), "checks": [], "images": {},
                        "scope": "isolated Linux namespaces; not a customer deployment", "cleanup": {}}
+        self.candidate = candidate
+        self.phase = "setup"
+        self.report["phases"] = {}
         self.source = Path(__file__).resolve().parents[1]
         self.file = Path(__file__).resolve()
+        self.report["runnerSha256"] = hashlib.sha256(self.file.read_bytes()).hexdigest()
+        if candidate:
+            self.report["candidate"] = {key: candidate[key] for key in ("imageId", "sourceHash")}
         self.guard = self.owner + "-guard"
         self.client_a, self.client_b = self.owner + "-a", self.owner + "-b"
         self.ipv6 = True
@@ -232,7 +239,7 @@ class Lab:
         return item
 
     def check(self, label, condition, detail=None):
-        entry = {"name": label, "passed": bool(condition)}
+        entry = {"name": label, "passed": bool(condition), "phase": self.phase}
         if detail is not None:
             entry["detail"] = detail
         self.report["checks"].append(entry)
@@ -263,6 +270,9 @@ class Lab:
             (code / source.name).write_bytes(raw)
             hashes[source.name] = hashlib.sha256(raw).hexdigest()
         self.report["sourceHashes"] = hashes
+        if self.candidate:
+            if hashes != self.candidate["guardHashes"] or self.report["runnerSha256"] != self.candidate["runnerSha256"]:
+                raise RuntimeError("current guard/harness differs from the bound candidate")
         if self.tools_image:
             self.report["images"]["tools"] = self.inspect("image", self.image)["Id"]
             return
@@ -309,7 +319,7 @@ class Lab:
         return name
 
     def run(self, name, image, args=(), command=(), network=None, ip=None, ip6=None, memory="192m", entrypoint=None):
-        argv = ["run", "-d", "--name", name, "--label", LABEL + "=" + self.owner,
+        argv = ["run", "--pull=never", "-d", "--name", name, "--label", LABEL + "=" + self.owner,
                 "--memory", memory, "--memory-swap", memory, "--cpus", "1", "--pids-limit", "256"]
         if network:
             argv += ["--network", network]
@@ -331,6 +341,8 @@ class Lab:
             raise
         identity = result.stdout.strip()
         self.containers.append(identity)
+        detail = self.own("container", identity)
+        self.volumes.extend(mount["Name"] for mount in detail.get("Mounts", []) if mount.get("Type") == "volume")
         self.write("resources.json", {"containers": self.containers, "networks": self.networks, "volumes": self.volumes})
         return identity
 
@@ -359,6 +371,37 @@ class Lab:
         self.process_handles.append(log)
         self.wait(lambda: self.control()["firewall"]["verified"], 30)
 
+    def runtime_snapshot(self, phase):
+        program = ("import hashlib,json,pathlib; p=pathlib.Path('/code'); "
+                   "print(json.dumps({'sourceHashes':{f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in p.glob('*.py')},"
+                   "'runnerSha256':hashlib.sha256(pathlib.Path('/lab/test.py').read_bytes()).hexdigest()}))")
+        snapshot = json.loads(self.exec(self.guard, ["python3", "-B", "-c", program]).stdout)
+        detail = self.own("container", self.guard)
+        snapshot.update({"phase": phase, "observedAt": time.time(), "containerId": detail["Id"], "imageId": detail["Image"]})
+        self.report.setdefault("runtimeSnapshots", []).append(snapshot)
+        self.write("report.json", self.report)
+        if (snapshot["sourceHashes"] != self.report["sourceHashes"] or
+                snapshot["runnerSha256"] != self.report["runnerSha256"] or snapshot["imageId"] != self.report["images"]["tools"]):
+            raise RuntimeError("actual running guard/harness bytes or tools image differ from the bound inputs")
+
+    def run_phase(self, name, callback):
+        self.phase = name
+        record = {"startedAt": time.time(), "completed": False, "checks": 0}
+        self.report["phases"][name] = record
+        begin = len(self.report["checks"])
+        try:
+            policy = self.control()["policy"]
+            record["policy"] = {key: policy[key] for key in ("enabled", "maxFailures", "banSeconds", "windowSeconds")}
+            if record["policy"] != {"enabled": True, "maxFailures": 3, "banSeconds": 86400, "windowSeconds": 0}:
+                raise RuntimeError("phase did not start with the required default protection policy")
+            self.runtime_snapshot(name + ":before")
+            callback()
+            self.runtime_snapshot(name + ":after")
+            record["completed"] = True
+        finally:
+            record.update({"finishedAt": time.time(), "checks": len(self.report["checks"]) - begin})
+            self.write("report.json", self.report)
+
     def stop_guard(self):
         if self.guard_process is None:
             return
@@ -386,7 +429,10 @@ class Lab:
             self.wait(lambda: next((row for row in self.control()["statistics"]["counters"] if row["ip"] == ip and row["count"] == expected), None), 20)
         status = self.control()
         ban = next((row for row in status["bans"] if row["ip"] == ip), None)
-        self.check(kind + ":third-failure-kernel-ban", ban and ban["applied"])
+        duration = status["policy"]["banSeconds"]
+        self.check(kind + ":third-failure-kernel-ban", ban and ban["applied"] and
+                   abs(ban["expiresAt"] - ban["createdAt"] - duration) < 1,
+                   {"banSeconds": duration, "createdAt": ban["createdAt"], "expiresAt": ban["expiresAt"]} if ban else None)
         return ban
 
     def prove_block(self, client, kind, target, label):
@@ -587,11 +633,14 @@ class Lab:
                 file.unlink()
         remaining = self.command(["ps", "-aq", "--filter", "label=" + LABEL + "=" + self.owner]).stdout.split()
         networks = self.command(["network", "ls", "-q", "--filter", "label=" + LABEL + "=" + self.owner]).stdout.split()
-        self.report["cleanup"] = {"remainingContainers": remaining, "remainingNetworks": networks, "errors": errors,
-                                  "passed": not remaining and not networks and not errors}
+        live_volumes = set(self.command(["volume", "ls", "-q"]).stdout.split())
+        volumes = sorted(set(self.volumes) & live_volumes)
+        self.report["cleanup"] = {"remainingContainers": remaining, "remainingNetworks": networks, "remainingVolumes": volumes, "errors": errors,
+                                  "passed": not remaining and not networks and not volumes and not errors}
         self.report["finishedAt"] = time.time()
-        current = {name: hashlib.sha256((self.source / name).read_bytes()).hexdigest() for name in self.report.get("sourceHashes", {})}
-        self.report["candidateChangedDuringRun"] = current != self.report.get("sourceHashes", {})
+        current = {file.name: hashlib.sha256(file.read_bytes()).hexdigest() for file in self.source.glob("*.py")}
+        self.report["candidateChangedDuringRun"] = (current != self.report.get("sourceHashes", {}) or
+            hashlib.sha256(self.file.read_bytes()).hexdigest() != self.report["runnerSha256"])
         self.write("report.json", self.report)
 
     def diagnose(self):
@@ -621,11 +670,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--inside", choices=("client", "control", "api"))
     parser.add_argument("--scratch")
-    parser.add_argument("--redis-image", default="sha256:71da9275c5f3fcb97d0fa0c8c5b36cc995327265420f17a04bfd544f458059f7")
-    parser.add_argument("--mysql-image", default="sha256:3466ba4a4828aa8d46fb7c3bc16b67b781c98413cf4ea0fac6feaa6e881faa26")
-    parser.add_argument("--mongodb-image", default="sha256:66f3cb7106154d8793364d06c1f56933795ee9ca2fdf63c194ce1403228f38d7")
+    parser.add_argument("--redis-image")
+    parser.add_argument("--mysql-image")
+    parser.add_argument("--mongodb-image")
     parser.add_argument("--keep-image", action="store_true")
     parser.add_argument("--tools-image")
+    parser.add_argument("--candidate-binding", help="frozen candidate, guard/harness hashes and exact cached image IDs")
     parser.add_argument("--phases", default="ssh,redis,mongodb,mysql")
     args = parser.parse_args()
     if args.inside:
@@ -638,23 +688,35 @@ def main():
     # 必须位于已登记的工作区 .tmp，不能接受盘根、源码根或外部链接作为清理边界。
     if not scratch.is_relative_to(repo / ".tmp") or not (scratch / "owner.json").is_file():
         raise RuntimeError("scratch must be an already registered workspace task directory")
-    lab = Lab(scratch, args.keep_image, args.tools_image)
     phases = args.phases.split(",")
-    if not phases or any(phase not in ("ssh", "redis", "mongodb", "mysql") for phase in phases):
+    if not phases or len(set(phases)) != len(phases) or any(phase not in ("ssh", "redis", "mongodb", "mysql") for phase in phases):
         raise ValueError("invalid lab phases")
+    candidate = json.loads(Path(args.candidate_binding).read_text(encoding="utf-8-sig")) if args.candidate_binding else None
+    images = {"tools": args.tools_image, "redis": args.redis_image, "mysql": args.mysql_image, "mongodb": args.mongodb_image}
+    required_images = {"tools", *(phase for phase in phases if phase != "ssh")}
+    for kind in required_images:
+        identity = images[kind]
+        if not identity or not re.fullmatch(r"sha256:[a-f0-9]{64}", identity):
+            parser.error("explicit cached --" + kind + "-image sha256 ID is required")
+        inspected = json.loads(subprocess.check_output(["docker", "image", "inspect", identity], text=True))[0]
+        if inspected["Id"] != identity or inspected["Os"] != "linux":
+            raise RuntimeError("cached image identity/platform mismatch: " + kind)
+    if candidate and (candidate["images"] != images or phases != ["ssh", "redis", "mongodb", "mysql"]):
+        raise RuntimeError("formal Security evidence requires all four phases and the exact frozen cached image IDs")
+    lab = Lab(scratch, args.keep_image, args.tools_image, candidate)
     lab.report["selectedPhases"] = phases
     succeeded = False
     try:
         lab.build()
         lab.setup()
         if "ssh" in phases:
-            lab.ssh_tests()
+            lab.run_phase("ssh", lab.ssh_tests)
         if "redis" in phases:
-            lab.redis_tests(args.redis_image)
+            lab.run_phase("redis", lambda: lab.redis_tests(args.redis_image))
         if "mongodb" in phases:
-            lab.database_tests("mongodb", args.mongodb_image)
+            lab.run_phase("mongodb", lambda: lab.database_tests("mongodb", args.mongodb_image))
         if "mysql" in phases:
-            lab.database_tests("mysql", args.mysql_image, switch_iptables=True)
+            lab.run_phase("mysql", lambda: lab.database_tests("mysql", args.mysql_image, switch_iptables=True))
         succeeded = True
     except BaseException as error:
         lab.report["failure"] = (type(error).__name__ + ":" + str(error)).replace(lab.password, "[redacted]")[:2000]
@@ -662,8 +724,11 @@ def main():
         lab.diagnose()
     finally:
         lab.cleanup()
-    print(json.dumps({"passed": succeeded and lab.report["cleanup"]["passed"], "report": str(lab.root / "report.json")}), flush=True)
-    return 0 if succeeded and lab.report["cleanup"]["passed"] else 1
+    passed = succeeded and lab.report["cleanup"]["passed"] and not lab.report["candidateChangedDuringRun"]
+    lab.report["completed"] = passed
+    lab.write("report.json", lab.report)
+    print(json.dumps({"passed": passed, "report": str(lab.root / "report.json")}), flush=True)
+    return 0 if passed else 1
 
 
 if __name__ == "__main__":

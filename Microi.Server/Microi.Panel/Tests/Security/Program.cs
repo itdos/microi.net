@@ -2,6 +2,12 @@ using System.Net;
 using Microsoft.Data.Sqlite;
 using Microi.Panel;
 
+if(args.Length==2&&args[0]=="--guard-bridge")
+{
+    await GuardBridgeChecks.Run(args[1]);
+    return;
+}
+
 var workspace = args.Length > 0 ? Path.GetFullPath(args[0]) : Directory.GetCurrentDirectory();
 if (!File.Exists(Path.Combine(workspace, "Microi.Server", "Microi.Panel", "Microi.Panel.csproj"))) throw new Exception("Provide the source workspace as the first argument.");
 var taskRoot = Path.Combine(workspace, ".tmp", "panel-login-security-" + Guid.NewGuid().ToString("N"));

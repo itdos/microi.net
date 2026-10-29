@@ -13,7 +13,7 @@ function remove(name){let c;try{c=JSON.parse(docker(['inspect',name]))[0];}catch
 function start(trusted=''){
  docker(['run','-d','--name',ops,'--label',label,'--memory','512m','--cpus','1','--env-file',resolve(work,'ops-test.env'),'--network',legacy.network,'-p','127.0.0.1:61880:8080',
  '-e','OPS_PUBLIC_URL='+(trusted?'https://localhost:61885':'http://localhost:61880'),'-e','OPS_TRUSTED_PROXY_IPS='+trusted,
- '-v','/var/run/docker.sock:/var/run/docker.sock','-v',`${resolve(work,'deployment.json')}:/etc/microi-ops/deployment.json:ro`,'-v',`${resolve(work,'platform.cer')}:/etc/microi-ops/platform.cer:ro`,
+ '-v','/var/run/docker.sock:/var/run/docker.sock',...legacy.diskGuardMount(docker),'-v',`${resolve(work,'deployment.json')}:/etc/microi-ops/deployment.json:ro`,'-v',`${resolve(work,'platform.cer')}:/etc/microi-ops/platform.cer:ro`,
  '-v',`${resolve(work,'data')}:/microi/ops/data`,'-v',`${resolve(work,'logs')}:/microi/logs/ops`,legacy.image]);
 }
 await writeFile(resolve(work,'fixture-tls/proxy.mjs'),`import https from 'node:https';import http from 'node:http';import fs from 'node:fs';https.createServer({cert:fs.readFileSync('/fixture/fixture-cert.pem'),key:fs.readFileSync('/fixture/fixture-key.pem')},(req,res)=>{const out=http.request({hostname:'${ops}',port:8080,path:req.url,method:req.method,headers:{...req.headers,'x-forwarded-proto':'https'}},back=>{res.writeHead(back.statusCode,back.headers);back.pipe(res)});out.on('error',()=>{res.writeHead(502);res.end()});req.pipe(out)}).listen(8443,'0.0.0.0');`);

@@ -17,6 +17,8 @@
     <Compile Include="PanelArchiveTests.cs" />
     <Compile Include="PanelScheduleTests.cs" />
     <Compile Include="PanelAcmeTests.cs" />
+    <Compile Include="HostNginxClientTests.cs" />
+    <Compile Include="HostDiskMaintenanceTests.cs" />
     <Compile Include="PanelBootstrapTests.cs" />
     <ProjectReference Include="../../Microi.Panel/Microi.Panel.csproj" />
   </ItemGroup>

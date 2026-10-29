@@ -63,6 +63,14 @@ public sealed class NginxService(PanelRepository repository, DockerEngine docker
     {
         if (resource.ConfigRevision != change.PreviousRevision && resource.ConfigRevision != change.Revision) throw new OpsException("当前网站版本与任务快照不同，停止覆盖。", 409);
         await AssertRunning(resource, ct);
+        // 发布前持久保存旧TLS事实；发生断线/进程重启后，回退仍需验证旧证书而非只读HTTP健康页。
+        var previous=repository.BackupState<NginxChange>("nginx-previous:"+operation.Id);
+        if(previous==null&&resource.ConfigRevision==change.PreviousRevision)
+        {
+            var used=resource.Websites.Sites.Select(x=>x.CertificateId).Where(x=>x.Length>0).ToHashSet();
+            previous=new(){Revision=resource.ConfigRevision,Configuration=resource.Websites,Certificates=repository.Certificates().Where(x=>used.Contains(x.Key)).ToDictionary()};
+            repository.SaveBackupState("nginx-previous:"+operation.Id,previous);
+        }
         var changedActive = false;
         try
         {
@@ -81,6 +89,7 @@ public sealed class NginxService(PanelRepository repository, DockerEngine docker
             Phase(operation, "切换配置并平滑重载"); changedActive = true;
             await Activate(resource, change.Revision, ct);
             await WaitRevision(resource, change.Revision, ct);
+            await VerifyCertificates(resource,change.Configuration,change.Certificates,ct);
             resource.ConfigRevision = change.Revision; resource.Websites = change.Configuration; repository.SaveResource(resource);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; } // 保留任务，重启后从持久快照幂等发布。
@@ -92,12 +101,46 @@ public sealed class NginxService(PanelRepository repository, DockerEngine docker
                 {
                     Phase(operation, "新配置未通过回读，恢复上一版");
                     await Activate(resource, change.PreviousRevision, ct); await WaitRevision(resource, change.PreviousRevision, ct);
+                    if(previous==null)throw new OpsException("上一版证书快照缺失，无法验证TLS回退。",502);
+                    await VerifyCertificates(resource,previous.Configuration,previous.Certificates,ct);
                 }
                 catch (Exception rollback) when (rollback is not OperationCanceledException)
                 { throw new OpsException("新配置发布失败，上一版也未能恢复就绪。请检查 Nginx 日志后继续原任务；版本目录已保留。", 502); }
             }
             throw new OpsException((original is OpsException ? original.Message : "Nginx 配置发布失败。") + (changedActive ? " 已恢复上一版并验证就绪。" : " 原配置保持生效。"), 502);
         }
+    }
+    public async Task VerifyCertificates(PanelResource resource,NginxConfiguration configuration,IReadOnlyDictionary<string,PanelCertificate> certificates,CancellationToken ct)
+    {
+        var expected=configuration.Sites.Where(x=>x.Enabled&&x.CertificateId.Length>0)
+            .SelectMany(site=>site.Domains.Select(NginxConfig.Domain).Select(domain=>new HostNginxTlsDomain(
+                domain.StartsWith("*.",StringComparison.Ordinal)?"microi-certificate-check-a"+domain[1..]:domain,
+                PanelAcme.CertificateSha256(certificates[site.CertificateId])))).Distinct().ToArray();
+        if(expected.Length==0)return;
+        await AssertRunning(resource,ct);
+        using var host=new HostNginxService();
+        var deadline=DateTimeOffset.UtcNow.AddSeconds(10);
+        while(true)
+        {
+            try
+            {
+                var receipt=await host.VerifyManagedTls(new(resource.OwnerId,resource.Id,resource.ContainerId,expected),ct);
+                ValidateCertificateReceipt(receipt,expected);return;
+            }
+            catch(OpsException error) when(error.Status==502&&DateTimeOffset.UtcNow<deadline){await Task.Delay(250,ct);}
+        }
+    }
+    public static void ValidateCertificateReceipt(System.Text.Json.Nodes.JsonObject receipt,HostNginxTlsDomain[] expected)
+    {
+        try
+        {
+            if(receipt["verified"]?.GetValue<bool>()!=true||receipt["certificates"] is not System.Text.Json.Nodes.JsonArray actual||actual.Count!=expected.Length
+                ||expected.Any(item=>actual.Count(row=>row?["serverName"]?.GetValue<string>()==item.ServerName
+                    &&string.Equals(row?["sha256"]?.GetValue<string>(),item.CertificateSha256,StringComparison.OrdinalIgnoreCase))!=1))
+                throw new OpsException("Nginx实际TLS证书与候选版本不一致，停止提交证书账本。",502);
+        }
+        catch(Exception error) when(error is InvalidOperationException or FormatException)
+        {throw new OpsException("Nginx TLS验证回执格式无效。",502);}
     }
     private async Task Activate(PanelResource resource, string revision, CancellationToken ct)
     {

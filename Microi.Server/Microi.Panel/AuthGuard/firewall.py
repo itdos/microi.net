@@ -7,6 +7,8 @@ import shutil
 import subprocess
 import threading
 import time
+import shlex
+import uuid
 
 from store import GuardError, canonical_ip
 
@@ -199,16 +201,11 @@ add rule inet {TABLE} forward ip6 daddr @redis6 tcp dport 6379 drop comment "{MA
                 self._run(base + ["-A", CHAIN] + marker)
             elif self._run(base + ["-C", CHAIN] + marker, check=False).returncode:
                 raise GuardError("同名 iptables 链没有吾码归属标记。", 409)
+            self._parse_iptables(self._run(base + ["-S", CHAIN]).stdout.splitlines())
             for target in ("INPUT", "FORWARD", "DOCKER-USER"):
                 if target == "DOCKER-USER" and self._run(base + ["-S", target], check=False).returncode:
                     continue
-                if self._run(base + ["-C", target, "-j", CHAIN], check=False).returncode:
-                    self._run(base + ["-I", target, "1", "-j", CHAIN])
-                # 必须位于接受已建立连接规则之前；不能只检查跳转存在。
-                rules = self._run(base + ["-S", target]).stdout.splitlines()
-                first = next((line for line in rules if line.startswith("-A ")), "")
-                if first != "-A " + target + " -j " + CHAIN:
-                    raise GuardError(target + " 中吾码跳转不是首条，无法保证拦截。", 503)
+                self._iptables_anchor(base, target)
             lines = self._run(base + ["-S", CHAIN]).stdout.splitlines()
             existing = self._parse_iptables(lines)
             needed = {ip for ip in desired if ipaddress.ip_address(ip).version == version}
@@ -227,6 +224,34 @@ add rule inet {TABLE} forward ip6 daddr @redis6 tcp dport 6379 drop comment "{MA
                 raise GuardError("iptables 封禁/Redis 后端规则回读失败。", 503)
             all_actual |= actual
         return all_actual
+
+    def _iptables_anchor(self, base, target):
+        # Docker may prepend its own FORWARD jump when a network is created.
+        # Give each replacement a distinct comment: delete old exact specifications,
+        # never rule numbers, so concurrent unrelated edits cannot become deletion targets.
+        def rules():
+            return [shlex.split(line)[2:] for line in self._run(base + ["-S", target]).stdout.splitlines()
+                    if line.startswith("-A " + target + " ")]
+        def owned(rule):
+            if rule == ["-j", CHAIN]: return True  # Original installer format.
+            return (len(rule) == 6 and rule[:3] == ["-m", "comment", "--comment"]
+                    and rule[4:] == ["-j", CHAIN] and rule[3].startswith(MARKER + ":anchor:")
+                    and len(rule[3]) == len(MARKER + ":anchor:") + 32
+                    and all(c in "0123456789abcdef" for c in rule[3][-32:]))
+        before = rules()
+        if before and owned(before[0]): return
+        old = [rule for rule in before if owned(rule)]
+        if len(old) > 256: raise GuardError("吾码防护跳转数量异常，保留现场。", 409)
+        anchor = ["-m", "comment", "--comment", MARKER + ":anchor:" + uuid.uuid4().hex, "-j", CHAIN]
+        self._run(base + ["-I", target, "1"] + anchor)
+        observed = rules()
+        if not observed or observed[0] != anchor or observed[1:] != before:
+            raise GuardError(target + " 在防护定位期间变化，保留规则并停止确认。", 409)
+        for rule in old:
+            self._run(base + ["-D", target] + rule)
+        observed = rules()
+        if observed != [anchor] + [rule for rule in before if not owned(rule)]:
+            raise GuardError(target + " 防护跳转回读不一致，无法保证拦截。", 503)
 
     @staticmethod
     def _parse_iptables(lines):

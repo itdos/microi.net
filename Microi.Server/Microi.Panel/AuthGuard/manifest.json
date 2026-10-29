@@ -1,7 +1,8 @@
 {
   "protocol": 1,
+  "nginxProtocol": 1,
   "entrypoint": "daemon.py",
-  "files": ["daemon.py", "store.py", "firewall.py", "collectors.py", "redis_proxy.py", "run.sh", "microi-auth-guard.service"],
+  "files": ["daemon.py", "store.py", "firewall.py", "collectors.py", "redis_proxy.py", "nginx_adapter.py", "run.sh", "microi-auth-guard.service"],
   "controlSocket": "/run/microi-auth-guard/control.sock",
   "stateDirectory": "/var/lib/microi-auth-guard",
   "configFile": "/etc/microi-auth-guard/config.json",

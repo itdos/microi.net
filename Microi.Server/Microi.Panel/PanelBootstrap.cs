@@ -10,7 +10,7 @@ public sealed record PanelBootstrapPlan(string Root,string PublicUrl,int Port,st
 public sealed record PanelBootstrapFiles(string Environment,string Compose,byte[] Certificate,string CertificatePassword,string Fingerprint);
 public static class PanelBootstrap
 {
-    public const string DefaultImage="registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.1";
+    public const string DefaultImage="registry.cn-hangzhou.aliyuncs.com/microios/microi-panel:v2.0.2";
     public static PanelBootstrapFiles Build(PanelBootstrapPlan plan)
     {
         if(!plan.Root.StartsWith('/')||plan.Root=="/"||plan.Root.Split('/').Any(x=>x is "." or "..")||plan.Root.Any(x=>char.IsControl(x)||x is ':' or '\\'))throw new OpsException("面板目录必须为独立的 Linux 绝对目录，不能包含上级路径、冒号或控制字符。");
@@ -34,8 +34,8 @@ public static class PanelBootstrap
             +"\nOPS_DEPLOYMENT_FILE=/etc/microi-panel/deployment.json\nOPS_TLS_CERTIFICATE_FILE=/etc/microi-panel/panel.pfx\nOPS_TLS_PASSWORD_FILE=/etc/microi-panel/tls-password\n";
         // 自带 TLS 监听，不依赖待管理的 Nginx/宝塔/1Panel，避免更新入口的循环依赖。
         var service=new JsonObject{["image"]=plan.Image,["container_name"]="microi-panel",["restart"]="unless-stopped",["env_file"]=new JsonArray(plan.Root+"/config/panel.env"),
-            ["ports"]=new JsonArray(plan.BindAddress+":"+plan.Port+":8443"),["volumes"]=new JsonArray("/var/run/docker.sock:/var/run/docker.sock",plan.Root+"/config:/etc/microi-panel:ro",plan.Root+"/data:/microi/ops/data",plan.Root+"/logs:/microi/logs/ops","/run/microi-auth-guard:/run/microi-auth-guard:ro"),
-            ["mem_limit"]="512m",["cpus"]="1.0",["security_opt"]=new JsonArray("no-new-privileges:true"),["stop_grace_period"]="30s",
+            ["ports"]=new JsonArray(plan.BindAddress+":"+plan.Port+":8443"),["volumes"]=new JsonArray("/var/run/docker.sock:/var/run/docker.sock",plan.Root+"/config:/etc/microi-panel:ro",plan.Root+"/data:/microi/ops/data",plan.Root+"/logs:/microi/logs/ops","/run/microi-auth-guard:/run/microi-auth-guard:ro","/run/microi-disk-guard:/run/microi-disk-guard:ro"),
+            ["mem_limit"]="512m",["cpus"]=1.0,["security_opt"]=new JsonArray("no-new-privileges:true"),["stop_grace_period"]="30s",
             ["logging"]=new JsonObject{["driver"]="json-file",["options"]=new JsonObject{["max-size"]="10m",["max-file"]="3"}}};
         var compose=new JsonObject{["name"]="microi-panel",["services"]=new JsonObject{["microi-panel"]=service}};
         return new(environment,compose.ToJsonString(new(){WriteIndented=true}),certificate.Export(X509ContentType.Pfx,certificatePassword),certificatePassword,certificate.GetCertHashString(HashAlgorithmName.SHA256));

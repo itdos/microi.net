@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
-import { MciButton, MciCard, MciFormField, MciModal, MciSkeleton, MciDataState } from '@microi/mci-ui';
+import { MciButton, MciCard, MciFormField, MciModal, MciSkeleton } from '@microi/mci-ui';
+import MciDataState from './PanelDataState.vue';
 import { api, formatTime } from './api.js';
 
 const snapshot = ref(null), loading = ref(true), busy = ref(false), message = ref(''), dirty = ref(false), unban = ref(null), confirmation = ref('');

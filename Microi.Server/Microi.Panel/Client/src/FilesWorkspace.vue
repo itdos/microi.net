@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
-import { MciButton, MciCard, MciFormField, MciModal, MciDataState, MciSkeleton } from '@microi/mci-ui';
+import { MciButton, MciCard, MciFormField, MciModal, MciSkeleton } from '@microi/mci-ui';
+import MciDataState from './PanelDataState.vue';
 import { api, formatBytes, formatTime } from './api.js';
 const emit = defineEmits(['navigate']);
 const instances = ref([]), instance = ref(''), sites = ref([]), site = ref(''), directory = ref(''), listing = ref({ entries: [], total: 0 });

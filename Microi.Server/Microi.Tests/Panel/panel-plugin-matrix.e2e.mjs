@@ -1,5 +1,6 @@
 // Real Linux Docker acceptance for every published plugin version; each instance belongs to this run.
 import assert from 'node:assert/strict';
+import {diskGuardMount} from '../../Microi.Panel/Tests/disk-guard-fixture.mjs';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -14,6 +15,7 @@ const run=process.env.PANEL_MATRIX_RUN_ID||'panel-matrix-'+new Date().toISOStrin
 assert(/^[a-z][a-z0-9-]{5,60}$/.test(run),'Invalid isolated matrix run id');
 const work=resolve(process.env.PANEL_TEST_RESULTS||resolve(root,'.tmp/panel-acceptance'),run),labelKey='io.microi.panel.test';
 const selectedIds=process.env.PANEL_PLUGIN_IDS?.split(',').filter(Boolean);
+const requireHostGuard=!selectedIds||selectedIds.includes('redis');
 const basePort=Number(process.env.PANEL_MATRIX_PORT||61990),servicePort=basePort+10,base=`http://localhost:${basePort}`;
 const panelImage=process.env.PANEL_TEST_IMAGE||'microi-panel:dev-20260910';
 const admin='matrix-test',adminPassword=randomBytes(30).toString('base64url');
@@ -39,14 +41,17 @@ try{
  assert.equal(docker(['ps','-q','--filter','label=io.microi.ops.controller=true']),'','Another Ops controller is running on this Docker Engine');
  panelImageId=JSON.parse(docker(['image','inspect',panelImage]))[0].Id;
  docker(['volume','create','--label',`${labelKey}=${run}`,run+'-data']);
- docker(['run','-d','--name',run,'--label',`${labelKey}=${run}`,'--memory','512m','--cpus','1','--env-file',resolve(work,'panel.env'),'-p',`127.0.0.1:${basePort}:8080`,'-v','/var/run/docker.sock:/var/run/docker.sock','-v',run+'-data:/microi/ops/data',panelImageId]);
+ // Redis 分片必须经过真实宿主代理。其它插件的业务读写/备份分片独立验证，不冒充主机安全验收。
+ const hostMount=requireHostGuard?['--mount','type=bind,src=/run/microi-auth-guard,dst=/run/microi-auth-guard,readonly']:[];
+ docker(['run','-d','--name',run,'--label',`${labelKey}=${run}`,'--memory','512m','--cpus','1','--env-file',resolve(work,'panel.env'),'-p',`127.0.0.1:${basePort}:8080`,'-v','/var/run/docker.sock:/var/run/docker.sock',...hostMount,...diskGuardMount(docker),'-v',run+'-data:/microi/ops/data',panelImageId]);
  context=await request.newContext({baseURL:base,timeout:30000});await until(async()=>{try{return(await context.get('/health')).ok();}catch{return false;}},'Panel startup');
  csrf=(await api('session')).csrfToken;await api('login',{account:admin,password:adminPassword},200);csrf=(await api('session')).csrfToken;
  owner=(await api('panel/snapshot')).ownerId;catalog=await api('panel/catalog');
+ if(requireHostGuard)assert.equal((await api('panel/security')).host?.firewall?.verified,true,'Redis acceptance requires the real host guard and verified firewall');
  if(selectedIds){assert(selectedIds.length>0&&new Set(selectedIds).size===selectedIds.length);for(const id of selectedIds)assert(catalog.some(p=>p.id===id),'Unknown plugin shard: '+id);}
  const selectedCatalog=selectedIds?catalog.filter(p=>selectedIds.includes(p.id)):catalog;
  await writeFile(resolve(work,'catalog.json'),JSON.stringify(catalog,null,2));
- await writeFile(resolve(work,'context.json'),JSON.stringify({run,work,owner,base,basePort,panelImage,panelImageId},null,2));
+ await writeFile(resolve(work,'context.json'),JSON.stringify({run,work,owner,base,basePort,panelImage,panelImageId,hostGuardRequired:requireHostGuard},null,2));
  // 分片只控制这一轮进程的资源峰值；发布门禁仍须合并实际目录的全部版本，缺一即失败。
  for(const plugin of selectedCatalog){
   for(const [index,version] of plugin.versions.entries()){
